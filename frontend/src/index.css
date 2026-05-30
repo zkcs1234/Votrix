@@ -1,0 +1,246 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --color-charcoal: #111827;
+  --color-charcoal-light: #374151;
+  --color-muted: #6b7280;
+  --color-surface: #f3f4f6;
+  --color-white: #ffffff;
+}
+
+/* Theme-aware utilities: use text-v-text, bg-v-surface, etc. (Tailwind v4 canonical) */
+@theme inline {
+  --color-v-bg: var(--v-bg);
+  --color-v-surface: var(--v-surface);
+  --color-v-surface-elevated: var(--v-surface-elevated);
+  --color-v-border: var(--v-border);
+  --color-v-border-strong: var(--v-border-strong);
+  --color-v-text: var(--v-text);
+  --color-v-text-muted: var(--v-text-muted);
+  --color-v-text-subtle: var(--v-text-subtle);
+  --color-v-sidebar: var(--v-sidebar);
+  --color-v-sidebar-text: var(--v-sidebar-text);
+  --color-v-sidebar-active: var(--v-sidebar-active);
+  --color-v-primary: var(--v-primary);
+  --color-v-primary-hover: var(--v-primary-hover);
+  --color-v-success: var(--v-success);
+  --color-v-success-bg: var(--v-success-bg);
+  --color-v-danger: var(--v-danger);
+  --color-v-danger-bg: var(--v-danger-bg);
+  --color-v-warning: var(--v-warning);
+  --color-v-warning-bg: var(--v-warning-bg);
+  --shadow-v-shadow: var(--v-shadow);
+  --shadow-v-shadow-md: var(--v-shadow-md);
+}
+
+@layer base {
+  :root,
+  [data-theme='light'] {
+    color-scheme: light;
+    --v-bg: #f3f4f6;
+    --v-surface: #ffffff;
+    --v-surface-elevated: #f9fafb;
+    --v-border: #e5e7eb;
+    --v-border-strong: #d1d5db;
+    --v-text: #111827;
+    --v-text-muted: #374151;
+    --v-text-subtle: #6b7280;
+    --v-sidebar: #111827;
+    --v-sidebar-text: #d1d5db;
+    --v-sidebar-active: #ffffff;
+    --v-primary: #111827;
+    --v-primary-hover: #1f2937;
+    --v-success: #059669;
+    --v-success-bg: #ecfdf5;
+    --v-danger: #b91c1c;
+    --v-danger-bg: #fef2f2;
+    --v-warning: #b45309;
+    --v-warning-bg: #fffbeb;
+    --v-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+    --v-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  }
+
+  [data-theme='dark'] {
+    color-scheme: dark;
+    --v-bg: #0b0f14;
+    --v-surface: #111827;
+    --v-surface-elevated: #1f2937;
+    --v-border: #374151;
+    --v-border-strong: #4b5563;
+    --v-text: #f9fafb;
+    --v-text-muted: #d1d5db;
+    --v-text-subtle: #9ca3af;
+    --v-sidebar: #0a0d12;
+    --v-sidebar-text: #d1d5db;
+    --v-sidebar-active: #ffffff;
+    --v-primary: #f9fafb;
+    --v-primary-hover: #e5e7eb;
+    --v-success: #34d399;
+    --v-success-bg: #064e3b33;
+    --v-danger: #f87171;
+    --v-danger-bg: #7f1d1d33;
+    --v-warning: #fbbf24;
+    --v-warning-bg: #78350f33;
+    --v-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.25);
+    --v-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+  }
+
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    min-height: 100vh;
+    background-color: var(--v-bg);
+    color: var(--v-text);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .v-card {
+    border-radius: 0.75rem;
+    border: 1px solid var(--v-border);
+    background-color: var(--v-surface);
+    box-shadow: var(--v-shadow);
+  }
+
+  .v-input {
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid var(--v-border-strong);
+    background-color: var(--v-surface);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    color: var(--v-text);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .v-input::placeholder {
+    color: var(--v-text-subtle);
+  }
+
+  .v-input:focus {
+    outline: none;
+    border-color: var(--v-text-muted);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--v-text-muted) 15%, transparent);
+  }
+
+  .v-table-wrap {
+    overflow: hidden;
+    border-radius: 0.75rem;
+    border: 1px solid var(--v-border);
+    background-color: var(--v-surface);
+    box-shadow: var(--v-shadow);
+  }
+
+  .v-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .v-table thead {
+    background-color: var(--v-surface-elevated);
+  }
+
+  .v-table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--v-text-muted);
+    border-bottom: 1px solid var(--v-border);
+  }
+
+  .v-table td {
+    padding: 0.875rem 1rem;
+    color: var(--v-text);
+    border-bottom: 1px solid var(--v-border);
+  }
+
+  .v-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .v-table tbody tr:hover {
+    background-color: var(--v-surface-elevated);
+  }
+}
+
+/* Remap legacy colorful slate utilities to neutral design tokens */
+@layer utilities {
+  .bg-slate-950,
+  .bg-slate-900,
+  .bg-slate-900\/60,
+  .bg-slate-900\/40,
+  .bg-slate-900\/80 {
+    background-color: var(--v-surface) !important;
+  }
+
+  .bg-slate-800,
+  .hover\:bg-slate-800:hover,
+  .hover\:bg-slate-800\/50:hover {
+    background-color: var(--v-surface-elevated) !important;
+  }
+
+  .border-slate-800,
+  .border-slate-700 {
+    border-color: var(--v-border) !important;
+  }
+
+  .text-white {
+    color: var(--v-text) !important;
+  }
+
+  .text-slate-200,
+  .text-slate-300 {
+    color: var(--v-text-muted) !important;
+  }
+
+  .text-slate-400,
+  .text-slate-500,
+  .text-slate-600 {
+    color: var(--v-text-subtle) !important;
+  }
+
+  .text-indigo-300,
+  .text-indigo-400,
+  .hover\:text-indigo-300:hover {
+    color: var(--v-text-muted) !important;
+  }
+
+  .bg-indigo-600,
+  .hover\:bg-indigo-500:hover {
+    background-color: var(--v-primary) !important;
+    color: #fff !important;
+  }
+
+  .text-emerald-400 {
+    color: var(--v-success) !important;
+  }
+
+  .text-red-300,
+  .text-red-400 {
+    color: var(--v-danger) !important;
+  }
+
+  .border-red-900\/50,
+  .bg-red-950\/40 {
+    border-color: color-mix(in srgb, var(--v-danger) 30%, transparent) !important;
+    background-color: var(--v-danger-bg) !important;
+  }
+
+  .from-slate-950,
+  .via-slate-900,
+  .to-indigo-950 {
+    --tw-gradient-from: var(--v-bg) !important;
+    --tw-gradient-to: var(--v-bg) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+}

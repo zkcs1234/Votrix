@@ -1,0 +1,208 @@
+import { useState } from 'react'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
+import { authService } from '@/services/auth.service'
+import VotrixLogo from '@/components/brand/VotrixLogo'
+import ThemeToggle from '@/components/ui/ThemeToggle'
+import Button from '@/components/ui/Button'
+
+function NavLinks({ items, eventId, location, onNavigate }) {
+  const linkClass = (active) =>
+    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition duration-150 ${
+      active
+        ? 'bg-white/10 font-medium text-v-sidebar-active'
+        : 'text-v-sidebar-text hover:bg-white/5 hover:text-white'
+    }`
+
+  return (
+    <nav className="space-y-0.5">
+      {items.map((item) => {
+        if (item.scoped && !eventId) {
+          return (
+            <span
+              key={item.label}
+              className="block cursor-not-allowed rounded-lg px-3 py-2.5 text-sm text-gray-600"
+              title="Select an event first"
+            >
+              {item.label}
+            </span>
+          )
+        }
+
+        const href = item.scoped
+          ? item.hrefTemplate?.(eventId) ?? `${item.basePath}/${eventId}/${item.path}`
+          : item.path
+
+        const active = item.isActive
+          ? item.isActive(location, eventId)
+          : item.scoped
+            ? location.pathname.includes(`/${item.path}`)
+            : location.pathname === item.path
+
+        return (
+          <Link key={item.label} to={href} onClick={onNavigate} className={linkClass(active)}>
+            {item.label}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}
+
+function SidebarContent({
+  homeLink,
+  moduleLabel,
+  navItems,
+  eventId,
+  location,
+  footerLink,
+  onNavigate,
+}) {
+  return (
+    <>
+      <VotrixLogo size="md" linkTo={homeLink} className="text-white" />
+      {moduleLabel && (
+        <p className="mt-3 text-[11px] font-medium uppercase tracking-wider text-gray-500">
+          {moduleLabel}
+        </p>
+      )}
+      {navItems?.length > 0 && (
+        <div className="mt-8">
+          <NavLinks
+            items={navItems}
+            eventId={eventId}
+            location={location}
+            onNavigate={onNavigate}
+          />
+        </div>
+      )}
+      {footerLink && (
+        <Link
+          to={footerLink.to}
+          onClick={onNavigate}
+          className="mt-8 block text-xs text-gray-500 transition hover:text-gray-300"
+        >
+          {footerLink.label}
+        </Link>
+      )}
+    </>
+  )
+}
+
+export default function AppShell({
+  title,
+  moduleLabel,
+  homeLink = '/',
+  navItems = [],
+  eventId,
+  footerLink,
+  children,
+}) {
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { user, clearSession } = useAuth()
+
+  const closeMobile = () => setMobileOpen(false)
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout()
+    } catch {
+      /* clear local session even if API fails */
+    }
+    clearSession()
+    navigate('/')
+  }
+
+  const displayName = user?.username ?? user?.email ?? 'User'
+  const initials = displayName.slice(0, 2).toUpperCase()
+
+  const sidebar = (
+    <SidebarContent
+      homeLink={homeLink}
+      moduleLabel={moduleLabel}
+      navItems={navItems}
+      eventId={eventId}
+      location={location}
+      footerLink={footerLink}
+      onNavigate={closeMobile}
+    />
+  )
+
+  return (
+    <div className="flex min-h-screen bg-v-bg">
+      <aside className="hidden w-64 shrink-0 bg-v-sidebar p-6 md:block">
+        {sidebar}
+      </aside>
+
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            aria-label="Close menu"
+            onClick={closeMobile}
+          />
+          <aside className="relative flex h-full w-[min(100%,280px)] flex-col bg-v-sidebar p-6 shadow-xl">
+            {sidebar}
+          </aside>
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow sm:px-6 sm:py-4">
+          <button
+            type="button"
+            className="rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated md:hidden"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-base font-semibold text-v-text sm:text-lg">
+              {title}
+            </h1>
+            {moduleLabel && (
+              <p className="truncate text-xs text-v-text-subtle">{moduleLabel}</p>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-3">
+            <ThemeToggle />
+            <div className="hidden items-center gap-2 sm:flex">
+              <div
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-v-surface-elevated text-xs font-semibold text-v-text-muted"
+                aria-hidden
+              >
+                {initials}
+              </div>
+              <span className="max-w-35 truncate text-sm text-v-text-muted">
+                {displayName}
+              </span>
+            </div>
+            <Button variant="secondary" size="sm" onClick={handleLogout} className="hidden sm:inline-flex">
+              Sign out
+            </Button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated sm:hidden"
+              aria-label="Sign out"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 p-4 md:p-8">{children ?? <Outlet />}</main>
+      </div>
+    </div>
+  )
+}

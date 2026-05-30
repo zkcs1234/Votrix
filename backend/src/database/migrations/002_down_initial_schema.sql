@@ -1,0 +1,23 @@
+-- Rollback for 001_initial_schema.sql (run only if you need to reset Phase 2 tables)
+
+DROP TABLE IF EXISTS poll_answers CASCADE;
+DROP TABLE IF EXISTS poll_questions CASCADE;
+DROP TABLE IF EXISTS judge_scores CASCADE;
+DROP TABLE IF EXISTS criteria CASCADE;
+DROP TABLE IF EXISTS contestants CASCADE;
+DROP TABLE IF EXISTS candidates CASCADE;
+DROP TABLE IF EXISTS positions CASCADE;
+DROP TABLE IF EXISTS invitations CASCADE;
+DROP TABLE IF EXISTS event_voters CASCADE;
+DROP TABLE IF EXISTS events CASCADE;
+DROP TABLE IF EXISTS organizations CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+DROP FUNCTION IF EXISTS set_updated_at() CASCADE;
+
+DROP TYPE IF EXISTS poll_question_type CASCADE;
+DROP TYPE IF EXISTS event_type CASCADE;
+DROP TYPE IF EXISTS event_status CASCADE;
+DROP TYPE IF EXISTS organization_status CASCADE;
+DROP TYPE IF EXISTS organization_type CASCADE;
+DROP TYPE IF EXISTS user_role CASCADE;
