@@ -10,6 +10,7 @@ const EXEMPT_PATHS = new Set([
   '/auth/organizer/login',
   '/auth/voter/login',
   '/auth/logout',
+  '/admin/organizers',
   '/health',
   '/health/',
 ])
