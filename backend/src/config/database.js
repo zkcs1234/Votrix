@@ -1,6 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 import { env } from './env.js'
 
+// Node < 22 does not provide a global WebSocket constructor. Supabase realtime
+// needs a WebSocket implementation when running on Node 20/21. Provide `ws`.
+try {
+  // Dynamically import `ws` using top-level await (supported in Node ESM).
+  // If `ws` is not installed this will throw; ensure `ws` is added to package.json.
+  const { default: ws } = await import('ws')
+  if (!globalThis.WebSocket) globalThis.WebSocket = ws
+} catch (e) {
+  // If import fails, continue — createClient will throw a helpful error during startup.
+}
+
 let supabase = null
 
 export function getSupabase() {
