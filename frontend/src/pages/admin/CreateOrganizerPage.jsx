@@ -8,15 +8,18 @@ import { authService } from '@/services/auth.service'
 import AuthFormField from '@/components/auth/AuthFormField'
 import SubmitButton from '@/components/auth/SubmitButton'
 import { API_BASE_URL } from '@/utils/constants'
-import { getCsrfToken, setCsrfToken } from '@/utils/csrf'
+import { clearCsrfToken, setCsrfToken } from '@/utils/csrf'
 
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
 
 async function ensureCsrfToken() {
-  if (getCsrfToken()) return
+  clearCsrfToken()
 
-  const { data } = await axios.get(`${API_BASE_URL}/auth/csrf`, { withCredentials: true })
+  const { data } = await axios.get(`${API_BASE_URL}/auth/csrf`, {
+    withCredentials: true,
+    params: { t: Date.now() },
+  })
   if (data.csrfToken) setCsrfToken(data.csrfToken)
 }
 
