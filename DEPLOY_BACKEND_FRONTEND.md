@@ -89,6 +89,7 @@ Notes:
 
 - You can generate secrets locally with `openssl rand -hex 32` or any secure generator.
 - The API asserts required env vars at startup (see `backend/src/config/env.js`).
+- Email links and login URLs are built from `FRONTEND_URL` in `backend/src/utils/urls.js`, so redeploy Render after updating it.
 
 ### D. Deploy and verify
 
@@ -185,8 +186,10 @@ Frontend (Vercel):
 - CORS errors: confirm `FRONTEND_URL` matches the site origin and `CLIENT_URLS` contains preview URLs.
 - CORS errors from a Vercel preview URL: either add that exact preview URL to `CLIENT_URLS` or leave `ALLOW_VERCEL_PREVIEWS=true` so `https://*.vercel.app` is accepted.
 - Cookies not sent: check `SameSite=None` and `Secure=true` in production; verify `FRONTEND_URL` and `VITE_API_URL` usage.
+- If `POST /api/admin/organizers` returns `403 Invalid or missing CSRF token`, reload the admin page after deploy so the organizer form fetches a fresh CSRF token before submit.
 - Missing env var: API will throw at startup; add the missing var in Render and redeploy.
 - Migrations not applied: run SQL in Supabase SQL Editor and ensure the admin user exists.
+- If you need to delete an organizer user for a fresh test, delete their `organizations` row(s) first, then delete the `users` row, because `organizations.organizer_id` is `ON DELETE RESTRICT`.
 
 ---
 

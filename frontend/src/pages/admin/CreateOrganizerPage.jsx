@@ -1,14 +1,24 @@
 ﻿import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import axios from 'axios'
 import { Link } from 'react-router-dom'
 import { createOrganizerSchema } from '@/schemas/auth.schemas'
 import { authService } from '@/services/auth.service'
 import AuthFormField from '@/components/auth/AuthFormField'
 import SubmitButton from '@/components/auth/SubmitButton'
+import { API_BASE_URL } from '@/utils/constants'
+import { getCsrfToken, setCsrfToken } from '@/utils/csrf'
 
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
+
+async function ensureCsrfToken() {
+  if (getCsrfToken()) return
+
+  const { data } = await axios.get(`${API_BASE_URL}/auth/csrf`, { withCredentials: true })
+  if (data.csrfToken) setCsrfToken(data.csrfToken)
+}
 
 export default function CreateOrganizerPage() {
   const [error, setError] = useState(null)
@@ -32,6 +42,7 @@ export default function CreateOrganizerPage() {
     setLoading(true)
 
     try {
+      await ensureCsrfToken()
       const { data } = await authService.createOrganizer({ ...values, sendEmail: true })
       setSuccess(`Organizer created: ${data.user.email}`)
       if (data.email?.sent) {
