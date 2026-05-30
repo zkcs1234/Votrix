@@ -80,6 +80,7 @@ Open Render service → Environment → Environment Variables and add the values
 Optional / tuning variables:
 
 - `CLIENT_URLS` (comma-separated extra origins)
+- `ALLOW_VERCEL_PREVIEWS` = `true` (default) to allow `https://*.vercel.app` preview URLs during testing
 - `COOKIE_SAME_SITE` (default `none` in production)
 - `JWT_ACCESS_EXPIRES_IN` (default `15m`)
 - `JWT_REFRESH_EXPIRES_IN` (default `7d`)
@@ -182,6 +183,7 @@ Frontend (Vercel):
 ## 6 — Troubleshooting
 
 - CORS errors: confirm `FRONTEND_URL` matches the site origin and `CLIENT_URLS` contains preview URLs.
+- CORS errors from a Vercel preview URL: either add that exact preview URL to `CLIENT_URLS` or leave `ALLOW_VERCEL_PREVIEWS=true` so `https://*.vercel.app` is accepted.
 - Cookies not sent: check `SameSite=None` and `Secure=true` in production; verify `FRONTEND_URL` and `VITE_API_URL` usage.
 - Missing env var: API will throw at startup; add the missing var in Render and redeploy.
 - Migrations not applied: run SQL in Supabase SQL Editor and ensure the admin user exists.

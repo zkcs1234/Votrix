@@ -17,6 +17,26 @@ export function createApp() {
 
   const app = express()
 
+  function isAllowedOrigin(origin) {
+    const normalizedOrigin = origin.replace(/\/$/, '')
+
+    if (env.clientOrigins.includes(normalizedOrigin)) {
+      return true
+    }
+
+    const allowVercelPreviews = (process.env.ALLOW_VERCEL_PREVIEWS || 'true').toLowerCase() !== 'false'
+    if (allowVercelPreviews) {
+      try {
+        const url = new URL(normalizedOrigin)
+        return url.protocol === 'https:' && url.hostname.endsWith('.vercel.app')
+      } catch {
+        return false
+      }
+    }
+
+    return false
+  }
+
   app.set('trust proxy', 1)
 
   app.use(
@@ -32,7 +52,7 @@ export function createApp() {
           callback(null, true)
           return
         }
-        if (env.clientOrigins.includes(origin.replace(/\/$/, ''))) {
+        if (isAllowedOrigin(origin)) {
           callback(null, true)
           return
         }

@@ -3,8 +3,15 @@ import { env } from '../config/env.js'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
-/** Paths under /api that do not require CSRF (token issuance + health). */
-const EXEMPT_PATHS = new Set(['/auth/csrf', '/health', '/health/'])
+/** Paths under /api that do not require CSRF (token issuance, health, and public login). */
+const EXEMPT_PATHS = new Set([
+  '/auth/csrf',
+  '/auth/admin/login',
+  '/auth/organizer/login',
+  '/auth/voter/login',
+  '/health',
+  '/health/',
+])
 
 function normalizeApiPath(req) {
   const full = req.originalUrl?.split('?')[0] ?? req.path
