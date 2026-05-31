@@ -1,4 +1,23 @@
+import axios from 'axios'
 import api from '@/services/api'
+import { API_BASE_URL } from '@/utils/constants'
+import { CSRF_HEADER, clearCsrfToken, setCsrfToken } from '@/utils/csrf'
+
+async function ensureFreshCsrfToken() {
+  clearCsrfToken()
+
+  const { data } = await axios.get(`${API_BASE_URL}/auth/csrf`, {
+    withCredentials: true,
+    params: { t: Date.now() },
+  })
+
+  if (data.csrfToken) {
+    setCsrfToken(data.csrfToken)
+    return data.csrfToken
+  }
+
+  return null
+}
 
 export const authService = {
   adminLogin(credentials) {
@@ -26,7 +45,11 @@ export const authService = {
   },
 
   changePassword(payload) {
-    return api.post('/auth/change-password', payload)
+    return ensureFreshCsrfToken().then((csrfToken) =>
+      api.post('/auth/change-password', payload, {
+        headers: csrfToken ? { [CSRF_HEADER]: csrfToken } : undefined,
+      }),
+    )
   },
 
   createOrganizer(payload) {
