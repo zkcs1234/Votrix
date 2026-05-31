@@ -72,6 +72,34 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config
     const status = error.response?.status
+    const message = String(error.response?.data?.message || '')
+
+    if (
+      status === 403 &&
+      original &&
+      !original._csrfRetry &&
+      !original.url?.includes('/auth/csrf') &&
+      message.toLowerCase().includes('csrf')
+    ) {
+      original._csrfRetry = true
+
+      try {
+        const { data } = await axios.get(`${API_BASE_URL}/auth/csrf`, {
+          withCredentials: true,
+          params: { t: Date.now() },
+        })
+
+        if (data.csrfToken) {
+          setCsrfToken(data.csrfToken)
+          original.headers = original.headers || {}
+          original.headers[CSRF_HEADER] = data.csrfToken
+        }
+
+        return api(original)
+      } catch {
+        // Fall through to existing error handling.
+      }
+    }
 
     if (status === 403 && error.response?.data?.code === 'MUST_CHANGE_PASSWORD') {
       return Promise.reject(error)
