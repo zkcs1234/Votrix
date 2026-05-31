@@ -1,4 +1,10 @@
-export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+const configuredApiUrl = (import.meta.env.VITE_API_URL || '/api').trim().replace(/\/$/, '')
+
+// In production, prefer same-origin API proxy to avoid third-party cookie blocking.
+const useSameOriginApi =
+  import.meta.env.PROD && import.meta.env.VITE_USE_SAME_ORIGIN_API !== 'false'
+
+export const API_BASE_URL = useSameOriginApi ? '/api' : configuredApiUrl
 
 export const USER_ROLES = {
   ADMIN: 'admin',
