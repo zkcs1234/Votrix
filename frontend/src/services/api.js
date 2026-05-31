@@ -33,7 +33,24 @@ let refreshPromise = null
 
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete'])
 
-api.interceptors.request.use((config) => {
+async function ensureCsrfToken() {
+  const existingToken = getCsrfToken()
+  if (existingToken) return existingToken
+
+  const { data } = await axios.get(`${API_BASE_URL}/auth/csrf`, {
+    withCredentials: true,
+    params: { t: Date.now() },
+  })
+
+  if (data.csrfToken) {
+    setCsrfToken(data.csrfToken)
+    return data.csrfToken
+  }
+
+  return null
+}
+
+api.interceptors.request.use(async (config) => {
   const token = getItem(STORAGE_KEYS.ACCESS_TOKEN)
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -41,7 +58,7 @@ api.interceptors.request.use((config) => {
 
   const method = config.method?.toLowerCase()
   if (method && MUTATING_METHODS.has(method)) {
-    const csrf = getCsrfToken()
+    const csrf = (await ensureCsrfToken()) || getCsrfToken()
     if (csrf) {
       config.headers[CSRF_HEADER] = csrf
     }
