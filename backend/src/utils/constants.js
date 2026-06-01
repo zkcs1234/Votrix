@@ -57,4 +57,6 @@ export const DB_TABLES = {
   ELECTION_VOTES: 'election_votes',
   POLL_OPTIONS: 'poll_options',
   POLL_SUBMISSIONS: 'poll_submissions',
+  SYSTEM_SETTINGS: 'system_settings',
+  AUDIT_LOGS: 'audit_logs',
 }

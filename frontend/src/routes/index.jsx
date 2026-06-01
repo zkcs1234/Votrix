@@ -17,7 +17,10 @@ const OrganizerLoginPage = lazy(() => import('@/pages/auth/OrganizerLoginPage'))
 const VoterLoginPage = lazy(() => import('@/pages/auth/VoterLoginPage'))
 const ChangePasswordPage = lazy(() => import('@/pages/auth/ChangePasswordPage'))
 const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'))
-const CreateOrganizerPage = lazy(() => import('@/pages/admin/CreateOrganizerPage'))
+const OrganizerManagementPage = lazy(() => import('@/pages/admin/OrganizerManagementPage'))
+const GlobalEventsPage = lazy(() => import('@/pages/admin/GlobalEventsPage'))
+const SystemSettingsPage = lazy(() => import('@/pages/admin/SystemSettingsPage'))
+const AuditLogsPage = lazy(() => import('@/pages/admin/AuditLogsPage'))
 const OrganizerDashboardPage = lazy(() => import('@/pages/organizer/OrganizerDashboardPage'))
 const VoterDashboardPage = lazy(() => import('@/pages/voter/VoterDashboardPage'))
 const VoterEventPage = lazy(() => import('@/pages/voter/VoterEventPage'))
@@ -130,7 +133,10 @@ export const routeConfig = [
     ),
     children: [
       { index: true, element: <AdminDashboardPage /> },
-      { path: 'organizers/new', element: <CreateOrganizerPage /> },
+      { path: 'organizers', element: <OrganizerManagementPage /> },
+      { path: 'events', element: <GlobalEventsPage /> },
+      { path: 'settings', element: <SystemSettingsPage /> },
+      { path: 'audit-logs', element: <AuditLogsPage /> },
     ],
   },
   {

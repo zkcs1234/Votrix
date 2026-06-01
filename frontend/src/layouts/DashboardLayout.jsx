@@ -16,9 +16,24 @@ export default function DashboardLayout({ title = 'Dashboard' }) {
     ...(role === USER_ROLES.ADMIN
       ? [
           {
-            label: 'Create organizer',
-            path: '/admin/organizers/new',
+            label: 'Organizer Management',
+            path: '/admin/organizers',
             isActive: (loc) => loc.pathname.startsWith('/admin/organizers'),
+          },
+          {
+            label: 'Global Events',
+            path: '/admin/events',
+            isActive: (loc) => loc.pathname.startsWith('/admin/events'),
+          },
+          {
+            label: 'System Settings',
+            path: '/admin/settings',
+            isActive: (loc) => loc.pathname.startsWith('/admin/settings'),
+          },
+          {
+            label: 'Audit Logs',
+            path: '/admin/audit-logs',
+            isActive: (loc) => loc.pathname.startsWith('/admin/audit-logs'),
           },
         ]
       : []),
