@@ -61,7 +61,7 @@ export default function AdminDashboardPage() {
         title="Admin dashboard"
         description={`Signed in as ${user?.username ?? 'admin'}`}
         actions={
-          <Link to="/admin/organizers/new">
+          <Link to="/admin/organizers">
             <Button>Create organizer</Button>
           </Link>
         }
@@ -85,7 +85,7 @@ export default function AdminDashboardPage() {
           <ul className="mt-4 space-y-3 text-sm">
             <li>
               <Link
-                to="/admin/organizers/new"
+                to="/admin/organizers"
                 className="font-medium text-v-text-muted hover:text-v-text"
               >
                 Create organizer account →
