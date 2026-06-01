@@ -1,10 +1,11 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import ImageUploadField from '@/components/upload/ImageUploadField'
+import Button from '@/components/ui/Button'
+import Card from '@/components/ui/Card'
 
-import { INPUT_CLASS } from '@/utils/uiClasses'
-const inputClass = INPUT_CLASS
+import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
 export default function PageantEventFormPage() {
   const { eventId } = useParams()
@@ -15,6 +16,7 @@ export default function PageantEventFormPage() {
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(!isNew)
 
   useEffect(() => {
     if (isNew) return
@@ -22,7 +24,7 @@ export default function PageantEventFormPage() {
       setTitle(data.event.title)
       setDescription(data.event.description || '')
       setBanner(data.event.banner)
-    })
+    }).finally(() => setLoading(false))
   }, [eventId, isNew])
 
   const handleSubmit = async (e) => {
@@ -43,23 +45,62 @@ export default function PageantEventFormPage() {
     }
   }
 
+  if (loading) return <p className="v-caption">Loading...</p>
+
   return (
     <div className="mx-auto max-w-lg">
-      <h2 className="text-xl font-semibold text-v-text">{isNew ? 'Create pageant' : 'Edit pageant'}</h2>
-      <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-        <input className={inputClass} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-        <textarea className={inputClass} rows={4} placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
-        <ImageUploadField
-          label="Event banner"
-          variant="banner"
-          currentUrl={banner}
-          onFileSelect={setBannerFile}
-          disabled={saving}
-        />
-        <button type="submit" disabled={saving} className="rounded-lg bg-v-primary px-6 py-2.5 text-white hover:bg-v-primary-hover disabled:opacity-60">
-          Save
-        </button>
-      </form>
+      <h2 className="v-page-title mb-6">{isNew ? 'Create pageant event' : 'Edit pageant event'}</h2>
+
+      <Card padding="md">
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="v-form-field">
+            <label className={LABEL_CLASS} htmlFor="title">
+              Title
+            </label>
+            <input
+              id="title"
+              className={INPUT_CLASS}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter pageant title"
+              required
+            />
+          </div>
+
+          <div className="v-form-field">
+            <label className={LABEL_CLASS} htmlFor="description">
+              Description
+            </label>
+            <textarea
+              id="description"
+              className={INPUT_CLASS}
+              rows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter pageant description (optional)"
+            />
+            <p className={HELPER_TEXT}>Optional description for judges and contestants</p>
+          </div>
+
+          <ImageUploadField
+            label="Event banner"
+            hint="Wide image for event headers."
+            variant="banner"
+            currentUrl={banner}
+            onFileSelect={setBannerFile}
+            disabled={saving}
+          />
+
+          <div className="v-form-actions">
+            <Button
+              type="submit"
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : isNew ? 'Create pageant' : 'Save changes'}
+            </Button>
+          </div>
+        </form>
+      </Card>
     </div>
   )
 }

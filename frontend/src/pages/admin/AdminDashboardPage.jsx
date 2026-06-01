@@ -32,7 +32,7 @@ export default function AdminDashboardPage() {
         if (!alive) return
         setError(err.response?.data?.message || 'Failed to load admin dashboard')
       } finally {
-        if (alive) setLoading(false)
+        if (!alive) setLoading(false)
       }
     }
 
@@ -56,7 +56,7 @@ export default function AdminDashboardPage() {
   const voterGrowth = analytics?.charts?.voterGrowth ?? []
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Admin dashboard"
         description={`Signed in as ${user?.username ?? 'admin'}`}
@@ -72,41 +72,69 @@ export default function AdminDashboardPage() {
         <StatCard label="Total events" value={stats?.totalEvents ?? 0} />
         <StatCard label="Total voters" value={stats?.totalVoters ?? 0} />
         <StatCard label="Active events" value={stats?.activeEvents ?? 0} />
-        <StatCard label="Finished events" value={stats?.finishedEvents ?? 0} />
-        <StatCard label="Election events" value={stats?.totalElectionEvents ?? 0} />
-        <StatCard label="Pageant events" value={stats?.totalPageantEvents ?? 0} />
-        <StatCard label="Polling events" value={stats?.totalPollingEvents ?? 0} />
-        <StatCard label="Total votes cast" value={stats?.totalVotesCast ?? 0} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <h3 className="font-semibold text-v-text">Quick actions</h3>
-          <ul className="mt-4 space-y-3 text-sm">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Link
+          to="/admin/organizers"
+          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
+        >
+          <h3 className="v-section-title">Organizers</h3>
+          <p className="v-caption">
+            {stats?.totalOrganizers ?? 0} total accounts
+          </p>
+        </Link>
+        <Link
+          to="/admin/events"
+          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
+        >
+          <h3 className="v-section-title">Events</h3>
+          <p className="v-caption">
+            {stats?.totalEvents ?? 0} across all modules
+          </p>
+        </Link>
+        <Link
+          to="/admin/settings"
+          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
+        >
+          <h3 className="v-section-title">Settings</h3>
+          <p className="v-caption">System configuration</p>
+        </Link>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card padding="sm">
+          <h3 className="v-section-title">Quick actions</h3>
+          <ul className="mt-3 space-y-2 text-sm">
             <li>
               <Link
                 to="/admin/organizers"
-                className="font-medium text-v-text-muted hover:text-v-text"
+                className="v-btn-tertiary"
               >
                 Create organizer account →
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/admin/events"
+                className="v-btn-tertiary"
+              >
+                View all events →
               </Link>
             </li>
           </ul>
         </Card>
 
-        <Card>
-          <h3 className="font-semibold text-v-text">Recent organizer activity</h3>
-          {!recentActivity.length && (
-            <p className="mt-3 text-sm text-v-text-subtle">
-              No events available. Create your first event to begin.
-            </p>
-          )}
-          {!!recentActivity.length && (
-            <ul className="mt-3 space-y-2 text-sm text-v-text-subtle">
-              {recentActivity.slice(0, 8).map((item, idx) => (
+        <Card padding="sm">
+          <h3 className="v-section-title">Recent activity</h3>
+          {!recentActivity.length ? (
+            <p className="v-caption mt-3">No recent activity</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm">
+              {recentActivity.slice(0, 5).map((item, idx) => (
                 <li key={`${item.type}-${item.timestamp}-${idx}`} className="rounded-lg border border-v-border px-3 py-2">
-                  <p className="text-v-text">{item.label}</p>
-                  <p className="text-xs text-v-text-subtle">
+                  <p className="v-body-text">{item.label}</p>
+                  <p className="v-caption">
                     {new Date(item.timestamp).toLocaleString()}
                   </p>
                 </li>
@@ -116,38 +144,32 @@ export default function AdminDashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <h3 className="font-semibold text-v-text">Monthly events</h3>
-          {!monthlyEvents.length && (
-            <p className="mt-3 text-sm text-v-text-subtle">
-              No events available. Create your first event to begin.
-            </p>
-          )}
-          {!!monthlyEvents.length && (
-            <ul className="mt-3 space-y-2 text-sm text-v-text-subtle">
-              {monthlyEvents.map((point) => (
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card padding="sm">
+          <h3 className="v-section-title">Monthly events</h3>
+          {!monthlyEvents.length ? (
+            <p className="v-caption mt-3">No event data yet</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm">
+              {monthlyEvents.slice(0, 6).map((point) => (
                 <li key={point.key} className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2">
-                  <span>{point.label}</span>
-                  <span className="text-v-text">{point.value}</span>
+                  <span className="v-caption">{point.label}</span>
+                  <span className="v-body-text font-medium">{point.value}</span>
                 </li>
               ))}
             </ul>
           )}
         </Card>
-        <Card>
-          <h3 className="font-semibold text-v-text">Voter growth</h3>
-          {!voterGrowth.length && (
-            <p className="mt-3 text-sm text-v-text-subtle">
-              No voter records yet.
-            </p>
-          )}
-          {!!voterGrowth.length && (
-            <ul className="mt-3 space-y-2 text-sm text-v-text-subtle">
-              {voterGrowth.map((point) => (
+        <Card padding="sm">
+          <h3 className="v-section-title">Voter growth</h3>
+          {!voterGrowth.length ? (
+            <p className="v-caption mt-3">No voter data yet</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm">
+              {voterGrowth.slice(0, 6).map((point) => (
                 <li key={point.key} className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2">
-                  <span>{point.label}</span>
-                  <span className="text-v-text">{point.value}</span>
+                  <span className="v-caption">{point.label}</span>
+                  <span className="v-body-text font-medium">{point.value}</span>
                 </li>
               ))}
             </ul>

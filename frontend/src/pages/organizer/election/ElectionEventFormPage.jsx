@@ -1,14 +1,14 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import ImageUploadField from '@/components/upload/ImageUploadField'
+import Button from '@/components/ui/Button'
+import Card from '@/components/ui/Card'
 
-import { INPUT_CLASS } from '@/utils/uiClasses'
-const inputClass = INPUT_CLASS
+import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
 export default function ElectionEventFormPage() {
   const { eventId } = useParams()
-  /** Route `events/new` has no :eventId param â€” useParams() is undefined there */
   const isNew = !eventId || eventId === 'new'
   const navigate = useNavigate()
 
@@ -58,45 +58,64 @@ export default function ElectionEventFormPage() {
     }
   }
 
-  if (loading) return <p className="text-v-text-subtle">Loadingâ€¦</p>
+  if (loading) return <p className="v-caption">Loading...</p>
 
   return (
     <div className="mx-auto max-w-lg">
-      <h2 className="text-xl font-semibold text-v-text">{isNew ? 'Create event' : 'Edit event'}</h2>
+      <h2 className="v-page-title mb-6">{isNew ? 'Create election event' : 'Edit election event'}</h2>
 
-      <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-        <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Title</label>
-          <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} required />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Description</label>
-          <textarea
-            className={inputClass}
-            rows={4}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+      <Card padding="md">
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="v-form-field">
+            <label className={LABEL_CLASS} htmlFor="title">
+              Title
+            </label>
+            <input
+              id="title"
+              className={INPUT_CLASS}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter election title"
+              required
+            />
+          </div>
+
+          <div className="v-form-field">
+            <label className={LABEL_CLASS} htmlFor="description">
+              Description
+            </label>
+            <textarea
+              id="description"
+              className={INPUT_CLASS}
+              rows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter election description (optional)"
+            />
+            <p className={HELPER_TEXT}>Optional description for voters</p>
+          </div>
+
+          <ImageUploadField
+            label="Event banner"
+            hint="Wide image for event headers (stored on Cloudinary)."
+            variant="banner"
+            currentUrl={banner}
+            onFileSelect={setBannerFile}
+            disabled={saving}
           />
-        </div>
-        <ImageUploadField
-          label="Event banner"
-          hint="Wide image for event headers (stored on Cloudinary)."
-          variant="banner"
-          currentUrl={banner}
-          onFileSelect={setBannerFile}
-          disabled={saving}
-        />
 
-        {error && <p className="text-sm text-v-danger">{error}</p>}
+          {error && <p className="v-error-text">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-v-primary px-6 py-2.5 text-white hover:bg-v-primary-hover disabled:opacity-60"
-        >
-          {saving ? 'Savingâ€¦' : 'Save event'}
-        </button>
-      </form>
+          <div className="v-form-actions">
+            <Button
+              type="submit"
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : isNew ? 'Create event' : 'Save changes'}
+            </Button>
+          </div>
+        </form>
+      </Card>
     </div>
   )
 }

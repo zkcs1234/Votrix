@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import PageLoader from '@/components/ui/PageLoader'
@@ -52,9 +52,9 @@ export default function OrganizerDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="v-card p-8">
-        <h2 className="text-lg font-semibold text-v-text">Organizer dashboard</h2>
-        <p className="mt-2 text-v-text-subtle">
+      <div className="v-card-md">
+        <h2 className="v-page-title">Organizer dashboard</h2>
+        <p className="v-caption mt-2">
           Signed in as <span className="text-v-text-muted">{user?.email}</span>
         </p>
       </div>
@@ -64,85 +64,75 @@ export default function OrganizerDashboardPage() {
         <StatCard label="Active events" value={stats?.activeEvents ?? 0} />
         <StatCard label="Finished events" value={stats?.finishedEvents ?? 0} />
         <StatCard label="Assigned voters" value={stats?.totalAssignedVoters ?? 0} />
-        <StatCard label="Votes cast" value={stats?.totalVotesCast ?? 0} />
-        <StatCard label="Election events" value={stats?.totalElectionEvents ?? 0} />
-        <StatCard label="Pageant events" value={stats?.totalPageantEvents ?? 0} />
-        <StatCard label="Polling events" value={stats?.totalPollingEvents ?? 0} />
       </div>
-
-      <Link
-        to="/organizer/reports"
-        className="block rounded-2xl border border-violet-900/50 bg-violet-950/30 p-8 transition hover:border-violet-700"
-      >
-        <h3 className="text-lg font-semibold text-v-text">Analytics & reports</h3>
-        <p className="mt-2 text-sm text-v-text-subtle">
-          Turnout reports, vote summaries, pageant rankings, and polling charts across all events.
-        </p>
-      </Link>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Link
           to="/organizer/election"
-          className="block rounded-2xl border border-v-border bg-v-surface-elevated p-8 transition hover:border-v-border-strong"
+          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
         >
-          <h3 className="text-lg font-semibold text-v-text">Election module</h3>
-          <p className="mt-2 text-sm text-v-text-subtle">
-            Manage events, positions, candidates, voters, and view live analytics.
+          <h3 className="v-section-title">Election module</h3>
+          <p className="v-caption">
+            Manage events, positions, candidates, and voters.
           </p>
         </Link>
         <Link
           to="/organizer/pageant"
-          className="block rounded-2xl border border-v-border bg-v-surface-elevated p-8 transition hover:border-v-border-strong"
+          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
         >
-          <h3 className="text-lg font-semibold text-v-text">Pageant module</h3>
-          <p className="mt-2 text-sm text-v-text-subtle">
-            Contestants, criteria, judge scoring, and live weighted rankings.
+          <h3 className="v-section-title">Pageant module</h3>
+          <p className="v-caption">
+            Contestants, criteria, judge scoring, and rankings.
           </p>
         </Link>
         <Link
           to="/organizer/polling"
-          className="block rounded-2xl border border-v-border bg-v-surface-elevated p-8 transition hover:border-v-border-strong"
+          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
         >
-          <h3 className="text-lg font-semibold text-v-text">Polling module</h3>
-          <p className="mt-2 text-sm text-v-text-subtle">
-            Build surveys, configure anonymity and expiry, and view response analytics.
+          <h3 className="v-section-title">Polling module</h3>
+          <p className="v-caption">
+            Build surveys, configure settings, and view analytics.
           </p>
         </Link>
       </div>
 
+      <Link
+        to="/organizer/reports"
+        className="v-card-md block transition hover:border-v-border-strong"
+      >
+        <h3 className="v-section-title">Analytics & reports</h3>
+        <p className="v-caption mt-2">
+          Turnout reports, vote summaries, pageant rankings, and polling charts.
+        </p>
+      </Link>
+
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <h3 className="font-semibold text-v-text">Recent organizer activity</h3>
-          {!(dashboard?.recentActivity ?? []).length && (
-            <p className="mt-3 text-sm text-v-text-subtle">
-              No events available. Create your first event to begin.
-            </p>
-          )}
-          {!!(dashboard?.recentActivity ?? []).length && (
-            <ul className="mt-3 space-y-2 text-sm text-v-text-subtle">
-              {(dashboard?.recentActivity ?? []).slice(0, 8).map((item, idx) => (
+        <Card padding="sm">
+          <h3 className="v-section-title">Recent activity</h3>
+          {!(dashboard?.recentActivity ?? []).length ? (
+            <p className="v-caption mt-3">No recent activity</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm">
+              {(dashboard?.recentActivity ?? []).slice(0, 5).map((item, idx) => (
                 <li key={`${item.type}-${item.timestamp}-${idx}`} className="rounded-lg border border-v-border px-3 py-2">
-                  <p className="text-v-text">{item.label}</p>
-                  <p className="text-xs text-v-text-subtle">{new Date(item.timestamp).toLocaleString()}</p>
+                  <p className="v-body-text">{item.label}</p>
+                  <p className="v-caption">{new Date(item.timestamp).toLocaleString()}</p>
                 </li>
               ))}
             </ul>
           )}
         </Card>
 
-        <Card>
-          <h3 className="font-semibold text-v-text">Monthly event growth</h3>
-          {!monthlyEvents.length && (
-            <p className="mt-3 text-sm text-v-text-subtle">
-              No events available. Create your first event to begin.
-            </p>
-          )}
-          {!!monthlyEvents.length && (
-            <ul className="mt-3 space-y-2 text-sm text-v-text-subtle">
-              {monthlyEvents.map((point) => (
+        <Card padding="sm">
+          <h3 className="v-section-title">Monthly event growth</h3>
+          {!monthlyEvents.length ? (
+            <p className="v-caption mt-3">No event data yet</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm">
+              {monthlyEvents.slice(0, 6).map((point) => (
                 <li key={point.key} className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2">
-                  <span>{point.label}</span>
-                  <span className="text-v-text">{point.value}</span>
+                  <span className="v-caption">{point.label}</span>
+                  <span className="v-body-text font-medium">{point.value}</span>
                 </li>
               ))}
             </ul>
@@ -150,17 +140,16 @@ export default function OrganizerDashboardPage() {
         </Card>
       </div>
 
-      <Card>
-        <h3 className="font-semibold text-v-text">Participation by module</h3>
-        {!participation.length && (
-          <p className="mt-3 text-sm text-v-text-subtle">No participation data yet.</p>
-        )}
-        {!!participation.length && (
-          <ul className="mt-3 space-y-2 text-sm text-v-text-subtle">
+      <Card padding="sm">
+        <h3 className="v-section-title">Participation by module</h3>
+        {!participation.length ? (
+          <p className="v-caption mt-3">No participation data yet</p>
+        ) : (
+          <ul className="mt-3 space-y-2 text-sm">
             {participation.map((row) => (
               <li key={row.module} className="rounded-lg border border-v-border px-3 py-2">
-                <p className="font-medium text-v-text">{row.module}</p>
-                <p>
+                <p className="v-body-text font-medium">{row.module}</p>
+                <p className="v-caption">
                   Participated: {row.participated} / {row.assigned} ({row.rate}%)
                 </p>
               </li>

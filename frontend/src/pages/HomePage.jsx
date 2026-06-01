@@ -20,17 +20,17 @@ const cards = [
 
 export default function HomePage() {
   return (
-    <section className="mx-auto max-w-6xl flex-1 px-4 py-16 sm:px-6 sm:py-24">
+    <section className="mx-auto max-w-6xl flex-1 px-4 py-12 md:py-16">
       <div className="text-center">
         <motion.h1
-          className="text-4xl font-bold tracking-tight text-v-text md:text-5xl"
+          className="text-3xl font-bold tracking-tight text-v-text md:text-4xl lg:text-5xl"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
         >
           Online Voting, Polling &amp; Scoring
         </motion.h1>
         <motion.p
-          className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-v-text-subtle"
+          className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-v-text-subtle md:text-lg"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
@@ -38,7 +38,7 @@ export default function HomePage() {
           VOTRIX helps organizers run elections, pageants, and polls with role-based access for
           admins, organizers, and voters.
         </motion.p>
-        <div className="mt-10 flex flex-wrap justify-center gap-3">
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link to="/login/organizer">
             <Button size="lg">Organizer login</Button>
           </Link>
@@ -50,7 +50,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="mt-20 grid gap-6 md:grid-cols-3">
+      <div className="mt-16 grid gap-6 md:grid-cols-3">
         {cards.map((card, index) => (
           <motion.div
             key={card.title}
@@ -58,9 +58,9 @@ export default function HomePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 + index * 0.08 }}
           >
-            <Card className="h-full transition hover:shadow-v-shadow-md">
-              <h2 className="text-lg font-semibold text-v-text">{card.title}</h2>
-              <p className="mt-3 text-sm leading-relaxed text-v-text-subtle">
+            <Card className="h-full transition hover:border-v-border-strong">
+              <h2 className="v-section-title">{card.title}</h2>
+              <p className="v-caption mt-3 leading-relaxed">
                 {card.description}
               </p>
             </Card>
@@ -68,7 +68,7 @@ export default function HomePage() {
         ))}
       </div>
 
-      <p className="mt-16 text-center text-xs font-medium uppercase tracking-wider text-v-text-subtle">
+      <p className="mt-12 text-center text-xs font-medium uppercase tracking-wider text-v-text-subtle">
         Every Vote Counts.
       </p>
     </section>

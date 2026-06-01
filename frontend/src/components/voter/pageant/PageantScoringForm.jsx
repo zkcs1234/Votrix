@@ -1,4 +1,6 @@
-﻿export default function PageantScoringForm({ sheet, scores, onScoreChange, disabled }) {
+import ScoreInput from '@/components/ui/ScoreInput'
+
+export default function PageantScoringForm({ sheet, scores, onScoreChange, disabled }) {
   const { contestants, criteria } = sheet
 
   return (
@@ -7,13 +9,13 @@
         <table className="w-full min-w-[600px] text-sm">
           <thead>
             <tr className="border-b border-v-border bg-v-surface-elevated">
-              <th className="p-3 text-left text-v-text-subtle">Contestant</th>
+              <th className="p-3 text-left v-caption">Contestant</th>
               {criteria.map((c) => (
-                <th key={c.id} className="p-3 text-center text-v-text-muted">
-                  {c.name}
+                <th key={c.id} className="p-3 text-center">
+                  <span className="text-v-text-muted">{c.name}</span>
                   <br />
-                  <span className="text-xs text-v-text-subtle">
-                    {c.minScore}â€“{c.maxScore} Â· {c.percentage}%
+                  <span className="v-caption">
+                    {c.minScore}–{c.maxScore} · {c.percentage}%
                   </span>
                 </th>
               ))}
@@ -51,22 +53,22 @@
 
       <div className="space-y-4 md:hidden">
         {contestants.map((cont) => (
-          <article key={cont.id} className="rounded-2xl border border-v-border bg-v-surface p-4">
+          <article key={cont.id} className="v-card-md">
             <div className="flex items-center gap-3">
               {cont.photo && (
                 <img src={cont.photo} alt="" className="h-12 w-12 rounded-lg object-cover" />
               )}
-              <h4 className="font-medium text-v-text">
+              <h4 className="v-section-title">
                 #{cont.contestantNumber} {cont.name}
               </h4>
             </div>
             <div className="mt-4 space-y-3">
               {criteria.map((crit) => (
                 <div key={crit.id} className="flex items-center justify-between gap-2">
-                  <label className="text-sm text-v-text-muted">
+                  <label className="v-caption">
                     {crit.name}
                     <span className="block text-xs text-v-text-subtle">
-                      {crit.minScore}â€“{crit.maxScore}
+                      {crit.minScore}–{crit.maxScore}
                     </span>
                   </label>
                   <ScoreInput
@@ -75,6 +77,7 @@
                     scores={scores}
                     onScoreChange={onScoreChange}
                     disabled={disabled}
+                    size="md"
                   />
                 </div>
               ))}
@@ -86,18 +89,22 @@
   )
 }
 
-function ScoreInput({ contestantId, criteria, scores, onScoreChange, disabled }) {
+function ScoreInputComponent({ contestantId, criteria, scores, onScoreChange, disabled }) {
   const key = `${contestantId}:${criteria.id}`
+  const currentValue = scores[key] ?? ''
+
   return (
-    <input
-      type="number"
+    <ScoreInput
       min={criteria.minScore}
       max={criteria.maxScore}
       step="0.5"
+      value={currentValue}
+      onChange={(val) => onScoreChange(contestantId, criteria.id, val)}
       disabled={disabled}
-      className="v-input w-20 px-2 py-1 text-center disabled:opacity-50"
-      value={scores[key] ?? ''}
-      onChange={(e) => onScoreChange(contestantId, criteria.id, e.target.value)}
+      size="sm"
     />
   )
 }
+
+// Re-export the inner component for backwards compatibility
+export { ScoreInputComponent as ScoreInput }

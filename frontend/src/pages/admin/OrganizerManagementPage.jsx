@@ -3,6 +3,7 @@ import { adminService } from '@/services/admin.service'
 import CreateOrganizerModal from '@/components/admin/CreateOrganizerModal'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import SearchInput from '@/components/ui/SearchInput'
 import { format } from 'date-fns'
 
 export default function OrganizerManagementPage() {
@@ -10,6 +11,7 @@ export default function OrganizerManagementPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [search, setSearch] = useState('')
 
   const fetchOrganizers = async () => {
     try {
@@ -28,56 +30,75 @@ export default function OrganizerManagementPage() {
     fetchOrganizers()
   }, [])
 
+  const filteredOrganizers = organizers.filter((org) => {
+    const searchLower = search.toLowerCase()
+    return (
+      org.email.toLowerCase().includes(searchLower) ||
+      org.organizations?.some((o) => o.organization_name.toLowerCase().includes(searchLower))
+    )
+  })
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-v-text">Organizer Management</h1>
-          <p className="text-v-text-subtle">Manage organizer accounts and their organizations.</p>
+          <h1 className="v-page-title">Organizer Management</h1>
+          <p className="v-caption">Manage organizer accounts and their organizations.</p>
         </div>
         <Button onClick={() => setIsModalOpen(true)}>Create Organizer</Button>
       </div>
 
-      <Card>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <SearchInput
+          placeholder="Search organizers by email or organization..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="sm:w-80"
+        />
+      </div>
+
+      <Card padding="sm">
         {loading ? (
-          <div className="p-8 text-center text-v-text-subtle">Loading organizers...</div>
+          <div className="p-8 text-center v-caption">Loading organizers...</div>
         ) : error ? (
           <div className="p-8 text-center text-v-danger">{error}</div>
-        ) : organizers.length === 0 ? (
-          <div className="p-8 text-center text-v-text-subtle">No organizers found.</div>
+        ) : filteredOrganizers.length === 0 ? (
+          <div className="p-8 text-center v-caption">
+            {search ? 'No organizers found matching your search' : 'No organizers found.'}
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-v-text">
-              <thead className="bg-v-surface-elevated text-xs font-semibold uppercase text-v-text-subtle">
+          <div className="v-table-wrap">
+            <table className="v-table">
+              <thead>
                 <tr>
-                  <th className="px-6 py-4">Email</th>
-                  <th className="px-6 py-4">Created At</th>
-                  <th className="px-6 py-4">Organizations</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <th>Email</th>
+                  <th>Created At</th>
+                  <th>Organizations</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-v-border">
-                {organizers.map((org) => (
+                {filteredOrganizers.map((org) => (
                   <tr key={org.id} className="hover:bg-v-surface-elevated/50">
-                    <td className="px-6 py-4 font-medium">{org.email}</td>
-                    <td className="px-6 py-4">
+                    <td className="font-medium">{org.email}</td>
+                    <td className="v-caption">
                       {format(new Date(org.created_at), 'MMM d, yyyy')}
                     </td>
-                    <td className="px-6 py-4">
+                    <td>
                       {org.organizations?.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
                           {org.organizations.map(o => (
-                            <span key={o.id} className="inline-flex items-center rounded-full bg-v-primary/10 px-2.5 py-0.5 text-xs font-medium text-v-primary">
+                            <span key={o.id} className="v-badge">
                               {o.organization_name}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-v-text-muted">None</span>
+                        <span className="v-caption">None</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="text-v-primary hover:text-v-primary-hover">Edit</button>
+                    <td className="text-right">
+                      <button className="v-btn-tertiary text-sm">Edit</button>
                     </td>
                   </tr>
                 ))}
@@ -87,9 +108,9 @@ export default function OrganizerManagementPage() {
         )}
       </Card>
 
-      <CreateOrganizerModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <CreateOrganizerModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         onSuccess={fetchOrganizers}
       />
     </div>

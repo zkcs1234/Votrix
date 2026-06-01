@@ -10,8 +10,6 @@ import { API_BASE_URL } from '@/utils/constants'
 import { clearCsrfToken, setCsrfToken } from '@/utils/csrf'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 
-const inputClass = INPUT_CLASS
-
 async function ensureCsrfToken() {
   clearCsrfToken()
   const { data } = await axios.get(`${API_BASE_URL}/auth/csrf`, {
@@ -68,21 +66,24 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-xl bg-v-surface p-6 shadow-xl border border-v-border relative">
-        <button 
-          onClick={onClose} 
-          className="absolute top-4 right-4 text-v-text-muted hover:text-v-text"
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1 text-v-text-muted hover:text-v-text"
+          aria-label="Close"
         >
-          ✕
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
-        
-        <h2 className="text-lg font-semibold text-v-text">Create Organizer</h2>
-        <p className="mt-1 text-sm text-v-text-subtle">
+
+        <h2 className="v-page-title">Create Organizer</h2>
+        <p className="v-caption mt-1">
           The organizer must change this password on first login.
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
           <AuthFormField label="Email" id="email" error={errors.email?.message}>
-            <input id="email" type="email" className={inputClass} {...register('email')} />
+            <input id="email" type="email" className={INPUT_CLASS} {...register('email')} />
           </AuthFormField>
 
           <AuthFormField
@@ -90,16 +91,16 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess }) {
             id="password"
             error={errors.password?.message}
           >
-            <input id="password" type="password" className={inputClass} {...register('password')} />
+            <input id="password" type="password" className={INPUT_CLASS} {...register('password')} />
           </AuthFormField>
 
           {error && (
-            <p className="rounded-lg border px-3 py-2 text-sm text-v-danger bg-v-danger-bg">
+            <p className="rounded-lg border border-v-danger bg-v-danger-bg px-3 py-2 text-sm text-v-danger">
               {error}
             </p>
           )}
           {success && (
-            <p className="rounded-lg border border-emerald-900/50 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-300">
+            <p className="rounded-lg border border-v-success bg-v-success-bg px-3 py-2 text-sm text-v-success">
               {success}
             </p>
           )}

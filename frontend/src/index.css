@@ -7,6 +7,15 @@
   --color-muted: #6b7280;
   --color-surface: #f3f4f6;
   --color-white: #ffffff;
+
+  /* Spacing scale */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-12: 48px;
 }
 
 /* Theme-aware utilities: use text-v-text, bg-v-surface, etc. (Tailwind v4 canonical) */
@@ -30,6 +39,8 @@
   --color-v-danger-bg: var(--v-danger-bg);
   --color-v-warning: var(--v-warning);
   --color-v-warning-bg: var(--v-warning-bg);
+  --color-v-accent: var(--v-accent);
+  --color-v-accent-bg: var(--v-accent-bg);
   --shadow-v-shadow: var(--v-shadow);
   --shadow-v-shadow-md: var(--v-shadow-md);
 }
@@ -57,6 +68,8 @@
     --v-danger-bg: #fef2f2;
     --v-warning: #b45309;
     --v-warning-bg: #fffbeb;
+    --v-accent: #d97706;
+    --v-accent-bg: #fffbeb;
     --v-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
     --v-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
   }
@@ -82,6 +95,8 @@
     --v-danger-bg: #7f1d1d33;
     --v-warning: #fbbf24;
     --v-warning-bg: #78350f33;
+    --v-accent: #fbbf24;
+    --v-accent-bg: #78350f33;
     --v-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.25);
     --v-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3);
   }
@@ -104,6 +119,7 @@
 }
 
 @layer components {
+  /* Card variants */
   .v-card {
     border-radius: 0.75rem;
     border: 1px solid var(--v-border);
@@ -111,6 +127,31 @@
     box-shadow: var(--v-shadow);
   }
 
+  .v-card-sm {
+    border-radius: 0.75rem;
+    border: 1px solid var(--v-border);
+    background-color: var(--v-surface);
+    box-shadow: var(--v-shadow);
+    padding: 1rem;
+  }
+
+  .v-card-md {
+    border-radius: 0.75rem;
+    border: 1px solid var(--v-border);
+    background-color: var(--v-surface);
+    box-shadow: var(--v-shadow);
+    padding: 1.5rem;
+  }
+
+  .v-card-lg {
+    border-radius: 0.75rem;
+    border: 1px solid var(--v-border);
+    background-color: var(--v-surface);
+    box-shadow: var(--v-shadow);
+    padding: 2rem;
+  }
+
+  /* Input base */
   .v-input {
     width: 100%;
     border-radius: 0.5rem;
@@ -132,6 +173,7 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--v-text-muted) 15%, transparent);
   }
 
+  /* Table styles */
   .v-table-wrap {
     overflow: hidden;
     border-radius: 0.75rem;
@@ -156,10 +198,13 @@
     font-weight: 600;
     color: var(--v-text-muted);
     border-bottom: 1px solid var(--v-border);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
   .v-table td {
-    padding: 0.875rem 1rem;
+    padding: 0.75rem 1rem;
     color: var(--v-text);
     border-bottom: 1px solid var(--v-border);
   }
@@ -170,6 +215,222 @@
 
   .v-table tbody tr:hover {
     background-color: var(--v-surface-elevated);
+  }
+
+  /* Typography utilities */
+  .v-page-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--v-text);
+  }
+
+  .v-section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--v-text);
+  }
+
+  .v-body-text {
+    font-size: 0.875rem;
+    color: var(--v-text);
+  }
+
+  .v-caption {
+    font-size: 0.75rem;
+    color: var(--v-text-subtle);
+  }
+
+  .v-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--v-text-muted);
+    margin-bottom: 0.25rem;
+  }
+
+  /* Form field spacing */
+  .v-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .v-form-field + .v-form-field {
+    margin-top: 1rem;
+  }
+
+  /* Button hierarchy */
+  .v-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    transition: all 0.15s;
+    background-color: var(--v-primary);
+    color: var(--v-surface);
+    border: none;
+    cursor: pointer;
+  }
+
+  .v-btn-primary:hover {
+    background-color: var(--v-primary-hover);
+  }
+
+  .v-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .v-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    transition: all 0.15s;
+    background-color: var(--v-surface);
+    color: var(--v-text);
+    border: 1px solid var(--v-border-strong);
+    cursor: pointer;
+  }
+
+  .v-btn-secondary:hover {
+    background-color: var(--v-surface-elevated);
+  }
+
+  .v-btn-tertiary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: var(--v-text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+
+  .v-btn-tertiary:hover {
+    color: var(--v-text);
+  }
+
+  /* Stat card accent colors */
+  .v-stat-accent {
+    color: var(--v-accent);
+  }
+
+  .v-stat-success {
+    color: var(--v-success);
+  }
+
+  .v-stat-muted {
+    color: var(--v-text-muted);
+  }
+
+  /* Search input */
+  .v-search-input {
+    position: relative;
+  }
+
+  .v-search-input input {
+    padding-left: 2.5rem;
+  }
+
+  .v-search-input svg {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1rem;
+    height: 1rem;
+    color: var(--v-text-subtle);
+  }
+
+  /* Empty state */
+  .v-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    border: 1px dashed var(--v-border);
+    border-radius: 0.75rem;
+    background-color: var(--v-surface);
+  }
+
+  .v-empty-state-title {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--v-text);
+    margin-top: 0.75rem;
+  }
+
+  .v-empty-state-description {
+    font-size: 0.875rem;
+    color: var(--v-text-subtle);
+    margin-top: 0.25rem;
+  }
+
+  /* Form group spacing */
+  .v-form-group {
+    margin-bottom: 1rem;
+  }
+
+  .v-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+
+  /* Helper text */
+  .v-helper-text {
+    font-size: 0.75rem;
+    color: var(--v-text-subtle);
+    margin-top: 0.25rem;
+  }
+
+  /* Error text */
+  .v-error-text {
+    font-size: 0.75rem;
+    color: var(--v-danger);
+    margin-top: 0.25rem;
+  }
+
+  /* Badge */
+  .v-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 9999px;
+    background-color: var(--v-surface-elevated);
+    color: var(--v-text-muted);
+  }
+
+  .v-badge-success {
+    background-color: var(--v-success-bg);
+    color: var(--v-success);
+  }
+
+  .v-badge-warning {
+    background-color: var(--v-warning-bg);
+    color: var(--v-warning);
+  }
+
+  .v-badge-danger {
+    background-color: var(--v-danger-bg);
+    color: var(--v-danger);
   }
 }
 
@@ -221,8 +482,13 @@
     color: #fff !important;
   }
 
-  .text-emerald-400 {
+  .text-emerald-400,
+  .text-emerald-300 {
     color: var(--v-success) !important;
+  }
+
+  .text-amber-400 {
+    color: var(--v-accent) !important;
   }
 
   .text-red-300,

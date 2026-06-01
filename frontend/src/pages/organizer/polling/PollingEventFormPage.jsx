@@ -1,10 +1,12 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import ImageUploadField from '@/components/upload/ImageUploadField'
+import DateTimeInput from '@/components/ui/DateTimeInput'
+import Button from '@/components/ui/Button'
+import Card from '@/components/ui/Card'
 
-import { INPUT_CLASS } from '@/utils/uiClasses'
-const inputClass = INPUT_CLASS
+import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
 export default function PollingEventFormPage() {
   const { eventId } = useParams()
@@ -21,6 +23,7 @@ export default function PollingEventFormPage() {
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(!isNew)
 
   useEffect(() => {
     if (isNew) return
@@ -34,7 +37,7 @@ export default function PollingEventFormPage() {
         pollExpiresAt: e.pollExpiresAt ? e.pollExpiresAt.slice(0, 16) : '',
       })
       setBanner(e.banner)
-    })
+    }).finally(() => setLoading(false))
   }, [eventId, isNew])
 
   const handleSubmit = async (e) => {
@@ -61,72 +64,99 @@ export default function PollingEventFormPage() {
     }
   }
 
+  if (loading) return <p className="v-caption">Loading...</p>
+
   return (
     <div className="mx-auto max-w-lg space-y-6">
-      <h2 className="text-xl font-semibold text-v-text">{isNew ? 'Create poll' : 'Poll settings'}</h2>
+      <h2 className="v-page-title">{isNew ? 'Create poll' : 'Poll settings'}</h2>
 
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <input
-          className={inputClass}
-          placeholder="Poll title"
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-          required
-        />
-        <textarea
-          className={inputClass}
-          rows={3}
-          placeholder="Description"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
+      <Card padding="md">
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="v-form-field">
+            <label className={LABEL_CLASS} htmlFor="title">
+              Poll title
+            </label>
+            <input
+              id="title"
+              className={INPUT_CLASS}
+              placeholder="Enter poll title"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              required
+            />
+          </div>
 
-        <ImageUploadField
-          label="Poll banner (optional)"
-          variant="banner"
-          currentUrl={banner}
-          onFileSelect={setBannerFile}
-          disabled={saving}
-        />
+          <div className="v-form-field">
+            <label className={LABEL_CLASS} htmlFor="description">
+              Description
+            </label>
+            <textarea
+              id="description"
+              className={INPUT_CLASS}
+              rows={3}
+              placeholder="Enter poll description (optional)"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </div>
 
-        <label className="flex items-center gap-2 text-sm text-v-text-muted">
-          <input
-            type="checkbox"
-            checked={form.pollAnonymous}
-            onChange={(e) => setForm({ ...form, pollAnonymous: e.target.checked })}
+          <ImageUploadField
+            label="Poll banner (optional)"
+            hint="Wide image for poll headers."
+            variant="banner"
+            currentUrl={banner}
+            onFileSelect={setBannerFile}
+            disabled={saving}
           />
-          Anonymous responses (hide respondent identity in analytics)
-        </label>
 
-        <label className="flex items-center gap-2 text-sm text-v-text-muted">
-          <input
-            type="checkbox"
-            checked={form.pollAllowMultipleSubmissions}
-            onChange={(e) =>
-              setForm({ ...form, pollAllowMultipleSubmissions: e.target.checked })
-            }
-          />
-          Allow multiple submissions per respondent
-        </label>
+          <div className="space-y-3 pt-2">
+            <label className="flex items-center gap-3 text-sm text-v-text-muted">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-v-border-strong"
+                checked={form.pollAnonymous}
+                onChange={(e) => setForm({ ...form, pollAnonymous: e.target.checked })}
+              />
+              <span>Anonymous responses</span>
+            </label>
+            <p className="v-caption -mt-2 pl-7">Hide respondent identity in analytics</p>
 
-        <div>
-          <label className="mb-1 block text-sm text-v-text-subtle">Expiration date (optional)</label>
-          <input
-            type="datetime-local"
-            className={inputClass}
-            value={form.pollExpiresAt}
-            onChange={(e) => setForm({ ...form, pollExpiresAt: e.target.value })}
-          />
-        </div>
+            <label className="flex items-center gap-3 text-sm text-v-text-muted">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-v-border-strong"
+                checked={form.pollAllowMultipleSubmissions}
+                onChange={(e) =>
+                  setForm({ ...form, pollAllowMultipleSubmissions: e.target.checked })
+                }
+              />
+              <span>Allow multiple submissions</span>
+            </label>
+            <p className="v-caption -mt-2 pl-7">Allow respondents to submit more than once</p>
+          </div>
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-v-primary px-6 py-2.5 text-white hover:bg-v-primary-hover disabled:opacity-60"
-        >
-          {isNew ? 'Create & build questions' : 'Save settings'}
-        </button>
-      </form>
+          <div className="v-form-field">
+            <label className={LABEL_CLASS} htmlFor="pollExpiresAt">
+              Expiration date (optional)
+            </label>
+            <DateTimeInput
+              id="pollExpiresAt"
+              value={form.pollExpiresAt}
+              onChange={(val) => setForm({ ...form, pollExpiresAt: val })}
+            />
+            <p className={HELPER_TEXT}>Poll will close after this date</p>
+          </div>
+
+          <div className="v-form-actions">
+            <Button
+              type="submit"
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : isNew ? 'Create & build questions' : 'Save settings'}
+            </Button>
+          </div>
+        </form>
+      </Card>
     </div>
   )
 }

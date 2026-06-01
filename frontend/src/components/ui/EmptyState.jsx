@@ -1,9 +1,25 @@
-export default function EmptyState({ title, description, action }) {
+import Button from './Button'
+
+export default function EmptyState({
+  title,
+  description,
+  actionLabel,
+  onAction,
+  icon,
+  className = '',
+}) {
   return (
-    <div className="rounded-2xl border border-dashed border-v-border px-6 py-12 text-center">
-      <p className="font-medium text-v-text">{title}</p>
-      {description && <p className="mt-2 text-sm text-v-text-muted">{description}</p>}
-      {action && <div className="mt-6">{action}</div>}
+    <div className={`v-empty-state ${className}`}>
+      {icon && <div className="text-v-text-subtle">{icon}</div>}
+      <p className="v-empty-state-title">{title}</p>
+      {description && (
+        <p className="v-empty-state-description">{description}</p>
+      )}
+      {actionLabel && onAction && (
+        <Button onClick={onAction} className="mt-4">
+          {actionLabel}
+        </Button>
+      )}
     </div>
   )
 }

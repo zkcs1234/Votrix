@@ -133,7 +133,9 @@ export default function AppShell({
   return (
     <div className="flex min-h-screen bg-v-bg">
       <aside className="hidden w-64 shrink-0 bg-v-sidebar p-6 md:block">
-        {sidebar}
+        <div className="h-full flex flex-col">
+          {sidebar}
+        </div>
       </aside>
 
       {mobileOpen && (

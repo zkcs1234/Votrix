@@ -1,7 +1,9 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import SearchInput from '@/components/ui/SearchInput'
+import Button from '@/components/ui/Button'
 
 export default function ElectionVotersPage() {
   const { eventId } = useParams()
@@ -10,6 +12,7 @@ export default function ElectionVotersPage() {
   const [email, setEmail] = useState('')
   const [importResult, setImportResult] = useState(null)
   const [error, setError] = useState(null)
+  const [search, setSearch] = useState('')
 
   const load = () => {
     electionService
@@ -51,6 +54,15 @@ export default function ElectionVotersPage() {
     e.target.value = ''
   }
 
+  const filteredVoters = voters.filter((v) => {
+    const searchLower = search.toLowerCase()
+    return (
+      v.email.toLowerCase().includes(searchLower) ||
+      (v.firstName && v.firstName.toLowerCase().includes(searchLower)) ||
+      (v.lastName && v.lastName.toLowerCase().includes(searchLower))
+    )
+  })
+
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -60,60 +72,83 @@ export default function ElectionVotersPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <h2 className="text-xl font-semibold text-v-text">Voters</h2>
+    <div className="space-y-6">
+      <h2 className="v-page-title">Voters</h2>
 
-      <div className="v-card p-6">
-        <h3 className="text-sm font-medium text-v-text-muted">CSV upload</h3>
-        <p className="mt-1 text-xs text-v-text-subtle">
+      <div className="v-card-sm">
+        <h3 className="v-label">CSV upload</h3>
+        <p className="v-helper-text mb-3">
           Columns: email, firstname, lastname. Duplicates in file are rejected.
         </p>
-        <input type="file" accept=".csv" className="mt-3 text-sm text-v-text-subtle" onChange={handleCsv} />
+        <input
+          type="file"
+          accept=".csv"
+          className="v-caption"
+          onChange={handleCsv}
+        />
         {importResult && (
-          <p className="mt-2 text-sm text-v-success">
-            Imported {importResult.succeeded} of {importResult.total} â€” invitation emails sent.
+          <p className="v-caption mt-2 text-v-success">
+            Imported {importResult.succeeded} of {importResult.total} — invitation emails sent.
           </p>
         )}
       </div>
 
-      <form onSubmit={handleInvite} className="flex flex-wrap gap-2">
+      <form onSubmit={handleInvite} className="flex flex-wrap gap-3">
         <input
           type="email"
           placeholder="voter@email.com"
-          className="v-input flex-1"
+          className="v-input flex-1 min-w-[200px]"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
         />
-        <button type="submit" className="rounded-xl bg-v-primary px-4 py-2 text-sm text-white">
-          Invite
-        </button>
+        <Button type="submit">Invite</Button>
       </form>
 
-      {error && <p className="text-sm text-v-danger">{error}</p>}
+      {error && <p className="v-error-text">{error}</p>}
 
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-v-border text-v-text-subtle">
-            <th className="py-2">Email</th>
-            <th>Name</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {voters.map((v) => (
-            <tr key={v.id} className="border-b border-v-border/50">
-              <td className="py-3 text-v-text-muted">{v.email}</td>
-              <td className="text-v-text-subtle">
-                {[v.firstName, v.lastName].filter(Boolean).join(' ') || 'â€”'}
-              </td>
-              <td className={v.hasVoted ? 'text-v-success' : 'text-v-text-subtle'}>
-                {v.hasVoted ? 'Voted' : 'Pending'}
-              </td>
+      <div className="v-table-wrap">
+        <div className="p-4 border-b border-v-border">
+          <SearchInput
+            placeholder="Search voters by email or name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-xs"
+          />
+        </div>
+        <table className="v-table">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Name</th>
+              <th>Status</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {filteredVoters.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="text-center v-caption py-8">
+                  {search ? 'No voters found matching your search' : 'No voters yet'}
+                </td>
+              </tr>
+            ) : (
+              filteredVoters.map((v) => (
+                <tr key={v.id}>
+                  <td className="text-v-text-muted">{v.email}</td>
+                  <td className="v-caption">
+                    {[v.firstName, v.lastName].filter(Boolean).join(' ') || '—'}
+                  </td>
+                  <td>
+                    <span className={v.hasVoted ? 'v-badge v-badge-success' : 'v-badge'}>
+                      {v.hasVoted ? 'Voted' : 'Pending'}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

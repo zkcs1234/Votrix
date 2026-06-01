@@ -1,11 +1,16 @@
 /** Shared Tailwind class strings — use with design tokens from index.css */
 export const INPUT_CLASS = 'v-input'
 export const CARD_CLASS = 'v-card'
-export const CARD_PANEL = 'v-card p-6'
-export const PAGE_TITLE = 'text-xl font-semibold text-v-text'
+export const CARD_PANEL = 'v-card-md'
+export const CARD_SM = 'v-card-sm'
+export const CARD_LG = 'v-card-lg'
+export const PAGE_TITLE = 'v-page-title'
 export const PAGE_SUBTITLE = 'text-sm text-v-text-subtle'
+export const LABEL_CLASS = 'v-label'
+export const HELPER_TEXT = 'v-helper-text'
 export const LINK_MUTED = 'font-medium text-v-text-muted hover:text-v-text'
 export const BTN_PRIMARY =
-  'inline-flex items-center justify-center rounded-lg bg-v-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-v-primary-hover'
+  'v-btn-primary'
 export const BTN_SECONDARY =
-  'inline-flex items-center justify-center rounded-lg border border-v-border-strong bg-v-surface px-4 py-2 text-sm font-medium text-v-text transition hover:bg-v-surface-elevated'
+  'v-btn-secondary'
+export const BTN_TERTIARY = 'v-btn-tertiary'

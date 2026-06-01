@@ -1,8 +1,9 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { voterService } from '@/services/voter.service'
 import { useAuth } from '@/hooks/useAuth'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import VoterEventCard from '@/components/voter/VoterEventCard'
+import Card from '@/components/ui/Card'
 
 function EventSection({ title, description, events }) {
   if (!events?.length) return null
@@ -10,8 +11,8 @@ function EventSection({ title, description, events }) {
   return (
     <section>
       <div className="mb-3">
-        <h3 className="font-medium text-v-text">{title}</h3>
-        {description && <p className="text-sm text-v-text-subtle">{description}</p>}
+        <h3 className="v-section-title">{title}</h3>
+        {description && <p className="v-caption">{description}</p>}
       </div>
       <ul className="space-y-2">
         {events.map((event) => (
@@ -26,9 +27,9 @@ function EventSection({ title, description, events }) {
 
 function StatCard({ label, value, accent }) {
   return (
-    <div className="rounded-2xl border border-v-border bg-v-surface p-5">
-      <p className="text-xs text-v-text-subtle">{label}</p>
-      <p className={`mt-2 text-3xl font-bold ${accent}`}>{value}</p>
+    <div className="v-card-sm">
+      <p className="v-caption">{label}</p>
+      <p className={`mt-2 text-3xl font-bold tracking-tight ${accent}`}>{value}</p>
     </div>
   )
 }
@@ -55,7 +56,7 @@ export default function VoterDashboardPage() {
           setError(err.response?.data?.message || 'Failed to load dashboard')
         })
         .finally(() => {
-          if (alive) setLoading(false)
+          if (!alive) setLoading(false)
         })
     }
 
@@ -82,22 +83,22 @@ export default function VoterDashboardPage() {
   const stats = data?.stats ?? { total: 0, active: 0, assigned: 0, completed: 0 }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <div className="v-card p-8">
-        <h2 className="text-lg font-semibold text-v-text">Your events</h2>
-        <p className="mt-2 text-v-text-subtle">
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div className="v-card-md">
+        <h2 className="v-page-title">Your events</h2>
+        <p className="v-caption mt-2">
           Signed in as <span className="text-v-text-muted">{user?.email}</span>
         </p>
-        <p className="mt-1 text-sm text-v-text-subtle">
+        <p className="v-caption mt-1">
           Elections, pageant judging, and polls assigned to you appear below.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Assigned" value={stats.assigned} accent="text-amber-400" />
-        <StatCard label="Active now" value={stats.active} accent="text-v-success" />
-        <StatCard label="Completed" value={stats.completed} accent="text-v-text-muted" />
-        <StatCard label="Total" value={stats.total} accent="text-white" />
+        <StatCard label="Assigned" value={stats.assigned} accent="v-stat-accent" />
+        <StatCard label="Active now" value={stats.active} accent="v-stat-success" />
+        <StatCard label="Completed" value={stats.completed} accent="v-stat-muted" />
+        <StatCard label="Total" value={stats.total} accent="v-text" />
       </div>
 
       <EventSection
@@ -119,9 +120,9 @@ export default function VoterDashboardPage() {
       />
 
       {stats.total === 0 && (
-        <p className="rounded-xl border border-dashed border-v-border px-6 py-10 text-center text-sm text-v-text-subtle">
-          No events available. Create your first event to begin.
-        </p>
+        <Card padding="sm" className="text-center">
+          <p className="v-caption">No events available. Create your first event to begin.</p>
+        </Card>
       )}
     </div>
   )
