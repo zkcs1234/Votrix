@@ -32,7 +32,7 @@ export default function AdminDashboardPage() {
         if (!alive) return
         setError(err.response?.data?.message || 'Failed to load admin dashboard')
       } finally {
-        if (!alive) setLoading(false)
+        if (alive) setLoading(false)
       }
     }
 
