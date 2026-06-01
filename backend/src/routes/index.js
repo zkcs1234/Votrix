@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { publicApiLimiter } from '../middleware/rateLimiter.js'
 import healthRoutes from './health.routes.js'
 import authRoutes from './auth.routes.js'
 import adminRoutes from './admin.routes.js'
@@ -7,7 +8,7 @@ import voterRoutes from './voter.routes.js'
 
 const router = Router()
 
-router.get('/', (_req, res) => {
+router.get('/', publicApiLimiter, (_req, res) => {
   res.json({
     success: true,
     message: 'VOTRIX API',

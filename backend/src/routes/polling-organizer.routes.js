@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { uploadSingle, uploadImage } from '../middleware/upload.js'
-import { uploadLimiter } from '../middleware/rateLimiter.js'
+import { uploadLimiter, csvImportLimiter, emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/polling-organizer.controller.js'
 
 const router = Router()
@@ -21,7 +21,7 @@ router.delete('/events/:eventId/questions/:questionId', ctrl.deleteQuestion)
 
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
 
-router.post('/events/:eventId/respondents/invite', ctrl.inviteRespondent)
-router.post('/events/:eventId/respondents/import', uploadSingle('file'), ctrl.importRespondentsCsv)
+router.post('/events/:eventId/respondents/invite', emailLimiter, ctrl.inviteRespondent)
+router.post('/events/:eventId/respondents/import', csvImportLimiter, uploadSingle('file'), ctrl.importRespondentsCsv)
 
 export default router

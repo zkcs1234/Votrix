@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authenticate, authorize, requirePasswordChanged } from '../middleware/auth.js'
 import { USER_ROLES } from '../utils/constants.js'
+import { adminActionLimiter } from '../middleware/rateLimiter.js'
 import * as adminController from '../controllers/admin.controller.js'
 
 const router = Router()
@@ -12,7 +13,7 @@ router.get('/dashboard', adminController.getDashboard)
 router.get('/analytics', adminController.getAnalytics)
 
 router.get('/organizers', adminController.getOrganizers)
-router.post('/organizers', adminController.createOrganizerAccount)
+router.post('/organizers', adminActionLimiter, adminController.createOrganizerAccount)
 
 router.get('/events', adminController.getGlobalEvents)
 

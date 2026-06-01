@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { uploadSingle, uploadImage } from '../middleware/upload.js'
-import { uploadLimiter } from '../middleware/rateLimiter.js'
+import { uploadLimiter, csvImportLimiter, emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/pageant-organizer.controller.js'
 
 const router = Router()
@@ -31,8 +31,8 @@ router.patch('/events/:eventId/criteria/:criteriaId', ctrl.updateCriteria)
 router.delete('/events/:eventId/criteria/:criteriaId', ctrl.deleteCriteria)
 
 router.get('/events/:eventId/judges', ctrl.listJudges)
-router.post('/events/:eventId/judges/invite', ctrl.inviteJudge)
-router.post('/events/:eventId/judges/import', uploadSingle('file'), ctrl.importJudgesCsv)
+router.post('/events/:eventId/judges/invite', emailLimiter, ctrl.inviteJudge)
+router.post('/events/:eventId/judges/import', csvImportLimiter, uploadSingle('file'), ctrl.importJudgesCsv)
 
 router.get('/events/:eventId/rankings', ctrl.getRankings)
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)

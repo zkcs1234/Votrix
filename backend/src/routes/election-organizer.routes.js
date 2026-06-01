@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { uploadSingle, uploadImage } from '../middleware/upload.js'
-import { uploadLimiter } from '../middleware/rateLimiter.js'
+import { uploadLimiter, csvImportLimiter, emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/election-organizer.controller.js'
 
 const router = Router()
@@ -31,8 +31,8 @@ router.post(
 )
 
 router.get('/events/:eventId/voters', ctrl.listVoters)
-router.post('/events/:eventId/voters/invite', ctrl.inviteVoter)
-router.post('/events/:eventId/voters/import', uploadSingle('file'), ctrl.importCsv)
+router.post('/events/:eventId/voters/invite', emailLimiter, ctrl.inviteVoter)
+router.post('/events/:eventId/voters/import', csvImportLimiter, uploadSingle('file'), ctrl.importCsv)
 
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
 
