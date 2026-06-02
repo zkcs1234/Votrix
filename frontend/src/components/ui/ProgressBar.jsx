@@ -3,7 +3,7 @@
  * Use for file uploads, CSV imports, bulk operations, and long-running tasks
  */
 
-export default function ProgressBar({
+export function ProgressBar({
   value = 0,
   max = 100,
   showLabel = true,

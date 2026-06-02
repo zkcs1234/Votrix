@@ -3,7 +3,7 @@
  * Use for loading states where layout is known
  */
 
-export default function Skeleton({ className = '' }) {
+export function Skeleton({ className = '' }) {
   return (
     <div
       className={`animate-pulse rounded-lg bg-v-surface-elevated ${className}`}
@@ -11,6 +11,11 @@ export default function Skeleton({ className = '' }) {
     />
   )
 }
+
+export { ProgressBarWithStats } from './ProgressBar'
+export { ProgressBar } from './ProgressBar'
+
+export default Skeleton
 
 export function SkeletonCard() {
   return (
