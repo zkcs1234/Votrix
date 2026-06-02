@@ -62,6 +62,9 @@ export function ProgressBarWithStats({
   failed = 0,
   className = '',
 }) {
+  // percentage is intentionally computed here for accessibility/consistency,
+  // but it is not used in the UI for this stats wrapper.
+  // eslint-disable-next-line no-unused-vars
   const percentage = Math.min(100, Math.max(0, (value / max) * 100))
 
   return (
