@@ -1,49 +1,118 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { reportsService } from '@/services/reports.service'
-import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import {
+  SkeletonReport,
+  SkeletonChart,
+  SkeletonStatCard,
+} from '@/components/ui/Skeleton'
 import ReportHeader from '@/components/reports/ReportHeader'
 import TurnoutReport from '@/components/reports/TurnoutReport'
 import BarChart from '@/components/reports/BarChart'
 import StatCard from '@/components/reports/StatCard'
 import { downloadCsv, downloadJson } from '@/utils/exportReport'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+
+function ReportHeaderSkeleton() {
+  return (
+    <div className="space-y-2">
+      <div className="h-7 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
+      <div className="h-4 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
+    </div>
+  )
+}
+
+function ReportActionsSkeleton() {
+  return (
+    <div className="flex gap-2">
+      <div className="h-8 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
+      <div className="h-8 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
+      <div className="h-8 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
+    </div>
+  )
+}
 
 export default function ElectionReportPage() {
   const { eventId } = useParams()
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
 
-  const load = () => {
+  // Use delayed loading
+  const showLoader = useDelayedLoading(loading, 300)
+
+  const load = async () => {
     setLoading(true)
-    reportsService
-      .getElectionReport(eventId)
-      .then(({ data }) => setReport(data.report))
-      .finally(() => setLoading(false))
+    try {
+      const { data } = await reportsService.getElectionReport(eventId)
+      setReport(data.report)
+    } catch (err) {
+      console.error('Failed to load report:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
     load()
   }, [eventId])
 
-  const handleExportCsv = () => {
-    const rows = []
-    for (const pos of report?.voteSummary?.positionSummaries ?? []) {
-      for (const c of pos.candidates) {
-        rows.push({
-          position: pos.positionName,
-          candidate: c.candidateName,
-          votes: c.votes,
-          votePercentage: c.votePercentage,
-        })
+  const handleExportCsv = async () => {
+    setExporting(true)
+    try {
+      const rows = []
+      for (const pos of report?.voteSummary?.positionSummaries ?? []) {
+        for (const c of pos.candidates) {
+          rows.push({
+            position: pos.positionName,
+            candidate: c.candidateName,
+            votes: c.votes,
+            votePercentage: c.votePercentage,
+          })
+        }
       }
+      downloadCsv(`election-report-${eventId}.csv`, rows)
+    } finally {
+      setExporting(false)
     }
-    downloadCsv(`election-report-${eventId}.csv`, rows)
   }
 
-  if (loading) {
+  const handleExportJson = async () => {
+    setExporting(true)
+    try {
+      downloadJson(`election-report-${eventId}.json`, report)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  // Show nothing under 300ms
+  if (loading && !showLoader) {
+    return null
+  }
+
+  // Show skeleton after 300ms
+  if (loading || showLoader) {
     return (
-      <div className="flex justify-center py-20">
-        <LoadingSpinner />
+      <div className="mx-auto max-w-4xl space-y-8 print:space-y-6">
+        <div className="flex justify-between">
+          <ReportHeaderSkeleton />
+          <ReportActionsSkeleton />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="v-card-sm">
+            <div className="h-4 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
+            <div className="mt-2 h-8 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
+          </div>
+          <div className="v-card-sm">
+            <div className="h-4 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
+            <div className="mt-2 h-8 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
+          </div>
+        </div>
+
+        <SkeletonChart />
+        <SkeletonChart />
       </div>
     )
   }
@@ -54,7 +123,7 @@ export default function ElectionReportPage() {
     <div className="mx-auto max-w-4xl space-y-8 print:space-y-6">
       <ReportHeader
         title={report.event.title}
-        subtitle="Election report â€” turnout & vote summary"
+        subtitle="Election report — turnout & vote summary"
         generatedAt={report.generatedAt}
       />
 
@@ -69,14 +138,16 @@ export default function ElectionReportPage() {
         <button
           type="button"
           onClick={handleExportCsv}
-          className="rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted"
+          disabled={exporting}
+          className="rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted disabled:opacity-50"
         >
-          Export CSV
+          {exporting ? 'Exporting...' : 'Export CSV'}
         </button>
         <button
           type="button"
-          onClick={() => downloadJson(`election-report-${eventId}.json`, report)}
-          className="rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
+          onClick={handleExportJson}
+          disabled={exporting}
+          className="rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted disabled:opacity-50"
         >
           Export JSON
         </button>

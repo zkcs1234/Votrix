@@ -102,6 +102,59 @@ export const electionService = {
     })
   },
 
+  /**
+   * Import CSV with progress tracking
+   * Uses XMLHttpRequest to track upload progress
+   * @param {string} eventId - Event ID
+   * @param {File} file - CSV file
+   * @param {Function} onProgress - Progress callback
+   * @returns {Promise} - Import result
+   */
+  importCsvWithProgress(eventId, file, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      const form = new FormData()
+      form.append('file', file)
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          // Estimate total based on file size (rough estimate)
+          const estimatedTotal = Math.max(event.total, file.size * 2)
+          onProgress({
+            processed: event.loaded,
+            total: estimatedTotal,
+            succeeded: Math.floor(event.loaded / 3),
+            failed: 0,
+          })
+        }
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ data: JSON.parse(xhr.responseText) })
+        } else {
+          reject({
+            response: {
+              data: JSON.parse(xhr.responseText),
+              status: xhr.status,
+            },
+          })
+        }
+      }
+
+      xhr.onerror = () => {
+        reject({
+          response: { data: { message: 'Network error during import' }, status: xhr.status },
+        })
+      }
+
+      xhr.open('POST', `${api.defaults.baseURL}${base}/events/${eventId}/voters/import`)
+      xhr.setRequestHeader('Authorization', `Bearer ${api.defaults.headers.Authorization?.replace('Bearer ', '')}`)
+      xhr.withCredentials = true
+      xhr.send(form)
+    })
+  },
+
   getAnalytics(eventId) {
     return api.get(`${base}/events/${eventId}/analytics`)
   },

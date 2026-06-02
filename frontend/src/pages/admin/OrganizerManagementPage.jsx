@@ -5,6 +5,54 @@ import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import SearchInput from '@/components/ui/SearchInput'
 import { format } from 'date-fns'
+import { SkeletonTable } from '@/components/ui/Skeleton'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+
+function TableSkeleton() {
+  return (
+    <div className="v-table-wrap">
+      <table className="v-table">
+        <thead>
+          <tr>
+            <th>
+              <div className="h-4 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
+            </th>
+            <th>
+              <div className="h-4 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
+            </th>
+            <th>
+              <div className="h-4 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
+            </th>
+            <th className="text-right">
+              <div className="h-4 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-v-border">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <tr key={i} className="hover:bg-v-surface-elevated/50">
+              <td>
+                <div className="h-4 w-40 animate-pulse rounded-lg bg-v-surface-elevated" />
+              </td>
+              <td>
+                <div className="h-4 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
+              </td>
+              <td>
+                <div className="flex gap-2">
+                  <div className="h-6 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
+                  <div className="h-6 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
+                </div>
+              </td>
+              <td className="text-right">
+                <div className="h-6 w-12 animate-pulse rounded-lg bg-v-surface-elevated ml-auto" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 export default function OrganizerManagementPage() {
   const [organizers, setOrganizers] = useState([])
@@ -13,11 +61,15 @@ export default function OrganizerManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [search, setSearch] = useState('')
 
+  // Use delayed loading
+  const showLoader = useDelayedLoading(loading, 300)
+
   const fetchOrganizers = async () => {
     try {
       setLoading(true)
       const { data } = await adminService.getOrganizers()
       setOrganizers(data.organizers || [])
+      setError(null)
     } catch (err) {
       setError('Failed to load organizers')
       console.error(err)
@@ -37,6 +89,32 @@ export default function OrganizerManagementPage() {
       org.organizations?.some((o) => o.organization_name.toLowerCase().includes(searchLower))
     )
   })
+
+  // Show nothing under 300ms
+  if (loading && !showLoader) {
+    return null
+  }
+
+  // Show skeleton after 300ms
+  if (loading || showLoader) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="h-8 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
+            <div className="mt-2 h-4 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
+          </div>
+          <div className="h-10 w-36 animate-pulse rounded-lg bg-v-surface-elevated" />
+        </div>
+
+        <div className="h-10 w-80 animate-pulse rounded-lg bg-v-surface-elevated" />
+
+        <Card padding="sm">
+          <TableSkeleton />
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -58,9 +136,7 @@ export default function OrganizerManagementPage() {
       </div>
 
       <Card padding="sm">
-        {loading ? (
-          <div className="p-8 text-center v-caption">Loading organizers...</div>
-        ) : error ? (
+        {error ? (
           <div className="p-8 text-center text-v-danger">{error}</div>
         ) : filteredOrganizers.length === 0 ? (
           <div className="p-8 text-center v-caption">

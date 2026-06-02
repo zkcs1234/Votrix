@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import { voterService } from '@/services/voter.service'
 import { useAuth } from '@/hooks/useAuth'
-import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import {
+  SkeletonDashboard,
+  SkeletonStatCard,
+  SkeletonEventCard,
+} from '@/components/ui/Skeleton'
 import VoterEventCard from '@/components/voter/VoterEventCard'
 import Card from '@/components/ui/Card'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 function EventSection({ title, description, events }) {
   if (!events?.length) return null
@@ -34,11 +39,40 @@ function StatCard({ label, value, accent }) {
   )
 }
 
+function StatCardSkeleton() {
+  return (
+    <div className="v-card-sm">
+      <div className="h-4 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
+      <div className="mt-2 h-8 w-12 animate-pulse rounded-lg bg-v-surface-elevated" />
+    </div>
+  )
+}
+
+function EventSectionSkeleton() {
+  return (
+    <section>
+      <div className="mb-3">
+        <div className="h-5 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
+      </div>
+      <ul className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <li key={i}>
+            <SkeletonEventCard />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export default function VoterDashboardPage() {
   const { user } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  // Use delayed loading - only show skeleton after 300ms
+  const showLoader = useDelayedLoading(loading, 300)
 
   useEffect(() => {
     let alive = true
@@ -56,7 +90,8 @@ export default function VoterDashboardPage() {
           setError(err.response?.data?.message || 'Failed to load dashboard')
         })
         .finally(() => {
-          if (!alive) setLoading(false)
+          if (!alive) return
+          setLoading(false)
         })
     }
 
@@ -68,10 +103,29 @@ export default function VoterDashboardPage() {
     }
   }, [])
 
-  if (loading) {
+  // Show nothing under 300ms - prevents loading flicker
+  if (loading && !showLoader) {
+    return null
+  }
+
+  // Show skeleton after 300ms
+  if (loading || showLoader) {
     return (
-      <div className="flex justify-center py-20">
-        <LoadingSpinner />
+      <div className="mx-auto max-w-3xl space-y-6">
+        <div className="v-card-md">
+          <div className="h-8 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
+          <div className="mt-2 h-4 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+        </div>
+
+        <EventSectionSkeleton />
+        <EventSectionSkeleton />
       </div>
     )
   }

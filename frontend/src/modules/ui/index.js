@@ -8,7 +8,21 @@ export { default as StatCard } from '@/components/ui/StatCard'
 export { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/ui/Table'
 export { default as PageHeader } from '@/components/ui/PageHeader'
 export { default as EmptyState } from '@/components/ui/EmptyState'
-export { default as Skeleton, SkeletonCard } from '@/components/ui/Skeleton'
+export {
+  default as Skeleton,
+  SkeletonCard,
+  SkeletonTable,
+  SkeletonStatCard,
+  SkeletonEventCard,
+  SkeletonEventList,
+  SkeletonDashboard,
+  SkeletonForm,
+  SkeletonGrid,
+  SkeletonList,
+  SkeletonChart,
+  SkeletonReport,
+} from '@/components/ui/Skeleton'
+export { default as ProgressBar, ProgressBarWithStats, IndeterminateProgressBar } from '@/components/ui/ProgressBar'
 export { default as PageLoader } from '@/components/ui/PageLoader'
 export { default as ThemeToggle } from '@/components/ui/ThemeToggle'
 export { default as ToastContainer } from '@/components/ui/ToastContainer'
