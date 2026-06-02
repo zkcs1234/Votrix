@@ -30,6 +30,7 @@ export default function Button({
       disabled={disabled || loading}
       className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-v-bg ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
+
     >
       {loading && (
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />

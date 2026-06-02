@@ -318,7 +318,12 @@
     transition: color 0.15s;
   }
 
-  .v-btn-tertiary:hover {
+.v-btn-tertiary:hover {
+    color: var(--v-text);
+  }
+
+  /* Native button fallback: keep button text readable even if a page sets an incorrect inherited color */
+  button {
     color: var(--v-text);
   }
 
