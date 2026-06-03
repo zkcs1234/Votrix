@@ -9,7 +9,9 @@ import {
 export const getNotifications = asyncHandler(async (req, res) => {
   const unreadOnly = req.query.unreadOnly === 'true'
   const limit = Math.min(Number(req.query.limit) || 25, 100)
-  const notifications = await listNotifications(req.user.id, { unreadOnly, limit })
+  const type = typeof req.query.type === 'string' && req.query.type.trim() ? req.query.type.trim() : null
+  const entity = typeof req.query.entity === 'string' && req.query.entity.trim() ? req.query.entity.trim() : null
+  const notifications = await listNotifications(req.user.id, { unreadOnly, limit, type, entity })
   res.json({ success: true, notifications })
 })
 

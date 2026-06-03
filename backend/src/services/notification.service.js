@@ -71,7 +71,10 @@ export async function createNotificationsForRole(role, payload) {
   return createNotificationsForUsers((data ?? []).map((row) => row.id), payload)
 }
 
-export async function listNotifications(userId, { unreadOnly = false, limit = 25 } = {}) {
+export async function listNotifications(
+  userId,
+  { unreadOnly = false, limit = 25, type = null, entity = null } = {},
+) {
   let query = getClient()
     .from(DB_TABLES.NOTIFICATIONS)
     .select('*')
@@ -81,6 +84,12 @@ export async function listNotifications(userId, { unreadOnly = false, limit = 25
 
   if (unreadOnly) {
     query = query.eq('is_read', false)
+  }
+  if (type) {
+    query = query.eq('type', type)
+  }
+  if (entity) {
+    query = query.eq('entity', entity)
   }
 
   const { data, error } = await query

@@ -16,6 +16,21 @@ function pct(part, total) {
   return total > 0 ? Math.round((part / total) * 10000) / 100 : 0
 }
 
+function csvEscape(value) {
+  const raw = value === null || value === undefined ? '' : String(value)
+  return `"${raw.replace(/"/g, '""')}"`
+}
+
+function rowsToCsv(rows) {
+  if (!rows?.length) return ''
+  const headers = Object.keys(rows[0])
+  const lines = [headers.join(',')]
+  for (const row of rows) {
+    lines.push(headers.map((header) => csvEscape(row[header])).join(','))
+  }
+  return lines.join('\n')
+}
+
 export async function getReportsOverview(organizerId) {
   const [elections, pageants, polls] = await Promise.all([
     listElectionEvents(organizerId),
@@ -253,5 +268,88 @@ export async function getPollingReport(eventId, organizerId) {
       pollAnonymous: analytics.pollAnonymous,
     },
     questions: analytics.questions,
+  }
+}
+
+export async function getReportsOverviewExport(organizerId) {
+  const report = await getReportsOverview(organizerId)
+  const rows = [
+    ...report.elections.map((item) => ({
+      type: 'election',
+      title: item.title,
+      status: item.status,
+      metric: 'turnoutPercentage',
+      value: item.stats?.turnoutPercentage ?? 0,
+      details: `${item.stats?.votedCount ?? 0}/${item.stats?.totalVoters ?? 0}`,
+    })),
+    ...report.pageants.map((item) => ({
+      type: 'pageant',
+      title: item.title,
+      status: item.status,
+      metric: 'turnoutPercentage',
+      value: item.stats?.turnoutPercentage ?? 0,
+      details: `${item.stats?.submittedCount ?? 0}/${item.stats?.totalJudges ?? 0}`,
+    })),
+    ...report.polls.map((item) => ({
+      type: 'polling',
+      title: item.title,
+      status: item.status,
+      metric: 'responseRate',
+      value: item.stats?.responseRate ?? 0,
+      details: `${item.stats?.totalSubmissions ?? 0}/${item.stats?.totalRespondents ?? 0}`,
+    })),
+  ]
+
+  return {
+    filename: `reports-overview-${new Date().toISOString().slice(0, 10)}.csv`,
+    csv: rowsToCsv(rows),
+    json: report,
+  }
+}
+
+export async function getElectionReportExport(eventId, organizerId) {
+  const report = await getElectionReport(eventId, organizerId)
+  const rows = (report.voteSummary?.candidateResults ?? []).map((candidate) => ({
+    position: candidate.positionName ?? candidate.positionId ?? '',
+    candidate: candidate.candidateName ?? '',
+    votes: candidate.votes ?? 0,
+    votePercentage: candidate.votePercentage ?? 0,
+    shareOfTotalBallots: candidate.shareOfTotalBallots ?? 0,
+  }))
+
+  return {
+    filename: `election-report-${eventId}.csv`,
+    csv: rowsToCsv(rows),
+    json: report,
+  }
+}
+
+export async function getPageantReportExport(eventId, organizerId) {
+  const report = await getPageantReport(eventId, organizerId)
+  const rows = (report.rankings ?? []).map((row) => ({
+    contestant: row.contestantName ?? row.name ?? '',
+    totalScore: row.totalScore ?? 0,
+    rank: row.rank ?? '',
+  }))
+
+  return {
+    filename: `pageant-report-${eventId}.csv`,
+    csv: rowsToCsv(rows),
+    json: report,
+  }
+}
+
+export async function getPollingReportExport(eventId, organizerId) {
+  const report = await getPollingReport(eventId, organizerId)
+  const rows = (report.questions ?? []).map((question) => ({
+    question: question.question ?? question.title ?? '',
+    type: question.type ?? '',
+    submissions: question.submissions ?? question.responses ?? 0,
+  }))
+
+  return {
+    filename: `polling-report-${eventId}.csv`,
+    csv: rowsToCsv(rows),
+    json: report,
   }
 }

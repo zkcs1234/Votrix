@@ -2,7 +2,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import * as authService from '../services/auth.service.js'
 import { setAuthCookies, clearAuthCookies } from '../utils/cookies.js'
 import { issueCsrfToken, clearCsrfCookie } from '../utils/csrf.js'
-import { verifyRefreshToken } from '../utils/jwt.js'
+import { verifyAccessToken, verifyRefreshToken } from '../utils/jwt.js'
 import { env } from '../config/env.js'
 import {
   validateAdminLogin,
@@ -14,6 +14,7 @@ import {
   validateResetPassword,
 } from '../validators/email.validator.js'
 import * as passwordResetService from '../services/password-reset.service.js'
+import { createAuditLog } from '../services/admin.service.js'
 
 function sendAuthResponse(res, { accessToken, refreshToken, user }) {
   setAuthCookies(res, { accessToken, refreshToken })
@@ -27,6 +28,25 @@ function sendAuthResponse(res, { accessToken, refreshToken, user }) {
   })
 }
 
+async function writeAuthAudit({
+  action,
+  userId = null,
+  entityId = null,
+  details = {},
+}) {
+  try {
+    await createAuditLog({
+      userId,
+      action,
+      entity: 'users',
+      entityId,
+      details,
+    })
+  } catch {
+    // Authentication should not fail just because audit storage is unavailable.
+  }
+}
+
 export const getCsrfToken = asyncHandler(async (_req, res) => {
   const csrfToken = issueCsrfToken(res)
   res.json({ success: true, csrfToken })
@@ -34,20 +54,89 @@ export const getCsrfToken = asyncHandler(async (_req, res) => {
 
 export const adminLogin = asyncHandler(async (req, res) => {
   const credentials = validateAdminLogin(req.body)
-  const tokens = await authService.loginAdmin(credentials)
-  sendAuthResponse(res, tokens)
+  try {
+    const tokens = await authService.loginAdmin(credentials)
+    await writeAuthAudit({
+      action: 'ADMIN_LOGIN_SUCCESS',
+      userId: tokens.user?.id ?? null,
+      entityId: tokens.user?.id ?? null,
+      details: {
+        username: tokens.user?.username ?? null,
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+      },
+    })
+    return sendAuthResponse(res, tokens)
+  } catch (error) {
+    await writeAuthAudit({
+      action: 'ADMIN_LOGIN_FAILED',
+      details: {
+        username: credentials.username,
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+        message: error.message,
+      },
+    })
+    throw error
+  }
 })
 
 export const organizerLogin = asyncHandler(async (req, res) => {
   const credentials = validateEmailLogin(req.body)
-  const tokens = await authService.loginOrganizer(credentials)
-  sendAuthResponse(res, tokens)
+  try {
+    const tokens = await authService.loginOrganizer(credentials)
+    await writeAuthAudit({
+      action: 'ORGANIZER_LOGIN_SUCCESS',
+      userId: tokens.user?.id ?? null,
+      entityId: tokens.user?.id ?? null,
+      details: {
+        email: tokens.user?.email ?? credentials.email,
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+      },
+    })
+    return sendAuthResponse(res, tokens)
+  } catch (error) {
+    await writeAuthAudit({
+      action: 'ORGANIZER_LOGIN_FAILED',
+      details: {
+        email: credentials.email,
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+        message: error.message,
+      },
+    })
+    throw error
+  }
 })
 
 export const voterLogin = asyncHandler(async (req, res) => {
   const credentials = validateEmailLogin(req.body)
-  const tokens = await authService.loginVoter(credentials)
-  sendAuthResponse(res, tokens)
+  try {
+    const tokens = await authService.loginVoter(credentials)
+    await writeAuthAudit({
+      action: 'VOTER_LOGIN_SUCCESS',
+      userId: tokens.user?.id ?? null,
+      entityId: tokens.user?.id ?? null,
+      details: {
+        email: tokens.user?.email ?? credentials.email,
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+      },
+    })
+    return sendAuthResponse(res, tokens)
+  } catch (error) {
+    await writeAuthAudit({
+      action: 'VOTER_LOGIN_FAILED',
+      details: {
+        email: credentials.email,
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+        message: error.message,
+      },
+    })
+    throw error
+  }
 })
 
 export const refresh = asyncHandler(async (req, res) => {
@@ -64,6 +153,32 @@ export const refresh = asyncHandler(async (req, res) => {
 })
 
 export const logout = asyncHandler(async (_req, res) => {
+  const token =
+    _req.cookies?.[env.jwt.accessCookieName] ||
+    (_req.headers.authorization?.startsWith('Bearer ')
+      ? _req.headers.authorization.slice(7)
+      : null)
+
+  if (token) {
+    try {
+      const decoded = verifyAccessToken(token)
+      await writeAuthAudit({
+        action: 'USER_LOGOUT',
+        userId: decoded.sub ?? null,
+        entityId: decoded.sub ?? null,
+        details: {
+          role: decoded.role ?? null,
+          username: decoded.username ?? null,
+          email: decoded.email ?? null,
+          ip: _req.ip ?? null,
+          userAgent: _req.get('user-agent') ?? null,
+        },
+      })
+    } catch {
+      // Ignore invalid/expired tokens during logout cleanup.
+    }
+  }
+
   clearAuthCookies(res)
   clearCsrfCookie(res)
   res.json({ success: true, message: 'Logged out' })

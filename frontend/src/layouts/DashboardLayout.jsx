@@ -31,6 +31,11 @@ export default function DashboardLayout({ title = 'Dashboard' }) {
             isActive: (loc) => loc.pathname.startsWith('/admin/events'),
           },
           {
+            label: 'Notifications',
+            path: '/notifications',
+            isActive: (loc) => loc.pathname.startsWith('/notifications'),
+          },
+          {
             label: 'System Settings',
             path: '/admin/settings',
             isActive: (loc) => loc.pathname.startsWith('/admin/settings'),
