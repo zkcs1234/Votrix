@@ -13,11 +13,7 @@ export default function DashboardLayout({ title = 'Dashboard' }) {
       path: home,
       isActive: (loc) => loc.pathname === home,
     },
-    {
-      label: 'Notifications',
-      path: '/notifications',
-      isActive: (loc) => loc.pathname.startsWith('/notifications'),
-    },
+
     ...(role === USER_ROLES.ADMIN
       ? [
           {
