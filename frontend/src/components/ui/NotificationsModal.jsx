@@ -20,8 +20,8 @@ const TYPE_TONE = {
 function NotificationSkeleton() {
   return (
     <div className="space-y-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-24 animate-pulse rounded-2xl bg-v-surface-elevated" />
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="h-20 animate-pulse rounded-2xl bg-v-surface-elevated" />
       ))}
     </div>
   )
@@ -39,32 +39,29 @@ function NotificationCard({ notification, onMarkRead }) {
           : 'border-v-border bg-v-surface-elevated/40'
       }`}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1 space-y-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-medium text-v-text">{notification.title}</h3>
-            <Badge tone={TYPE_TONE[notification.type] ?? 'default'}>
-              {notification.type.replace('.', ' ')}
-            </Badge>
+            <h3 className="text-sm font-medium text-v-text">{notification.title}</h3>
             {unread && <Badge tone="warning">Unread</Badge>}
           </div>
-          <p className="text-sm text-v-text-muted">{notification.message}</p>
-          <p className="text-xs text-v-text-subtle">
+          <p className="text-xs text-v-text-muted line-clamp-2">{notification.message}</p>
+          <p className="text-[10px] text-v-text-subtle">
             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
           </p>
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2 sm:flex-col sm:items-end">
           {actionAvailable && (
             <Link
               to={notification.action_url}
-              className="inline-flex items-center justify-center rounded-lg border border-v-border-strong bg-v-surface px-3 py-1.5 text-sm font-medium text-v-text transition hover:bg-v-surface-elevated"
+              className="inline-flex items-center justify-center rounded-lg border border-v-border-strong bg-v-surface px-2.5 py-1 text-xs font-medium text-v-text transition hover:bg-v-surface-elevated"
             >
               Open
             </Link>
           )}
           {unread && (
-            <Button size="sm" onClick={() => onMarkRead(notification.id)}>
+            <Button size="sm" className="!px-2.5 !py-1 !text-xs" onClick={() => onMarkRead(notification.id)}>
               Mark read
             </Button>
           )}
@@ -74,7 +71,7 @@ function NotificationCard({ notification, onMarkRead }) {
   )
 }
 
-export default function NotificationsPage() {
+export default function NotificationsModal({ onClose }) {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -155,88 +152,77 @@ export default function NotificationsPage() {
     }
   }
 
-  if (loading && !showLoader) {
-    return null
-  }
-
-  if (loading || showLoader) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <div className="h-8 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
-          <div className="mt-2 h-4 w-80 animate-pulse rounded-lg bg-v-surface-elevated" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
-          <div className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
-          <div className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
-        </div>
-        <NotificationSkeleton />
-      </div>
-    )
-  }
-
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="v-page-title">Notifications</h1>
-          <p className="v-caption">
-            Keep track of organizer approvals, event updates, invitations, and responses.
-          </p>
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
+      <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 flex max-h-[85vh] w-[90vw] sm:w-[500px] flex-col overflow-hidden rounded-2xl border border-v-border bg-v-bg shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-v-border p-4">
+          <h2 className="text-lg font-semibold text-v-text">Notifications</h2>
+          <Button size="sm" variant="secondary" onClick={onClose} className="!p-1">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </Button>
         </div>
-        <Button onClick={handleMarkAllRead} loading={saving} variant="secondary">
-          Mark all read
-        </Button>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Total" value={summary.total} />
-        <StatCard label="Unread" value={summary.unread} />
-        <StatCard label="Read" value={summary.read} />
-      </div>
-
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <SearchInput
-          placeholder="Search notifications"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="lg:max-w-lg"
-        />
-
-        <div className="flex flex-wrap gap-2">
-          {['all', 'unread', 'read'].map((item) => (
-            <Button
-              key={item}
-              type="button"
-              variant={filter === item ? 'primary' : 'secondary'}
-              onClick={() => setFilter(item)}
-            >
-              {item === 'all' ? 'All' : item.charAt(0).toUpperCase() + item.slice(1)}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {error ? (
-        <div className="rounded-xl border border-v-danger bg-v-danger-bg px-4 py-3 text-sm text-v-danger">
-          {error}
-        </div>
-      ) : filteredNotifications.length === 0 ? (
-        <Card className="p-8 text-center">
-          <p className="v-caption">No notifications match your filters.</p>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {filteredNotifications.map((notification) => (
-            <NotificationCard
-              key={notification.id}
-              notification={notification}
-              onMarkRead={handleMarkRead}
+        
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="mb-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-v-text-subtle">
+                {summary.unread} unread / {summary.total} total
+              </span>
+              <Button size="sm" onClick={handleMarkAllRead} loading={saving} variant="ghost" className="!px-2 !py-1 !text-xs">
+                Mark all read
+              </Button>
+            </div>
+            
+            <SearchInput
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
-          ))}
+            
+            <div className="flex flex-wrap gap-1">
+              {['all', 'unread', 'read'].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setFilter(item)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                    filter === item
+                      ? 'bg-v-primary text-white'
+                      : 'bg-v-surface-elevated text-v-text-muted hover:bg-v-border'
+                  }`}
+                >
+                  {item === 'all' ? 'All' : item.charAt(0).toUpperCase() + item.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loading || showLoader ? (
+            <NotificationSkeleton />
+          ) : error ? (
+            <div className="rounded-xl border border-v-danger bg-v-danger-bg px-4 py-3 text-sm text-v-danger">
+              {error}
+            </div>
+          ) : filteredNotifications.length === 0 ? (
+            <Card className="p-6 text-center">
+              <p className="text-sm text-v-text-muted">No notifications match your filters.</p>
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {filteredNotifications.map((notification) => (
+                <NotificationCard
+                  key={notification.id}
+                  notification={notification}
+                  onMarkRead={handleMarkRead}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </>
   )
 }
