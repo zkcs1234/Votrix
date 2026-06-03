@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import ImageUploadField from '@/components/upload/ImageUploadField'
+import DateTimeInput from '@/components/ui/DateTimeInput'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 
@@ -15,6 +16,8 @@ export default function ElectionEventFormPage() {
   const [step, setStep] = useState(1)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [loading, setLoading] = useState(!isNew)
@@ -28,6 +31,8 @@ export default function ElectionEventFormPage() {
       .then(({ data }) => {
         setTitle(data.event.title)
         setDescription(data.event.description || '')
+        setStartDate(data.event.start_date ? data.event.start_date.slice(0, 16) : '')
+        setEndDate(data.event.end_date ? data.event.end_date.slice(0, 16) : '')
         setBanner(data.event.banner)
       })
       .finally(() => setLoading(false))
@@ -44,12 +49,18 @@ export default function ElectionEventFormPage() {
     setError(null)
 
     try {
+      const payload = {
+        title,
+        description,
+        startDate: startDate ? new Date(startDate).toISOString() : null,
+        endDate: endDate ? new Date(endDate).toISOString() : null,
+      }
       let id = eventId
       if (isNew) {
-        const { data } = await electionService.createEvent({ title, description })
+        const { data } = await electionService.createEvent(payload)
         id = data.event.id
       } else {
-        await electionService.updateEvent(eventId, { title, description })
+        await electionService.updateEvent(eventId, payload)
       }
 
       if (bannerFile) {
@@ -105,6 +116,30 @@ export default function ElectionEventFormPage() {
                 placeholder="Enter election description (optional)"
               />
               <p className={HELPER_TEXT}>Optional description for voters</p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="v-form-field">
+                <label className={LABEL_CLASS} htmlFor="startDate">
+                  Start Date (Optional)
+                </label>
+                <DateTimeInput
+                  id="startDate"
+                  value={startDate}
+                  onChange={setStartDate}
+                />
+              </div>
+
+              <div className="v-form-field">
+                <label className={LABEL_CLASS} htmlFor="endDate">
+                  End Date (Optional)
+                </label>
+                <DateTimeInput
+                  id="endDate"
+                  value={endDate}
+                  onChange={setEndDate}
+                />
+              </div>
             </div>
 
             <div className="v-form-actions">
