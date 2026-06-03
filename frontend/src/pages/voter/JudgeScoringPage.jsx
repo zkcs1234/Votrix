@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -19,10 +19,23 @@ export default function JudgeScoringPage() {
       .then(({ data }) => {
         setSheet(data)
         if (data.hasScored) setDone(true)
-        setScores({ ...data.existingScores })
+        
+        try {
+          const savedStr = localStorage.getItem(`votrix_pageant_draft_${eventId}`)
+          const saved = savedStr ? JSON.parse(savedStr) : {}
+          setScores({ ...data.existingScores, ...saved })
+        } catch {
+          setScores({ ...data.existingScores })
+        }
       })
       .finally(() => setLoading(false))
   }, [eventId])
+
+  useEffect(() => {
+    if (Object.keys(scores).length > 0) {
+      localStorage.setItem(`votrix_pageant_draft_${eventId}`, JSON.stringify(scores))
+    }
+  }, [eventId, scores])
 
   const setScore = (contestantId, criteriaId, value) => {
     const key = `${contestantId}:${criteriaId}`
@@ -68,6 +81,7 @@ export default function JudgeScoringPage() {
 
     try {
       await pageantService.submitScores(eventId, payload)
+      localStorage.removeItem(`votrix_pageant_draft_${eventId}`)
       setDone(true)
     } catch (err) {
       setError(err.response?.data?.message || 'Submit failed')

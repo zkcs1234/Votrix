@@ -12,6 +12,7 @@ export default function ElectionEventFormPage() {
   const isNew = !eventId || eventId === 'new'
   const navigate = useNavigate()
 
+  const [step, setStep] = useState(1)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [banner, setBanner] = useState(null)
@@ -31,6 +32,11 @@ export default function ElectionEventFormPage() {
       })
       .finally(() => setLoading(false))
   }, [eventId, isNew])
+
+  const handleNext = (e) => {
+    e.preventDefault()
+    setStep(2)
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -62,59 +68,80 @@ export default function ElectionEventFormPage() {
 
   return (
     <div className="mx-auto max-w-lg">
-      <h2 className="v-page-title mb-6">{isNew ? 'Create election event' : 'Edit election event'}</h2>
+      <h2 className="v-page-title mb-2">{isNew ? 'Create election event' : 'Edit election event'}</h2>
+      <div className="mb-6 flex items-center gap-2 text-sm text-v-text-subtle">
+        <span className={step === 1 ? 'text-v-primary font-medium' : ''}>Step 1: Details</span>
+        <span>→</span>
+        <span className={step === 2 ? 'text-v-primary font-medium' : ''}>Step 2: Branding</span>
+      </div>
 
       <Card padding="md">
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="v-form-field">
-            <label className={LABEL_CLASS} htmlFor="title">
-              Title
-            </label>
-            <input
-              id="title"
-              className={INPUT_CLASS}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter election title"
-              required
-            />
-          </div>
+        {step === 1 ? (
+          <form className="space-y-4" onSubmit={handleNext}>
+            <div className="v-form-field">
+              <label className={LABEL_CLASS} htmlFor="title">
+                Title
+              </label>
+              <input
+                id="title"
+                className={INPUT_CLASS}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter election title"
+                required
+              />
+            </div>
 
-          <div className="v-form-field">
-            <label className={LABEL_CLASS} htmlFor="description">
-              Description
-            </label>
-            <textarea
-              id="description"
-              className={INPUT_CLASS}
-              rows={4}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter election description (optional)"
-            />
-            <p className={HELPER_TEXT}>Optional description for voters</p>
-          </div>
+            <div className="v-form-field">
+              <label className={LABEL_CLASS} htmlFor="description">
+                Description
+              </label>
+              <textarea
+                id="description"
+                className={INPUT_CLASS}
+                rows={4}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter election description (optional)"
+              />
+              <p className={HELPER_TEXT}>Optional description for voters</p>
+            </div>
 
-          <ImageUploadField
-            label="Event banner"
-            hint="Wide image for event headers (stored on Cloudinary)."
-            variant="banner"
-            currentUrl={banner}
-            onFileSelect={setBannerFile}
-            disabled={saving}
-          />
-
-          {error && <p className="v-error-text">{error}</p>}
-
-          <div className="v-form-actions">
-            <Button
-              type="submit"
+            <div className="v-form-actions">
+              <Button type="submit">Next step</Button>
+            </div>
+          </form>
+        ) : (
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <ImageUploadField
+              label="Event banner"
+              hint="Wide image for event headers (stored on Cloudinary)."
+              variant="banner"
+              currentUrl={banner}
+              onFileSelect={setBannerFile}
               disabled={saving}
-            >
-              {saving ? 'Saving...' : isNew ? 'Create event' : 'Save changes'}
-            </Button>
-          </div>
-        </form>
+            />
+
+            {error && <p className="v-error-text">{error}</p>}
+
+            <div className="flex justify-between pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setStep(1)}
+                disabled={saving}
+              >
+                Back
+              </Button>
+              <Button
+                type="submit"
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : isNew ? 'Create event' : 'Save changes'}
+              </Button>
+            </div>
+          </form>
+        )}
       </Card>
     </div>
   )

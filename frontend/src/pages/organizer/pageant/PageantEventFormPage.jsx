@@ -11,12 +11,15 @@ export default function PageantEventFormPage() {
   const { eventId } = useParams()
   const isNew = !eventId || eventId === 'new'
   const navigate = useNavigate()
+
+  const [step, setStep] = useState(1)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!isNew)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     if (isNew) return
@@ -27,9 +30,16 @@ export default function PageantEventFormPage() {
     }).finally(() => setLoading(false))
   }, [eventId, isNew])
 
+  const handleNext = (e) => {
+    e.preventDefault()
+    setStep(2)
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
+    setError(null)
+
     try {
       let id = eventId
       if (isNew) {
@@ -38,8 +48,12 @@ export default function PageantEventFormPage() {
       } else {
         await pageantService.updateEvent(eventId, { title, description })
       }
-      if (bannerFile) await pageantService.uploadBanner(id, bannerFile)
+      if (bannerFile) {
+        await pageantService.uploadBanner(id, bannerFile)
+      }
       navigate(`/organizer/pageant/events/${id}/contestants`)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save event')
     } finally {
       setSaving(false)
     }
@@ -49,57 +63,80 @@ export default function PageantEventFormPage() {
 
   return (
     <div className="mx-auto max-w-lg">
-      <h2 className="v-page-title mb-6">{isNew ? 'Create pageant event' : 'Edit pageant event'}</h2>
+      <h2 className="v-page-title mb-2">{isNew ? 'Create pageant event' : 'Edit pageant event'}</h2>
+      <div className="mb-6 flex items-center gap-2 text-sm text-v-text-subtle">
+        <span className={step === 1 ? 'text-v-primary font-medium' : ''}>Step 1: Details</span>
+        <span>→</span>
+        <span className={step === 2 ? 'text-v-primary font-medium' : ''}>Step 2: Branding</span>
+      </div>
 
       <Card padding="md">
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="v-form-field">
-            <label className={LABEL_CLASS} htmlFor="title">
-              Title
-            </label>
-            <input
-              id="title"
-              className={INPUT_CLASS}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter pageant title"
-              required
-            />
-          </div>
+        {step === 1 ? (
+          <form className="space-y-4" onSubmit={handleNext}>
+            <div className="v-form-field">
+              <label className={LABEL_CLASS} htmlFor="title">
+                Title
+              </label>
+              <input
+                id="title"
+                className={INPUT_CLASS}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter pageant title"
+                required
+              />
+            </div>
 
-          <div className="v-form-field">
-            <label className={LABEL_CLASS} htmlFor="description">
-              Description
-            </label>
-            <textarea
-              id="description"
-              className={INPUT_CLASS}
-              rows={4}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter pageant description (optional)"
-            />
-            <p className={HELPER_TEXT}>Optional description for judges and contestants</p>
-          </div>
+            <div className="v-form-field">
+              <label className={LABEL_CLASS} htmlFor="description">
+                Description
+              </label>
+              <textarea
+                id="description"
+                className={INPUT_CLASS}
+                rows={4}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter pageant description (optional)"
+              />
+              <p className={HELPER_TEXT}>Optional description for judges and contestants</p>
+            </div>
 
-          <ImageUploadField
-            label="Event banner"
-            hint="Wide image for event headers."
-            variant="banner"
-            currentUrl={banner}
-            onFileSelect={setBannerFile}
-            disabled={saving}
-          />
-
-          <div className="v-form-actions">
-            <Button
-              type="submit"
+            <div className="v-form-actions">
+              <Button type="submit">Next step</Button>
+            </div>
+          </form>
+        ) : (
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <ImageUploadField
+              label="Event banner"
+              hint="Wide image for event headers."
+              variant="banner"
+              currentUrl={banner}
+              onFileSelect={setBannerFile}
               disabled={saving}
-            >
-              {saving ? 'Saving...' : isNew ? 'Create pageant' : 'Save changes'}
-            </Button>
-          </div>
-        </form>
+            />
+
+            {error && <p className="v-error-text">{error}</p>}
+
+            <div className="flex justify-between pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setStep(1)}
+                disabled={saving}
+              >
+                Back
+              </Button>
+              <Button
+                type="submit"
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : isNew ? 'Create pageant' : 'Save changes'}
+              </Button>
+            </div>
+          </form>
+        )}
       </Card>
     </div>
   )

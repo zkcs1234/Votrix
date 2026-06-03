@@ -27,12 +27,34 @@ function validateSelections(positions, selections) {
 export default function VoterEventPage() {
   const { eventId } = useParams()
   const [ballot, setBallot] = useState(null)
-  const [selections, setSelections] = useState({})
-  const [skippedPositions, setSkippedPositions] = useState(() => new Set())
+  const [selections, setSelections] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`votrix_election_draft_${eventId}`)
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  })
+  const [skippedPositions, setSkippedPositions] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`votrix_election_skipped_${eventId}`)
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
+
+  useEffect(() => {
+    localStorage.setItem(`votrix_election_draft_${eventId}`, JSON.stringify(selections))
+    localStorage.setItem(
+      `votrix_election_skipped_${eventId}`,
+      JSON.stringify(Array.from(skippedPositions))
+    )
+  }, [eventId, selections, skippedPositions])
 
   useEffect(() => {
     electionService
@@ -96,6 +118,8 @@ export default function VoterEventPage() {
 
     try {
       await electionService.submitVote(eventId, selections)
+      localStorage.removeItem(`votrix_election_draft_${eventId}`)
+      localStorage.removeItem(`votrix_election_skipped_${eventId}`)
       setDone(true)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit ballot')

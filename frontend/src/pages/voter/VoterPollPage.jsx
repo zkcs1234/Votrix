@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -7,7 +7,14 @@ import PollQuestionField from '@/components/voter/polling/PollQuestionField'
 export default function VoterPollPage() {
   const { eventId } = useParams()
   const [poll, setPoll] = useState(null)
-  const [answers, setAnswers] = useState({})
+  const [answers, setAnswers] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`votrix_poll_draft_${eventId}`)
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  })
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -24,6 +31,10 @@ export default function VoterPollPage() {
   useEffect(() => {
     loadPoll().finally(() => setLoading(false))
   }, [eventId])
+
+  useEffect(() => {
+    localStorage.setItem(`votrix_poll_draft_${eventId}`, JSON.stringify(answers))
+  }, [eventId, answers])
 
   const questions = poll?.questions ?? []
 
@@ -47,6 +58,7 @@ export default function VoterPollPage() {
 
     try {
       await pollingService.submitPoll(eventId, answers)
+      localStorage.removeItem(`votrix_poll_draft_${eventId}`)
       setDone(true)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit')
