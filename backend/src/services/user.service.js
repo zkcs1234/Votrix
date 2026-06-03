@@ -69,6 +69,7 @@ export async function createOrganizer({
       email: normalizedEmail,
       password: passwordHash,
       role: USER_ROLES.ORGANIZER,
+      account_status: 'pending',
       must_change_password: mustChangePassword,
     })
     .select('*')

@@ -43,7 +43,7 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess }) {
     try {
       await ensureCsrfToken()
       const { data } = await adminService.createOrganizer({ ...values, sendEmail: true })
-      setSuccess(`Organizer created: ${data.user.email}`)
+      setSuccess(`Organizer created and pending approval: ${data.user.email}`)
       if (data.email?.sent) {
         setEmailStatus('Invitation email sent successfully.')
       } else if (data.email?.skipped) {
@@ -78,7 +78,7 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess }) {
 
         <h2 className="v-page-title">Create Organizer</h2>
         <p className="v-caption mt-1">
-          The organizer must change this password on first login.
+          New organizer accounts start in pending review, and the organizer must change this password on first login.
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>

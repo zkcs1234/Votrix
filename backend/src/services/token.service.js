@@ -7,6 +7,7 @@ export function buildTokenPayload(user) {
     role: user.role,
     username: user.username ?? undefined,
     email: user.email ?? undefined,
+    accountStatus: user.account_status ?? 'active',
     mustChangePassword: Boolean(user.must_change_password),
   }
 }

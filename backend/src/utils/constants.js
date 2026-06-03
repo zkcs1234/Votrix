@@ -4,6 +4,13 @@ export const USER_ROLES = {
   VOTER: 'voter',
 }
 
+export const ACCOUNT_STATUS = {
+  PENDING: 'pending',
+  ACTIVE: 'active',
+  SUSPENDED: 'suspended',
+  ARCHIVED: 'archived',
+}
+
 export const ORG_TYPES = {
   ELECTION: 'election',
   PAGEANT: 'pageant',
@@ -59,4 +66,5 @@ export const DB_TABLES = {
   POLL_SUBMISSIONS: 'poll_submissions',
   SYSTEM_SETTINGS: 'system_settings',
   AUDIT_LOGS: 'audit_logs',
+  NOTIFICATIONS: 'notifications',
 }

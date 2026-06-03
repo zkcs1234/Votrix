@@ -110,7 +110,8 @@ export default function AdminDashboardPage() {
           <div className="mt-2 h-4 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <StatCardSkeleton />
           <StatCardSkeleton />
           <StatCardSkeleton />
           <StatCardSkeleton />
@@ -170,11 +171,12 @@ export default function AdminDashboardPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total organizers" value={stats?.totalOrganizers ?? 0} />
         <StatCard label="Total events" value={stats?.totalEvents ?? 0} />
         <StatCard label="Total voters" value={stats?.totalVoters ?? 0} />
         <StatCard label="Active events" value={stats?.activeEvents ?? 0} />
+        <StatCard label="Votes cast" value={stats?.totalVotesCast ?? 0} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -223,6 +225,22 @@ export default function AdminDashboardPage() {
                 className="v-btn-tertiary"
               >
                 View all events →
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/admin/audit-logs"
+                className="v-btn-tertiary"
+              >
+                Review audit logs →
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/admin/settings"
+                className="v-btn-tertiary"
+              >
+                Update system settings →
               </Link>
             </li>
           </ul>

@@ -6,6 +6,7 @@ import { generateTemporaryPassword } from '../utils/crypto.js'
 import { findUserByEmail, findUserById, sanitizeUser } from './user.service.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { sendVoterInvitationEmail } from './mailer.service.js'
+import { createNotification } from './notification.service.js'
 
 function getClient() {
   const client = getSupabase()
@@ -96,6 +97,22 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
       .update({ invitation_sent: true })
       .eq('event_id', eventId)
       .eq('voter_id', user.id)
+
+    await createNotification({
+      userId: user.id,
+      type: 'voter.invitation',
+      title: `You're invited to ${event.title}`,
+      message: `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
+      actionUrl:
+        event.event_type === 'pageant'
+          ? `/voter/pageant/events/${event.id}/score`
+          : event.event_type === 'polling'
+            ? `/voter/polling/events/${event.id}`
+            : `/voter/events/${event.id}`,
+      entity: 'events',
+      entityId: event.id,
+      metadata: { eventType: event.event_type, organizationName: event.organizations?.organization_name },
+    })
   }
 
   return {
@@ -139,6 +156,22 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
       .update({ invitation_sent: true })
       .eq('event_id', eventId)
       .eq('voter_id', voterId)
+
+    await createNotification({
+      userId: voterId,
+      type: 'voter.invitation.resend',
+      title: `Invitation resent for ${event.title}`,
+      message: `A new temporary password was sent for ${event.title}.`,
+      actionUrl:
+        event.event_type === 'pageant'
+          ? `/voter/pageant/events/${event.id}/score`
+          : event.event_type === 'polling'
+            ? `/voter/polling/events/${event.id}`
+            : `/voter/events/${event.id}`,
+      entity: 'events',
+      entityId: event.id,
+      metadata: { eventType: event.event_type, organizationName: event.organizations?.organization_name },
+    })
   }
 
   return { email: emailResult }

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { authenticate, authorize, requirePasswordChanged } from '../middleware/auth.js'
+import { authenticate, authorize, requireActiveAccount, requirePasswordChanged } from '../middleware/auth.js'
 import { USER_ROLES } from '../utils/constants.js'
 import { emailLimiter } from '../middleware/rateLimiter.js'
 import * as organizerController from '../controllers/organizer.controller.js'
@@ -10,7 +10,7 @@ import reportsOrganizerRoutes from './reports-organizer.routes.js'
 
 const router = Router()
 
-router.use(authenticate, authorize(USER_ROLES.ORGANIZER), requirePasswordChanged)
+router.use(authenticate, authorize(USER_ROLES.ORGANIZER), requireActiveAccount, requirePasswordChanged)
 
 router.use('/election', electionOrganizerRoutes)
 router.use('/pageant', pageantOrganizerRoutes)

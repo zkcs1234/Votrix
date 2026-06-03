@@ -2,6 +2,7 @@ import { getSupabase } from '../config/database.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES } from '../utils/constants.js'
 import { sendEventNotificationEmail } from './mailer.service.js'
+import { createNotificationsForUsers } from './notification.service.js'
 
 function getClient() {
   const client = getSupabase()
@@ -40,7 +41,7 @@ export async function assertOrganizerOwnsEvent(eventId, organizerId) {
   return event
 }
 
-export async function getEventVoterEmails(eventId) {
+export async function getEventVoterAccounts(eventId) {
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_VOTERS)
     .select(
@@ -72,7 +73,7 @@ function formatDate(iso) {
 
 export async function notifyEventParticipants(eventId, organizerId, { message }) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
-  const voters = await getEventVoterEmails(eventId)
+  const voters = await getEventVoterAccounts(eventId)
 
   if (!voters.length) {
     return { sent: 0, failed: 0, total: 0, message: 'No voters enrolled for this event' }
@@ -98,6 +99,30 @@ export async function notifyEventParticipants(eventId, organizerId, { message })
 
   const sent = results.filter((r) => r.sent).length
   const failed = results.length - sent
+
+  const successfulVoterIds = voters
+    .filter((_voter, index) => results[index]?.sent)
+    .map((voter) => voter.id)
+
+  if (successfulVoterIds.length) {
+    await createNotificationsForUsers(successfulVoterIds, {
+      type: 'event.notification',
+      title: `New update for ${event.title}`,
+      message: defaultMessage,
+      actionUrl:
+        event.event_type === 'pageant'
+          ? `/voter/pageant/events/${event.id}/score`
+          : event.event_type === 'polling'
+            ? `/voter/polling/events/${event.id}`
+            : `/voter/events/${event.id}`,
+      entity: 'events',
+      entityId: event.id,
+      metadata: {
+        eventType: event.event_type,
+        organizationName: event.organizations?.organization_name,
+      },
+    })
+  }
 
   return {
     sent,

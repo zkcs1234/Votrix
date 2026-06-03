@@ -1,6 +1,7 @@
 import { ApiError } from '../utils/ApiError.js'
 import { verifyAccessToken } from '../utils/jwt.js'
 import { env } from '../config/env.js'
+import { findUserById } from '../services/user.service.js'
 
 function extractAccessToken(req) {
   const header = req.headers.authorization
@@ -23,6 +24,7 @@ export function authenticate(req, _res, next) {
       role: decoded.role,
       username: decoded.username,
       email: decoded.email,
+      accountStatus: decoded.accountStatus,
       mustChangePassword: Boolean(decoded.mustChangePassword),
     }
     next()
@@ -56,4 +58,33 @@ export function requirePasswordChanged(req, _res, next) {
     )
   }
   next()
+}
+
+export async function requireActiveAccount(req, _res, next) {
+  try {
+    const user = await findUserById(req.user?.id)
+    if (!user) {
+      return next(new ApiError(401, 'User not found'))
+    }
+
+    if (user.account_status === 'active') {
+      return next()
+    }
+
+    if (user.account_status === 'pending') {
+      return next(new ApiError(403, 'Your account is pending approval'))
+    }
+
+    if (user.account_status === 'suspended') {
+      return next(new ApiError(403, 'Your account has been suspended'))
+    }
+
+    if (user.account_status === 'archived') {
+      return next(new ApiError(403, 'Your account is archived'))
+    }
+
+    return next(new ApiError(403, 'Your account is not active'))
+  } catch (error) {
+    return next(error)
+  }
 }

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { authService } from '@/services/auth.service'
+import { notificationsService } from '@/services/notifications.service'
 import VotrixLogo from '@/components/brand/VotrixLogo'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import Button from '@/components/ui/Button'
@@ -99,6 +100,7 @@ export default function AppShell({
   children,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const location = useLocation()
   const navigate = useNavigate()
   const { user, clearSession } = useAuth()
@@ -117,6 +119,40 @@ export default function AppShell({
 
   const displayName = user?.username ?? user?.email ?? 'User'
   const initials = displayName.slice(0, 2).toUpperCase()
+
+  useEffect(() => {
+    if (!user) return undefined
+
+    let alive = true
+
+    const loadUnreadCount = async () => {
+      try {
+        const { data } = await notificationsService.getUnreadCount()
+        if (alive) {
+          setUnreadCount(data.unreadCount ?? 0)
+        }
+      } catch {
+        if (alive) {
+          setUnreadCount(0)
+        }
+      }
+    }
+
+    void loadUnreadCount()
+    const intervalId = setInterval(loadUnreadCount, 30000)
+
+    const handleUpdate = () => {
+      void loadUnreadCount()
+    }
+
+    window.addEventListener('votrix-notifications-updated', handleUpdate)
+
+    return () => {
+      alive = false
+      clearInterval(intervalId)
+      window.removeEventListener('votrix-notifications-updated', handleUpdate)
+    }
+  }, [user, location.pathname])
 
   const sidebar = (
     <SidebarContent
@@ -175,6 +211,20 @@ export default function AppShell({
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
+            <Link
+              to="/notifications"
+              className="relative rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated"
+              aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.857 17.082a2.142 2.142 0 0 1-4.714 0m8.285-4.66v-2.29A6.428 6.428 0 0 0 12 3.704a6.428 6.428 0 0 0-6.428 6.428v2.29c0 .972-.387 1.904-1.075 2.593L3 16.51h18l-1.497-1.497a3.66 3.66 0 0 1-1.075-2.593Z" />
+              </svg>
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-v-danger px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </Link>
             <ThemeToggle />
             <div className="hidden items-center gap-2 sm:flex">
               <div

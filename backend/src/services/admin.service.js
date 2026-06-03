@@ -1,6 +1,6 @@
 import { getSupabase } from '../config/database.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
+import { DB_TABLES, USER_ROLES, ACCOUNT_STATUS } from '../utils/constants.js'
 
 function getClient() {
   const client = getSupabase()
@@ -13,7 +13,7 @@ function getClient() {
 export async function getOrganizersList() {
   const { data, error } = await getClient()
     .from(DB_TABLES.USERS)
-    .select('id, email, created_at, updated_at')
+    .select('id, email, created_at, updated_at, account_status')
     .eq('role', USER_ROLES.ORGANIZER)
     .order('created_at', { ascending: false })
 
@@ -28,9 +28,19 @@ export async function getOrganizersList() {
 
   return data.map(orgUser => {
     const userOrgs = orgs.filter(o => o.organizer_id === orgUser.id)
+    const organizationSummary = userOrgs.reduce(
+      (acc, org) => {
+        acc.total += 1
+        acc[org.status] = (acc[org.status] ?? 0) + 1
+        return acc
+      },
+      { total: 0, draft: 0, active: 0, inactive: 0, archived: 0 },
+    )
+
     return {
       ...orgUser,
-      organizations: userOrgs
+      organizations: userOrgs,
+      organizationSummary,
     }
   })
 }
@@ -116,4 +126,23 @@ export async function createAuditLog({ userId, action, entity, entityId, details
     })
 
   if (error) throw new ApiError(500, error.message)
+}
+
+export async function updateOrganizerAccountStatus(organizerId, accountStatus) {
+  if (!Object.values(ACCOUNT_STATUS).includes(accountStatus)) {
+    throw new ApiError(400, 'Invalid account status')
+  }
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.USERS)
+    .update({ account_status: accountStatus })
+    .eq('id', organizerId)
+    .eq('role', USER_ROLES.ORGANIZER)
+    .select('id, email, account_status')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+  if (!data) throw new ApiError(404, 'Organizer not found')
+
+  return data
 }

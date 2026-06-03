@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { lazy } from 'react'
 import MainLayout from '@/layouts/MainLayout'
 import AuthLayout from '@/layouts/AuthLayout'
@@ -24,6 +25,7 @@ const AuditLogsPage = lazy(() => import('@/pages/admin/AuditLogsPage'))
 const OrganizerDashboardPage = lazy(() => import('@/pages/organizer/OrganizerDashboardPage'))
 const VoterDashboardPage = lazy(() => import('@/pages/voter/VoterDashboardPage'))
 const VoterEventPage = lazy(() => import('@/pages/voter/VoterEventPage'))
+const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/pages/auth/ResetPasswordPage'))
 
@@ -123,6 +125,15 @@ export const routeConfig = [
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <ChangePasswordPage /> }],
+  },
+  {
+    path: '/notifications',
+    element: (
+      <ProtectedRoute allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.ORGANIZER, USER_ROLES.VOTER]}>
+        <DashboardLayout title="Notifications" />
+      </ProtectedRoute>
+    ),
+    children: [{ index: true, element: <NotificationsPage /> }],
   },
   {
     path: '/admin',

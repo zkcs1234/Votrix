@@ -10,6 +10,24 @@ import {
 } from './user.service.js'
 import { issueTokenPair } from './token.service.js'
 
+function assertAccountActive(user) {
+  if (user?.account_status === 'active') return
+
+  if (user?.account_status === 'pending') {
+    throw new ApiError(403, 'Your account is pending approval')
+  }
+
+  if (user?.account_status === 'suspended') {
+    throw new ApiError(403, 'Your account has been suspended')
+  }
+
+  if (user?.account_status === 'archived') {
+    throw new ApiError(403, 'Your account is archived')
+  }
+
+  throw new ApiError(403, 'Your account is not active')
+}
+
 async function loginWithCredentials({ findUser, identifier, password, invalidMessage }) {
   const user = await findUser(identifier)
 
@@ -21,6 +39,8 @@ async function loginWithCredentials({ findUser, identifier, password, invalidMes
   if (!valid) {
     throw new ApiError(401, invalidMessage)
   }
+
+  assertAccountActive(user)
 
   return issueTokenPair(user)
 }
@@ -57,6 +77,7 @@ export async function refreshSession(userId) {
   if (!user) {
     throw new ApiError(401, 'User not found')
   }
+  assertAccountActive(user)
   return issueTokenPair(user)
 }
 

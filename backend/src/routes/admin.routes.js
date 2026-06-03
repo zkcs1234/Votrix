@@ -14,6 +14,7 @@ router.get('/analytics', adminController.getAnalytics)
 
 router.get('/organizers', adminController.getOrganizers)
 router.post('/organizers', adminActionLimiter, adminController.createOrganizerAccount)
+router.patch('/organizers/:organizerId/status', adminActionLimiter, adminController.updateOrganizerStatus)
 
 router.get('/events', adminController.getGlobalEvents)
 

@@ -15,6 +15,9 @@ export const adminService = {
   createOrganizer(data) {
     return api.post(`${base}/organizers`, data)
   },
+  updateOrganizerStatus(organizerId, accountStatus) {
+    return api.patch(`${base}/organizers/${organizerId}/status`, { accountStatus })
+  },
   getGlobalEvents() {
     return api.get(`${base}/events`)
   },

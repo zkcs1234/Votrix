@@ -2,14 +2,17 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { createOrganizer } from '../services/user.service.js'
 import { validateCreateOrganizer } from '../validators/auth.validator.js'
 import { getAdminDashboardStats, getAdminAnalytics } from '../services/dashboard.service.js'
+import { ACCOUNT_STATUS } from '../utils/constants.js'
 import { 
   getOrganizersList, 
   getGlobalEvents as fetchGlobalEvents, 
   getSystemSettings as fetchSystemSettings, 
   saveSystemSetting, 
   getAuditLogs as fetchAuditLogs,
-  createAuditLog
+  createAuditLog,
+  updateOrganizerAccountStatus,
 } from '../services/admin.service.js'
+import { createAdminAlert, createNotification } from '../services/notification.service.js'
 
 export const createOrganizerAccount = asyncHandler(async (req, res) => {
   const payload = validateCreateOrganizer(req.body)
@@ -29,11 +32,68 @@ export const createOrganizerAccount = asyncHandler(async (req, res) => {
     details: { email: user.email }
   })
 
+  await createAdminAlert({
+    type: 'organizer.pending',
+    title: 'New organizer pending approval',
+    message: `${user.email} was created and is waiting for approval.`,
+    actionUrl: '/admin/organizers',
+    entity: 'users',
+    entityId: user.id,
+    metadata: { email: user.email },
+  })
+
   res.status(201).json({
     success: true,
-    message: 'Organizer account created',
+    message: 'Organizer account created and pending approval',
     user,
     email,
+  })
+})
+
+export const updateOrganizerStatus = asyncHandler(async (req, res) => {
+  const { organizerId } = req.params
+  const { accountStatus } = req.body ?? {}
+
+  if (!Object.values(ACCOUNT_STATUS).includes(accountStatus)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid account status',
+    })
+  }
+
+  const updatedOrganizer = await updateOrganizerAccountStatus(organizerId, accountStatus)
+
+  await createNotification({
+    userId: updatedOrganizer.id,
+    type: 'organizer.status',
+    title: 'Your organizer account status changed',
+    message:
+      accountStatus === 'active'
+        ? 'Your account has been approved. You can now access the organizer dashboard.'
+        : accountStatus === 'suspended'
+          ? 'Your account has been suspended. Access is temporarily disabled.'
+          : 'Your account status has been updated.',
+    actionUrl: '/notifications',
+    entity: 'users',
+    entityId: updatedOrganizer.id,
+    metadata: { accountStatus },
+  })
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'UPDATE_ORGANIZER_STATUS',
+    entity: 'users',
+    entityId: updatedOrganizer.id,
+    details: {
+      email: updatedOrganizer.email,
+      accountStatus: updatedOrganizer.account_status,
+    },
+  })
+
+  res.json({
+    success: true,
+    message: 'Organizer status updated',
+    organizer: updatedOrganizer,
   })
 })
 

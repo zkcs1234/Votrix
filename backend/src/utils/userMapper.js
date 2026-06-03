@@ -6,6 +6,7 @@ export function sanitizeUser(row) {
     username: row.username ?? null,
     email: row.email ?? null,
     role: row.role,
+    accountStatus: row.account_status ?? 'active',
     mustChangePassword: Boolean(row.must_change_password),
     createdAt: row.created_at,
   }
