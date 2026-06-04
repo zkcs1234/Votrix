@@ -1,39 +1,91 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
-import { pollingService, QUESTION_TYPES } from '@/services/polling.service'
+import { pollingService } from '@/services/polling.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 
-import { INPUT_CLASS } from '@/utils/uiClasses'
-const inputClass = INPUT_CLASS
-
-function apiTypeToForm(type) {
-  return type === 'single_choice' ? 'multiple_choice' : type
-}
-
-function needsOptions(type) {
-  return ['multiple_choice', 'checkbox'].includes(type)
-}
+// Phase 7 — Question Builder is registry-driven. The list of available
+// types comes from the API; we do not hardcode type names here.
 
 const emptyForm = () => ({
   question: '',
-  type: 'multiple_choice',
+  type: 'single_choice',
   required: true,
+  typeConfig: {},
   options: [{ label: '' }, { label: '' }],
 })
+
+const ui = {
+  radio: 'Single choice (radio buttons)',
+  checkbox: 'Multiple selection (checkboxes)',
+  textarea: 'Open text',
+  rating: 'Numeric rating',
+  likert: 'Likert scale',
+  ranking: 'Ranking (drag to order)',
+}
+
+function needsFreeOptions(typeDef) {
+  if (!typeDef) return true
+  const input = typeDef.ui?.input
+  if (input === 'radio' || input === 'checkbox' || input === 'ranking') return true
+  return false
+}
+
+function isAutoOptionsType(typeDef) {
+  return Boolean(typeDef?.ui?.autoOptions)
+}
+
+function configFieldFor(typeDef) {
+  // Returns an array of { key, label, kind, value, options } for the
+  // fields we want to render for this type. Kept in the UI for clarity —
+  // the engine on the server does the same with configSchema.
+  if (!typeDef) return []
+  switch (typeDef.answerFormat?.kind) {
+    case 'numeric':
+      return [
+        { key: 'min', label: 'Min', kind: 'number' },
+        { key: 'max', label: 'Max', kind: 'number' },
+        { key: 'step', label: 'Step', kind: 'number' },
+      ]
+    case 'text':
+      return [
+        { key: 'maxLength', label: 'Max length', kind: 'number' },
+        { key: 'multiline', label: 'Multiline', kind: 'boolean' },
+      ]
+    case 'ranking':
+      return [
+        { key: 'allowTies', label: 'Allow ties', kind: 'boolean' },
+        { key: 'minItems', label: 'Min items to rank', kind: 'number' },
+      ]
+    default:
+      return []
+  }
+}
 
 export default function PollingBuilderPage() {
   const { eventId } = useParams()
   const [questions, setQuestions] = useState([])
+  const [types, setTypes] = useState([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState(emptyForm())
   const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
+  const currentTypeDef = useMemo(
+    () => types.find((t) => t.key === form.type) ?? null,
+    [types, form.type],
+  )
+
   const load = () => {
-    pollingService
-      .listQuestions(eventId)
-      .then(({ data }) => setQuestions(data.questions ?? []))
+    Promise.all([
+      pollingService.listQuestions(eventId),
+      pollingService.listQuestionTypes(),
+    ])
+      .then(([qRes, tRes]) => {
+        setQuestions(qRes.data.questions ?? [])
+        setTypes(tRes.data.types ?? [])
+      })
       .finally(() => setLoading(false))
   }
 
@@ -51,8 +103,9 @@ export default function PollingBuilderPage() {
     setEditingId(q.id)
     setForm({
       question: q.question,
-      type: apiTypeToForm(q.type),
+      type: q.type,
       required: q.required,
+      typeConfig: q.typeConfig ?? {},
       options:
         q.options?.length > 0
           ? q.options.map((o) => ({ label: o.label }))
@@ -60,9 +113,10 @@ export default function PollingBuilderPage() {
     })
   }
 
-  const handleTypeChange = (type) => {
-    const next = { ...form, type }
-    if (needsOptions(type) && form.options.length < 2) {
+  const handleTypeChange = (typeKey) => {
+    const next = { ...form, type: typeKey, typeConfig: {} }
+    const def = types.find((t) => t.key === typeKey)
+    if (def && needsFreeOptions(def) && form.options.length < 2) {
       next.options = [{ label: '' }, { label: '' }]
     }
     setForm(next)
@@ -77,12 +131,13 @@ export default function PollingBuilderPage() {
       question: form.question,
       type: form.type,
       required: form.required,
+      typeConfig: form.typeConfig,
       sortOrder: editingId
         ? questions.find((q) => q.id === editingId)?.sortOrder ?? 0
         : questions.length,
     }
 
-    if (needsOptions(form.type)) {
+    if (needsFreeOptions(currentTypeDef)) {
       const options = form.options.filter((o) => o.label.trim())
       if (options.length < 2) {
         setError('Add at least two options')
@@ -130,33 +185,85 @@ export default function PollingBuilderPage() {
           {editingId ? 'Edit question' : 'Add question'}
         </h3>
 
-        <input
-          className={inputClass}
-          placeholder="Question text"
-          value={form.question}
-          onChange={(e) => setForm({ ...form, question: e.target.value })}
-          required
-        />
+        <div>
+          <label className={LABEL_CLASS}>Question text</label>
+          <input
+            className={INPUT_CLASS}
+            placeholder="Question text"
+            value={form.question}
+            onChange={(e) => setForm({ ...form, question: e.target.value })}
+            required
+          />
+        </div>
 
-        <select
-          className={inputClass}
-          value={form.type}
-          onChange={(e) => handleTypeChange(e.target.value)}
-        >
-          {QUESTION_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+        <div>
+          <label className={LABEL_CLASS}>Question type</label>
+          <select
+            className={INPUT_CLASS}
+            value={form.type}
+            onChange={(e) => handleTypeChange(e.target.value)}
+          >
+            {types.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          {currentTypeDef?.description && (
+            <p className="mt-1 text-xs text-v-text-subtle">
+              {currentTypeDef.description}
+            </p>
+          )}
+        </div>
 
-        {needsOptions(form.type) && (
+        {/* Per-type config — rendered dynamically from configSchema. */}
+        {configFieldFor(currentTypeDef).map((f) => (
+          <div key={f.key} className="grid grid-cols-2 gap-2">
+            <label className={LABEL_CLASS}>{f.label}</label>
+            {f.kind === 'boolean' ? (
+              <input
+                type="checkbox"
+                checked={Boolean(form.typeConfig?.[f.key])}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    typeConfig: { ...form.typeConfig, [f.key]: e.target.checked },
+                  })
+                }
+              />
+            ) : (
+              <input
+                type="number"
+                step="any"
+                className={INPUT_CLASS}
+                value={form.typeConfig?.[f.key] ?? ''}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    typeConfig: {
+                      ...form.typeConfig,
+                      [f.key]: e.target.value === '' ? undefined : Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            )}
+          </div>
+        ))}
+
+        {isAutoOptionsType(currentTypeDef) && (
+          <p className="text-xs text-v-text-subtle">
+            Options are generated automatically for this type.
+          </p>
+        )}
+
+        {needsFreeOptions(currentTypeDef) && (
           <div className="space-y-2">
             <p className="text-xs text-v-text-subtle">Options</p>
             {form.options.map((opt, i) => (
               <div key={i} className="flex gap-2">
                 <input
-                  className={inputClass}
+                  className={INPUT_CLASS}
                   placeholder={`Option ${i + 1}`}
                   value={opt.label}
                   onChange={(e) => {
@@ -189,14 +296,6 @@ export default function PollingBuilderPage() {
               + Add option
             </button>
           </div>
-        )}
-
-        {form.type === 'yes_no' && (
-          <p className="text-xs text-v-text-subtle">Yes / No options are created automatically.</p>
-        )}
-
-        {form.type === 'rating' && (
-          <p className="text-xs text-v-text-subtle">Respondents rate from 1 to 5 stars.</p>
         )}
 
         <label className="flex items-center gap-2 text-sm text-v-text-muted">
@@ -237,13 +336,13 @@ export default function PollingBuilderPage() {
                 <span className="text-xs text-v-text-subtle">Q{idx + 1}</span>
                 <p className="font-medium text-v-text">{q.question}</p>
                 <p className="mt-1 text-xs text-v-text-muted/80">
-                  {QUESTION_TYPES.find((t) => t.value === apiTypeToForm(q.type))?.label ?? q.type}
-                  {q.required ? ' Â· Required' : ''}
+                  {types.find((t) => t.key === q.type)?.label ?? q.type}
+                  {q.required ? ' · Required' : ''}
                 </p>
                 {q.options?.length > 0 && (
                   <ul className="mt-2 text-sm text-v-text-subtle">
                     {q.options.map((o) => (
-                      <li key={o.id}>â€¢ {o.label}</li>
+                      <li key={o.id}>• {o.label}</li>
                     ))}
                   </ul>
                 )}

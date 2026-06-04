@@ -1,6 +1,10 @@
 import { getSupabase } from '../config/database.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES, USER_ROLES } from '../utils/constants.js'
+import {
+  DB_TABLES,
+  COMPETITION_SCORING_EVENT_TYPES,
+  USER_ROLES,
+} from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import {
   getOrCreatePageantOrganization,
@@ -11,6 +15,12 @@ import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
 import { findUserByEmail, sanitizeUser } from './user.service.js'
 import { sendJudgeInvitationEmail } from './mailer.service.js'
+import {
+  computeRankings,
+  resolveScoreBounds,
+  mergeScoringConfig,
+  isScoreInBounds,
+} from '../modules/scoring-engine.js'
 
 function getClient() {
   const client = getSupabase()
@@ -235,14 +245,10 @@ export async function setEventScoring(eventId, organizerId, scoringEnabled) {
   await assertCompetitionEvent(eventId, organizerId)
 
   if (scoringEnabled) {
-    const criteria = await listCriteria(eventId, organizerId)
-    const totalPct = criteria.reduce((s, c) => s + c.percentage, 0)
-    if (criteria.length && Math.abs(totalPct - 100) > 0.01) {
-      throw new ApiError(
-        400,
-        `Criteria percentages must total 100% (currently ${totalPct}%)`,
-      )
-    }
+    // Use the foundation validator so category, round, and criterion weights
+    // are ALL checked against 100%. Phase 4 / 5 engine owns the rules.
+    const { assertScoringWeightsValid } = await import('./competition.service.js')
+    await assertScoringWeightsValid(eventId, organizerId)
   }
 
   const { data, error } = await getClient()
@@ -515,6 +521,52 @@ export async function assertJudgeEnrolled(eventId, judgeId) {
   return data
 }
 
+// ---------------------------------------------------------------------------
+// Phase 6 — Judge assignment enforcement.
+// A first-class judge (competition_judges row) may have ZERO or MORE
+// competition_judge_assignments rows. If the row is missing entirely, the
+// judge is event-wide. If the rows exist, the judge can only score
+// (contestant, criterion) pairs that belong to one of the assigned scopes.
+//
+// For Phase 6 we enforce this at submit time: the requested (round_id,
+// category_id) must be covered by the judge's assignments; otherwise the
+// submission is rejected.
+// ---------------------------------------------------------------------------
+export async function getJudgeAssignmentContext(eventId, judgeId) {
+  const { data, error } = await getClient()
+    .from(DB_TABLES.COMPETITION_JUDGES)
+    .select(
+      'id, role, is_active, has_submitted, competition_judge_assignments (id, scope, scope_id)',
+    )
+    .eq('event_id', eventId)
+    .eq('user_id', judgeId)
+    .maybeSingle()
+
+  if (error) throw new ApiError(500, error.message)
+  if (!data) return { isFirstClass: false, role: 'judge', assignments: [] }
+  return {
+    isFirstClass: true,
+    role: data.role,
+    isActive: data.is_active,
+    hasSubmitted: data.has_submitted,
+    judgeRowId: data.id,
+    assignments: data.competition_judge_assignments ?? [],
+  }
+}
+
+export function canJudgeScore(assignmentContext, { roundId = null, categoryId = null } = {}) {
+  if (!assignmentContext.isFirstClass) return true
+  if (assignmentContext.role === 'score_reviewer') return false
+  const list = assignmentContext.assignments
+  if (!list || list.length === 0) return true
+  return list.some((a) => {
+    if (a.scope === 'event') return true
+    if (a.scope === 'round' && roundId && a.scope_id === roundId) return true
+    if (a.scope === 'category' && categoryId && a.scope_id === categoryId) return true
+    return false
+  })
+}
+
 export async function getJudgeScoringSheet(eventId, judgeId) {
   const enrollment = await assertJudgeEnrolled(eventId, judgeId)
   const event = await getEventById(eventId)
@@ -563,6 +615,21 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
     throw new ApiError(403, 'Scoring is not open for this event')
   }
 
+  const scoringConfig = mergeScoringConfig(event.scoring_config)
+  const eventBounds = resolveScoreBounds(scoringConfig)
+
+  // Phase 6: if the judge has a first-class competition_judges row,
+  // enforce their assignment scope. A score_reviewer is read-only.
+  const judgeCtx = await getJudgeAssignmentContext(eventId, judgeId)
+  if (judgeCtx.isFirstClass) {
+    if (!judgeCtx.isActive) {
+      throw new ApiError(403, 'This judge account is inactive for this event')
+    }
+    if (judgeCtx.role === 'score_reviewer') {
+      throw new ApiError(403, 'Score reviewers cannot submit scores')
+    }
+  }
+
   const contestants = await getClient()
     .from(DB_TABLES.CONTESTANTS)
     .select('id')
@@ -602,10 +669,35 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
     if (!crit) throw new ApiError(400, 'Invalid criteria')
 
     const score = Number(entry.score)
-    if (Number.isNaN(score) || score < crit.minScore || score > crit.maxScore) {
+    if (Number.isNaN(score)) {
+      throw new ApiError(400, `Score for ${crit.name} must be a number`)
+    }
+
+    // Per-criterion min/max continue to win if explicitly configured;
+    // otherwise we fall back to the event-level score-type bounds.
+    const min = crit.minScore ?? eventBounds.min
+    const max = crit.maxScore ?? eventBounds.max
+    if (score < min || score > max) {
       throw new ApiError(
         400,
-        `Score for ${crit.name} must be between ${crit.minScore} and ${crit.maxScore}`,
+        `Score for ${crit.name} must be between ${min} and ${max}`,
+      )
+    }
+    if (!isScoreInBounds(score, scoringConfig)) {
+      throw new ApiError(
+        400,
+        `Score for ${crit.name} is outside the configured score type (${eventBounds.min}–${eventBounds.max})`,
+      )
+    }
+
+    // Phase 6: assignment scope check.
+    if (judgeCtx.isFirstClass && !canJudgeScore(judgeCtx, {
+      roundId: entry.roundId ?? null,
+      categoryId: entry.categoryId ?? null,
+    })) {
+      throw new ApiError(
+        403,
+        `You are not assigned to score ${crit.name} for this contestant`,
       )
     }
 
@@ -613,6 +705,8 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
       judge_id: judgeId,
       contestant_id: entry.contestantId,
       criteria_id: entry.criteriaId,
+      round_id: entry.roundId ?? null,
+      category_id: entry.categoryId ?? null,
       score,
     })
   }
@@ -688,32 +782,39 @@ export async function listJudgeCompetitionEvents(judgeId) {
 export async function getLiveRankings(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
 
-  const [contestantsRes, criteriaRes, judgesRes] = await Promise.all([
-    getClient().from(DB_TABLES.CONTESTANTS).select('*').eq('event_id', eventId),
-    getClient().from(DB_TABLES.CRITERIA).select('*').eq('event_id', eventId),
-    getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
-      .select('id', { count: 'exact', head: true })
-      .eq('event_id', eventId)
-      .eq('is_judge', true),
-  ])
+  const [eventRes, contestantsRes, criteriaRes, judgesRes, roundsRes, categoriesRes, scoresRes] =
+    await Promise.all([
+      getClient()
+        .from(DB_TABLES.EVENTS)
+        .select('scoring_config')
+        .eq('id', eventId)
+        .single(),
+      getClient().from(DB_TABLES.CONTESTANTS).select('*').eq('event_id', eventId),
+      getClient().from(DB_TABLES.CRITERIA).select('*').eq('event_id', eventId),
+      getClient()
+        .from(DB_TABLES.EVENT_VOTERS)
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', eventId)
+        .eq('is_judge', true),
+      getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('*').eq('event_id', eventId),
+      getClient().from(DB_TABLES.COMPETITION_CATEGORIES).select('*').eq('event_id', eventId),
+      getClient()
+        .from(DB_TABLES.JUDGE_SCORES)
+        .select('contestant_id, criteria_id, round_id, category_id, score, judge_id')
+    ])
 
+  if (eventRes.error) throw new ApiError(500, eventRes.error.message)
   if (contestantsRes.error) throw new ApiError(500, contestantsRes.error.message)
   if (criteriaRes.error) throw new ApiError(500, criteriaRes.error.message)
+  if (roundsRes.error) throw new ApiError(500, roundsRes.error.message)
+  if (categoriesRes.error) throw new ApiError(500, categoriesRes.error.message)
 
-  const contestants = (contestantsRes.data ?? []).map(mapContestant)
-  const criteria = (criteriaRes.data ?? []).map(mapCriteria)
-  const contestantIds = contestants.map((c) => c.id)
-
-  let scores = []
+  const contestantIds = (contestantsRes.data ?? []).map((c) => c.id)
+  let scores = scoresRes.data ?? []
   if (contestantIds.length) {
-    const { data: scoresData, error: scoresErr } = await getClient()
-      .from(DB_TABLES.JUDGE_SCORES)
-      .select('contestant_id, criteria_id, score, judge_id')
-      .in('contestant_id', contestantIds)
-
-    if (scoresErr) throw new ApiError(500, scoresErr.message)
-    scores = scoresData ?? []
+    scores = scores.filter((s) => contestantIds.includes(s.contestant_id))
+  } else {
+    scores = []
   }
 
   const { count: totalJudges } = judgesRes
@@ -724,51 +825,41 @@ export async function getLiveRankings(eventId, organizerId) {
     .eq('is_judge', true)
     .eq('has_scored', true)
 
-  const results = contestants.map((contestant) => {
-    const criteriaBreakdown = criteria.map((crit) => {
-      const critScores = scores
-        .filter((s) => s.contestant_id === contestant.id && s.criteria_id === crit.id)
-        .map((s) => Number(s.score))
-
-      const average =
-        critScores.length > 0
-          ? critScores.reduce((a, b) => a + b, 0) / critScores.length
-          : 0
-
-      return {
-        criteriaId: crit.id,
-        criteriaName: crit.name,
-        percentage: crit.percentage,
-        average: Math.round(average * 100) / 100,
-        judgeCount: critScores.length,
-      }
-    })
-
-    const weightedScore = criteriaBreakdown.reduce(
-      (sum, c) => sum + c.average * (c.percentage / 100),
-      0,
-    )
-
-    return {
-      contestantId: contestant.id,
-      contestantName: contestant.name,
-      contestantNumber: contestant.contestantNumber,
-      photo: contestant.photo,
-      criteriaBreakdown,
-      weightedScore: Math.round(weightedScore * 100) / 100,
-    }
+  const { rankings, debug } = computeRankings({
+    scores,
+    contestants: contestantsRes.data ?? [],
+    criteria: criteriaRes.data ?? [],
+    rounds: roundsRes.data ?? [],
+    categories: categoriesRes.data ?? [],
+    config: eventRes.data?.scoring_config,
   })
 
-  results.sort((a, b) => b.weightedScore - a.weightedScore)
-  results.forEach((r, i) => {
-    r.rank = i + 1
-  })
-
-  const totalPct = criteria.reduce((s, c) => s + c.percentage, 0)
+  // Map the engine's nested shape to the public shape the UI already uses.
+  const publicRankings = rankings.map((row) => ({
+    contestantId: row.contestantId,
+    contestantName: row.contestantName,
+    contestantNumber: row.contestantNumber,
+    photo: row.photo,
+    rank: row.rank,
+    weightedScore: row.finalScore,
+    finalScore: row.finalScore,
+    criteriaBreakdown: Object.values(row.perCriterion).map((c) => ({
+      criteriaId: c.criteriaId,
+      criteriaName: c.criteriaName,
+      percentage: c.percentage,
+      average: c.average,
+      judgeCount: c.judgeCount,
+    })),
+    perRound: Object.values(row.perRound),
+    perCategory: Object.values(row.perCategory),
+  }))
 
   return {
-    rankings: results,
-    criteriaTotalPercentage: totalPct,
+    rankings: publicRankings,
+    criteriaTotalPercentage: debug.criterionTotals,
+    roundWeightTotal: debug.roundTotals,
+    categoryWeightTotal: debug.categoryTotals,
+    scoringConfig: mergeScoringConfig(eventRes.data?.scoring_config),
     judges: {
       total: totalJudges ?? 0,
       submitted: submittedJudges ?? 0,

@@ -21,6 +21,13 @@ router.delete('/events/:eventId/questions/:questionId', ctrl.deleteQuestion)
 
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
 
+// Phase 7 — Question type registry (database-driven, no hardcoded list)
+router.get('/question-types', ctrl.listQuestionTypes)
+router.get('/question-types/custom', ctrl.listCustomQuestionTypes)
+router.post('/question-types/custom', ctrl.createCustomQuestionType)
+router.patch('/question-types/custom/:typeId', ctrl.updateCustomQuestionType)
+router.delete('/question-types/custom/:typeId', ctrl.deleteCustomQuestionType)
+
 router.post('/events/:eventId/respondents/invite', emailLimiter, ctrl.inviteRespondent)
 router.post('/events/:eventId/respondents/import', csvImportLimiter, uploadSingle('file'), ctrl.importRespondentsCsv)
 

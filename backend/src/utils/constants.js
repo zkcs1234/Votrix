@@ -50,13 +50,49 @@ export const COMPETITION_SCORING_EVENT_TYPES = new Set([
   EVENT_TYPES.COMPETITION_SCORING,
 ])
 
+// Legacy aliases preserved for backward compatibility with existing callers.
+// The Phase 7 question-type registry is the source of truth — these constants
+// are convenience lookups for code paths that still use them.
 export const POLL_QUESTION_TYPES = {
   SINGLE_CHOICE: 'single_choice',
-  MULTIPLE_CHOICE: 'single_choice',
+  MULTIPLE_CHOICE: 'multiple_choice',
   CHECKBOX: 'checkbox',
   YES_NO: 'yes_no',
   TEXT: 'text',
+  OPEN_TEXT: 'open_text',
   RATING: 'rating',
+  LIKERT_SCALE: 'likert_scale',
+  RANKING: 'ranking',
+}
+
+// Scoring configuration (Phase 5). Stored on events.scoring_config as JSONB.
+// Keep these in sync with the JSONB shape in migration 015.
+export const SCORE_TYPES = {
+  RANGE_1_10: 'range_1_10',
+  RANGE_1_100: 'range_1_100',
+  DECIMAL: 'decimal',
+  CUSTOM_RANGE: 'custom_range',
+}
+
+export const CALCULATION_METHODS = {
+  AVERAGE: 'average',
+  WEIGHTED_AVERAGE: 'weighted_average',
+  SUM: 'sum',
+  HIGHEST_SCORE: 'highest_score',
+  LOWEST_REMOVAL: 'lowest_removal',
+}
+
+// Judge permission roles (Phase 6).
+export const JUDGE_ROLES = {
+  JUDGE: 'judge',
+  HEAD_JUDGE: 'head_judge',
+  SCORE_REVIEWER: 'score_reviewer',
+}
+
+export const ASSIGNMENT_SCOPES = {
+  EVENT: 'event',
+  CATEGORY: 'category',
+  ROUND: 'round',
 }
 
 export const DB_TABLES = {
@@ -70,6 +106,15 @@ export const DB_TABLES = {
   CONTESTANTS: 'competition_contestants',
   CRITERIA: 'competition_criteria',
   JUDGE_SCORES: 'competition_scores',
+  COMPETITION_CATEGORIES: 'competition_categories',
+  COMPETITION_ROUNDS: 'competition_rounds',
+  COMPETITION_ROUND_CONTESTANTS: 'competition_round_contestants',
+  COMPETITION_ROUND_CRITERIA: 'competition_round_criteria',
+  COMPETITION_JUDGES: 'competition_judges',
+  COMPETITION_JUDGE_ASSIGNMENTS: 'competition_judge_assignments',
+  SYSTEM_POLL_QUESTION_TYPES: 'system_poll_question_types',
+  POLL_QUESTION_TYPES_REGISTRY: 'poll_question_types',
+  POLL_QUESTION_TYPES_VIEW: 'v_poll_question_types',
   POLL_QUESTIONS: 'poll_questions',
   POLL_ANSWERS: 'poll_answers',
   PASSWORD_RESET_TOKENS: 'password_reset_tokens',

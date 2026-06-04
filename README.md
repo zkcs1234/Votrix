@@ -61,9 +61,9 @@ Organizer: `/organizer/pageant` · Judges score at `/voter/pageant/events/:event
 
 ## Phase 8 — Polling module
 
-Dynamic polls and surveys: question builder (multiple choice, checkbox, yes/no, text, rating), organizer settings (anonymous, multiple submissions, expiration), and analytics with charts and percentages.
+Dynamic polls and surveys: registry-driven question types (single choice, multiple choice, yes/no, rating, Likert, open text, ranking), organizer settings (anonymous, multiple submissions, expiration), and analytics with charts and percentages.
 
-See [backend/src/database/POLLING.md](backend/src/database/POLLING.md). Run migration `006_polling_module.sql`.
+See [backend/src/database/POLLING.md](backend/src/database/POLLING.md). Run migrations `006_polling_module.sql` + `017_polling_question_type_registry.sql`.
 
 Organizer: `/organizer/polling` · Respondents: `/voter/polling/events/:eventId`
 

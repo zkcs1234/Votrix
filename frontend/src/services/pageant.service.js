@@ -112,6 +112,82 @@ export const pageantService = {
     return api.get(`${org}/events/${eventId}/analytics`)
   },
 
+  // Phase 4 — Foundation (single round-trip for the workspace UI)
+  getFoundation(eventId) {
+    return api.get(`${org}/events/${eventId}/foundation`)
+  },
+
+  // Phase 4 — Categories
+  listCategories(eventId) {
+    return api.get(`${org}/events/${eventId}/categories`)
+  },
+  createCategory(eventId, payload) {
+    return api.post(`${org}/events/${eventId}/categories`, payload)
+  },
+  updateCategory(eventId, categoryId, payload) {
+    return api.patch(`${org}/events/${eventId}/categories/${categoryId}`, payload)
+  },
+  deleteCategory(eventId, categoryId) {
+    return api.delete(`${org}/events/${eventId}/categories/${categoryId}`)
+  },
+
+  // Phase 4 — Rounds
+  listRounds(eventId) {
+    return api.get(`${org}/events/${eventId}/rounds`)
+  },
+  createRound(eventId, payload) {
+    return api.post(`${org}/events/${eventId}/rounds`, payload)
+  },
+  updateRound(eventId, roundId, payload) {
+    return api.patch(`${org}/events/${eventId}/rounds/${roundId}`, payload)
+  },
+  deleteRound(eventId, roundId) {
+    return api.delete(`${org}/events/${eventId}/rounds/${roundId}`)
+  },
+  addRoundContestant(eventId, roundId, contestantId) {
+    return api.post(`${org}/events/${eventId}/rounds/${roundId}/contestants/${contestantId}`)
+  },
+  removeRoundContestant(eventId, roundId, contestantId) {
+    return api.delete(`${org}/events/${eventId}/rounds/${roundId}/contestants/${contestantId}`)
+  },
+  addRoundCriteria(eventId, roundId, criteriaId) {
+    return api.post(`${org}/events/${eventId}/rounds/${roundId}/criteria/${criteriaId}`)
+  },
+  removeRoundCriteria(eventId, roundId, criteriaId) {
+    return api.delete(`${org}/events/${eventId}/rounds/${roundId}/criteria/${criteriaId}`)
+  },
+
+  // Phase 5 — Scoring config
+  getScoringConfig(eventId) {
+    return api.get(`${org}/events/${eventId}/scoring-config`)
+  },
+  setScoringConfig(eventId, payload) {
+    return api.patch(`${org}/events/${eventId}/scoring-config`, payload)
+  },
+
+  // Phase 6 — First-class judges
+  listJudgesV2(eventId) {
+    return api.get(`${org}/events/${eventId}/judges-v2`)
+  },
+  inviteJudgeV2(eventId, payload) {
+    return api.post(`${org}/events/${eventId}/judges-v2/invite`, payload)
+  },
+  updateJudgeV2(eventId, judgeId, payload) {
+    return api.patch(`${org}/events/${eventId}/judges-v2/${judgeId}`, payload)
+  },
+  deleteJudgeV2(eventId, judgeId) {
+    return api.delete(`${org}/events/${eventId}/judges-v2/${judgeId}`)
+  },
+  listJudgeAssignments(eventId, judgeId) {
+    return api.get(`${org}/events/${eventId}/judges-v2/${judgeId}/assignments`)
+  },
+  createJudgeAssignment(eventId, judgeId, payload) {
+    return api.post(`${org}/events/${eventId}/judges-v2/${judgeId}/assignments`, payload)
+  },
+  deleteJudgeAssignment(eventId, judgeId, assignmentId) {
+    return api.delete(`${org}/events/${eventId}/judges-v2/${judgeId}/assignments/${assignmentId}`)
+  },
+
   // Judge (voter)
   listJudgeEvents() {
     return api.get(`${judge}/events`)

@@ -1,8 +1,26 @@
 import { getSupabase } from '../config/database.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, EVENT_TYPES, POLL_QUESTION_TYPES } from '../utils/constants.js'
+import { DB_TABLES, EVENT_TYPES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { getOrCreatePollingOrganization, mapOrganization } from './organization.service.js'
+import {
+  loadQuestionTypeRegistry,
+  findQuestionType,
+  requireQuestionType,
+} from './polling-registry.service.js'
+import {
+  buildAutoOptions,
+  validateAnswer as validateAnswerV2,
+  serializeAnswer as serializeAnswerV2,
+  validateTypeConfig,
+  buildAnalytics,
+} from '../modules/poll-question-types.js'
+
+// Phase 7 — Polling question types are now registry-driven. The legacy
+// POLL_QUESTION_TYPES constants and the `multiple_choice` alias are kept in
+// utils/constants.js for backward compatibility with existing code, but the
+// question creation / validation / analytics paths now go through
+// poll-question-types.js so a new type is a single SQL INSERT away.
 
 function getClient() {
   const client = getSupabase()
@@ -27,20 +45,32 @@ function mapPollEvent(row) {
   }
 }
 
-function mapQuestion(row, options = []) {
-  return {
+function mapQuestion(row, options = [], typeDef = null) {
+  const out = {
     id: row.id,
     eventId: row.event_id,
     question: row.question,
     type: row.type,
     sortOrder: row.sort_order,
     required: row.required,
+    typeConfig: row.type_config ?? {},
     options: options.map((o) => ({
       id: o.id,
       label: o.label,
       sortOrder: o.sort_order,
     })),
   }
+  if (typeDef) {
+    out.typeDef = {
+      key: typeDef.key,
+      label: typeDef.label,
+      description: typeDef.description,
+      answerFormat: typeDef.answerFormat,
+      configSchema: typeDef.configSchema,
+      ui: typeDef.ui,
+    }
+  }
+  return out
 }
 
 async function assertPollingEvent(eventId, organizerId) {
@@ -49,6 +79,11 @@ async function assertPollingEvent(eventId, organizerId) {
     throw new ApiError(400, 'This event is not a poll')
   }
   return event
+}
+
+async function getPollingOrgId(organizerId) {
+  const org = await getOrCreatePollingOrganization(organizerId)
+  return org.id
 }
 
 function isPollOpen(event) {
@@ -223,6 +258,8 @@ async function loadOptionsForQuestions(questionIds) {
 
 export async function listQuestions(eventId, organizerId) {
   await assertPollingEvent(eventId, organizerId)
+  const orgId = await getPollingOrgId(organizerId)
+  const registry = await loadQuestionTypeRegistry(orgId)
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
@@ -235,41 +272,69 @@ export async function listQuestions(eventId, organizerId) {
   const ids = (data ?? []).map((q) => q.id)
   const optMap = await loadOptionsForQuestions(ids)
 
-  return (data ?? []).map((q) => mapQuestion(q, optMap[q.id] ?? []))
+  return (data ?? []).map((q) => {
+    const typeDef = registry.find((r) => r.key === q.type) ?? null
+    return mapQuestion(q, optMap[q.id] ?? [], typeDef)
+  })
 }
 
 export async function createQuestion(eventId, organizerId, payload) {
   await assertPollingEvent(eventId, organizerId)
 
-  const type = normalizeQuestionType(payload.type)
+  const orgId = await getPollingOrgId(organizerId)
+  const typeDef = await requireQuestionType(orgId, payload.type)
+  const typeConfig = validateTypeConfig(typeDef, payload.typeConfig)
 
   const { data: question, error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
     .insert({
       event_id: eventId,
       question: payload.question,
-      type,
+      type: typeDef.key,
       sort_order: payload.sortOrder ?? 0,
       required: payload.required !== false,
+      type_config: typeConfig,
     })
     .select('*')
     .single()
 
   if (error) throw new ApiError(500, error.message)
 
-  const options = await upsertQuestionOptions(question.id, type, payload.options)
+  const options = await upsertQuestionOptions(
+    question.id,
+    typeDef,
+    typeConfig,
+    payload.options,
+  )
 
-  return mapQuestion(question, options)
+  return mapQuestion(question, options, typeDef)
 }
 
 export async function updateQuestion(eventId, organizerId, questionId, payload) {
   await assertPollingEvent(eventId, organizerId)
 
+  const orgId = await getPollingOrgId(organizerId)
+  const registry = await loadQuestionTypeRegistry(orgId)
+
   const updates = {}
   if (payload.question !== undefined) updates.question = payload.question
-  if (payload.type !== undefined) updates.type = normalizeQuestionType(payload.type)
+  let typeDef = null
+  if (payload.type !== undefined) {
+    typeDef = registry.find((r) => r.key === payload.type) ?? null
+    if (!typeDef) throw new ApiError(400, `Unknown question type: ${payload.type}`)
+    updates.type = typeDef.key
+  }
   if (payload.sortOrder !== undefined) updates.sort_order = payload.sortOrder
   if (payload.required !== undefined) updates.required = payload.required
+  if (payload.typeConfig !== undefined) {
+    let def = typeDef
+    if (!def) {
+      const currentKey = await currentTypeKey(questionId)
+      def = registry.find((r) => r.key === currentKey) ?? null
+    }
+    if (!def) throw new ApiError(400, 'Cannot update typeConfig without a known type')
+    updates.type_config = validateTypeConfig(def, payload.typeConfig)
+  }
 
   const { data: question, error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
@@ -282,16 +347,30 @@ export async function updateQuestion(eventId, organizerId, questionId, payload) 
   if (error) throw new ApiError(500, error.message)
   if (!question) throw new ApiError(404, 'Question not found')
 
+  // Re-resolve the typeDef in case the type didn't change.
+  const finalTypeDef = typeDef ?? registry.find((r) => r.key === question.type) ?? null
+  const finalTypeConfig = question.type_config ?? {}
+
   let options = []
   if (payload.options) {
     await getClient().from(DB_TABLES.POLL_OPTIONS).delete().eq('question_id', questionId)
-    options = await upsertQuestionOptions(question.id, question.type, payload.options)
+    options = await upsertQuestionOptions(question.id, finalTypeDef, finalTypeConfig, payload.options)
   } else {
     const optMap = await loadOptionsForQuestions([questionId])
     options = optMap[questionId] ?? []
   }
 
-  return mapQuestion(question, options)
+  return mapQuestion(question, options, finalTypeDef)
+}
+
+async function currentTypeKey(questionId) {
+  const { data, error } = await getClient()
+    .from(DB_TABLES.POLL_QUESTIONS)
+    .select('type')
+    .eq('id', questionId)
+    .maybeSingle()
+  if (error) throw new ApiError(500, error.message)
+  return data?.type
 }
 
 export async function deleteQuestion(eventId, organizerId, questionId) {
@@ -306,41 +385,48 @@ export async function deleteQuestion(eventId, organizerId, questionId) {
   if (error) throw new ApiError(500, error.message)
 }
 
+// Legacy alias used in some admin code paths. The registry is the source of
+// truth; this returns the key as-is if it is known.
 function normalizeQuestionType(type) {
-  const map = {
-    multiple_choice: POLL_QUESTION_TYPES.SINGLE_CHOICE,
-    single_choice: POLL_QUESTION_TYPES.SINGLE_CHOICE,
-    checkbox: POLL_QUESTION_TYPES.CHECKBOX,
-    yes_no: POLL_QUESTION_TYPES.YES_NO,
-    text: POLL_QUESTION_TYPES.TEXT,
-    rating: POLL_QUESTION_TYPES.RATING,
-  }
-  const normalized = map[type]
-  if (!normalized) throw new ApiError(400, 'Invalid question type')
-  return normalized
+  return type
 }
 
-async function upsertQuestionOptions(questionId, type, optionsInput) {
+async function upsertQuestionOptions(questionId, typeDef, typeConfig, optionsInput) {
+  if (!typeDef) return []
+  const fmt = typeDef.answerFormat ?? {}
+  const kind = fmt.kind
+
+  // Numeric, text, ranking-as-options are free-form (no poll_options rows).
+  // For ranking, options live in poll_options and the answer is a ranking map.
   let options = optionsInput ?? []
 
-  if (type === POLL_QUESTION_TYPES.YES_NO && !options.length) {
-    options = [{ label: 'Yes' }, { label: 'No' }]
+  // Auto-generated options (Yes/No, Likert).
+  if ((kind === 'choice' && Array.isArray(fmt.autoOptions)) ||
+      (kind === 'choice' && fmt.autoOptionsFromConfig)) {
+    if (!options.length) {
+      options = buildAutoOptions(typeDef, typeConfig)
+    }
   }
 
-  if ([POLL_QUESTION_TYPES.SINGLE_CHOICE, POLL_QUESTION_TYPES.CHECKBOX, POLL_QUESTION_TYPES.YES_NO].includes(type)) {
-    if (!options.length) throw new ApiError(400, 'Options are required for this question type')
+  // Choice / ranking types need at least two poll_options rows.
+  if (kind === 'choice' || kind === 'ranking') {
+    if (!options.length) {
+      throw new ApiError(400, 'Options are required for this question type')
+    }
+    if (options.length < 2) {
+      throw new ApiError(400, 'Provide at least two options')
+    }
   }
 
   if (!options.length) return []
 
   const rows = options.map((o, i) => ({
     question_id: questionId,
-    label: o.label,
-    sort_order: o.sortOrder ?? i,
+    label: typeof o === 'string' ? o : o.label,
+    sort_order: typeof o === 'string' ? i : o.sortOrder ?? i,
   }))
 
   const { data, error } = await getClient().from(DB_TABLES.POLL_OPTIONS).insert(rows).select('*')
-
   if (error) throw new ApiError(500, error.message)
   return data ?? []
 }
@@ -369,7 +455,9 @@ export async function getPollForVoter(eventId, voterId) {
     throw new ApiError(400, 'Not a polling event')
   }
 
-  const questions = await listQuestionsPublic(eventId)
+  const orgId = event.organizations?.id
+  const registry = await loadQuestionTypeRegistry(orgId)
+  const questions = await listQuestionsPublic(eventId, registry)
   const open = isPollOpen(event)
 
   const { count } = await getClient()
@@ -384,13 +472,15 @@ export async function getPollForVoter(eventId, voterId) {
   return {
     event: mapPollEvent(event),
     questions,
+    questionTypes: registry, // Phase 7 — voter UI uses this to render the right input
     pollOpen: open,
     canSubmit: canSubmitAgain,
     submissionCount: count ?? 0,
   }
 }
 
-async function listQuestionsPublic(eventId) {
+async function listQuestionsPublic(eventId, registry = null) {
+  registry = registry ?? (await loadQuestionTypeRegistry())
   const { data, error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
     .select('*')
@@ -401,7 +491,10 @@ async function listQuestionsPublic(eventId) {
 
   const ids = (data ?? []).map((q) => q.id)
   const optMap = await loadOptionsForQuestions(ids)
-  return (data ?? []).map((q) => mapQuestion(q, optMap[q.id] ?? []))
+  return (data ?? []).map((q) => {
+    const typeDef = registry.find((r) => r.key === q.type) ?? null
+    return mapQuestion(q, optMap[q.id] ?? [], typeDef)
+  })
 }
 
 export async function submitPollResponse(eventId, voterId, answers) {
@@ -412,8 +505,24 @@ export async function submitPollResponse(eventId, voterId, answers) {
     throw new ApiError(403, 'This poll is closed or expired')
   }
 
-  const questions = await listQuestionsPublic(eventId)
-  validateAnswers(questions, answers)
+  const orgId = event.organizations?.id
+  const registry = await loadQuestionTypeRegistry(orgId)
+  const questions = await listQuestionsPublic(eventId, registry)
+
+  // Run the registry-driven validator on every answer.
+  for (const q of questions) {
+    const typeDef = registry.find((r) => r.key === q.type) ?? null
+    if (!typeDef) {
+      throw new ApiError(500, `Question ${q.id} uses unknown type: ${q.type}`)
+    }
+    try {
+      validateAnswerV2(typeDef, q.typeConfig ?? {}, q.options, answers[q.id], {
+        required: q.required,
+      })
+    } catch (err) {
+      throw new ApiError(400, `${q.question}: ${err.message}`)
+    }
+  }
 
   if (!event.poll_allow_multiple_submissions) {
     const { data: locked, error: lockErr } = await getClient()
@@ -450,18 +559,20 @@ export async function submitPollResponse(eventId, voterId, answers) {
   const rows = []
 
   for (const q of questions) {
+    const typeDef = registry.find((r) => r.key === q.type)
     const raw = answers[q.id]
-    if (raw === undefined || raw === null || raw === '') {
-      if (q.required) throw new ApiError(400, `Answer required for: ${q.question}`)
-      continue
-    }
+    if (raw === undefined || raw === null || raw === '') continue
 
-    const stored = serializeAnswer(q, raw)
+    const validated = validateAnswerV2(typeDef, q.typeConfig ?? {}, q.options, raw, {
+      required: false, // already checked above
+    })
+    if (validated === null) continue
+
     rows.push({
       question_id: q.id,
       voter_id: voterId,
       submission_id: submission.id,
-      answer: stored,
+      answer: serializeAnswerV2(validated),
     })
   }
 
@@ -492,41 +603,13 @@ export async function submitPollResponse(eventId, voterId, answers) {
   return { success: true, submissionId: submission.id, message: 'Response submitted' }
 }
 
-function serializeAnswer(question, raw) {
-  if (question.type === POLL_QUESTION_TYPES.CHECKBOX) {
-    const arr = Array.isArray(raw) ? raw : [raw]
-    return JSON.stringify(arr)
-  }
-  return String(raw)
-}
-
 function validateAnswers(questions, answers) {
+  // Legacy path retained for backward compatibility — new code paths go
+  // through submitPollResponse which validates per question.
   for (const q of questions) {
     const val = answers[q.id]
     if (q.required && (val === undefined || val === null || val === '' || (Array.isArray(val) && !val.length))) {
       throw new ApiError(400, `Answer required: ${q.question}`)
-    }
-
-    if (val === undefined || val === null || val === '') continue
-
-    if (q.type === POLL_QUESTION_TYPES.RATING) {
-      const num = Number(val)
-      if (Number.isNaN(num) || num < 1 || num > 5) {
-        throw new ApiError(400, `Rating must be 1–5 for: ${q.question}`)
-      }
-    }
-
-    if ([POLL_QUESTION_TYPES.SINGLE_CHOICE, POLL_QUESTION_TYPES.YES_NO].includes(q.type)) {
-      const validIds = new Set(q.options.map((o) => o.id))
-      if (!validIds.has(val)) throw new ApiError(400, 'Invalid option selected')
-    }
-
-    if (q.type === POLL_QUESTION_TYPES.CHECKBOX) {
-      const arr = Array.isArray(val) ? val : [val]
-      const validIds = new Set(q.options.map((o) => o.id))
-      for (const id of arr) {
-        if (!validIds.has(id)) throw new ApiError(400, 'Invalid checkbox option')
-      }
     }
   }
 }
@@ -559,6 +642,8 @@ export async function getPollAnalytics(eventId, organizerId) {
   const event = await getEventById(eventId)
   const anonymous = Boolean(event.poll_anonymous)
 
+  const orgId = await getPollingOrgId(organizerId)
+  const registry = await loadQuestionTypeRegistry(orgId)
   const questions = await listQuestions(eventId, organizerId)
 
   const { count: totalSubmissions } = await getClient()
@@ -578,14 +663,22 @@ export async function getPollAnalytics(eventId, organizerId) {
 
   const questionAnalytics = questions.map((q) => {
     const qAnswers = (allAnswers ?? []).filter((a) => a.question_id === q.id)
-    const responseCount = qAnswers.length
-
+    const typeDef = registry.find((r) => r.key === q.type) ?? null
+    const stats = buildAnalytics({
+      question: q,
+      answers: qAnswers,
+      options: q.options,
+      typeDef,
+      typeConfig: q.typeConfig ?? {},
+      anonymous,
+    })
     return {
       questionId: q.id,
       question: q.question,
       type: q.type,
-      responseCount,
-      ...buildQuestionStats(q, qAnswers, anonymous),
+      typeLabel: typeDef?.label ?? q.type,
+      responseCount: qAnswers.length,
+      ...stats,
     }
   })
 
@@ -594,65 +687,4 @@ export async function getPollAnalytics(eventId, organizerId) {
     pollAnonymous: anonymous,
     questions: questionAnalytics,
   }
-}
-
-function buildQuestionStats(question, answers, anonymous) {
-  if (question.type === POLL_QUESTION_TYPES.TEXT) {
-    const samples = answers.map((a) => ({
-      text: a.answer,
-      respondent: anonymous ? null : a.voter_id,
-    }))
-    return { type: 'text', responses: samples }
-  }
-
-  if (question.type === POLL_QUESTION_TYPES.RATING) {
-    const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
-    for (const a of answers) {
-      const n = Math.round(Number(a.answer))
-      if (dist[n] !== undefined) dist[n]++
-    }
-    return {
-      type: 'rating',
-      distribution: Object.entries(dist).map(([rating, count]) => ({
-        rating: Number(rating),
-        count,
-        percentage: answers.length ? Math.round((count / answers.length) * 10000) / 100 : 0,
-      })),
-      average:
-        answers.length > 0
-          ? Math.round(
-              (answers.reduce((s, a) => s + Number(a.answer), 0) / answers.length) * 100,
-            ) / 100
-          : 0,
-    }
-  }
-
-  const optionCounts = {}
-  for (const o of question.options) {
-    optionCounts[o.id] = { optionId: o.id, label: o.label, count: 0 }
-  }
-
-  for (const a of answers) {
-    if (question.type === POLL_QUESTION_TYPES.CHECKBOX) {
-      let selected = []
-      try {
-        selected = JSON.parse(a.answer)
-      } catch {
-        selected = [a.answer]
-      }
-      for (const id of selected) {
-        if (optionCounts[id]) optionCounts[id].count++
-      }
-    } else {
-      if (optionCounts[a.answer]) optionCounts[a.answer].count++
-    }
-  }
-
-  const total = answers.length
-  const options = Object.values(optionCounts).map((o) => ({
-    ...o,
-    percentage: total ? Math.round((o.count / total) * 10000) / 100 : 0,
-  }))
-
-  return { type: 'choice', options, totalResponses: total }
 }

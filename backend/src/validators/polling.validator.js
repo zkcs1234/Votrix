@@ -1,6 +1,6 @@
 import { ApiError } from '../utils/ApiError.js'
-
-const VALID_TYPES = ['multiple_choice', 'single_choice', 'checkbox', 'yes_no', 'text', 'rating']
+import { requireQuestionType } from '../services/polling-registry.service.js'
+import { validateTypeConfig } from '../modules/poll-question-types.js'
 
 export function validatePollEvent(body, isCreate = false) {
   if (isCreate && !body?.title?.trim()) {
@@ -21,17 +21,26 @@ export function validatePollEvent(body, isCreate = false) {
   return payload
 }
 
-export function validateQuestion(body) {
+// Phase 7 — question validation is registry-driven. The list of valid
+// types is no longer hardcoded here; instead we ask the registry.
+export async function validateQuestion(body, organizationId) {
   if (!body?.question?.trim()) throw new ApiError(400, 'Question text is required')
-  if (!VALID_TYPES.includes(body.type)) {
-    throw new ApiError(400, `Invalid type. Use: ${VALID_TYPES.join(', ')}`)
+  if (!body?.type) throw new ApiError(400, 'Question type is required')
+
+  const typeDef = await requireQuestionType(organizationId, body.type)
+  let typeConfig
+  try {
+    typeConfig = validateTypeConfig(typeDef, body.typeConfig)
+  } catch (err) {
+    throw new ApiError(400, err.message)
   }
 
   return {
     question: body.question.trim(),
-    type: body.type,
+    type: typeDef.key,
     sortOrder: Number(body.sortOrder ?? 0),
     required: body.required !== false,
+    typeConfig,
     options: body.options,
   }
 }
@@ -49,4 +58,23 @@ export function validatePollToggle(body) {
     throw new ApiError(400, 'pollingEnabled must be a boolean')
   }
   return body.pollingEnabled
+}
+
+// Phase 7 — custom type validators
+export function validateCustomType(body) {
+  if (!body?.key?.trim()) throw new ApiError(400, 'key is required')
+  if (!body?.label?.trim()) throw new ApiError(400, 'label is required')
+  if (!body?.answerFormat || typeof body.answerFormat !== 'object') {
+    throw new ApiError(400, 'answerFormat is required')
+  }
+  return {
+    key: body.key.trim(),
+    label: body.label.trim(),
+    description: body.description?.trim() || null,
+    answerFormat: body.answerFormat,
+    configSchema: body.configSchema ?? {},
+    ui: body.ui ?? {},
+    sortOrder: Number(body.sortOrder ?? 100),
+    isActive: body.isActive !== false,
+  }
 }

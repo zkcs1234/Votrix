@@ -58,6 +58,9 @@ const PageantContestantsPage = lazy(
 const PageantCriteriaPage = lazy(() => import('@/pages/organizer/pageant/PageantCriteriaPage'))
 const PageantJudgesPage = lazy(() => import('@/pages/organizer/pageant/PageantJudgesPage'))
 const PageantRankingsPage = lazy(() => import('@/pages/organizer/pageant/PageantRankingsPage'))
+const CompetitionWorkspacePage = lazy(
+  () => import('@/pages/organizer/pageant/CompetitionWorkspacePage'),
+)
 const JudgeScoringPage = lazy(() => import('@/pages/voter/JudgeScoringPage'))
 
 const PollingDashboardPage = lazy(
@@ -199,6 +202,7 @@ export const routeConfig = [
       { path: 'events', element: <PageantEventsPage /> },
       { path: 'events/new', element: <PageantEventFormPage /> },
       { path: 'events/:eventId/edit', element: <PageantEventFormPage /> },
+      { path: 'events/:eventId/workspace', element: <CompetitionWorkspacePage /> },
       { path: 'events/:eventId/contestants', element: <PageantContestantsPage /> },
       { path: 'events/:eventId/criteria', element: <PageantCriteriaPage /> },
       { path: 'events/:eventId/judges', element: <PageantJudgesPage /> },

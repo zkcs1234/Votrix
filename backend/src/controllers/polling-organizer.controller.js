@@ -7,11 +7,20 @@ import {
   validatePollEvent,
   validateQuestion,
   validatePollToggle,
+  validateCustomType,
 } from '../validators/polling.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
 import { updateOrganizationLogo } from '../services/organization.service.js'
 import { ORG_TYPES } from '../utils/constants.js'
+import {
+  loadQuestionTypeRegistry,
+  listCustomTypes,
+  createCustomType,
+  updateCustomType,
+  deleteCustomType,
+} from '../services/polling-registry.service.js'
+import { getOrCreatePollingOrganization } from '../services/organization.service.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const data = await pollingService.getOrganizerDashboard(req.user.id)
@@ -70,7 +79,8 @@ export const listQuestions = asyncHandler(async (req, res) => {
 })
 
 export const createQuestion = asyncHandler(async (req, res) => {
-  const payload = validateQuestion(req.body)
+  const org = await getOrCreatePollingOrganization(req.user.id)
+  const payload = await validateQuestion(req.body, org.id)
   const question = await pollingService.createQuestion(
     req.params.eventId,
     req.user.id,
@@ -80,7 +90,8 @@ export const createQuestion = asyncHandler(async (req, res) => {
 })
 
 export const updateQuestion = asyncHandler(async (req, res) => {
-  const payload = validateQuestion(req.body)
+  const org = await getOrCreatePollingOrganization(req.user.id)
+  const payload = await validateQuestion(req.body, org.id)
   const question = await pollingService.updateQuestion(
     req.params.eventId,
     req.user.id,
@@ -119,4 +130,39 @@ export const importRespondentsCsv = asyncHandler(async (req, res) => {
   if (!req.file) throw new ApiError(400, 'CSV file required')
   const result = await importVotersFromCsv(req.params.eventId, req.user.id, req.file.buffer)
   res.json({ success: true, ...result })
+})
+
+// ---------------------------------------------------------------------------
+// Phase 7 — Question type registry
+// ---------------------------------------------------------------------------
+export const listQuestionTypes = asyncHandler(async (req, res) => {
+  const org = await getOrCreatePollingOrganization(req.user.id)
+  const types = await loadQuestionTypeRegistry(org.id)
+  res.json({ success: true, types })
+})
+
+export const listCustomQuestionTypes = asyncHandler(async (req, res) => {
+  const org = await getOrCreatePollingOrganization(req.user.id)
+  const types = await listCustomTypes(org.id)
+  res.json({ success: true, types })
+})
+
+export const createCustomQuestionType = asyncHandler(async (req, res) => {
+  const org = await getOrCreatePollingOrganization(req.user.id)
+  const payload = validateCustomType(req.body)
+  const type = await createCustomType(org.id, payload)
+  res.status(201).json({ success: true, type })
+})
+
+export const updateCustomQuestionType = asyncHandler(async (req, res) => {
+  const org = await getOrCreatePollingOrganization(req.user.id)
+  const payload = validateCustomType(req.body)
+  const type = await updateCustomType(org.id, req.params.typeId, payload)
+  res.json({ success: true, type })
+})
+
+export const deleteCustomQuestionType = asyncHandler(async (req, res) => {
+  const org = await getOrCreatePollingOrganization(req.user.id)
+  await deleteCustomType(org.id, req.params.typeId)
+  res.json({ success: true, message: 'Custom type removed' })
 })

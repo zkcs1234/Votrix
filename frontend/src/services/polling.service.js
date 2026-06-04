@@ -76,6 +76,23 @@ export const pollingService = {
     })
   },
 
+  // Phase 7 — Question type registry (database-driven)
+  listQuestionTypes() {
+    return api.get(`${org}/question-types`)
+  },
+  listCustomQuestionTypes() {
+    return api.get(`${org}/question-types/custom`)
+  },
+  createCustomQuestionType(payload) {
+    return api.post(`${org}/question-types/custom`, payload)
+  },
+  updateCustomQuestionType(typeId, payload) {
+    return api.patch(`${org}/question-types/custom/${typeId}`, payload)
+  },
+  deleteCustomQuestionType(typeId) {
+    return api.delete(`${org}/question-types/custom/${typeId}`)
+  },
+
   listMyPolls() {
     return api.get(`${voter}/events`)
   },
@@ -89,6 +106,8 @@ export const pollingService = {
   },
 }
 
+// Backward-compat export. The UI no longer relies on this list; it loads
+// types from the registry. Keep it for any existing imports.
 export const QUESTION_TYPES = [
   { value: 'multiple_choice', label: 'Multiple choice' },
   { value: 'checkbox', label: 'Checkbox' },

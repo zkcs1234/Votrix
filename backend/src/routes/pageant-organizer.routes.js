@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { uploadSingle, uploadImage } from '../middleware/upload.js'
 import { uploadLimiter, csvImportLimiter, emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/pageant-organizer.controller.js'
+import competitionRoutes from './competition-organizer.routes.js'
 
 const router = Router()
 
@@ -36,5 +37,10 @@ router.post('/events/:eventId/judges/import', csvImportLimiter, uploadSingle('fi
 
 router.get('/events/:eventId/rankings', ctrl.getRankings)
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
+
+// Phase 4-6 dynamic scoring engine: categories, rounds, scoring config,
+// first-class judges, and flexible assignments live under
+// `/events/:eventId/...` and share the auth middleware on the parent router.
+router.use('/events/:eventId', competitionRoutes)
 
 export default router
