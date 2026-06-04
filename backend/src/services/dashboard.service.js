@@ -1,6 +1,12 @@
 import { getSupabase } from '../config/database.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, EVENT_TYPES, EVENT_STATUS, USER_ROLES } from '../utils/constants.js'
+import {
+  DB_TABLES,
+  EVENT_TYPES,
+  EVENT_STATUS,
+  COMPETITION_SCORING_EVENT_TYPES,
+  USER_ROLES,
+} from '../utils/constants.js'
 
 function getClient() {
   const client = getSupabase()
@@ -77,16 +83,18 @@ async function getEventRowsByOrganizer(organizerId) {
 
 function collectEventIdsByType(events) {
   const electionEventIds = []
-  const pageantEventIds = []
+  const competitionEventIds = []
   const pollingEventIds = []
 
   for (const event of events ?? []) {
     if (event.event_type === EVENT_TYPES.ELECTION) electionEventIds.push(event.id)
-    if (event.event_type === EVENT_TYPES.PAGEANT) pageantEventIds.push(event.id)
+    if (COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)) {
+      competitionEventIds.push(event.id)
+    }
     if (event.event_type === EVENT_TYPES.POLLING) pollingEventIds.push(event.id)
   }
 
-  return { electionEventIds, pageantEventIds, pollingEventIds }
+  return { electionEventIds, competitionEventIds, pollingEventIds }
 }
 
 async function loadRecentActivity({ eventIds, includeOrganizerCreations = false, organizerId = null }) {
@@ -246,7 +254,7 @@ export async function getAdminDashboardStats() {
       totalOrganizers: activeOrganizerIds.size,
       totalEvents: events.length,
       totalElectionEvents: events.filter((e) => e.event_type === EVENT_TYPES.ELECTION).length,
-      totalPageantEvents: events.filter((e) => e.event_type === EVENT_TYPES.PAGEANT).length,
+      totalPageantEvents: events.filter((e) => COMPETITION_SCORING_EVENT_TYPES.has(e.event_type)).length,
       totalPollingEvents: events.filter((e) => e.event_type === EVENT_TYPES.POLLING).length,
       activeEvents: events.filter((e) => e.status === EVENT_STATUS.ACTIVE).length,
       finishedEvents: events.filter((e) => e.status === EVENT_STATUS.COMPLETED).length,
@@ -293,8 +301,8 @@ export async function getAdminAnalytics() {
           count: events.filter((e) => e.event_type === EVENT_TYPES.ELECTION).length,
         },
         {
-          type: EVENT_TYPES.PAGEANT,
-          count: events.filter((e) => e.event_type === EVENT_TYPES.PAGEANT).length,
+          type: 'competition_scoring',
+          count: events.filter((e) => COMPETITION_SCORING_EVENT_TYPES.has(e.event_type)).length,
         },
         {
           type: EVENT_TYPES.POLLING,
@@ -319,7 +327,7 @@ export async function getAdminAnalytics() {
 
 export async function getOrganizerDashboardStats(organizerId) {
   const events = await getEventRowsByOrganizer(organizerId)
-  const { electionEventIds, pageantEventIds, pollingEventIds } = collectEventIdsByType(events)
+  const { electionEventIds, competitionEventIds, pollingEventIds } = collectEventIdsByType(events)
 
   const [
     totalAssigned,
@@ -340,12 +348,12 @@ export async function getOrganizerDashboardStats(organizerId) {
           getClient().from(DB_TABLES.ELECTION_VOTES).select('*', { count: 'exact', head: true }).in('event_id', electionEventIds),
         )
       : Promise.resolve(0),
-    pageantEventIds.length
+    competitionEventIds.length
       ? countRows(
           getClient()
             .from(DB_TABLES.JUDGE_SCORES)
-            .select('id, contestants!inner(event_id)', { count: 'exact', head: true })
-            .in('contestants.event_id', pageantEventIds),
+            .select('id, competition_contestants!inner(event_id)', { count: 'exact', head: true })
+            .in('competition_contestants.event_id', competitionEventIds),
         )
       : Promise.resolve(0),
     pollingEventIds.length
@@ -365,12 +373,12 @@ export async function getOrganizerDashboardStats(organizerId) {
             .eq('has_voted', true),
         )
       : Promise.resolve(0),
-    pageantEventIds.length
+    competitionEventIds.length
       ? countRows(
           getClient()
             .from(DB_TABLES.EVENT_VOTERS)
             .select('*', { count: 'exact', head: true })
-            .in('event_id', pageantEventIds)
+            .in('event_id', competitionEventIds)
             .eq('is_judge', true)
             .eq('has_scored', true),
         )
@@ -397,7 +405,7 @@ export async function getOrganizerDashboardStats(organizerId) {
       activeEvents: events.filter((e) => e.status === EVENT_STATUS.ACTIVE).length,
       finishedEvents: events.filter((e) => e.status === EVENT_STATUS.COMPLETED).length,
       totalElectionEvents: electionEventIds.length,
-      totalPageantEvents: pageantEventIds.length,
+      totalPageantEvents: competitionEventIds.length,
       totalPollingEvents: pollingEventIds.length,
       totalAssignedVoters: totalAssigned,
       totalVotesCast: electionVotes + judgeScores + pollAnswers,
@@ -411,7 +419,7 @@ export async function getOrganizerDashboardStats(organizerId) {
 
 export async function getOrganizerAnalytics(organizerId) {
   const events = await getEventRowsByOrganizer(organizerId)
-  const { electionEventIds, pageantEventIds, pollingEventIds } = collectEventIdsByType(events)
+  const { electionEventIds, competitionEventIds, pollingEventIds } = collectEventIdsByType(events)
 
   const [voterRowsRes, electionVotesRes, judgeScoresRes, pollAnswersRes] = await Promise.all([
     events.length
@@ -420,8 +428,8 @@ export async function getOrganizerAnalytics(organizerId) {
     electionEventIds.length
       ? getClient().from(DB_TABLES.ELECTION_VOTES).select('created_at, event_id').in('event_id', electionEventIds)
       : Promise.resolve({ data: [], error: null }),
-    pageantEventIds.length
-      ? getClient().from(DB_TABLES.JUDGE_SCORES).select('created_at, contestants!inner(event_id)').in('contestants.event_id', pageantEventIds)
+    competitionEventIds.length
+      ? getClient().from(DB_TABLES.JUDGE_SCORES).select('created_at, competition_contestants!inner(event_id)').in('competition_contestants.event_id', competitionEventIds)
       : Promise.resolve({ data: [], error: null }),
     pollingEventIds.length
       ? getClient().from(DB_TABLES.POLL_ANSWERS).select('created_at, poll_questions!inner(event_id)').in('poll_questions.event_id', pollingEventIds)
@@ -438,10 +446,10 @@ export async function getOrganizerAnalytics(organizerId) {
   const electionVoted = voterRows.filter((r) => electionEventIds.includes(r.event_id) && r.has_voted).length
 
   const pageantJudges = voterRows.filter(
-    (r) => pageantEventIds.includes(r.event_id) && r.is_judge,
+    (r) => competitionEventIds.includes(r.event_id) && r.is_judge,
   ).length
   const pageantCompleted = voterRows.filter(
-    (r) => pageantEventIds.includes(r.event_id) && r.is_judge && r.has_scored,
+    (r) => competitionEventIds.includes(r.event_id) && r.is_judge && r.has_scored,
   ).length
 
   const pollingAssigned = voterRows.filter((r) => pollingEventIds.includes(r.event_id)).length
@@ -467,7 +475,7 @@ export async function getOrganizerAnalytics(organizerId) {
           rate: electionAssigned > 0 ? Math.round((electionVoted / electionAssigned) * 10000) / 100 : 0,
         },
         {
-          module: EVENT_TYPES.PAGEANT,
+          module: 'competition_scoring',
           assigned: pageantJudges,
           participated: pageantCompleted,
           rate: pageantJudges > 0 ? Math.round((pageantCompleted / pageantJudges) * 10000) / 100 : 0,

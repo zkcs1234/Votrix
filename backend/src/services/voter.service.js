@@ -1,5 +1,5 @@
 import { listVoterElectionEvents } from './election.service.js'
-import { listJudgePageantEvents } from './pageant.service.js'
+import { listJudgeCompetitionEvents } from './pageant.service.js'
 import { listVoterPollEvents } from './polling.service.js'
 
 function isPollOpen(event) {
@@ -29,7 +29,7 @@ function classifyElection(event) {
   }
 }
 
-function classifyPageant(event) {
+function classifyCompetition(event) {
   let bucket = 'assigned'
   if (event.hasScored) bucket = 'completed'
   else if (event.scoringEnabled) bucket = 'active'
@@ -38,10 +38,10 @@ function classifyPageant(event) {
     id: event.id,
     title: event.title,
     description: event.description,
-    eventType: 'pageant',
+    eventType: 'competition_scoring',
     bucket,
     statusLabel: bucket === 'completed' ? 'Scores submitted' : event.scoringEnabled ? 'Scoring open' : 'Waiting to open',
-    actionPath: `/voter/pageant/events/${event.id}/score`,
+    actionPath: `/voter/competition/events/${event.id}/score`,
     actionLabel:
       bucket === 'active' ? 'Score contestants' : bucket === 'completed' ? 'View scores' : 'View event',
     scoringEnabled: Boolean(event.scoringEnabled),
@@ -90,15 +90,15 @@ function classifyPoll(event) {
 }
 
 export async function getVoterDashboard(voterId) {
-  const [elections, pageants, polls] = await Promise.all([
+  const [elections, competitions, polls] = await Promise.all([
     listVoterElectionEvents(voterId),
-    listJudgePageantEvents(voterId),
+    listJudgeCompetitionEvents(voterId),
     listVoterPollEvents(voterId),
   ])
 
   const events = [
     ...elections.map(classifyElection),
-    ...pageants.map(classifyPageant),
+    ...competitions.map(classifyCompetition),
     ...polls.map(classifyPoll),
   ]
 

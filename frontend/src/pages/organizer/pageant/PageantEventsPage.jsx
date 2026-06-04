@@ -40,7 +40,7 @@ export default function PageantEventsPage() {
       <div className="flex justify-between">
         <h2 className="text-xl font-semibold text-v-text">Competition Scoring events</h2>
         <Link
-          to="/organizer/pageant/events/new"
+          to="/organizer/competition/events/new"
           className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white"
         >
           New event
@@ -53,7 +53,7 @@ export default function PageantEventsPage() {
           className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-border bg-v-surface p-5"
         >
           <Link
-            to={`/organizer/pageant/events/${event.id}/contestants`}
+            to={`/organizer/competition/events/${event.id}/contestants`}
             className="text-lg font-medium text-v-text hover:text-v-text"
           >
             {event.title}
@@ -71,7 +71,7 @@ export default function PageantEventsPage() {
               {event.scoringEnabled ? 'Close scoring' : 'Open scoring'}
             </button>
             <Link
-              to={`/organizer/pageant/events/${event.id}/edit`}
+              to={`/organizer/competition/events/${event.id}/edit`}
               className="rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
             >
               Edit

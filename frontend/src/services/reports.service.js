@@ -12,7 +12,11 @@ export const reportsService = {
   },
 
   getPageantReport(eventId) {
-    return api.get(`${base}/pageant/${eventId}`)
+    return api.get(`${base}/competition/${eventId}`)
+  },
+
+  getCompetitionReport(eventId) {
+    return api.get(`${base}/competition/${eventId}`)
   },
 
   getPollingReport(eventId) {

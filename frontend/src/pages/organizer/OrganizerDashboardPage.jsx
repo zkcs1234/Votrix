@@ -174,10 +174,10 @@ export default function OrganizerDashboardPage() {
           </p>
         </Link>
         <Link
-          to="/organizer/pageant"
+          to="/organizer/competition"
           className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
         >
-          <h3 className="v-section-title">Competion Scoring module</h3>
+          <h3 className="v-section-title">Competition Scoring module</h3>
           <p className="v-caption">
             Contestants, criteria, judge scoring, and rankings.
           </p>
@@ -199,7 +199,7 @@ export default function OrganizerDashboardPage() {
       >
         <h3 className="v-section-title">Analytics & reports</h3>
         <p className="v-caption mt-2">
-          Turnout reports, vote summaries, pageant rankings, and polling charts.
+          Turnout reports, vote summaries, competition rankings, and polling charts.
         </p>
       </Link>
 

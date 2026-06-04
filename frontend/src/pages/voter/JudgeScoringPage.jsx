@@ -21,7 +21,9 @@ export default function JudgeScoringPage() {
         if (data.hasScored) setDone(true)
         
         try {
-          const savedStr = localStorage.getItem(`votrix_pageant_draft_${eventId}`)
+          const savedStr =
+            localStorage.getItem(`votrix_competition_draft_${eventId}`) ??
+            localStorage.getItem(`votrix_pageant_draft_${eventId}`)
           const saved = savedStr ? JSON.parse(savedStr) : {}
           setScores({ ...data.existingScores, ...saved })
         } catch {
@@ -33,7 +35,7 @@ export default function JudgeScoringPage() {
 
   useEffect(() => {
     if (Object.keys(scores).length > 0) {
-      localStorage.setItem(`votrix_pageant_draft_${eventId}`, JSON.stringify(scores))
+      localStorage.setItem(`votrix_competition_draft_${eventId}`, JSON.stringify(scores))
     }
   }, [eventId, scores])
 
@@ -81,6 +83,7 @@ export default function JudgeScoringPage() {
 
     try {
       await pageantService.submitScores(eventId, payload)
+      localStorage.removeItem(`votrix_competition_draft_${eventId}`)
       localStorage.removeItem(`votrix_pageant_draft_${eventId}`)
       setDone(true)
     } catch (err) {

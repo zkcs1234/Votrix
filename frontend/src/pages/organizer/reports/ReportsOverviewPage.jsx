@@ -73,8 +73,8 @@ export default function ReportsOverviewPage() {
       />
 
       <EventList
-        title="Pageant rankings & judge turnout"
-        events={report?.pageants}
+        title="Competition rankings & judge turnout"
+        events={report?.competitions ?? report?.pageants}
         accent="text-v-text-muted"
         statLabel={(s) => `${s.turnoutPercentage}% judges scored (${s.submittedCount}/${s.totalJudges})`}
       />

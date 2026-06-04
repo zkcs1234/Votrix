@@ -35,7 +35,7 @@ export default function PageantRankingsPage() {
         <h2 className="text-xl font-semibold text-v-text">Live rankings</h2>
         <div className="flex gap-3">
           <Link
-            to={`/organizer/reports/pageant/${eventId}`}
+            to={`/organizer/reports/competition/${eventId}`}
             className="text-sm text-v-text-muted hover:text-v-text"
           >
             Full competition scoring report â†’

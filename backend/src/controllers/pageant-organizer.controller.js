@@ -6,11 +6,11 @@ import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
 import { updateOrganizationLogo } from '../services/organization.service.js'
 import { ORG_TYPES } from '../utils/constants.js'
 import {
-  validatePageantEvent,
+  validateCompetitionEvent,
   validateContestant,
   validateCriteria,
   validateScoringToggle,
-} from '../validators/pageant.validator.js'
+} from '../validators/competition.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
@@ -19,24 +19,24 @@ export const getDashboard = asyncHandler(async (req, res) => {
 })
 
 export const listEvents = asyncHandler(async (req, res) => {
-  const events = await pageantService.listPageantEvents(req.user.id)
+  const events = await pageantService.listCompetitionEvents(req.user.id)
   res.json({ success: true, events })
 })
 
 export const createEvent = asyncHandler(async (req, res) => {
-  const payload = validatePageantEvent(req.body, true)
-  const event = await pageantService.createPageantEvent(req.user.id, payload)
+  const payload = validateCompetitionEvent(req.body, true)
+  const event = await pageantService.createCompetitionEvent(req.user.id, payload)
   res.status(201).json({ success: true, event })
 })
 
 export const getEvent = asyncHandler(async (req, res) => {
-  const event = await pageantService.getPageantEvent(req.params.eventId, req.user.id)
+  const event = await pageantService.getCompetitionEvent(req.params.eventId, req.user.id)
   res.json({ success: true, event })
 })
 
 export const updateEvent = asyncHandler(async (req, res) => {
-  const payload = validatePageantEvent(req.body)
-  const event = await pageantService.updatePageantEvent(
+  const payload = validateCompetitionEvent(req.body)
+  const event = await pageantService.updateCompetitionEvent(
     req.params.eventId,
     req.user.id,
     payload,
@@ -51,18 +51,18 @@ export const setScoring = asyncHandler(async (req, res) => {
 })
 
 export const uploadOrganizationLogo = asyncHandler(async (req, res) => {
-  const result = await uploadImageFile(req.file, UPLOAD_KIND.LOGO, `pageant-${req.user.id}`)
+  const result = await uploadImageFile(req.file, UPLOAD_KIND.LOGO, `competition-${req.user.id}`)
   const organization = await updateOrganizationLogo(
     req.user.id,
-    ORG_TYPES.PAGEANT,
+    ORG_TYPES.COMPETITION_SCORING,
     result.secure_url,
   )
   res.json({ success: true, url: result.secure_url, organization })
 })
 
 export const uploadBanner = asyncHandler(async (req, res) => {
-  const result = await uploadImageFile(req.file, UPLOAD_KIND.BANNER, `pageant-${req.params.eventId}`)
-  const event = await pageantService.updatePageantEvent(req.params.eventId, req.user.id, {
+  const result = await uploadImageFile(req.file, UPLOAD_KIND.BANNER, `competition-${req.params.eventId}`)
+  const event = await pageantService.updateCompetitionEvent(req.params.eventId, req.user.id, {
     banner: result.secure_url,
   })
   res.json({ success: true, url: result.secure_url, event })
@@ -179,6 +179,7 @@ export const getRankings = asyncHandler(async (req, res) => {
 })
 
 export const getAnalytics = asyncHandler(async (req, res) => {
-  const analytics = await pageantService.getPageantAnalytics(req.params.eventId, req.user.id)
+  const analytics = await pageantService.getCompetitionAnalytics(req.params.eventId, req.user.id)
   res.json({ success: true, analytics })
 })
+

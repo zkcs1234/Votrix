@@ -5,12 +5,14 @@ import { EVENT_TYPE_META } from '@/services/voter.service'
 const TYPE_BORDER = {
   election: 'border-v-border hover:border-v-border-strong',
   pageant: 'border-v-border hover:border-v-border-strong',
+  competition_scoring: 'border-v-border hover:border-v-border-strong',
   polling: 'border-v-border hover:border-v-border-strong',
 }
 
 const TYPE_ACCENT = {
   election: 'text-v-text-muted',
   pageant: 'text-v-text-muted',
+  competition_scoring: 'text-v-text-muted',
   polling: 'text-v-text-muted',
 }
 

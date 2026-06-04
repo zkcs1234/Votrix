@@ -19,7 +19,11 @@ export function eventUrl(eventId) {
 }
 
 export function pageantScoreUrl(eventId) {
-  return `${base}/voter/pageant/events/${eventId}/score`
+  return `${base}/voter/competition/events/${eventId}/score`
+}
+
+export function competitionScoreUrl(eventId) {
+  return `${base}/voter/competition/events/${eventId}/score`
 }
 
 export function passwordResetUrl(token) {

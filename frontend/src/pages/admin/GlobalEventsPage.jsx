@@ -97,7 +97,7 @@ export default function GlobalEventsPage() {
       <div>
         <h1 className="v-page-title">Global events</h1>
         <p className="v-caption">
-          Monitor all elections, pageants, and polls across the platform.
+          Monitor all elections, competitions, and polls across the platform.
         </p>
       </div>
 
@@ -138,10 +138,10 @@ export default function GlobalEventsPage() {
                 </Button>
                 <Button
                   type="button"
-                  variant={typeFilter === 'pageant' ? 'primary' : 'secondary'}
-                  onClick={() => setTypeFilter('pageant')}
+                  variant={typeFilter === 'competition_scoring' ? 'primary' : 'secondary'}
+                  onClick={() => setTypeFilter('competition_scoring')}
                 >
-                  Pageant
+                  Competition
                 </Button>
                 <Button
                   type="button"

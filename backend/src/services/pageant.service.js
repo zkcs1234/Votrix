@@ -1,8 +1,12 @@
 import { getSupabase } from '../config/database.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, EVENT_TYPES, USER_ROLES } from '../utils/constants.js'
+import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES, USER_ROLES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
-import { getOrCreatePageantOrganization, mapOrganization } from './organization.service.js'
+import {
+  getOrCreatePageantOrganization,
+  getOrCreateCompetitionScoringOrganization,
+  mapOrganization,
+} from './organization.service.js'
 import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
 import { findUserByEmail, sanitizeUser } from './user.service.js'
@@ -53,24 +57,39 @@ function mapCriteria(row) {
   }
 }
 
-async function assertPageantEvent(eventId, organizerId) {
+async function assertCompetitionEvent(eventId, organizerId) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
-  if (event.event_type !== EVENT_TYPES.PAGEANT) {
-    throw new ApiError(400, 'This event is not a pageant')
+  if (!COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)) {
+    throw new ApiError(400, 'This event is not a competition scoring event')
   }
   return event
+}
+
+// Backward-compat alias.
+const assertPageantEvent = assertCompetitionEvent
+
+// ——— Organization resolution ———
+//
+// The pageant/competition-scoring organization is created on first use. The
+// helper in organization.service.js is the single source of truth.
+
+async function getOrCreateOrg(organizerId) {
+  if (typeof getOrCreateCompetitionScoringOrganization === 'function') {
+    return getOrCreateCompetitionScoringOrganization(organizerId)
+  }
+  return getOrCreatePageantOrganization(organizerId)
 }
 
 // ——— Dashboard & events ———
 
 export async function getOrganizerDashboard(organizerId) {
-  const org = await getOrCreatePageantOrganization(organizerId)
+  const org = await getOrCreateOrg(organizerId)
 
   const { data: events, error } = await getClient()
     .from(DB_TABLES.EVENTS)
     .select('id, title, status, scoring_enabled, event_type')
     .eq('organization_id', org.id)
-    .eq('event_type', EVENT_TYPES.PAGEANT)
+    .in('event_type', Array.from(COMPETITION_SCORING_EVENT_TYPES))
     .order('created_at', { ascending: false })
 
   if (error) throw new ApiError(500, error.message)
@@ -100,8 +119,8 @@ export async function getOrganizerDashboard(organizerId) {
         .eq('has_scored', true),
       getClient()
         .from(DB_TABLES.JUDGE_SCORES)
-        .select('id, contestants!inner(event_id)', { count: 'exact', head: true })
-        .in('contestants.event_id', eventIds),
+        .select('id, competition_contestants!inner(event_id)', { count: 'exact', head: true })
+        .in('competition_contestants.event_id', eventIds),
     ])
 
     if (contestantsRes.error) throw new ApiError(500, contestantsRes.error.message)
@@ -134,12 +153,16 @@ export async function getOrganizerDashboard(organizerId) {
 }
 
 export async function listPageantEvents(organizerId) {
-  const org = await getOrCreatePageantOrganization(organizerId)
+  return listCompetitionEvents(organizerId)
+}
+
+export async function listCompetitionEvents(organizerId) {
+  const org = await getOrCreateOrg(organizerId)
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
     .select('*')
     .eq('organization_id', org.id)
-    .eq('event_type', EVENT_TYPES.PAGEANT)
+    .in('event_type', Array.from(COMPETITION_SCORING_EVENT_TYPES))
     .order('created_at', { ascending: false })
 
   if (error) throw new ApiError(500, error.message)
@@ -147,7 +170,11 @@ export async function listPageantEvents(organizerId) {
 }
 
 export async function createPageantEvent(organizerId, payload) {
-  const org = await getOrCreatePageantOrganization(organizerId)
+  return createCompetitionEvent(organizerId, payload)
+}
+
+export async function createCompetitionEvent(organizerId, payload) {
+  const org = await getOrCreateOrg(organizerId)
 
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
@@ -159,7 +186,7 @@ export async function createPageantEvent(organizerId, payload) {
       start_date: payload.startDate ?? null,
       end_date: payload.endDate ?? null,
       status: payload.status ?? 'draft',
-      event_type: EVENT_TYPES.PAGEANT,
+      event_type: 'competition_scoring',
       scoring_enabled: false,
     })
     .select('*')
@@ -170,7 +197,11 @@ export async function createPageantEvent(organizerId, payload) {
 }
 
 export async function updatePageantEvent(eventId, organizerId, payload) {
-  await assertPageantEvent(eventId, organizerId)
+  return updateCompetitionEvent(eventId, organizerId, payload)
+}
+
+export async function updateCompetitionEvent(eventId, organizerId, payload) {
+  await assertCompetitionEvent(eventId, organizerId)
 
   const updates = {}
   if (payload.title !== undefined) updates.title = payload.title
@@ -192,12 +223,16 @@ export async function updatePageantEvent(eventId, organizerId, payload) {
 }
 
 export async function getPageantEvent(eventId, organizerId) {
-  const event = await assertPageantEvent(eventId, organizerId)
+  return getCompetitionEvent(eventId, organizerId)
+}
+
+export async function getCompetitionEvent(eventId, organizerId) {
+  const event = await assertCompetitionEvent(eventId, organizerId)
   return mapEvent(event)
 }
 
 export async function setEventScoring(eventId, organizerId, scoringEnabled) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
   if (scoringEnabled) {
     const criteria = await listCriteria(eventId, organizerId)
@@ -227,7 +262,7 @@ export async function setEventScoring(eventId, organizerId, scoringEnabled) {
 // ——— Contestants ———
 
 export async function listContestants(eventId, organizerId) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
   const { data, error } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
@@ -240,7 +275,7 @@ export async function listContestants(eventId, organizerId) {
 }
 
 export async function createContestant(eventId, organizerId, payload) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
   const { data, error } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
@@ -263,7 +298,7 @@ export async function createContestant(eventId, organizerId, payload) {
 }
 
 export async function updateContestant(eventId, organizerId, contestantId, payload) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
   const updates = {}
   if (payload.name !== undefined) updates.name = payload.name
@@ -284,7 +319,7 @@ export async function updateContestant(eventId, organizerId, contestantId, paylo
 }
 
 export async function deleteContestant(eventId, organizerId, contestantId) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
   const { error } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
@@ -298,7 +333,7 @@ export async function deleteContestant(eventId, organizerId, contestantId) {
 // ——— Criteria ———
 
 export async function listCriteria(eventId, organizerId) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
   const { data, error } = await getClient()
     .from(DB_TABLES.CRITERIA)
@@ -311,7 +346,7 @@ export async function listCriteria(eventId, organizerId) {
 }
 
 export async function createCriteria(eventId, organizerId, payload) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
   const { data, error } = await getClient()
     .from(DB_TABLES.CRITERIA)
@@ -330,7 +365,7 @@ export async function createCriteria(eventId, organizerId, payload) {
 }
 
 export async function updateCriteria(eventId, organizerId, criteriaId, payload) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
   const updates = {}
   if (payload.name !== undefined) updates.name = payload.name
@@ -352,7 +387,7 @@ export async function updateCriteria(eventId, organizerId, criteriaId, payload) 
 }
 
 export async function deleteCriteria(eventId, organizerId, criteriaId) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
   const { error } = await getClient()
     .from(DB_TABLES.CRITERIA)
@@ -403,7 +438,7 @@ async function ensureJudgeAccount(email, plainPassword) {
 }
 
 export async function inviteJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName }) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
 
   const tempPassword = temporaryPassword || generateTemporaryPassword()
@@ -435,7 +470,7 @@ export async function inviteJudge(eventId, organizerId, { email, temporaryPasswo
 }
 
 export async function listJudges(eventId, organizerId) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_VOTERS)
@@ -484,8 +519,8 @@ export async function getJudgeScoringSheet(eventId, judgeId) {
   const enrollment = await assertJudgeEnrolled(eventId, judgeId)
   const event = await getEventById(eventId)
 
-  if (event.event_type !== EVENT_TYPES.PAGEANT) {
-    throw new ApiError(400, 'Not a pageant event')
+  if (!COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)) {
+    throw new ApiError(400, 'Not a competition scoring event')
   }
 
   const [contestants, criteria] = await Promise.all([
@@ -536,7 +571,7 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
   const criteria = await getClient().from(DB_TABLES.CRITERIA).select('*').eq('event_id', eventId)
 
   if (contestants.error || criteria.error) {
-    throw new ApiError(500, 'Failed to load pageant data')
+    throw new ApiError(500, 'Failed to load competition scoring data')
   }
 
   const contestantIds = new Set((contestants.data ?? []).map((c) => c.id))
@@ -616,6 +651,10 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
 }
 
 export async function listJudgePageantEvents(judgeId) {
+  return listJudgeCompetitionEvents(judgeId)
+}
+
+export async function listJudgeCompetitionEvents(judgeId) {
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_VOTERS)
     .select(
@@ -637,7 +676,7 @@ export async function listJudgePageantEvents(judgeId) {
   if (error) throw new ApiError(500, error.message)
 
   return (data ?? [])
-    .filter((r) => r.events?.event_type === EVENT_TYPES.PAGEANT)
+    .filter((r) => COMPETITION_SCORING_EVENT_TYPES.has(r.events?.event_type))
     .map((r) => ({
       ...mapEvent(r.events),
       hasScored: r.has_scored,
@@ -647,7 +686,7 @@ export async function listJudgePageantEvents(judgeId) {
 // ——— Live rankings ———
 
 export async function getLiveRankings(eventId, organizerId) {
-  await assertPageantEvent(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
   const [contestantsRes, criteriaRes, judgesRes] = await Promise.all([
     getClient().from(DB_TABLES.CONTESTANTS).select('*').eq('event_id', eventId),
@@ -738,6 +777,10 @@ export async function getLiveRankings(eventId, organizerId) {
 }
 
 export async function getPageantAnalytics(eventId, organizerId) {
+  return getCompetitionAnalytics(eventId, organizerId)
+}
+
+export async function getCompetitionAnalytics(eventId, organizerId) {
   const rankings = await getLiveRankings(eventId, organizerId)
 
   const [contestantsRes, criteriaRes, scoresRes] = await Promise.all([
@@ -745,8 +788,8 @@ export async function getPageantAnalytics(eventId, organizerId) {
     getClient().from(DB_TABLES.CRITERIA).select('id, name').eq('event_id', eventId),
     getClient()
       .from(DB_TABLES.JUDGE_SCORES)
-      .select('score, criteria_id, criteria!inner(event_id)')
-      .eq('criteria.event_id', eventId),
+      .select('score, criteria_id, competition_criteria!inner(event_id)')
+      .eq('competition_criteria.event_id', eventId),
   ])
 
   if (contestantsRes.error) throw new ApiError(500, contestantsRes.error.message)

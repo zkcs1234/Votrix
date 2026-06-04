@@ -62,7 +62,7 @@ export default function PageantEventFormPage() {
       if (bannerFile) {
         await pageantService.uploadBanner(id, bannerFile)
       }
-      navigate(`/organizer/pageant/events/${id}/contestants`)
+      navigate(`/organizer/competition/events/${id}/contestants`)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save event')
     } finally {
@@ -93,7 +93,7 @@ export default function PageantEventFormPage() {
                 className={INPUT_CLASS}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter pageant title"
+                placeholder="Enter competition title"
                 required
               />
             </div>
@@ -108,7 +108,7 @@ export default function PageantEventFormPage() {
                 rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter pageant description (optional)"
+                placeholder="Enter competition description (optional)"
               />
               <p className={HELPER_TEXT}>Optional description for judges and contestants</p>
             </div>

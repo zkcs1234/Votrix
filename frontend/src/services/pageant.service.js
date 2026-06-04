@@ -1,7 +1,11 @@
 import api from '@/services/api'
 
-const org = '/organizer/pageant'
-const judge = '/voter/pageant'
+// Two base paths are kept in sync so existing call sites continue to work
+// while the rest of the app migrates from `/pageant` to `/competition`.
+const org = '/organizer/competition'
+const orgLegacy = '/organizer/pageant'
+const judge = '/voter/competition'
+const judgeLegacy = '/voter/pageant'
 
 export const pageantService = {
   getDashboard() {
@@ -121,3 +125,15 @@ export const pageantService = {
     return api.post(`${judge}/events/${eventId}/score`, { scores })
   },
 }
+
+// Legacy alias — `/pageant` paths still resolve on the server, so older
+// imports keep working without a code change.
+export const legacyPageantService = {
+  ...pageantService,
+  getDashboard: () => api.get(`${orgLegacy}/dashboard`),
+  listEvents: () => api.get(`${orgLegacy}/events`),
+  listJudgeEvents: () => api.get(`${judgeLegacy}/events`),
+}
+
+// New canonical name.
+export const competitionService = pageantService

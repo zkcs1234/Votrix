@@ -12,6 +12,7 @@ router.use(authenticate, authorize(USER_ROLES.VOTER), requireActiveAccount, requ
 
 router.use('/election', electionVoterRoutes)
 router.use('/pageant', pageantJudgeRoutes)
+router.use('/competition', pageantJudgeRoutes)
 router.use('/polling', pollingVoterRoutes)
 
 router.get('/overview', voterController.getVoterOverview)

@@ -188,6 +188,24 @@ export const routeConfig = [
     ],
   },
   {
+    path: '/organizer/competition',
+    element: (
+      <ProtectedRoute allowedRoles={[USER_ROLES.ORGANIZER]}>
+        <PageantLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <PageantDashboardPage /> },
+      { path: 'events', element: <PageantEventsPage /> },
+      { path: 'events/new', element: <PageantEventFormPage /> },
+      { path: 'events/:eventId/edit', element: <PageantEventFormPage /> },
+      { path: 'events/:eventId/contestants', element: <PageantContestantsPage /> },
+      { path: 'events/:eventId/criteria', element: <PageantCriteriaPage /> },
+      { path: 'events/:eventId/judges', element: <PageantJudgesPage /> },
+      { path: 'events/:eventId/rankings', element: <PageantRankingsPage /> },
+    ],
+  },
+  {
     path: '/organizer/polling',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.ORGANIZER]}>
@@ -215,6 +233,7 @@ export const routeConfig = [
       { index: true, element: <ReportsOverviewPage /> },
       { path: 'election/:eventId', element: <ElectionReportPage /> },
       { path: 'pageant/:eventId', element: <PageantReportPage /> },
+      { path: 'competition/:eventId', element: <PageantReportPage /> },
       { path: 'polling/:eventId', element: <PollingReportPage /> },
     ],
   },
@@ -247,6 +266,15 @@ export const routeConfig = [
   },
   {
     path: '/voter/pageant/events/:eventId/score',
+    element: (
+      <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
+        <DashboardLayout title="Judge scoring" />
+      </ProtectedRoute>
+    ),
+    children: [{ index: true, element: <JudgeScoringPage /> }],
+  },
+  {
+    path: '/voter/competition/events/:eventId/score',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
         <DashboardLayout title="Judge scoring" />

@@ -73,7 +73,7 @@ export function SkeletonStatCard() {
 }
 
 /**
- * Event card skeleton - use for event lists (election, polling, pageant)
+ * Event card skeleton - use for event lists (election, polling, competition)
  */
 export function SkeletonEventCard() {
   return (

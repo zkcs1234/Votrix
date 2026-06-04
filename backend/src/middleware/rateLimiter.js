@@ -169,7 +169,7 @@ export const pollLimiters = makeEventLimiters({
   message: 'Too many poll submissions. Please wait before submitting again.',
 })
 
-/** Pageant score submission */
+/** Competition scoring submission */
 export const scoreLimiters = makeEventLimiters({
   name: 'score',
   ipMax: parseEnvInt('RATE_LIMIT_SCORE_IP_MAX', 10),

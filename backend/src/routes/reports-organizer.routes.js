@@ -9,6 +9,8 @@ router.get('/election/:eventId', ctrl.getElectionReport)
 router.get('/election/:eventId/export', ctrl.exportElectionReport)
 router.get('/pageant/:eventId', ctrl.getPageantReport)
 router.get('/pageant/:eventId/export', ctrl.exportPageantReport)
+router.get('/competition/:eventId', ctrl.getCompetitionReport)
+router.get('/competition/:eventId/export', ctrl.exportCompetitionReport)
 router.get('/polling/:eventId', ctrl.getPollingReport)
 router.get('/polling/:eventId/export', ctrl.exportPollingReport)
 

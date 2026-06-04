@@ -10,7 +10,7 @@ import {
   organizerLoginUrl,
   voterLoginUrl,
   eventUrl,
-  pageantScoreUrl,
+  competitionScoreUrl,
   passwordResetUrl,
 } from '../utils/urls.js'
 
@@ -87,7 +87,7 @@ export async function sendJudgeInvitationEmail({
   eventId,
   eventTitle,
 }) {
-  const link = pageantScoreUrl(eventId)
+  const link = competitionScoreUrl(eventId)
   const html = judgeInvitationTemplate({
     email,
     temporaryPassword,

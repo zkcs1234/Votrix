@@ -11,9 +11,13 @@ export const ACCOUNT_STATUS = {
   ARCHIVED: 'archived',
 }
 
+// Organization types. The 'pageant' value is kept as a backward-compatibility
+// alias for any rows inserted before the rename; new code paths use
+// 'competition_scoring'.
 export const ORG_TYPES = {
   ELECTION: 'election',
   PAGEANT: 'pageant',
+  COMPETITION_SCORING: 'competition_scoring',
   POLLING: 'polling',
 }
 
@@ -32,11 +36,19 @@ export const EVENT_STATUS = {
   CANCELLED: 'cancelled',
 }
 
+// Event types. 'pageant' is kept for backward compatibility.
 export const EVENT_TYPES = {
   ELECTION: 'election',
   PAGEANT: 'pageant',
+  COMPETITION_SCORING: 'competition_scoring',
   POLLING: 'polling',
 }
+
+// Set of all event types that use the competition-scoring model.
+export const COMPETITION_SCORING_EVENT_TYPES = new Set([
+  EVENT_TYPES.PAGEANT,
+  EVENT_TYPES.COMPETITION_SCORING,
+])
 
 export const POLL_QUESTION_TYPES = {
   SINGLE_CHOICE: 'single_choice',
@@ -55,9 +67,9 @@ export const DB_TABLES = {
   INVITATIONS: 'invitations',
   POSITIONS: 'positions',
   CANDIDATES: 'candidates',
-  CONTESTANTS: 'contestants',
-  CRITERIA: 'criteria',
-  JUDGE_SCORES: 'judge_scores',
+  CONTESTANTS: 'competition_contestants',
+  CRITERIA: 'competition_criteria',
+  JUDGE_SCORES: 'competition_scores',
   POLL_QUESTIONS: 'poll_questions',
   POLL_ANSWERS: 'poll_answers',
   PASSWORD_RESET_TOKENS: 'password_reset_tokens',

@@ -39,13 +39,21 @@ export const exportElectionReport = asyncHandler(async (req, res) => {
 })
 
 export const getPageantReport = asyncHandler(async (req, res) => {
-  const report = await reportsService.getPageantReport(req.params.eventId, req.user.id)
+  return getCompetitionReport(req, res)
+})
+
+export const getCompetitionReport = asyncHandler(async (req, res) => {
+  const report = await reportsService.getCompetitionReport(req.params.eventId, req.user.id)
   res.json({ success: true, report })
 })
 
 export const exportPageantReport = asyncHandler(async (req, res) => {
+  return exportCompetitionReport(req, res)
+})
+
+export const exportCompetitionReport = asyncHandler(async (req, res) => {
   const format = resolveFormat(req.query.format)
-  const exportData = await reportsService.getPageantReportExport(req.params.eventId, req.user.id)
+  const exportData = await reportsService.getCompetitionReportExport(req.params.eventId, req.user.id)
   return sendExport(res, { format, ...exportData })
 })
 

@@ -43,7 +43,7 @@ export default function PageantDashboardPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-v-text">Competition Scoring dashboard</h2>
         <Link
-          to="/organizer/pageant/events/new"
+          to="/organizer/competition/events/new"
           className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white hover:bg-v-primary-hover"
         >
           Create Competition Scoring Event
@@ -81,7 +81,7 @@ export default function PageantDashboardPage() {
           {(data?.events ?? []).slice(0, 5).map((e) => (
             <li key={e.id}>
               <Link
-                to={`/organizer/pageant/events/${e.id}/contestants`}
+                to={`/organizer/competition/events/${e.id}/contestants`}
                 className="flex justify-between rounded-lg border border-v-border px-4 py-3 hover:bg-v-surface-elevated"
               >
                 <span className="text-v-text-muted">{e.title}</span>

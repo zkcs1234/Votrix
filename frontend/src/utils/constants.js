@@ -15,6 +15,7 @@ export const USER_ROLES = {
 export const ORG_TYPES = {
   ELECTION: 'election',
   PAGEANT: 'pageant',
+  COMPETITION_SCORING: 'competition_scoring',
   POLLING: 'polling',
 }
 
@@ -36,8 +37,14 @@ export const EVENT_STATUS = {
 export const EVENT_TYPES = {
   ELECTION: 'election',
   PAGEANT: 'pageant',
+  COMPETITION_SCORING: 'competition_scoring',
   POLLING: 'polling',
 }
+
+export const COMPETITION_SCORING_EVENT_TYPES = new Set([
+  EVENT_TYPES.PAGEANT,
+  EVENT_TYPES.COMPETITION_SCORING,
+])
 
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'votrix_access_token',

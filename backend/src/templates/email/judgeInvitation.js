@@ -8,7 +8,7 @@ export function judgeInvitationTemplate({
   loginUrl,
 }) {
   const bodyHtml = `
-    <h1 style="margin:0 0 12px;font-size:20px;color:#fff;">You're invited as a pageant judge</h1>
+    <h1 style="margin:0 0 12px;font-size:20px;color:#fff;">You're invited as a competition judge</h1>
     <p style="margin:0 0 16px;">You have been assigned as a judge for <strong style="color:#fff;">${escapeHtml(eventTitle)}</strong>. Sign in to score contestants (one submission only).</p>
     ${infoBoxHtml([
       ['Event', eventTitle],

@@ -144,7 +144,7 @@ export default function VoterDashboardPage() {
           Signed in as <span className="text-v-text-muted">{user?.email}</span>
         </p>
         <p className="v-caption mt-1">
-          Elections, pageant judging, and polls assigned to you appear below.
+          Elections, competition judging, and polls assigned to you appear below.
         </p>
       </div>
 

@@ -9,7 +9,7 @@ const cards = [
     description: 'Run secure digital elections with audit-ready results and turnout analytics.',
   },
   {
-    title: 'Pageants',
+    title: 'Competitions',
     description: 'Score competitions with weighted criteria, judge panels, and live rankings.',
   },
   {
@@ -35,7 +35,7 @@ export default function HomePage() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
         >
-          VOTRIX helps organizers run elections, pageants, and polls with role-based access for
+          VOTRIX helps organizers run elections, competitions, and polls with role-based access for
           admins, organizers, and voters.
         </motion.p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">

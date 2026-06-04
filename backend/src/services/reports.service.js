@@ -1,9 +1,13 @@
 import { getSupabase } from '../config/database.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, EVENT_TYPES } from '../utils/constants.js'
+import {
+  DB_TABLES,
+  EVENT_TYPES,
+  COMPETITION_SCORING_EVENT_TYPES,
+} from '../utils/constants.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
 import { listElectionEvents, getElectionAnalytics, listPositions } from './election.service.js'
-import { listPageantEvents, getLiveRankings } from './pageant.service.js'
+import { listCompetitionEvents, getLiveRankings } from './pageant.service.js'
 import { listPollEvents, getPollAnalytics } from './polling.service.js'
 
 function getClient() {
@@ -32,19 +36,19 @@ function rowsToCsv(rows) {
 }
 
 export async function getReportsOverview(organizerId) {
-  const [elections, pageants, polls] = await Promise.all([
+  const [elections, competitions, polls] = await Promise.all([
     listElectionEvents(organizerId),
-    listPageantEvents(organizerId),
+    listCompetitionEvents(organizerId),
     listPollEvents(organizerId),
   ])
 
   const electionIds = elections.map((e) => e.id)
-  const pageantIds = pageants.map((e) => e.id)
+  const competitionIds = competitions.map((e) => e.id)
   const pollIds = polls.map((e) => e.id)
 
-  const [electionStats, pageantStats, pollStats] = await Promise.all([
+  const [electionStats, competitionStats, pollStats] = await Promise.all([
     loadElectionStats(electionIds),
-    loadPageantStats(pageantIds),
+    loadCompetitionStats(competitionIds),
     loadPollStats(pollIds),
   ])
 
@@ -55,10 +59,10 @@ export async function getReportsOverview(organizerId) {
       reportPath: `/organizer/reports/election/${e.id}`,
       stats: electionStats[e.id] ?? null,
     })),
-    pageants: pageants.map((e) => ({
+    competitions: competitions.map((e) => ({
       ...e,
-      reportPath: `/organizer/reports/pageant/${e.id}`,
-      stats: pageantStats[e.id] ?? null,
+      reportPath: `/organizer/reports/competition/${e.id}`,
+      stats: competitionStats[e.id] ?? null,
     })),
     polls: polls.map((e) => ({
       ...e,
@@ -93,7 +97,7 @@ async function loadElectionStats(eventIds) {
   return map
 }
 
-async function loadPageantStats(eventIds) {
+async function loadCompetitionStats(eventIds) {
   const map = {}
   if (!eventIds.length) return map
 
@@ -210,16 +214,20 @@ export async function getElectionReport(eventId, organizerId) {
 }
 
 export async function getPageantReport(eventId, organizerId) {
+  return getCompetitionReport(eventId, organizerId)
+}
+
+export async function getCompetitionReport(eventId, organizerId) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
-  if (event.event_type !== EVENT_TYPES.PAGEANT) {
-    throw new ApiError(400, 'Not a pageant event')
+  if (!COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)) {
+    throw new ApiError(400, 'Not a competition scoring event')
   }
 
   const rankingsData = await getLiveRankings(eventId, organizerId)
 
   return {
     generatedAt: new Date().toISOString(),
-    reportType: 'pageant',
+    reportType: 'competition_scoring',
     event: {
       id: event.id,
       title: event.title,
@@ -282,8 +290,8 @@ export async function getReportsOverviewExport(organizerId) {
       value: item.stats?.turnoutPercentage ?? 0,
       details: `${item.stats?.votedCount ?? 0}/${item.stats?.totalVoters ?? 0}`,
     })),
-    ...report.pageants.map((item) => ({
-      type: 'pageant',
+    ...report.competitions.map((item) => ({
+      type: 'competition_scoring',
       title: item.title,
       status: item.status,
       metric: 'turnoutPercentage',
@@ -325,7 +333,11 @@ export async function getElectionReportExport(eventId, organizerId) {
 }
 
 export async function getPageantReportExport(eventId, organizerId) {
-  const report = await getPageantReport(eventId, organizerId)
+  return getCompetitionReportExport(eventId, organizerId)
+}
+
+export async function getCompetitionReportExport(eventId, organizerId) {
+  const report = await getCompetitionReport(eventId, organizerId)
   const rows = (report.rankings ?? []).map((row) => ({
     contestant: row.contestantName ?? row.name ?? '',
     totalScore: row.totalScore ?? 0,
@@ -333,7 +345,7 @@ export async function getPageantReportExport(eventId, organizerId) {
   }))
 
   return {
-    filename: `pageant-report-${eventId}.csv`,
+    filename: `competition-report-${eventId}.csv`,
     csv: rowsToCsv(rows),
     json: report,
   }

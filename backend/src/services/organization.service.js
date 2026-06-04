@@ -72,13 +72,21 @@ export async function getOrCreatePollingOrganization(organizerId) {
 }
 
 export async function getOrCreatePageantOrganization(organizerId) {
+  return getOrCreateCompetitionScoringOrganization(organizerId)
+}
+
+export async function getOrCreateCompetitionScoringOrganization(organizerId) {
   const orgs = await listOrganizations(organizerId)
-  const existing = orgs.find((o) => o.organization_type === ORG_TYPES.PAGEANT)
+  // Prefer the new enum value but fall back to legacy 'pageant' rows so
+  // existing organizers keep a single shared organization.
+  const existing =
+    orgs.find((o) => o.organization_type === ORG_TYPES.COMPETITION_SCORING) ||
+    orgs.find((o) => o.organization_type === ORG_TYPES.PAGEANT)
   if (existing) return existing
 
   return createOrganization(organizerId, {
-    organizationName: 'My Pageants',
-    organizationType: ORG_TYPES.PAGEANT,
+    organizationName: 'My Competitions',
+    organizationType: ORG_TYPES.COMPETITION_SCORING,
   })
 }
 
@@ -86,8 +94,8 @@ async function getOrganizationForType(organizerId, organizationType) {
   if (organizationType === ORG_TYPES.ELECTION) {
     return getOrCreateElectionOrganization(organizerId)
   }
-  if (organizationType === ORG_TYPES.PAGEANT) {
-    return getOrCreatePageantOrganization(organizerId)
+  if (organizationType === ORG_TYPES.PAGEANT || organizationType === ORG_TYPES.COMPETITION_SCORING) {
+    return getOrCreateCompetitionScoringOrganization(organizerId)
   }
   if (organizationType === ORG_TYPES.POLLING) {
     return getOrCreatePollingOrganization(organizerId)

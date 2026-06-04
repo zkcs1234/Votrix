@@ -14,6 +14,7 @@ router.use(authenticate, authorize(USER_ROLES.ORGANIZER), requireActiveAccount, 
 
 router.use('/election', electionOrganizerRoutes)
 router.use('/pageant', pageantOrganizerRoutes)
+router.use('/competition', pageantOrganizerRoutes)
 router.use('/polling', pollingOrganizerRoutes)
 router.use('/reports', reportsOrganizerRoutes)
 

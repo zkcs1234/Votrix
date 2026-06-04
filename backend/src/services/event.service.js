@@ -1,6 +1,6 @@
 import { getSupabase } from '../config/database.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES } from '../utils/constants.js'
+import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
 import { sendEventNotificationEmail } from './mailer.service.js'
 import { createNotificationsForUsers } from './notification.service.js'
 
@@ -109,12 +109,11 @@ export async function notifyEventParticipants(eventId, organizerId, { message })
       type: 'event.notification',
       title: `New update for ${event.title}`,
       message: defaultMessage,
-      actionUrl:
-        event.event_type === 'pageant'
-          ? `/voter/pageant/events/${event.id}/score`
-          : event.event_type === 'polling'
-            ? `/voter/polling/events/${event.id}`
-            : `/voter/events/${event.id}`,
+      actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
+        ? `/voter/competition/events/${event.id}/score`
+        : event.event_type === 'polling'
+          ? `/voter/polling/events/${event.id}`
+          : `/voter/events/${event.id}`,
       entity: 'events',
       entityId: event.id,
       metadata: {
