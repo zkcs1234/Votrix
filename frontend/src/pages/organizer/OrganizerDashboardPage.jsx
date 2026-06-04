@@ -177,7 +177,7 @@ export default function OrganizerDashboardPage() {
           to="/organizer/pageant"
           className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
         >
-          <h3 className="v-section-title">Pageant module</h3>
+          <h3 className="v-section-title">Competion Scoring module</h3>
           <p className="v-caption">
             Contestants, criteria, judge scoring, and rankings.
           </p>
