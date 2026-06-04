@@ -1,62 +1,59 @@
-import { getSupabase } from '../config/database.js'
-import { ApiError } from '../utils/ApiError.js'
+// Phase 9 — refactored to use the shared `foundation/` helpers
+// (`db`, `wrap`, `mapEvent`, error factories). Behaviour and the exported
+// surface are unchanged; existing controllers/services keep working.
+
+import { db, wrap } from '../foundation/db.js'
+import { notFound, forbidden, badRequest } from '../foundation/errors.js'
 import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
 import { sendEventNotificationEmail } from './mailer.service.js'
 import { createNotificationsForUsers } from './notification.service.js'
 
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
-
 export async function getEventById(eventId) {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .select(
-      `
-      *,
-      organizations (
-        id,
-        organization_name,
-        organizer_id
+  const data = await wrap(
+    db()
+      .from(DB_TABLES.EVENTS)
+      .select(
+        `
+        *,
+        organizations (
+          id,
+          organization_name,
+          organizer_id
+        )
+      `,
       )
-    `,
-    )
-    .eq('id', eventId)
-    .maybeSingle()
-
-  if (error) throw new ApiError(500, error.message)
-  if (!data) throw new ApiError(404, 'Event not found')
+      .eq('id', eventId)
+      .maybeSingle(),
+    { notFoundMessage: 'Event not found', context: 'event.getEventById' },
+  )
   return data
 }
 
 export async function assertOrganizerOwnsEvent(eventId, organizerId) {
   const event = await getEventById(eventId)
-
   if (event.organizations?.organizer_id !== organizerId) {
-    throw new ApiError(403, 'You do not have access to this event')
+    throw forbidden('You do not have access to this event')
   }
-
   return event
 }
 
 export async function getEventVoterAccounts(eventId) {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
-    .select(
-      `
-      voter_id,
-      users (
-        id,
-        email,
-        role
+  const data = await wrap(
+    db()
+      .from(DB_TABLES.EVENT_VOTERS)
+      .select(
+        `
+        voter_id,
+        users (
+          id,
+          email,
+          role
+        )
+      `,
       )
-    `,
-    )
-    .eq('event_id', eventId)
-
-  if (error) throw new ApiError(500, error.message)
+      .eq('event_id', eventId),
+    { context: 'event.getEventVoterAccounts' },
+  )
 
   return (data ?? [])
     .map((row) => row.users)

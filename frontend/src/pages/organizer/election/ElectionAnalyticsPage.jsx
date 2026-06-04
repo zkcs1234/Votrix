@@ -1,44 +1,46 @@
-﻿import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
-import BarChart from '@/components/reports/BarChart'
-
-const VISIBILITY_LABEL = {
-  real_time: 'Real-time results',
-  hidden: 'Hidden results',
-  public: 'Public results',
-}
+import {
+  AnalyticsLayout,
+  AnalyticsSection,
+  AnalyticsStatsGrid,
+  DistributionList,
+  RankingList,
+  TrendList,
+  useModuleAnalytics,
+} from '@/modules/analytics'
+import {
+  buildElectionStats,
+  buildElectionCandidateRanking,
+  buildElectionPositionSummaries,
+  buildElectionParticipationTrend,
+  electionVisibilityLabel,
+} from '@/modules/election'
 
 export default function ElectionAnalyticsPage() {
   const { eventId } = useParams()
-  const [data, setData] = useState(null)
   const [event, setEvent] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { data, loading } = useModuleAnalytics({
+    moduleId: 'election',
+    eventId,
+    pollIntervalMs: 30_000,
+    skipReport: true,
+  })
 
   useEffect(() => {
     let alive = true
-
-    const load = () => {
-      Promise.all([
-        electionService.getAnalytics(eventId),
-        electionService.getEvent(eventId),
-      ])
-        .then(([analyticsRes, eventRes]) => {
-          if (!alive) return
-          setData(analyticsRes.data.analytics)
-          setEvent(eventRes.data.event)
-        })
-        .finally(() => {
-          if (alive) setLoading(false)
-        })
-    }
-
-    load()
-    const id = setInterval(load, 30000)
+    electionService
+      .getEvent(eventId)
+      .then(({ data: res }) => {
+        if (alive) setEvent(res.event)
+      })
+      .catch(() => {
+        /* non-fatal */
+      })
     return () => {
       alive = false
-      clearInterval(id)
     }
   }, [eventId])
 
@@ -51,77 +53,75 @@ export default function ElectionAnalyticsPage() {
   }
 
   const visibility = event?.resultsVisibility ?? event?.results_visibility ?? 'public'
+  const stats = buildElectionStats(data)
+  const rankings = buildElectionCandidateRanking(data)
+  const positionSummaries = buildElectionPositionSummaries(data)
+  const trend = buildElectionParticipationTrend(data)
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold text-v-text">Analytics</h2>
-        <Link
-          to={`/organizer/reports/election/${eventId}`}
-          className="text-sm text-v-text-muted hover:text-v-text"
-        >
-          Full report →
-        </Link>
-      </div>
-
+    <AnalyticsLayout
+      title="Election analytics"
+      description="Live turnout, candidate rankings, and position results."
+      fullReportTo={`/organizer/reports/election/${eventId}`}
+    >
       <div className="rounded-xl border border-v-border bg-v-surface p-4 text-sm text-v-text-muted">
         <span className="font-medium text-v-text">Voter-facing results:</span>{' '}
-        {VISIBILITY_LABEL[visibility] ?? visibility}
+        {electionVisibilityLabel(visibility)}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Stat label="Total voters" value={data?.totalVoters} />
-        <Stat label="Voted" value={data?.votedCount} />
-        <Stat label="Turnout" value={`${data?.turnoutPercentage ?? 0}%`} />
-        <Stat label="Live votes" value={data?.liveTotalVotes} />
-      </div>
+      <AnalyticsStatsGrid stats={stats} columns={4} />
 
-      <div className="v-card p-6">
-        <h3 className="font-medium text-v-text">Votes per candidate</h3>
-        <div className="mt-4">
-          <BarChart
-            colorClass="bg-v-primary"
-            items={(data?.candidateResults ?? []).map((c) => ({
-              id: c.candidateId,
-              label: c.candidateName,
-              count: c.votes,
-            }))}
-            valueKey="count"
+      <AnalyticsSection
+        title="Voting progress"
+        description="How many registered voters have cast their ballot so far."
+      >
+        <DistributionList
+          items={trend}
+          valueKey="value"
+          labelKey="label"
+          showCount
+          showPercentage={false}
+          emptyMessage="No voter activity yet."
+        />
+      </AnalyticsSection>
+
+      <AnalyticsSection
+        title="Candidate rankings"
+        description="Overall ranking across every position in this election."
+      >
+        <RankingList
+          items={rankings}
+          emptyMessage="No candidate data yet."
+          emptyDescription="Rankings will appear here once votes are cast."
+          valueFormatter={(v) => v ?? 0}
+        />
+      </AnalyticsSection>
+
+      <TrendList
+        title="Election participation trends"
+        description="Snapshot of total registered voters, votes cast, and outstanding ballots."
+        items={trend}
+      />
+
+      {positionSummaries.map((position) => (
+        <AnalyticsSection
+          key={position.id}
+          title={position.name}
+          meta={`${position.totalVotes} votes`}
+          description={
+            position.leader
+              ? `Leading: ${position.leader.name} (${position.leader.votes} votes, ${position.leader.percentage}%)`
+              : 'No votes yet for this position.'
+          }
+        >
+          <DistributionList
+            items={position.candidates}
+            valueKey="value"
             labelKey="label"
+            emptyMessage="No candidates for this position."
           />
-          {!data?.candidateResults?.length && (
-            <p className="text-sm text-v-text-subtle">No events available. Create your first event to begin.</p>
-          )}
-        </div>
-      </div>
-
-      {(data?.positionSummaries ?? []).map((position) => (
-        <div key={position.positionId} className="v-card p-6">
-          <h3 className="font-medium text-v-text">{position.positionName}</h3>
-          <div className="mt-4">
-            <BarChart
-              colorClass="bg-v-primary"
-              items={position.candidates.map((c) => ({
-                id: c.candidateId,
-                label: c.candidateName,
-                count: c.votes,
-                percentage: c.votePercentage,
-              }))}
-              valueKey="count"
-              labelKey="label"
-            />
-          </div>
-        </div>
+        </AnalyticsSection>
       ))}
-    </div>
-  )
-}
-
-function Stat({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-v-border bg-v-surface p-5">
-      <p className="text-xs text-v-text-subtle">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-white">{value ?? 0}</p>
-    </div>
+    </AnalyticsLayout>
   )
 }

@@ -1,158 +1,96 @@
-import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { reportsService } from '@/services/reports.service'
 import {
-  SkeletonReport,
+  AnalyticsSection,
+  AnalyticsStatsGrid,
+  DistributionList,
+  ReportActionsBar,
+  ReportDocument,
+  useModuleAnalytics,
+  downloadCsv,
+  downloadExcel,
+  downloadJson,
+  downloadPdf,
+} from '@/modules/analytics'
+import TurnoutReport from '@/components/reports/TurnoutReport'
+import {
+  buildElectionAuditActivity,
+  buildElectionExportPayload,
+  buildElectionReportCsvRows,
+  buildElectionReportSheets,
+} from '@/modules/election'
+import {
   SkeletonChart,
+  SkeletonReport,
   SkeletonStatCard,
 } from '@/components/ui/Skeleton'
-import ReportHeader from '@/components/reports/ReportHeader'
-import TurnoutReport from '@/components/reports/TurnoutReport'
-import BarChart from '@/components/reports/BarChart'
-import StatCard from '@/components/reports/StatCard'
-import { downloadCsv, downloadJson } from '@/utils/exportReport'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
-
-function ReportHeaderSkeleton() {
-  return (
-    <div className="space-y-2">
-      <div className="h-7 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
-      <div className="h-4 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
-    </div>
-  )
-}
-
-function ReportActionsSkeleton() {
-  return (
-    <div className="flex gap-2">
-      <div className="h-8 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
-      <div className="h-8 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
-      <div className="h-8 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
-    </div>
-  )
-}
 
 export default function ElectionReportPage() {
   const { eventId } = useParams()
-  const [report, setReport] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [exporting, setExporting] = useState(false)
+  const { report, loading, refresh, lastUpdated } = useModuleAnalytics({
+    moduleId: 'election',
+    eventId,
+    skipReport: false,
+  })
 
-  // Use delayed loading
   const showLoader = useDelayedLoading(loading, 300)
 
-  const load = async () => {
-    setLoading(true)
-    try {
-      const { data } = await reportsService.getElectionReport(eventId)
-      setReport(data.report)
-    } catch (err) {
-      console.error('Failed to load report:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  if (loading && !showLoader) return null
 
-  useEffect(() => {
-    load()
-  }, [eventId])
-
-  const handleExportCsv = async () => {
-    setExporting(true)
-    try {
-      const rows = []
-      for (const pos of report?.voteSummary?.positionSummaries ?? []) {
-        for (const c of pos.candidates) {
-          rows.push({
-            position: pos.positionName,
-            candidate: c.candidateName,
-            votes: c.votes,
-            votePercentage: c.votePercentage,
-          })
-        }
-      }
-      downloadCsv(`election-report-${eventId}.csv`, rows)
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  const handleExportJson = async () => {
-    setExporting(true)
-    try {
-      downloadJson(`election-report-${eventId}.json`, report)
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  // Show nothing under 300ms
-  if (loading && !showLoader) {
-    return null
-  }
-
-  // Show skeleton after 300ms
   if (loading || showLoader) {
     return (
       <div className="mx-auto max-w-4xl space-y-8 print:space-y-6">
-        <div className="flex justify-between">
-          <ReportHeaderSkeleton />
-          <ReportActionsSkeleton />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="v-card-sm">
-            <div className="h-4 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-            <div className="mt-2 h-8 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
-          </div>
-          <div className="v-card-sm">
-            <div className="h-4 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
-            <div className="mt-2 h-8 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
-          </div>
-        </div>
-
-        <SkeletonChart />
+        <SkeletonReport />
+        <SkeletonStatCard />
         <SkeletonChart />
       </div>
     )
   }
-
   if (!report) return null
 
+  const voteSummary = report.voteSummary ?? {}
+  const positionSummaries = voteSummary.positionSummaries ?? []
+  const candidateResults = voteSummary.candidateResults ?? []
+  const auditActivity = buildElectionAuditActivity({
+    totalVoters: report.turnout?.totalVoters,
+    votedCount: report.turnout?.votedCount,
+    liveTotalVotes: voteSummary.liveTotalVotes,
+    positionSummaries: { length: positionSummaries.length },
+  })
+
+  const handleExportCsv = () => {
+    downloadCsv(`election-report-${eventId}.csv`, buildElectionReportCsvRows(report))
+  }
+  const handleExportExcel = () => {
+    downloadExcel(`election-report-${eventId}`, buildElectionReportSheets(report))
+  }
+  const handleExportJson = () => {
+    downloadJson(`election-report-${eventId}.json`, report)
+  }
+  const handleExportPdf = () => {
+    downloadPdf(
+      `election-report-${eventId}.pdf`,
+      buildElectionExportPayload(report, {
+        generatedAt: report.generatedAt ?? lastUpdated,
+      }),
+    )
+  }
+
   return (
-    <div className="mx-auto max-w-4xl space-y-8 print:space-y-6">
-      <ReportHeader
-        title={report.event.title}
-        subtitle="Election report — turnout & vote summary"
-        generatedAt={report.generatedAt}
-      />
-
-      <div className="flex flex-wrap gap-2 print:hidden">
-        <button
-          type="button"
-          onClick={load}
-          className="rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
-        >
-          Refresh
-        </button>
-        <button
-          type="button"
-          onClick={handleExportCsv}
-          disabled={exporting}
-          className="rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted disabled:opacity-50"
-        >
-          {exporting ? 'Exporting...' : 'Export CSV'}
-        </button>
-        <button
-          type="button"
-          onClick={handleExportJson}
-          disabled={exporting}
-          className="rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted disabled:opacity-50"
-        >
-          Export JSON
-        </button>
-      </div>
-
+    <ReportDocument
+      title={report.event.title}
+      subtitle="Election report — turnout & vote summary"
+      generatedAt={report.generatedAt}
+      actions={
+        <ReportActionsBar
+          onRefresh={refresh}
+          onExportCsv={handleExportCsv}
+          onExportExcel={handleExportExcel}
+          onExportPdf={handleExportPdf}
+          onExportJson={handleExportJson}
+        />
+      }
+    >
       <TurnoutReport
         title="Voter turnout"
         stats={{
@@ -163,55 +101,74 @@ export default function ElectionReportPage() {
         barColorClass="bg-v-primary"
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard label="Total ballot selections" value={report.voteSummary.liveTotalVotes} />
-        <StatCard label="Positions" value={report.voteSummary.positionSummaries?.length} />
-      </div>
+      <AnalyticsStatsGrid
+        stats={[
+          {
+            id: 'selections',
+            label: 'Total ballot selections',
+            value: voteSummary.liveTotalVotes ?? 0,
+          },
+          {
+            id: 'positions',
+            label: 'Positions',
+            value: positionSummaries.length,
+          },
+        ]}
+        columns={2}
+      />
 
-      <section className="v-card p-6">
-        <h3 className="font-medium text-v-text">Overall vote summary</h3>
-        <BarChart
-          colorClass="bg-v-primary"
-          items={(report.voteSummary.candidateResults ?? []).map((c) => ({
+      <AnalyticsSection title="Overall vote summary">
+        <DistributionList
+          items={candidateResults.map((c) => ({
             id: c.candidateId,
             label: c.candidateName,
-            count: c.votes,
+            value: c.votes,
+            percentage: c.votePercentage,
           }))}
-          valueKey="count"
+          valueKey="value"
           labelKey="label"
+          emptyMessage="No candidate data."
         />
-      </section>
+      </AnalyticsSection>
 
-      {(report.voteSummary.positionSummaries ?? []).map((position) => (
-        <section
+      <AnalyticsSection title="Audit activity" description="Summary of records touched by this election.">
+        <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {auditActivity.map((row) => (
+            <div
+              key={row.key}
+              className="flex items-center justify-between rounded-lg border border-v-border px-4 py-2 text-sm"
+            >
+              <dt className="text-v-text-muted">{row.key}</dt>
+              <dd className="font-semibold text-v-text">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </AnalyticsSection>
+
+      {positionSummaries.map((position) => (
+        <AnalyticsSection
           key={position.positionId}
-          className="v-card p-6"
+          title={position.positionName}
+          meta={`${position.totalVotes ?? 0} votes`}
+          description={
+            position.leader
+              ? `Leading: ${position.leader.name} (${position.leader.votes} votes, ${position.leader.votePercentage}%)`
+              : null
+          }
         >
-          <div className="flex flex-wrap justify-between gap-2">
-            <h3 className="font-medium text-v-text">{position.positionName}</h3>
-            <span className="text-xs text-v-text-subtle">{position.totalVotes} votes</span>
-          </div>
-          {position.leader && (
-            <p className="mt-2 text-sm text-v-text-muted">
-              Leading: {position.leader.name} ({position.leader.votes} votes,{' '}
-              {position.leader.votePercentage}%)
-            </p>
-          )}
-          <div className="mt-4">
-            <BarChart
-              colorClass="bg-v-primary"
-              items={position.candidates.map((c) => ({
-                id: c.candidateId,
-                label: c.candidateName,
-                count: c.votes,
-                percentage: c.votePercentage,
-              }))}
-              valueKey="count"
-              labelKey="label"
-            />
-          </div>
-        </section>
+          <DistributionList
+            items={position.candidates.map((c) => ({
+              id: c.candidateId,
+              label: c.candidateName,
+              value: c.votes,
+              percentage: c.votePercentage,
+            }))}
+            valueKey="value"
+            labelKey="label"
+            emptyMessage="No candidates for this position."
+          />
+        </AnalyticsSection>
       ))}
-    </div>
+    </ReportDocument>
   )
 }

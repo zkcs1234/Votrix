@@ -1,33 +1,33 @@
-import { getSupabase } from '../config/database.js'
-import { ApiError } from '../utils/ApiError.js'
+// Phase 9 — refactored to use the shared `foundation/` audit helpers.
+// The existing `createAuditLog` and `getAuditLogs` exports are kept as
+// thin compatibility shims that delegate to `foundation/audit.js`, so
+// callers (admin.controller.js) continue to work unchanged.
+
+import { db, wrap } from '../foundation/db.js'
+import { badRequest, notFound } from '../foundation/errors.js'
+import { recordAudit, listAuditTrail } from '../foundation/audit.js'
+import { mapAuditLog } from '../foundation/mapper.js'
 import { DB_TABLES, USER_ROLES, ACCOUNT_STATUS } from '../utils/constants.js'
 
-function getClient() {
-  const client = getSupabase()
-  if (!client) {
-    throw new ApiError(503, 'Database is not configured')
-  }
-  return client
-}
-
 export async function getOrganizersList() {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.USERS)
-    .select('id, email, created_at, updated_at, account_status')
-    .eq('role', USER_ROLES.ORGANIZER)
-    .order('created_at', { ascending: false })
+  const users = await wrap(
+    db()
+      .from(DB_TABLES.USERS)
+      .select('id, email, created_at, updated_at, account_status')
+      .eq('role', USER_ROLES.ORGANIZER)
+      .order('created_at', { ascending: false }),
+    { context: 'admin.getOrganizersList' },
+  )
 
-  if (error) throw new ApiError(500, error.message)
+  const orgs = await wrap(
+    db()
+      .from(DB_TABLES.ORGANIZATIONS)
+      .select('id, organization_name, status, organizer_id'),
+    { context: 'admin.getOrganizersList.orgs' },
+  )
 
-  // Also fetch organization details for each organizer
-  const { data: orgs, error: orgError } = await getClient()
-    .from(DB_TABLES.ORGANIZATIONS)
-    .select('id, organization_name, status, organizer_id')
-
-  if (orgError) throw new ApiError(500, orgError.message)
-
-  return data.map(orgUser => {
-    const userOrgs = orgs.filter(o => o.organizer_id === orgUser.id)
+  return users.map((orgUser) => {
+    const userOrgs = orgs.filter((o) => o.organizer_id === orgUser.id)
     const organizationSummary = userOrgs.reduce(
       (acc, org) => {
         acc.total += 1
@@ -46,103 +46,85 @@ export async function getOrganizersList() {
 }
 
 export async function getGlobalEvents() {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .select(`
-      id, 
-      title, 
-      event_type, 
-      status, 
-      start_date, 
-      end_date, 
-      created_at,
-      organization_id,
-      organizations (
-        organization_name
-      )
-    `)
-    .order('created_at', { ascending: false })
-
-  if (error) throw new ApiError(500, error.message)
-  return data
+  return wrap(
+    db()
+      .from(DB_TABLES.EVENTS)
+      .select(`
+        id,
+        title,
+        event_type,
+        status,
+        start_date,
+        end_date,
+        created_at,
+        organization_id,
+        organizations (
+          organization_name
+        )
+      `)
+      .order('created_at', { ascending: false }),
+    { context: 'admin.getGlobalEvents' },
+  )
 }
 
 export async function getSystemSettings() {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.SYSTEM_SETTINGS)
-    .select('*')
-    .order('created_at', { ascending: true })
-
-  if (error) throw new ApiError(500, error.message)
-  return data
+  return wrap(
+    db()
+      .from(DB_TABLES.SYSTEM_SETTINGS)
+      .select('*')
+      .order('created_at', { ascending: true }),
+    { context: 'admin.getSystemSettings' },
+  )
 }
 
 export async function saveSystemSetting(key, value, description = null) {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.SYSTEM_SETTINGS)
-    .upsert(
-      { setting_key: key, setting_value: value, description },
-      { onConflict: 'setting_key' }
-    )
-    .select()
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
-  return data
-}
-
-export async function getAuditLogs() {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.AUDIT_LOGS)
-    .select(`
-      id,
-      action,
-      entity,
-      entity_id,
-      details,
-      created_at,
-      user_id,
-      users (
-        email,
-        role
+  return wrap(
+    db()
+      .from(DB_TABLES.SYSTEM_SETTINGS)
+      .upsert(
+        { setting_key: key, setting_value: value, description },
+        { onConflict: 'setting_key' },
       )
-    `)
-    .order('created_at', { ascending: false })
-    .limit(100)
-
-  if (error) throw new ApiError(500, error.message)
-  return data
+      .select()
+      .single(),
+    { context: 'admin.saveSystemSetting' },
+  )
 }
 
-export async function createAuditLog({ userId, action, entity, entityId, details }) {
-  const { error } = await getClient()
-    .from(DB_TABLES.AUDIT_LOGS)
-    .insert({
-      user_id: userId,
-      action,
-      entity,
-      entity_id: entityId,
-      details
-    })
+/**
+ * Backward-compatibility shim. New code should call
+ * `listAuditTrail({ entity, entityId, limit })` from `foundation/audit.js`
+ * directly. The returned rows are mapped with the shared `mapAuditLog`
+ * helper for consistency.
+ */
+export async function getAuditLogs({ limit = 100 } = {}) {
+  const rows = await listAuditTrail({ limit })
+  return (rows ?? []).map(mapAuditLog)
+}
 
-  if (error) throw new ApiError(500, error.message)
+/**
+ * Backward-compatibility shim. Delegates to foundation. The old signature
+ * took a single `args` object, which is preserved.
+ */
+export async function createAuditLog({ userId, action, entity, entityId, details }) {
+  return recordAudit({ userId, action, entity, entityId, details })
 }
 
 export async function updateOrganizerAccountStatus(organizerId, accountStatus) {
   if (!Object.values(ACCOUNT_STATUS).includes(accountStatus)) {
-    throw new ApiError(400, 'Invalid account status')
+    throw badRequest('Invalid account status')
   }
 
-  const { data, error } = await getClient()
-    .from(DB_TABLES.USERS)
-    .update({ account_status: accountStatus })
-    .eq('id', organizerId)
-    .eq('role', USER_ROLES.ORGANIZER)
-    .select('id, email, account_status')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
-  if (!data) throw new ApiError(404, 'Organizer not found')
-
+  const data = await wrap(
+    db()
+      .from(DB_TABLES.USERS)
+      .update({ account_status: accountStatus })
+      .eq('id', organizerId)
+      .eq('role', USER_ROLES.ORGANIZER)
+      .select('id, email, account_status')
+      .single(),
+    { context: 'admin.updateOrganizerAccountStatus' },
+  )
+  if (!data) throw notFound('Organizer not found')
   return data
 }

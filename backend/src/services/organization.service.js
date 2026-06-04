@@ -1,52 +1,43 @@
-import { getSupabase } from '../config/database.js'
-import { ApiError } from '../utils/ApiError.js'
+// Phase 9 — refactored to use the shared `foundation/` helpers.
+// The exported surface is unchanged; behaviour is identical.
+
+import { db, wrap } from '../foundation/db.js'
+import { mapOrganization as mapOrganizationShared } from '../foundation/mapper.js'
+import { forbidden, badRequest } from '../foundation/errors.js'
 import { DB_TABLES, ORG_TYPES } from '../utils/constants.js'
 
+// Re-export the shared mapper so existing imports
+// `import { mapOrganization } from './organization.service.js'`
+// keep working.
 export function mapOrganization(row) {
-  if (!row) return null
-  return {
-    id: row.id,
-    organizationName: row.organization_name,
-    organizationType: row.organization_type,
-    logo: row.logo ?? null,
-    status: row.status,
-    organizerId: row.organizer_id,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
-}
-
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
+  return mapOrganizationShared(row)
 }
 
 export async function listOrganizations(organizerId) {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.ORGANIZATIONS)
-    .select('*')
-    .eq('organizer_id', organizerId)
-    .order('created_at', { ascending: false })
-
-  if (error) throw new ApiError(500, error.message)
-  return data ?? []
+  return wrap(
+    db()
+      .from(DB_TABLES.ORGANIZATIONS)
+      .select('*')
+      .eq('organizer_id', organizerId)
+      .order('created_at', { ascending: false }),
+    { context: 'organization.listOrganizations' },
+  ) ?? []
 }
 
 export async function createOrganization(organizerId, { organizationName, organizationType }) {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.ORGANIZATIONS)
-    .insert({
-      organization_name: organizationName,
-      organization_type: organizationType || ORG_TYPES.ELECTION,
-      organizer_id: organizerId,
-      status: 'active',
-    })
-    .select('*')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
-  return data
+  return wrap(
+    db()
+      .from(DB_TABLES.ORGANIZATIONS)
+      .insert({
+        organization_name: organizationName,
+        organization_type: organizationType || ORG_TYPES.ELECTION,
+        organizer_id: organizerId,
+        status: 'active',
+      })
+      .select('*')
+      .single(),
+    { context: 'organization.createOrganization' },
+  )
 }
 
 export async function getOrCreateElectionOrganization(organizerId) {
@@ -100,22 +91,23 @@ async function getOrganizationForType(organizerId, organizationType) {
   if (organizationType === ORG_TYPES.POLLING) {
     return getOrCreatePollingOrganization(organizerId)
   }
-  throw new ApiError(400, 'Invalid organization type')
+  throw badRequest('Invalid organization type')
 }
 
 export async function updateOrganizationLogo(organizerId, organizationType, logoUrl) {
   const org = await getOrganizationForType(organizerId, organizationType)
   if (org.organizer_id !== organizerId) {
-    throw new ApiError(403, 'Not allowed to update this organization')
+    throw forbidden('Not allowed to update this organization')
   }
 
-  const { data, error } = await getClient()
-    .from(DB_TABLES.ORGANIZATIONS)
-    .update({ logo: logoUrl })
-    .eq('id', org.id)
-    .select('*')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
+  const data = await wrap(
+    db()
+      .from(DB_TABLES.ORGANIZATIONS)
+      .update({ logo: logoUrl })
+      .eq('id', org.id)
+      .select('*')
+      .single(),
+    { context: 'organization.updateOrganizationLogo' },
+  )
   return mapOrganization(data)
 }

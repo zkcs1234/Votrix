@@ -1,142 +1,148 @@
-﻿import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { reportsService } from '@/services/reports.service'
-import LoadingSpinner from '@/components/ui/LoadingSpinner'
-import ReportHeader from '@/components/reports/ReportHeader'
+import {
+  AnalyticsSection,
+  AnalyticsStatsGrid,
+  DistributionList,
+  ReportActionsBar,
+  ReportDocument,
+  useModuleAnalytics,
+  downloadCsv,
+  downloadExcel,
+  downloadJson,
+  downloadPdf,
+} from '@/modules/analytics'
 import TurnoutReport from '@/components/reports/TurnoutReport'
-import BarChart from '@/components/reports/BarChart'
-import { downloadJson } from '@/utils/exportReport'
-
-function typeLabel(type) {
-  const map = {
-    single_choice: 'Multiple choice',
-    checkbox: 'Checkbox',
-    yes_no: 'Yes / No',
-    text: 'Text',
-    rating: 'Rating',
-    choice: 'Choice',
-  }
-  return map[type] ?? type
-}
+import {
+  buildPollingExportPayload,
+  buildPollingReportCsvRows,
+  buildPollingReportSheets,
+  pollingQuestionTypeLabel,
+} from '@/modules/polling'
+import {
+  SkeletonChart,
+  SkeletonReport,
+  SkeletonStatCard,
+} from '@/components/ui/Skeleton'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 export default function PollingReportPage() {
   const { eventId } = useParams()
-  const [report, setReport] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { report, loading, refresh, lastUpdated } = useModuleAnalytics({
+    moduleId: 'polling',
+    eventId,
+  })
+  const showLoader = useDelayedLoading(loading, 300)
 
-  const load = () => {
-    setLoading(true)
-    reportsService
-      .getPollingReport(eventId)
-      .then(({ data }) => setReport(data.report))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    load()
-  }, [eventId])
-
-  if (loading) {
+  if (loading && !showLoader) return null
+  if (loading || showLoader) {
     return (
-      <div className="flex justify-center py-20">
-        <LoadingSpinner />
+      <div className="mx-auto max-w-4xl space-y-8 print:space-y-6">
+        <SkeletonReport />
+        <SkeletonStatCard />
+        <SkeletonChart />
       </div>
     )
   }
-
   if (!report) return null
 
+  const summary = report.responseSummary ?? {}
+  const questions = report.questions ?? []
+
+  const handleExportCsv = () => {
+    downloadCsv(`poll-report-${eventId}.csv`, buildPollingReportCsvRows(report))
+  }
+  const handleExportExcel = () => {
+    downloadExcel(`poll-report-${eventId}`, buildPollingReportSheets(report))
+  }
+  const handleExportJson = () => {
+    downloadJson(`poll-report-${eventId}.json`, report)
+  }
+  const handleExportPdf = () => {
+    downloadPdf(
+      `poll-report-${eventId}.pdf`,
+      buildPollingExportPayload(report, {
+        generatedAt: report.generatedAt ?? lastUpdated,
+      }),
+    )
+  }
+
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
-      <ReportHeader
-        title={report.event.title}
-        subtitle="Poll report â€” response charts"
-        generatedAt={report.generatedAt}
-      />
-
-      <div className="flex flex-wrap gap-2 print:hidden">
-        <button
-          type="button"
-          onClick={load}
-          className="rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
-        >
-          Refresh
-        </button>
-        <button
-          type="button"
-          onClick={() => downloadJson(`poll-report-${eventId}.json`, report)}
-          className="rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted"
-        >
-          Export JSON
-        </button>
-      </div>
-
+    <ReportDocument
+      title={report.event.title}
+      subtitle="Poll report — response charts"
+      generatedAt={report.generatedAt}
+      actions={
+        <ReportActionsBar
+          onRefresh={refresh}
+          onExportCsv={handleExportCsv}
+          onExportExcel={handleExportExcel}
+          onExportPdf={handleExportPdf}
+          onExportJson={handleExportJson}
+        />
+      }
+    >
       <TurnoutReport
         title="Response summary"
         stats={{
-          totalSubmissions: report.responseSummary.totalSubmissions,
-          enrolledRespondents: report.responseSummary.enrolledRespondents,
-          responseRate: report.responseSummary.responseRate,
+          totalSubmissions: summary.totalSubmissions,
+          enrolledRespondents: summary.enrolledRespondents,
+          responseRate: summary.responseRate,
         }}
         accentClass="text-v-text-muted"
         barColorClass="bg-v-primary"
       />
 
-      <p className="text-sm text-v-text-subtle">
-        Mode: {report.responseSummary.pollAnonymous ? 'Anonymous' : 'Identified'}
-      </p>
+      <AnalyticsStatsGrid
+        stats={[
+          {
+            id: 'mode',
+            label: 'Mode',
+            value: summary.pollAnonymous ? 'Anonymous' : 'Identified',
+            tone: 'muted',
+          },
+        ]}
+        columns={1}
+      />
 
-      {(report.questions ?? []).map((q) => (
-        <section
+      {questions.map((q) => (
+        <AnalyticsSection
           key={q.questionId}
-          className="v-card p-6"
+          title={q.question}
+          meta={`${pollingQuestionTypeLabel(q.type)} · ${q.responseCount ?? 0} answers`}
         >
-          <div className="flex flex-wrap justify-between gap-2">
-            <h3 className="font-medium text-v-text">{q.question}</h3>
-            <span className="text-xs text-v-text-subtle/80">
-              {typeLabel(q.type)} Â· {q.responseCount} answers
-            </span>
-          </div>
-
           {q.type === 'choice' && q.options && (
-            <div className="mt-4">
-              <BarChart
-                colorClass="bg-v-primary"
-                items={q.options.map((o) => ({
-                  id: o.optionId,
-                  label: o.label,
-                  count: o.count,
-                  percentage: o.percentage,
-                }))}
-                valueKey="count"
-                labelKey="label"
-              />
-            </div>
+            <DistributionList
+              items={q.options.map((o) => ({
+                id: o.optionId,
+                label: o.label,
+                value: o.count,
+                percentage: o.percentage,
+              }))}
+              valueKey="value"
+              labelKey="label"
+              emptyMessage="No answers yet."
+            />
           )}
-
           {q.type === 'rating' && q.distribution && (
             <>
-              <p className="mt-3 text-sm text-v-text-subtle">
+              <p className="mb-2 text-sm text-v-text-subtle">
                 Average: <span className="text-v-text-muted">{q.average}</span> / 5
               </p>
-              <div className="mt-4">
-                <BarChart
-                  colorClass="bg-v-primary"
-                  items={q.distribution.map((d) => ({
-                    id: String(d.rating),
-                    label: `${d.rating} star${d.rating !== 1 ? 's' : ''}`,
-                    count: d.count,
-                    percentage: d.percentage,
-                  }))}
-                  valueKey="count"
-                  labelKey="label"
-                />
-              </div>
+              <DistributionList
+                items={q.distribution.map((d) => ({
+                  id: String(d.rating),
+                  label: `${d.rating} star${d.rating !== 1 ? 's' : ''}`,
+                  value: d.count,
+                  percentage: d.percentage,
+                }))}
+                valueKey="value"
+                labelKey="label"
+                emptyMessage="No rating responses yet."
+              />
             </>
           )}
-
           {q.type === 'text' && (
-            <ul className="mt-4 max-h-72 space-y-2 overflow-y-auto text-sm text-v-text-muted">
+            <ul className="max-h-72 space-y-2 overflow-y-auto text-sm text-v-text-muted">
               {(q.responses ?? []).map((r, i) => (
                 <li key={i} className="rounded-lg border border-v-border px-3 py-2">
                   {r.text}
@@ -147,8 +153,16 @@ export default function PollingReportPage() {
               )}
             </ul>
           )}
-        </section>
+        </AnalyticsSection>
       ))}
-    </div>
+
+      {questions.length === 0 && (
+        <AnalyticsSection title="No questions yet">
+          <p className="text-sm text-v-text-subtle">
+            Add questions to start collecting responses for this poll.
+          </p>
+        </AnalyticsSection>
+      )}
+    </ReportDocument>
   )
 }

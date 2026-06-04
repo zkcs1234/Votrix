@@ -1,71 +1,47 @@
-﻿import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { pollingService } from '@/services/polling.service'
+import { useParams } from 'react-router-dom'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import {
+  AnalyticsLayout,
+  AnalyticsSection,
+  AnalyticsStatsGrid,
+  DistributionList,
+  RankingList,
+  TrendList,
+  useModuleAnalytics,
+} from '@/modules/analytics'
+import {
+  buildPollingStats,
+  buildPollingQuestionStats,
+  buildPollingMostSelected,
+  buildPollingRatingDistributions,
+  buildPollingParticipationTrend,
+  buildPollingQuestionDistribution,
+  pollingQuestionTypeLabel,
+} from '@/modules/polling'
 
-function typeLabel(type) {
-  const map = {
-    single_choice: 'Multiple choice',
-    checkbox: 'Checkbox',
-    yes_no: 'Yes / No',
-    text: 'Text',
-    rating: 'Rating',
+function TextResponses({ responses = [] }) {
+  if (!responses.length) {
+    return <p className="text-sm text-v-text-subtle">No text responses yet.</p>
   }
-  return map[type] ?? type
-}
-
-function ChoiceChart({ options, totalResponses }) {
-  const max = Math.max(...options.map((o) => o.count), 1)
-
   return (
-    <ul className="mt-4 space-y-3">
-      {options.map((o) => (
-        <li key={o.optionId}>
-          <div className="flex justify-between text-sm">
-            <span className="text-v-text-muted">{o.label}</span>
-            <span className="text-v-text-muted">
-              {o.count} ({o.percentage}%)
-            </span>
-          </div>
-          <div className="mt-1 h-2 overflow-hidden rounded-full bg-v-surface-elevated">
-            <div
-              className="h-full bg-v-primary transition-all"
-              style={{ width: `${(o.count / max) * 100}%` }}
-            />
-          </div>
+    <ul className="mt-4 max-h-64 space-y-2 overflow-y-auto text-sm text-v-text-muted">
+      {responses.map((r, i) => (
+        <li key={i} className="rounded-lg border border-v-border px-3 py-2">
+          {r.text}
         </li>
       ))}
-      <p className="text-xs text-v-text-subtle pt-1">{totalResponses} responses</p>
     </ul>
   )
 }
 
 export default function PollingAnalyticsPage() {
   const { eventId } = useParams()
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let alive = true
-
-    const load = () => {
-      pollingService
-        .getAnalytics(eventId)
-        .then(({ data: res }) => {
-          if (alive) setData(res.analytics)
-        })
-        .finally(() => {
-          if (alive) setLoading(false)
-        })
-    }
-
-    load()
-    const id = setInterval(load, 30000)
-    return () => {
-      alive = false
-      clearInterval(id)
-    }
-  }, [eventId])
+  const { data, loading } = useModuleAnalytics({
+    moduleId: 'polling',
+    eventId,
+    pollIntervalMs: 30_000,
+    skipReport: true,
+  })
 
   if (loading) {
     return (
@@ -75,82 +51,127 @@ export default function PollingAnalyticsPage() {
     )
   }
 
+  const stats = buildPollingStats(data)
+  const questionStats = buildPollingQuestionStats(data)
+  const mostSelected = buildPollingMostSelected(data)
+  const ratingDistros = buildPollingRatingDistributions(data)
+  const trend = buildPollingParticipationTrend(data)
+  const distributions = buildPollingQuestionDistribution(data)
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold text-v-text">Poll analytics</h2>
-        <Link
-          to={`/organizer/reports/polling/${eventId}`}
-          className="text-sm text-v-text-muted hover:text-v-text"
-        >
-          Full report â†’
-        </Link>
+    <AnalyticsLayout
+      title="Poll analytics"
+      description="Respondents, response rate, question statistics, and rating distributions."
+      fullReportTo={`/organizer/reports/polling/${eventId}`}
+    >
+      <div className="rounded-xl border border-v-border bg-v-surface p-4 text-sm text-v-text-muted">
+        <span className="font-medium text-v-text">Mode:</span>{' '}
+        {data?.pollAnonymous ? 'Anonymous' : 'Identified'}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-2xl border border-v-border bg-v-surface p-5">
-          <p className="text-xs text-v-text-subtle">Total submissions</p>
-          <p className="mt-2 text-3xl font-bold text-white">{data?.totalSubmissions ?? 0}</p>
-        </div>
-        <div className="rounded-2xl border border-v-border bg-v-surface p-5">
-          <p className="text-xs text-v-text-subtle">Mode</p>
-          <p className="mt-2 text-lg font-medium text-v-text-muted">
-            {data?.pollAnonymous ? 'Anonymous' : 'Identified'}
-          </p>
-        </div>
-      </div>
+      <AnalyticsStatsGrid stats={stats} columns={4} />
 
-      {(data?.questions ?? []).map((q) => (
-        <section
-          key={q.questionId}
-          className="v-card p-6"
-        >
-          <div className="flex flex-wrap justify-between gap-2">
-            <h3 className="font-medium text-v-text">{q.question}</h3>
-            <span className="text-xs text-v-text-subtle">
-              {typeLabel(q.type)} Â· {q.responseCount} answers
-            </span>
-          </div>
+      <AnalyticsSection
+        title="Most selected choices"
+        description="Top options across every choice-style question in this poll."
+      >
+        <RankingList
+          items={mostSelected}
+          showRank
+          variant="compact"
+          emptyMessage="No choice questions answered yet."
+          valueFormatter={(v, item) =>
+            item?.percentage !== undefined ? `${v} (${item.percentage}%)` : v
+          }
+        />
+      </AnalyticsSection>
 
-          {q.type === 'choice' && q.options && (
-            <ChoiceChart options={q.options} totalResponses={q.totalResponses} />
+      <AnalyticsSection
+        title="Rating distributions"
+        description="Average rating and per-question distribution for every rating question."
+      >
+        <div className="space-y-6">
+          {ratingDistros.length === 0 && (
+            <p className="text-sm text-v-text-subtle">No rating questions in this poll.</p>
           )}
+          {ratingDistros.map((rd) => (
+            <div key={rd.id}>
+              <p className="text-sm font-medium text-v-text">{rd.name}</p>
+              <p className="text-xs text-v-text-subtle">{rd.sublabel}</p>
+              <p className="mt-2 text-xs text-v-text-subtle">{rd.meta}</p>
+            </div>
+          ))}
+        </div>
+      </AnalyticsSection>
 
-          {q.type === 'rating' && q.distribution && (
-            <>
-              <p className="mt-3 text-sm text-v-text-subtle">
-                Average rating: <span className="text-v-text-muted">{q.average}</span> / 5
-              </p>
-              <ChoiceChart
-                options={q.distribution.map((d) => ({
-                  optionId: String(d.rating),
-                  label: `${d.rating} star${d.rating !== 1 ? 's' : ''}`,
-                  count: d.count,
-                  percentage: d.percentage,
-                }))}
-                totalResponses={q.responseCount}
-              />
-            </>
+      <TrendList
+        title="Participation trends"
+        description="Response counts per question."
+        items={trend}
+        emptyMessage="No questions answered yet."
+      />
+
+      <AnalyticsSection
+        title="Question statistics"
+        description="Per-question breakdown including choice distributions and text responses."
+      >
+        <div className="space-y-6">
+          {distributions.length === 0 && (
+            <p className="text-sm text-v-text-subtle">No questions configured.</p>
           )}
-
-          {q.type === 'text' && (
-            <ul className="mt-4 max-h-64 space-y-2 overflow-y-auto text-sm text-v-text-muted">
-              {(q.responses ?? []).length === 0 && (
-                <li className="text-v-text-subtle">No text responses yet.</li>
+          {distributions.map((q) => (
+            <div key={q.id}>
+              <div className="flex flex-wrap justify-between gap-2">
+                <h4 className="text-sm font-medium text-v-text">{q.name}</h4>
+                <span className="text-xs text-v-text-subtle">{q.sublabel}</span>
+              </div>
+              {q.contestants && (
+                <div className="mt-2">
+                  <DistributionList
+                    items={q.contestants}
+                    valueKey="value"
+                    labelKey="label"
+                    emptyMessage="No answers yet."
+                  />
+                </div>
               )}
-              {(q.responses ?? []).map((r, i) => (
-                <li key={i} className="rounded-lg border border-v-border px-3 py-2">
-                  {r.text}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ))}
+              {q.responses && <TextResponses responses={q.responses} />}
+              {q.value !== undefined && !q.contestants && !q.responses && (
+                <p className="mt-2 text-sm text-v-text-muted">
+                  Average rating: {Number(q.value).toFixed(2)} / 5
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </AnalyticsSection>
+
+      <AnalyticsSection
+        title="Question response summary"
+        description="Number of answers captured per question."
+      >
+        <DistributionList
+          items={questionStats.map((q) => ({
+            id: q.id,
+            label: q.name,
+            value: q.value,
+            sublabel: q.sublabel,
+          }))}
+          valueKey="value"
+          labelKey="label"
+          showCount
+          showPercentage={false}
+          emptyMessage="No question responses yet."
+        />
+      </AnalyticsSection>
 
       {!data?.questions?.length && (
-        <p className="text-sm text-v-text-subtle">No events available. Create your first event to begin.</p>
+        <p className="text-sm text-v-text-subtle">
+          {pollingQuestionTypeLabel
+            ? 'No questions yet. Add questions to start collecting responses.'
+            : ''}
+        </p>
       )}
-    </div>
+    </AnalyticsLayout>
   )
 }

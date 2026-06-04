@@ -1,12 +1,20 @@
-# VOTRIX Database (Phase 2)
+# VOTRIX Database (Phase 9)
 
 PostgreSQL schema for Supabase. All primary keys are **UUID** (`gen_random_uuid()`).
 
 ## Apply migrations
 
 1. Open [Supabase Dashboard](https://supabase.com/dashboard) → your project → **SQL Editor**.
-2. Paste and run `migrations/001_initial_schema.sql`.
-3. (Optional) To reset: run `migrations/002_down_initial_schema.sql`, then re-run `001`.
+2. Paste and run the migrations in numeric order (`001_*` → `020_*`).
+   - `001_initial_schema.sql` is the base schema.
+   - `004_election_module.sql` … `018_*` add Election, Competition Scoring,
+     and Polling incrementally.
+   - `019_phase9_indexes_and_optimizations.sql` adds Phase 9 composite
+     indexes and the `v_audit_log_with_user` view. Additive only —
+     safe to apply on top of an existing schema.
+3. To reset: run `020_phase9_indexes_and_optimizations_down.sql` to drop
+   the Phase 9 indexes, then the down migration that matches the
+   last phase you want to roll back, then re-apply in numeric order.
 
 ## Entity relationship
 
@@ -70,11 +78,33 @@ erDiagram
 | Type | Values |
 |------|--------|
 | `user_role` | `admin`, `organizer`, `voter` |
-| `organization_type` | `election`, `pageant`, `polling` |
+| `organization_type` | `election`, `pageant`, `polling`, `competition_scoring` |
 | `organization_status` | `draft`, `active`, `inactive`, `archived` |
 | `event_status` | `draft`, `scheduled`, `active`, `completed`, `cancelled` |
-| `event_type` | `election`, `pageant`, `polling` |
-| `poll_question_type` | `single_choice`, `multiple_choice`, `text`, `rating` |
+| `event_type` | `election`, `pageant`, `polling`, `competition_scoring` |
+| `poll_question_type` | `single_choice`, `multiple_choice`, `checkbox`, `yes_no`, `text`, `rating`, `likert_scale`, `open_text`, `ranking` |
+| `user_account_status` | `pending`, `active`, `suspended`, `archived` |
+| `election_results_visibility` | `real_time`, `hidden`, `public` |
+| `competition_judge_role` | `judge`, `head_judge`, `score_reviewer` |
+| `competition_assignment_scope` | `event`, `category`, `round` |
+
+## Phase 9 — Indexes & optimization
+
+`migrations/019_phase9_indexes_and_optimizations.sql` adds composite
+indexes that match the hot read paths the service layer actually runs:
+
+- `(event_id, has_voted)` and `(event_id, is_judge)` on `event_voters`
+- `(event_id, candidate_id)` on `election_votes`
+- `(criteria_id, round_id)` on `competition_scores`
+- `(event_id, sort_order)` on `poll_questions`
+- `(user_id, is_read, created_at DESC)` on `notifications`
+- `(entity, entity_id, created_at DESC)` on `audit_logs`
+- `(organizer_id, organization_type)` on `organizations`
+- GIN on `events.scoring_config` for JSONB lookups
+
+The migration also creates a `v_audit_log_with_user` view that joins
+`audit_logs` to `users` so the activity feed endpoint can read a single
+view instead of writing the join inline.
 
 ## Create admin manually
 

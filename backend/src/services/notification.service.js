@@ -1,12 +1,9 @@
-import { getSupabase } from '../config/database.js'
-import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
+// Phase 9 — refactored to use the shared `foundation/` helpers.
+// Behaviour and the exported surface are unchanged.
 
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
+import { db, wrap } from '../foundation/db.js'
+import { notFound } from '../foundation/errors.js'
+import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
 
 export async function createNotification({
   userId,
@@ -18,64 +15,62 @@ export async function createNotification({
   entityId = null,
   metadata = null,
 }) {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.NOTIFICATIONS)
-    .insert({
-      user_id: userId,
-      type,
-      title,
-      message,
-      action_url: actionUrl,
-      entity,
-      entity_id: entityId,
-      metadata,
-    })
-    .select('*')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
-  return data
+  return wrap(
+    db()
+      .from(DB_TABLES.NOTIFICATIONS)
+      .insert({
+        user_id: userId,
+        type,
+        title,
+        message,
+        action_url: actionUrl,
+        entity,
+        entity_id: entityId,
+        metadata,
+      })
+      .select('*')
+      .single(),
+    { context: 'notification.createNotification' },
+  )
 }
 
 export async function createNotificationsForUsers(userIds, payload) {
   const ids = (userIds ?? []).filter(Boolean)
   if (!ids.length) return []
 
-  const { data, error } = await getClient()
-    .from(DB_TABLES.NOTIFICATIONS)
-    .insert(
-      ids.map((userId) => ({
-        user_id: userId,
-        type: payload.type,
-        title: payload.title,
-        message: payload.message,
-        action_url: payload.actionUrl ?? null,
-        entity: payload.entity ?? null,
-        entity_id: payload.entityId ?? null,
-        metadata: payload.metadata ?? null,
-      })),
-    )
-    .select('*')
-
-  if (error) throw new ApiError(500, error.message)
-  return data ?? []
+  return wrap(
+    db()
+      .from(DB_TABLES.NOTIFICATIONS)
+      .insert(
+        ids.map((userId) => ({
+          user_id: userId,
+          type: payload.type,
+          title: payload.title,
+          message: payload.message,
+          action_url: payload.actionUrl ?? null,
+          entity: payload.entity ?? null,
+          entity_id: payload.entityId ?? null,
+          metadata: payload.metadata ?? null,
+        })),
+      )
+      .select('*'),
+    { context: 'notification.createNotificationsForUsers' },
+  ) ?? []
 }
 
 export async function createNotificationsForRole(role, payload) {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.USERS)
-    .select('id')
-    .eq('role', role)
-
-  if (error) throw new ApiError(500, error.message)
-  return createNotificationsForUsers((data ?? []).map((row) => row.id), payload)
+  const rows = await wrap(
+    db().from(DB_TABLES.USERS).select('id').eq('role', role),
+    { context: 'notification.createNotificationsForRole' },
+  )
+  return createNotificationsForUsers((rows ?? []).map((row) => row.id), payload)
 }
 
 export async function listNotifications(
   userId,
   { unreadOnly = false, limit = 25, type = null, entity = null } = {},
 ) {
-  let query = getClient()
+  let query = db()
     .from(DB_TABLES.NOTIFICATIONS)
     .select('*')
     .eq('user_id', userId)
@@ -92,46 +87,48 @@ export async function listNotifications(
     query = query.eq('entity', entity)
   }
 
-  const { data, error } = await query
-  if (error) throw new ApiError(500, error.message)
-  return data ?? []
+  return wrap(query, { context: 'notification.listNotifications' }) ?? []
 }
 
 export async function getUnreadNotificationCount(userId) {
-  const { count, error } = await getClient()
+  const { count, error } = await db()
     .from(DB_TABLES.NOTIFICATIONS)
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('is_read', false)
 
-  if (error) throw new ApiError(500, error.message)
+  if (error) {
+    const { serverError } = await import('../foundation/errors.js')
+    throw serverError(`notification.getUnreadNotificationCount: ${error.message}`)
+  }
   return count ?? 0
 }
 
 export async function markNotificationRead(notificationId, userId) {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.NOTIFICATIONS)
-    .update({ is_read: true })
-    .eq('id', notificationId)
-    .eq('user_id', userId)
-    .select('*')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
-  if (!data) throw new ApiError(404, 'Notification not found')
+  const data = await wrap(
+    db()
+      .from(DB_TABLES.NOTIFICATIONS)
+      .update({ is_read: true })
+      .eq('id', notificationId)
+      .eq('user_id', userId)
+      .select('*')
+      .single(),
+    { context: 'notification.markNotificationRead' },
+  )
+  if (!data) throw notFound('Notification not found')
   return data
 }
 
 export async function markAllNotificationsRead(userId) {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.NOTIFICATIONS)
-    .update({ is_read: true })
-    .eq('user_id', userId)
-    .eq('is_read', false)
-    .select('*')
-
-  if (error) throw new ApiError(500, error.message)
-  return data ?? []
+  return wrap(
+    db()
+      .from(DB_TABLES.NOTIFICATIONS)
+      .update({ is_read: true })
+      .eq('user_id', userId)
+      .eq('is_read', false)
+      .select('*'),
+    { context: 'notification.markAllNotificationsRead' },
+  ) ?? []
 }
 
 export async function createAdminAlert(payload) {
