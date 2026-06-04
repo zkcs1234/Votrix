@@ -2,8 +2,8 @@ import { useParams } from 'react-router-dom'
 import AppShell from '@/layouts/AppShell'
 
 const navItems = [
-  { label: 'Dashboard', path: '/organizer/pageant' },
-  { label: 'Events', path: '/organizer/pageant/events' },
+  { label: 'Competition Scoring Dashboard', path: '/organizer/pageant' },
+  { label: 'Competition Scoring Events', path: '/organizer/pageant/events' },
   {
     label: 'Contestants',
     path: 'contestants',
@@ -35,8 +35,8 @@ export default function PageantLayout() {
 
   return (
     <AppShell
-      title="Pageant scoring"
-      moduleLabel="Pageant"
+      title="Competition Scoring"
+      moduleLabel="Competition Scoring"
       homeLink="/organizer/pageant"
       navItems={navItems}
       eventId={eventId}

@@ -74,7 +74,7 @@ export default function PageantEventFormPage() {
 
   return (
     <div className="mx-auto max-w-lg">
-      <h2 className="v-page-title mb-2">{isNew ? 'Create pageant event' : 'Edit pageant event'}</h2>
+      <h2 className="v-page-title mb-2">{isNew ? 'Create Competition Scoring Event' : 'Edit Competition Scoring Event'}</h2>
       <div className="mb-6 flex items-center gap-2 text-sm text-v-text-subtle">
         <span className={step === 1 ? 'text-v-primary font-medium' : ''}>Step 1: Details</span>
         <span>→</span>
@@ -167,7 +167,7 @@ export default function PageantEventFormPage() {
                 type="submit"
                 disabled={saving}
               >
-                {saving ? 'Saving...' : isNew ? 'Create pageant' : 'Save changes'}
+                {saving ? 'Saving...' : isNew ? 'Create Competition Scoring Event' : 'Save changes'}
               </Button>
             </div>
           </form>

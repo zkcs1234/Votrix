@@ -32,7 +32,7 @@ export default function PageantReportPage() {
       contestantName: r.contestantName,
       weightedScore: r.weightedScore,
     }))
-    downloadCsv(`pageant-rankings-${eventId}.csv`, rows)
+    downloadCsv(`competition-rankings-${eventId}.csv`, rows)
   }
 
   if (loading) {
@@ -49,7 +49,7 @@ export default function PageantReportPage() {
     <div className="mx-auto max-w-4xl space-y-8">
       <ReportHeader
         title={report.event.title}
-        subtitle="Pageant report â€” rankings & judge turnout"
+        subtitle="Competition Scoring report â€” rankings & judge turnout"
         generatedAt={report.generatedAt}
       />
 
@@ -70,7 +70,7 @@ export default function PageantReportPage() {
         </button>
         <button
           type="button"
-          onClick={() => downloadJson(`pageant-report-${eventId}.json`, report)}
+          onClick={() => downloadJson(`competition-report-${eventId}.json`, report)}
           className="rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
         >
           Export JSON

@@ -48,7 +48,7 @@ export default function PageantJudgesPage() {
   return (
     <div className="space-y-8">
       <h2 className="text-xl font-semibold text-v-text">Judges</h2>
-      <p className="text-sm text-v-text-subtle">Judges are voter accounts with scoring access for this pageant.</p>
+      <p className="text-sm text-v-text-subtle">Judges are voter accounts with scoring access for this competition scoring event.</p>
 
       <div className="v-card p-6">
         <p className="text-sm text-v-text-muted">CSV: email, firstname, lastname</p>

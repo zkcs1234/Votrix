@@ -41,12 +41,12 @@ export default function PageantDashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-v-text">Pageant dashboard</h2>
+        <h2 className="text-xl font-semibold text-v-text">Competition Scoring dashboard</h2>
         <Link
           to="/organizer/pageant/events/new"
           className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white hover:bg-v-primary-hover"
         >
-          Create pageant
+          Create Competition Scoring Event
         </Link>
       </div>
 
@@ -75,7 +75,8 @@ export default function PageantDashboardPage() {
       />
 
       <div className="v-card p-6">
-        <h3 className="font-medium text-v-text">Recent pageants</h3>
+        <h3 className="font-medium text-v-text">Recent Competition Scoring events</h3>
+
         <ul className="mt-4 space-y-2">
           {(data?.events ?? []).slice(0, 5).map((e) => (
             <li key={e.id}>
@@ -92,7 +93,7 @@ export default function PageantDashboardPage() {
           ))}
           {!data?.events?.length && (
             <li className="rounded-lg border border-dashed border-v-border px-4 py-8 text-center text-sm text-v-text-subtle">
-              No events available. Create your first event to begin.
+              No competition scoring events available. Create your first event to begin.
             </li>
           )}
         </ul>

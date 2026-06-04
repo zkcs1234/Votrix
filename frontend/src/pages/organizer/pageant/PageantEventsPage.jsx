@@ -38,7 +38,7 @@ export default function PageantEventsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between">
-        <h2 className="text-xl font-semibold text-v-text">Pageant events</h2>
+        <h2 className="text-xl font-semibold text-v-text">Competition Scoring events</h2>
         <Link
           to="/organizer/pageant/events/new"
           className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white"

@@ -38,7 +38,7 @@ export default function PageantRankingsPage() {
             to={`/organizer/reports/pageant/${eventId}`}
             className="text-sm text-v-text-muted hover:text-v-text"
           >
-            Full report â†’
+            Full competition scoring report â†’
           </Link>
           <button type="button" onClick={load} className="text-sm text-v-text-subtle hover:text-v-text-muted">
             Refresh
