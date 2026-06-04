@@ -4,19 +4,30 @@ import { electionService } from '@/services/election.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import BarChart from '@/components/reports/BarChart'
 
+const VISIBILITY_LABEL = {
+  real_time: 'Real-time results',
+  hidden: 'Hidden results',
+  public: 'Public results',
+}
+
 export default function ElectionAnalyticsPage() {
   const { eventId } = useParams()
   const [data, setData] = useState(null)
+  const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let alive = true
 
     const load = () => {
-      electionService
-        .getAnalytics(eventId)
-        .then(({ data }) => {
-          if (alive) setData(data.analytics)
+      Promise.all([
+        electionService.getAnalytics(eventId),
+        electionService.getEvent(eventId),
+      ])
+        .then(([analyticsRes, eventRes]) => {
+          if (!alive) return
+          setData(analyticsRes.data.analytics)
+          setEvent(eventRes.data.event)
         })
         .finally(() => {
           if (alive) setLoading(false)
@@ -39,6 +50,8 @@ export default function ElectionAnalyticsPage() {
     )
   }
 
+  const visibility = event?.resultsVisibility ?? event?.results_visibility ?? 'public'
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -47,8 +60,13 @@ export default function ElectionAnalyticsPage() {
           to={`/organizer/reports/election/${eventId}`}
           className="text-sm text-v-text-muted hover:text-v-text"
         >
-          Full report â†’
+          Full report →
         </Link>
+      </div>
+
+      <div className="rounded-xl border border-v-border bg-v-surface p-4 text-sm text-v-text-muted">
+        <span className="font-medium text-v-text">Voter-facing results:</span>{' '}
+        {VISIBILITY_LABEL[visibility] ?? visibility}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">

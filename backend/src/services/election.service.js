@@ -24,6 +24,7 @@ function mapEvent(row) {
     status: row.status,
     eventType: row.event_type,
     votingEnabled: Boolean(row.voting_enabled),
+    resultsVisibility: row.results_visibility ?? 'public',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -34,8 +35,11 @@ function mapPosition(row) {
     id: row.id,
     eventId: row.event_id,
     name: row.name,
+    description: row.description ?? null,
     minVote: row.min_vote,
     maxVote: row.max_vote,
+    numberOfWinners: row.number_of_winners ?? 1,
+    displayOrder: row.display_order ?? 0,
     allowSkip: row.allow_skip,
   }
 }
@@ -47,6 +51,11 @@ function mapCandidate(row) {
     name: row.name,
     photo: row.photo,
     description: row.description,
+    biography: row.biography ?? null,
+    platform: row.platform ?? null,
+    // Expose both names so existing clients (partylist) keep working and the
+    // spec name (party) is available going forward.
+    party: row.partylist,
     partylist: row.partylist,
   }
 }
@@ -143,6 +152,7 @@ export async function createElectionEvent(organizerId, payload) {
       status: payload.status ?? 'draft',
       event_type: EVENT_TYPES.ELECTION,
       voting_enabled: false,
+      results_visibility: payload.resultsVisibility ?? 'public',
     })
     .select('*')
     .single()
@@ -161,6 +171,9 @@ export async function updateElectionEvent(eventId, organizerId, payload) {
   if (payload.startDate !== undefined) updates.start_date = payload.startDate
   if (payload.endDate !== undefined) updates.end_date = payload.endDate
   if (payload.status !== undefined) updates.status = payload.status
+  if (payload.resultsVisibility !== undefined) {
+    updates.results_visibility = payload.resultsVisibility
+  }
 
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
@@ -209,22 +222,45 @@ export async function listPositions(eventId, organizerId) {
     .from(DB_TABLES.POSITIONS)
     .select('*')
     .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
 
   if (error) throw new ApiError(500, error.message)
   return (data ?? []).map(mapPosition)
 }
 
+async function nextPositionDisplayOrder(eventId) {
+  const { data, error } = await getClient()
+    .from(DB_TABLES.POSITIONS)
+    .select('display_order')
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw new ApiError(500, error.message)
+  if (!data) return 0
+  return (data.display_order ?? 0) + 1
+}
+
 export async function createPosition(eventId, organizerId, payload) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
+
+  const displayOrder =
+    payload.displayOrder !== undefined
+      ? payload.displayOrder
+      : await nextPositionDisplayOrder(eventId)
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POSITIONS)
     .insert({
       event_id: eventId,
       name: payload.name,
+      description: payload.description ?? null,
       min_vote: payload.minVote ?? 1,
       max_vote: payload.maxVote ?? 1,
+      number_of_winners: payload.numberOfWinners ?? 1,
+      display_order: displayOrder,
       allow_skip: payload.allowSkip ?? false,
     })
     .select('*')
@@ -239,8 +275,11 @@ export async function updatePosition(eventId, organizerId, positionId, payload) 
 
   const updates = {}
   if (payload.name !== undefined) updates.name = payload.name
+  if (payload.description !== undefined) updates.description = payload.description
   if (payload.minVote !== undefined) updates.min_vote = payload.minVote
   if (payload.maxVote !== undefined) updates.max_vote = payload.maxVote
+  if (payload.numberOfWinners !== undefined) updates.number_of_winners = payload.numberOfWinners
+  if (payload.displayOrder !== undefined) updates.display_order = payload.displayOrder
   if (payload.allowSkip !== undefined) updates.allow_skip = payload.allowSkip
 
   const { data, error } = await getClient()
@@ -311,6 +350,8 @@ export async function createCandidate(eventId, organizerId, positionId, payload)
       name: payload.name,
       photo: payload.photo ?? null,
       description: payload.description ?? null,
+      biography: payload.biography ?? null,
+      platform: payload.platform ?? null,
       partylist: payload.partylist ?? null,
     })
     .select('*')
@@ -347,6 +388,8 @@ export async function updateCandidate(eventId, organizerId, candidateId, payload
   if (payload.name !== undefined) updates.name = payload.name
   if (payload.photo !== undefined) updates.photo = payload.photo
   if (payload.description !== undefined) updates.description = payload.description
+  if (payload.biography !== undefined) updates.biography = payload.biography
+  if (payload.platform !== undefined) updates.platform = payload.platform
   if (payload.partylist !== undefined) updates.partylist = payload.partylist
 
   const { data, error } = await getClient()
@@ -441,6 +484,7 @@ export async function getVoterBallot(eventId, voterId) {
     .from(DB_TABLES.POSITIONS)
     .select('*')
     .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
 
   if (posErr) throw new ApiError(500, posErr.message)

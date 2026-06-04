@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
-import { Skeleton, SkeletonGrid } from '@/components/ui/Skeleton'
+import { SkeletonGrid } from '@/components/ui/Skeleton'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
@@ -21,6 +21,9 @@ function CandidateCard({ candidate, positionName, onDelete }) {
     }
   }
 
+  // Prefer the new `party` field but fall back to legacy `partylist`.
+  const party = candidate.party ?? candidate.partylist
+
   return (
     <div className="rounded-xl border border-v-border bg-v-surface p-4">
       {candidate.photo && (
@@ -32,8 +35,16 @@ function CandidateCard({ candidate, positionName, onDelete }) {
       )}
       <p className="font-medium text-v-text">{candidate.name}</p>
       <p className="text-xs text-v-text-muted">{positionName}</p>
-      {candidate.partylist && (
-        <p className="mt-1 text-sm text-v-text-subtle">{candidate.partylist}</p>
+      {party && <p className="mt-1 text-sm text-v-text-subtle">{party}</p>}
+      {candidate.biography && (
+        <p className="mt-2 line-clamp-3 text-xs text-v-text-subtle">
+          <span className="font-medium text-v-text-muted">Bio:</span> {candidate.biography}
+        </p>
+      )}
+      {candidate.platform && (
+        <p className="mt-1 line-clamp-3 text-xs text-v-text-subtle">
+          <span className="font-medium text-v-text-muted">Platform:</span> {candidate.platform}
+        </p>
       )}
       <button
         type="button"
@@ -67,17 +78,18 @@ function CandidateFormSkeleton() {
   )
 }
 
+const EMPTY_FORM = { name: '', biography: '', platform: '', party: '' }
+
 export default function ElectionCandidatesPage() {
   const { eventId } = useParams()
   const [positions, setPositions] = useState([])
   const [candidates, setCandidates] = useState([])
   const [positionId, setPositionId] = useState('')
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ name: '', description: '', partylist: '' })
+  const [form, setForm] = useState(EMPTY_FORM)
   const [photoFile, setPhotoFile] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  // Use delayed loading
   const showLoader = useDelayedLoading(loading, 300)
 
   const load = useCallback(async () => {
@@ -107,13 +119,14 @@ export default function ElectionCandidatesPage() {
 
     setSaving(true)
 
-    // Optimistically add to list
     const tempId = `temp-${Date.now()}`
     const newCandidate = {
       id: tempId,
       name: form.name,
-      description: form.description,
-      partylist: form.partylist,
+      biography: form.biography,
+      platform: form.platform,
+      party: form.party,
+      partylist: form.party,
       positionId,
       photo: null,
     }
@@ -122,18 +135,15 @@ export default function ElectionCandidatesPage() {
     try {
       const { data } = await electionService.createCandidate(eventId, positionId, form)
 
-      // Replace temp with real data
       if (photoFile) {
         await electionService.uploadCandidatePhoto(eventId, data.candidate.id, photoFile)
       }
 
-      // Refresh to get updated data
       load()
 
-      setForm({ name: '', description: '', partylist: '' })
+      setForm(EMPTY_FORM)
       setPhotoFile(null)
     } catch (err) {
-      // Rollback on error
       setCandidates((prev) => prev.filter((c) => c.id !== tempId))
       console.error('Failed to create candidate:', err)
     } finally {
@@ -141,17 +151,13 @@ export default function ElectionCandidatesPage() {
     }
   }
 
-  // Optimistic UI - delete immediately
   const handleDelete = async (id) => {
     const previousCandidates = [...candidates]
-
-    // Optimistically remove
     setCandidates((prev) => prev.filter((c) => c.id !== id))
 
     try {
       await electionService.deleteCandidate(eventId, id)
     } catch (err) {
-      // Rollback on error
       setCandidates(previousCandidates)
       console.error('Failed to delete candidate:', err)
     }
@@ -159,12 +165,10 @@ export default function ElectionCandidatesPage() {
 
   const positionName = (id) => positions.find((p) => p.id === id)?.name ?? '—'
 
-  // Show nothing under 300ms
   if (loading && !showLoader) {
     return null
   }
 
-  // Show skeleton after 300ms
   if (loading || showLoader) {
     return (
       <div className="space-y-8">
@@ -177,7 +181,7 @@ export default function ElectionCandidatesPage() {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-xl font-semibold text-v-text">Candidates</h2>
+      <h2 className="text-xl font-semibold text-v-text">Candidate Management</h2>
 
       <form onSubmit={handleCreate} className="space-y-4 v-card p-6">
         <div>
@@ -206,20 +210,30 @@ export default function ElectionCandidatesPage() {
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Partylist</label>
+          <label className="mb-1 block text-sm text-v-text-muted">Party</label>
           <input
             className={inputClass}
-            value={form.partylist}
-            onChange={(e) => setForm({ ...form, partylist: e.target.value })}
+            placeholder="e.g. Independent"
+            value={form.party}
+            onChange={(e) => setForm({ ...form, party: e.target.value })}
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Description</label>
+          <label className="mb-1 block text-sm text-v-text-muted">Biography</label>
           <textarea
             className={inputClass}
-            rows={2}
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            rows={3}
+            value={form.biography}
+            onChange={(e) => setForm({ ...form, biography: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm text-v-text-muted">Platform</label>
+          <textarea
+            className={inputClass}
+            rows={3}
+            value={form.platform}
+            onChange={(e) => setForm({ ...form, platform: e.target.value })}
           />
         </div>
         <ImageUploadField

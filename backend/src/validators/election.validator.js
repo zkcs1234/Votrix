@@ -1,5 +1,19 @@
 import { ApiError } from '../utils/ApiError.js'
 
+export const ELECTION_RESULTS_VISIBILITY = ['real_time', 'hidden', 'public']
+
+function normalizeResultsVisibility(value) {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return 'public'
+  if (!ELECTION_RESULTS_VISIBILITY.includes(value)) {
+    throw new ApiError(
+      400,
+      `resultsVisibility must be one of ${ELECTION_RESULTS_VISIBILITY.join(', ')}`,
+    )
+  }
+  return value
+}
+
 export function validateCreateEvent(body) {
   if (!body?.title?.trim()) throw new ApiError(400, 'Event title is required')
   return {
@@ -9,6 +23,7 @@ export function validateCreateEvent(body) {
     startDate: body.startDate || null,
     endDate: body.endDate || null,
     status: body.status || 'draft',
+    resultsVisibility: normalizeResultsVisibility(body.resultsVisibility) ?? 'public',
   }
 }
 
@@ -20,6 +35,9 @@ export function validateUpdateEvent(body) {
   if (body.startDate !== undefined) payload.startDate = body.startDate
   if (body.endDate !== undefined) payload.endDate = body.endDate
   if (body.status !== undefined) payload.status = body.status
+  if (body.resultsVisibility !== undefined) {
+    payload.resultsVisibility = normalizeResultsVisibility(body.resultsVisibility)
+  }
   return payload
 }
 
@@ -27,24 +45,46 @@ export function validatePosition(body) {
   if (!body?.name?.trim()) throw new ApiError(400, 'Position name is required')
   const minVote = Number(body.minVote ?? 1)
   const maxVote = Number(body.maxVote ?? 1)
-  if (minVote < 0 || maxVote < minVote) {
+  if (Number.isNaN(minVote) || Number.isNaN(maxVote) || minVote < 0 || maxVote < minVote) {
     throw new ApiError(400, 'Invalid vote range')
   }
+
+  const numberOfWinners = Number(body.numberOfWinners ?? 1)
+  if (!Number.isInteger(numberOfWinners) || numberOfWinners < 1) {
+    throw new ApiError(400, 'Number of winners must be a positive integer')
+  }
+
+  let displayOrder
+  if (body.displayOrder !== undefined && body.displayOrder !== null && body.displayOrder !== '') {
+    displayOrder = Number(body.displayOrder)
+    if (!Number.isInteger(displayOrder) || displayOrder < 0) {
+      throw new ApiError(400, 'Display order must be a non-negative integer')
+    }
+  }
+
   return {
     name: body.name.trim(),
+    description: body.description?.trim() || null,
     minVote,
     maxVote,
+    numberOfWinners,
+    displayOrder,
     allowSkip: Boolean(body.allowSkip),
   }
 }
 
 export function validateCandidate(body) {
   if (!body?.name?.trim()) throw new ApiError(400, 'Candidate name is required')
+  // `party` is the spec name; `partylist` is the legacy field name. Accept
+  // either, persist to the existing column so voting logic doesn't change.
+  const party = body.party ?? body.partylist
   return {
     name: body.name.trim(),
     photo: body.photo || null,
     description: body.description?.trim() || null,
-    partylist: body.partylist?.trim() || null,
+    biography: body.biography?.trim() || null,
+    platform: body.platform?.trim() || null,
+    partylist: party?.trim?.() || null,
   }
 }
 

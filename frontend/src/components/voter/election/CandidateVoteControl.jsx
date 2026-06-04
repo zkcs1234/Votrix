@@ -1,4 +1,8 @@
 ﻿export default function CandidateVoteControl({ candidate, selected, disabled, onToggle }) {
+  // Prefer the new spec field name `party`; fall back to legacy `partylist`.
+  const party = candidate.party ?? candidate.partylist
+  const blurb = candidate.platform || candidate.biography || candidate.description
+
   return (
     <button
       type="button"
@@ -19,9 +23,9 @@
       )}
       <div className="flex-1 min-w-0">
         <p className="font-medium text-v-text">{candidate.name}</p>
-        {candidate.partylist && <p className="text-xs text-v-text-subtle">{candidate.partylist}</p>}
-        {candidate.description && (
-          <p className="mt-0.5 text-xs text-v-text-subtle line-clamp-2">{candidate.description}</p>
+        {party && <p className="text-xs text-v-text-subtle">{party}</p>}
+        {blurb && (
+          <p className="mt-0.5 text-xs text-v-text-subtle line-clamp-2">{blurb}</p>
         )}
       </div>
       <span

@@ -8,6 +8,24 @@ import Card from '@/components/ui/Card'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
+const RESULTS_VISIBILITY_OPTIONS = [
+  {
+    value: 'real_time',
+    label: 'Real-time results',
+    hint: 'Results stream as votes are cast.',
+  },
+  {
+    value: 'hidden',
+    label: 'Hidden results',
+    hint: 'Results are never shown to voters.',
+  },
+  {
+    value: 'public',
+    label: 'Public results',
+    hint: 'Results become visible once voting closes.',
+  },
+]
+
 export default function ElectionEventFormPage() {
   const { eventId } = useParams()
   const isNew = !eventId || eventId === 'new'
@@ -18,6 +36,7 @@ export default function ElectionEventFormPage() {
   const [description, setDescription] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [resultsVisibility, setResultsVisibility] = useState('public')
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [loading, setLoading] = useState(!isNew)
@@ -29,11 +48,17 @@ export default function ElectionEventFormPage() {
     electionService
       .getEvent(eventId)
       .then(({ data }) => {
-        setTitle(data.event.title)
-        setDescription(data.event.description || '')
-        setStartDate(data.event.start_date ? data.event.start_date.slice(0, 16) : '')
-        setEndDate(data.event.end_date ? data.event.end_date.slice(0, 16) : '')
-        setBanner(data.event.banner)
+        const ev = data.event
+        setTitle(ev.title)
+        setDescription(ev.description || '')
+        // The mapper returns camelCase, but legacy snake_case keys may still
+        // be present on cached responses — support both for safety.
+        const start = ev.startDate ?? ev.start_date
+        const end = ev.endDate ?? ev.end_date
+        setStartDate(start ? start.slice(0, 16) : '')
+        setEndDate(end ? end.slice(0, 16) : '')
+        setBanner(ev.banner)
+        setResultsVisibility(ev.resultsVisibility ?? ev.results_visibility ?? 'public')
       })
       .finally(() => setLoading(false))
   }, [eventId, isNew])
@@ -54,6 +79,7 @@ export default function ElectionEventFormPage() {
         description,
         startDate: startDate ? new Date(startDate).toISOString() : null,
         endDate: endDate ? new Date(endDate).toISOString() : null,
+        resultsVisibility,
       }
       let id = eventId
       if (isNew) {
@@ -141,6 +167,35 @@ export default function ElectionEventFormPage() {
                 />
               </div>
             </div>
+
+            <fieldset className="v-form-field">
+              <legend className={LABEL_CLASS}>Election Settings — Results</legend>
+              <div className="mt-2 space-y-2">
+                {RESULTS_VISIBILITY_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 transition ${
+                      resultsVisibility === opt.value
+                        ? 'border-v-primary bg-v-surface-elevated'
+                        : 'border-v-border hover:border-v-border-strong'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="resultsVisibility"
+                      className="mt-1"
+                      value={opt.value}
+                      checked={resultsVisibility === opt.value}
+                      onChange={(e) => setResultsVisibility(e.target.value)}
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-v-text">{opt.label}</span>
+                      <span className={HELPER_TEXT}>{opt.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
 
             <div className="v-form-actions">
               <Button type="submit">Next step</Button>
