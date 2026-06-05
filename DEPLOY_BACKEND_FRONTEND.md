@@ -130,6 +130,8 @@ In Vercel Project → Settings → Environment Variables, add:
 
 - `VITE_API_URL` = `https://<your-render-service>.onrender.com/api`
 
+This is the **only** required frontend env var. The frontend calls the API directly via this URL using CORS + `withCredentials: true`; there is no Vercel-side proxy.
+
 Optional preview environment:
 
 - Set the same `VITE_API_URL` for Preview and Production or use a preview-specific API host.
@@ -142,8 +144,10 @@ Optional preview environment:
 
 If auth/cookies fail:
 
+- Ensure `VITE_API_URL` on Vercel is set to `https://<render-service>.onrender.com/api` (with the `/api` suffix) and the frontend was redeployed after the change.
 - Ensure `FRONTEND_URL` on Render exactly matches the Vercel production URL (including `https://` and no trailing slash).
-- Confirm `VITE_API_URL` ends with `/api`.
+- Ensure `COOKIE_SAME_SITE=none` on Render (the API throws at startup in production otherwise).
+- Ensure `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` are different values (the API throws at startup in production otherwise).
 
 ---
 

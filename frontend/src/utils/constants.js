@@ -1,10 +1,11 @@
 const configuredApiUrl = (import.meta.env.VITE_API_URL || '/api').trim().replace(/\/$/, '')
 
-// In production, prefer same-origin API proxy to avoid third-party cookie blocking.
-const useSameOriginApi =
-  import.meta.env.PROD && import.meta.env.VITE_USE_SAME_ORIGIN_API !== 'false'
-
-export const API_BASE_URL = useSameOriginApi ? '/api' : configuredApiUrl
+// In production, VITE_API_URL must point at the Render API. Falling back to
+// the same-origin '/api' only works when a server-side proxy (vercel.json
+// rewrites, a Vite dev proxy, or a reverse proxy) is configured to forward
+// those calls to the API. We default to the configured URL so misconfigured
+// deploys fail loud instead of silently hitting the wrong host.
+export const API_BASE_URL = configuredApiUrl
 
 export const USER_ROLES = {
   ADMIN: 'admin',

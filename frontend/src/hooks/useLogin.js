@@ -1,17 +1,8 @@
 import { useState } from 'react'
-import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { getRoleDashboardPath } from '@/utils/auth'
-import { API_BASE_URL } from '@/utils/constants'
-import { getCsrfToken, setCsrfToken } from '@/utils/csrf'
 import { useToast } from '@/hooks/useToast'
-
-async function ensureCsrfToken() {
-  if (getCsrfToken()) return
-  const { data } = await axios.get(`${API_BASE_URL}/auth/csrf`, { withCredentials: true })
-  if (data.csrfToken) setCsrfToken(data.csrfToken)
-}
 
 export function useLogin(loginFn) {
   const navigate = useNavigate()
@@ -25,7 +16,9 @@ export function useLogin(loginFn) {
     setLoading(true)
 
     try {
-      await ensureCsrfToken()
+      // The `api` request interceptor fetches a CSRF token automatically
+      // for any POST. Login endpoints are CSRF-exempt on the server, so we
+      // don't need a pre-flight round-trip here.
       const { data } = await loginFn(values)
       setSession({
         accessToken: data.accessToken,

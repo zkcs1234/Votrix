@@ -20,6 +20,13 @@ export function assertProductionSecurity() {
     )
   }
 
+  if (env.jwt.accessSecret === env.jwt.refreshSecret) {
+    throw new Error(
+      'Production requires JWT_ACCESS_SECRET and JWT_REFRESH_SECRET to be DIFFERENT values. ' +
+        'Identical secrets compromise token rotation guarantees.',
+    )
+  }
+
   if (!env.csrf.secret || env.csrf.secret.length < 32) {
     throw new Error('Production requires CSRF_SECRET (min 32 characters).')
   }
@@ -29,8 +36,9 @@ export function assertProductionSecurity() {
   }
 
   if (env.cookie.sameSite !== 'none') {
-    console.warn(
-      '[votrix] COOKIE_SAME_SITE is not "none" — cross-origin cookies (Vercel + Render) may fail.',
+    throw new Error(
+      'Production requires COOKIE_SAME_SITE=none so cross-origin auth cookies (Vercel + Render) are accepted. ' +
+        'Set COOKIE_SAME_SITE=none in the Render environment.',
     )
   }
 

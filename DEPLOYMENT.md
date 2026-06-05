@@ -112,12 +112,15 @@ Expect `"success": true` and `"integrations.database.connected": true` after mig
 
 5. Deploy. Copy the production URL (e.g. `https://your-app.vercel.app`).
 
+**Important:** `VITE_API_URL` must be set to the **Render API origin with the `/api` suffix**, e.g. `https://votrix-api.onrender.com/api`. The frontend calls the API directly (CORS + `withCredentials: true`); there is no Vercel-side proxy. Without this var the production build defaults to `/api`, which will 404 because Vercel's static host does not forward `/api/*`.
+
 ## 4. Link frontend ↔ backend
 
 1. In **Render**, set `FRONTEND_URL` to your Vercel production URL (must be `https://`).
-2. Redeploy the API so CORS and cookies use the new origin.
-3. In **Vercel**, confirm `VITE_API_URL` points to the Render API with `/api` suffix.
-4. Redeploy the frontend if you changed `VITE_API_URL`.
+2. In **Render**, set `COOKIE_SAME_SITE=none` (the default in production, but explicit is safer).
+3. Redeploy the API so CORS and cookies use the new origin.
+4. In **Vercel**, confirm `VITE_API_URL` points to the Render API with `/api` suffix.
+5. Redeploy the frontend if you changed `VITE_API_URL`.
 
 ## 5. Third-party services
 
@@ -141,11 +144,13 @@ The frontend and API run on **different domains**. Production uses:
 - Cookies with `Secure` + `SameSite=None` (default when `NODE_ENV=production`)
 - CSRF double-submit (`GET /api/auth/csrf` before login)
 
-Both sites must use **HTTPS**. If login fails after deploy, check:
+Both sites must use **HTTPS**. If login fails after deploy, check in this order:
 
-1. `FRONTEND_URL` matches the browser address exactly.
-2. `VITE_API_URL` ends with `/api`.
-3. Render logs for CORS errors.
+1. **`VITE_API_URL` is set on Vercel** to `https://<render-host>/api` and the build was redeployed.
+2. **`FRONTEND_URL` on Render** matches the browser address exactly (no trailing slash, must be `https://`).
+3. **`COOKIE_SAME_SITE=none`** on Render (the default; the API now throws at startup if it is anything else in production).
+4. **Render logs** for CORS or CSRF errors. If you see `Invalid or missing CSRF token`, the user agent is being blocked from sending the cookie — almost always `SameSite` or `Secure` mismatches.
+5. **`JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` are different values.** Identical secrets fail startup in production.
 
 ## Local development
 
