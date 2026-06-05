@@ -23,8 +23,12 @@ export default function VotrixLogo({
       <div className={`inline-flex items-center ${config.gap} ${toneClass}`}>
         <VotrixMark className={`${config.mark} shrink-0`} title="" />
         {variant === 'full' && (
-          <span className={`${config.text} font-bold tracking-[0.14em] leading-none`}>
-            VOTRIX
+          <span
+            className={`${config.text} font-bold tracking-[0.14em] leading-none text-v-text`}
+          >
+            VOTR
+            <span className="text-v-primary">I</span>
+            X
           </span>
         )}
       </div>

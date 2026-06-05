@@ -95,7 +95,7 @@ export default function ElectionEventsPage() {
     // the effect runs once and triggers an async fetch, which is the
     // legitimate way to load data in a React component. The rule
     // can't infer this and flags it as cascading renders.
-    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 

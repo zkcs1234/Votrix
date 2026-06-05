@@ -2,11 +2,20 @@
 
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-charcoal: #111827;
   --color-charcoal-light: #374151;
   --color-muted: #6b7280;
   --color-surface: #f3f4f6;
   --color-white: #ffffff;
+
+  /* Motion tokens */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
 
   /* Spacing scale */
   --spacing-1: 4px;
@@ -33,6 +42,8 @@
   --color-v-sidebar-active: var(--v-sidebar-active);
   --color-v-primary: var(--v-primary);
   --color-v-primary-hover: var(--v-primary-hover);
+  --color-v-primary-soft: var(--v-primary-soft);
+  --color-v-brand-accent: var(--v-brand-accent);
   --color-v-success: var(--v-success);
   --color-v-success-bg: var(--v-success-bg);
   --color-v-danger: var(--v-danger);
@@ -43,6 +54,9 @@
   --color-v-accent-bg: var(--v-accent-bg);
   --shadow-v-shadow: var(--v-shadow);
   --shadow-v-shadow-md: var(--v-shadow-md);
+  --shadow-v-shadow-sm: var(--v-shadow-sm);
+  --shadow-v-shadow-lg: var(--v-shadow-lg);
+  --shadow-v-shadow-xl: var(--v-shadow-xl);
 }
 
 @layer base {
@@ -60,8 +74,11 @@
     --v-sidebar: #111827;
     --v-sidebar-text: #d1d5db;
     --v-sidebar-active: #ffffff;
-    --v-primary: #111827;
-    --v-primary-hover: #1f2937;
+      --v-primary: #4f46e5;          /* Votrix Indigo */
+    --v-primary-hover: #4338ca;
+    --v-primary-soft: #eef2ff;     /* tinted background */
+    --v-brand-accent: #7c3aed;     /* gradient end-stop (violet) */
+    --v-brand-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
     --v-success: #059669;
     --v-success-bg: #ecfdf5;
     --v-danger: #b91c1c;
@@ -70,8 +87,11 @@
     --v-warning-bg: #fffbeb;
     --v-accent: #d97706;
     --v-accent-bg: #fffbeb;
+    --v-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
     --v-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
-    --v-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    --v-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+    --v-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+    --v-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.06);
   }
 
   [data-theme='dark'] {
@@ -87,8 +107,11 @@
     --v-sidebar: #0a0d12;
     --v-sidebar-text: #d1d5db;
     --v-sidebar-active: #ffffff;
-    --v-primary: #f9fafb;
-    --v-primary-hover: #e5e7eb;
+    --v-primary: #818cf8;
+    --v-primary-hover: #a5b4fc;
+    --v-primary-soft: #1e1b4b;     /* deep indigo for dark surfaces */
+    --v-brand-accent: #c4b5fd;
+    --v-brand-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
     --v-success: #34d399;
     --v-success-bg: #064e3b33;
     --v-danger: #f87171;
@@ -97,8 +120,11 @@
     --v-warning-bg: #78350f33;
     --v-accent: #fbbf24;
     --v-accent-bg: #78350f33;
-    --v-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.25);
-    --v-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+    --v-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.30);
+    --v-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.35);
+    --v-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.40), 0 2px 4px -2px rgb(0 0 0 / 0.30);
+    --v-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.45), 0 4px 6px -4px rgb(0 0 0 / 0.30);
+    --v-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.55), 0 8px 10px -6px rgb(0 0 0 / 0.40);
   }
 
   html {
@@ -151,6 +177,40 @@
     padding: 2rem;
   }
 
+  /* Elevated card — uses the larger shadow tier, suitable for featured content */
+  .v-card-elevated {
+    border-radius: 0.75rem;
+    border: 1px solid var(--v-border);
+    background-color: var(--v-surface);
+    box-shadow: var(--v-shadow-md);
+  }
+
+  /* Hoverable card — adds lift + shadow-md on hover. Use on clickable cards. */
+  .v-card-hover {
+    border-radius: 0.75rem;
+    border: 1px solid var(--v-border);
+    background-color: var(--v-surface);
+    box-shadow: var(--v-shadow);
+    transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+  }
+
+  .v-card-hover:hover {
+    box-shadow: var(--v-shadow-lg);
+    transform: translateY(-2px);
+    border-color: var(--v-border-strong);
+  }
+
+  .v-card-hover:active {
+    transform: translateY(0);
+    box-shadow: var(--v-shadow);
+  }
+
+  /* Flat card — no border, no shadow. Useful inside an already-elevated container. */
+  .v-card-flat {
+    border-radius: 0.75rem;
+    background-color: var(--v-surface-elevated);
+  }
+
   /* Input base */
   .v-input {
     width: 100%;
@@ -169,8 +229,8 @@
 
   .v-input:focus {
     outline: none;
-    border-color: var(--v-text-muted);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--v-text-muted) 15%, transparent);
+    border-color: var(--v-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--v-primary) 30%, transparent);
   }
 
   /* Table styles */
@@ -219,14 +279,41 @@
 
   /* Typography utilities */
   .v-page-title {
-    font-size: 1.25rem;
-    font-weight: 600;
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
     color: var(--v-text);
+    line-height: 1.2;
+    text-wrap: balance;
   }
 
   .v-section-title {
-    font-size: 1.125rem;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--v-text);
+    line-height: 1.25;
+  }
+
+  /* Display heading — for hero surfaces (login, marketing, empty-states). */
+  .v-display {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(2rem, 4vw, 3rem);
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--v-text);
+    text-wrap: balance;
+  }
+
+  /* Numeric stat — use for vote counts, scores, percentages. */
+  .v-stat-number {
+    font-family: var(--font-mono);
     font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
     color: var(--v-text);
   }
 
@@ -278,6 +365,39 @@
 
   .v-btn-primary:hover {
     background-color: var(--v-primary-hover);
+  }
+
+  /* Brand gradient button — used for hero CTAs and "Get started" actions */
+  .v-btn-brand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    transition: all 0.15s;
+    background-image: var(--v-brand-gradient);
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 1px 2px 0 rgb(79 70 229 / 0.25);
+  }
+
+  .v-btn-brand:hover {
+    box-shadow: 0 4px 12px -2px rgb(79 70 229 / 0.45);
+    transform: translateY(-1px);
+  }
+
+  .v-btn-brand:active {
+    transform: translateY(0);
+  }
+
+  .v-btn-brand:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
   }
 
   .v-btn-primary:disabled {
@@ -436,6 +556,83 @@
   .v-badge-danger {
     background-color: var(--v-danger-bg);
     color: var(--v-danger);
+  }
+
+  /* ===== Motion utilities ===== */
+
+  /* Page fade-in — apply to route Outlet containers. */
+  .v-page-enter {
+    animation: v-fade-up var(--duration-normal) var(--ease-out) both;
+  }
+
+  @keyframes v-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Toast slide-in from bottom-right. */
+  .v-toast-enter {
+    animation: v-toast-in var(--duration-normal) var(--ease-out) both;
+  }
+
+  @keyframes v-toast-in {
+    from {
+      opacity: 0;
+      transform: translateX(20px) translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) translateY(0);
+    }
+  }
+
+  /* Button press feedback — drop on any button or clickable element. */
+  .v-press {
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .v-press:active {
+    transform: scale(0.97);
+  }
+
+  /* Skeleton shimmer — for loading placeholders. */
+  .v-skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--v-surface-elevated) 0%,
+      var(--v-border) 50%,
+      var(--v-surface-elevated) 100%
+    );
+    background-size: 200% 100%;
+    animation: v-skeleton-shimmer 1.4s linear infinite;
+    border-radius: 0.5rem;
+  }
+
+  @keyframes v-skeleton-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* Respect users who prefer reduced motion: disable animations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

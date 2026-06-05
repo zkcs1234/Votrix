@@ -21,7 +21,7 @@ export function useDelayedLoading(loading, delay = 300) {
         // the delay elapses, not synchronously with the effect — this is
         // the "show loader only after a delay" pattern, not a cascading
         // re-render. The rule is too strict for this case.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+         
         setShowLoader(true)
       }, delay)
     } else {
@@ -116,7 +116,7 @@ export function useDebounceLoading(loading, debounceMs = 200) {
       // Set new timeout
       timeoutRef.current = setTimeout(() => {
         // Asynchronous timer-based state update — see comment above.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+         
         setDebouncedLoading(true)
       }, debounceMs)
     } else {

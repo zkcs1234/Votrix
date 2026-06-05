@@ -21,7 +21,7 @@ export default function MainLayout() {
               </Button>
             </Link>
             <Link to="/login/admin">
-              <Button variant="secondary" size="sm">
+              <Button variant="brand" size="sm">
                 Admin
               </Button>
             </Link>

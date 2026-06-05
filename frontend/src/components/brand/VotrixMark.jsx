@@ -12,28 +12,25 @@ export default function VotrixMark({ className = '', title }) {
       aria-label={decorative ? undefined : title}
     >
       {!decorative && <title>{title}</title>}
-      <rect
-        x="5"
-        y="9"
-        width="22"
-        height="19"
-        rx="4"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
+      {/* Stylized "V" — two converging strokes meeting at the bottom.
+          Reads as: vote tally / consensus / choice. */}
       <path
-        d="M10 9V6.75C10 5.78 10.78 5 11.75 5H20.25C21.22 5 22 5.78 22 6.75V9"
+        d="M4 5 L13 27 L16 27"
         stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M11.5 17.5L15 21L22.5 13.5"
-        stroke="currentColor"
-        strokeWidth="2.25"
+        strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      <path
+        d="M16 27 L19 27 L28 5"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Apex accent dot — a single tally mark above the V's vertex.
+          Reinforces the "vote" idea; also serves as the brand color hotspot. */}
+      <circle cx="16" cy="5" r="2.25" fill="currentColor" />
     </svg>
   )
 }

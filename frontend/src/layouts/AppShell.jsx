@@ -264,7 +264,7 @@ export default function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-8">{children ?? <Outlet />}</main>
+        <main className="v-page-enter flex-1 p-4 md:p-8">{children ?? <Outlet />}</main>
       </div>
     </div>
   )

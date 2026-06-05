@@ -36,7 +36,7 @@ export default function VoterPollPage() {
     localStorage.setItem(`votrix_poll_draft_${eventId}`, JSON.stringify(answers))
   }, [eventId, answers])
 
-  const questions = poll?.questions ?? []
+  const questions = useMemo(() => poll?.questions ?? [], [poll])
 
   const answeredCount = useMemo(() => {
     return questions.filter((q) => {

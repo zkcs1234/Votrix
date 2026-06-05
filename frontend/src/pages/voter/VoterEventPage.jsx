@@ -66,7 +66,7 @@ export default function VoterEventPage() {
       .finally(() => setLoading(false))
   }, [eventId])
 
-  const positions = ballot?.positions ?? []
+  const positions = useMemo(() => ballot?.positions ?? [], [ballot])
   const progress = useMemo(() => {
     if (!positions.length) return 0
     const filled = positions.filter((p) => {

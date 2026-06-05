@@ -3,7 +3,7 @@
 import { Suspense, createElement } from 'react'
 import PageLoader from '@/components/ui/PageLoader'
 
-// eslint-disable-next-line react-refresh/only-export-components
+ 
 export function wrapWithSuspense(routes) {
   return routes.map((route) => {
     const next = { ...route }

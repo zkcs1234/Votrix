@@ -19,7 +19,7 @@ export default function ToastContainer() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`pointer-events-auto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${styles[toast.type]}`}
+          className={`v-toast-enter pointer-events-auto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm shadow-v-shadow-md ${styles[toast.type]}`}
           role="alert"
         >
           <p className="flex-1 leading-snug">{toast.message}</p>
