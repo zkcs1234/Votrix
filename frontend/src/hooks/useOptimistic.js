@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/useToast'
 export function useOptimistic({ onSuccess, onError } = {}) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState(null)
-  const { error: showError, success } = useToast()
+  const { error: showError } = useToast()
 
   const execute = useCallback(
     async (updateFn, rollbackFn, apiCall) => {

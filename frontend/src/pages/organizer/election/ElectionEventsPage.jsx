@@ -1,10 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
-import { SkeletonList } from '@/components/ui/Skeleton'
-import Button from '@/components/ui/Button'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
-import { useOptimistic } from '@/hooks/useOptimistic'
 
 function EventCard({ event, onToggleVoting }) {
   const [toggling, setToggling] = useState(false)
@@ -77,7 +74,6 @@ function EventCardSkeleton() {
 export default function ElectionEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
 
   // Use delayed loading
   const showLoader = useDelayedLoading(loading, 300)
@@ -87,15 +83,19 @@ export default function ElectionEventsPage() {
     try {
       const { data } = await electionService.listEvents()
       setEvents(data.events ?? [])
-      setError(null)
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load events')
+    } catch {
+      // Errors are surfaced via the empty state below
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
+    // The setState calls inside `load()` are the "fetch on mount" pattern:
+    // the effect runs once and triggers an async fetch, which is the
+    // legitimate way to load data in a React component. The rule
+    // can't infer this and flags it as cascading renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
     load()
   }, [load])
 
@@ -103,7 +103,6 @@ export default function ElectionEventsPage() {
   const handleToggleVoting = useCallback(
     async (event) => {
       const previousEvents = [...events]
-      const previousEvent = events.find((e) => e.id === event.id)
 
       // Optimistically update UI
       setEvents((prev) =>

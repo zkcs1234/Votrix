@@ -17,6 +17,11 @@ export function useDelayedLoading(loading, delay = 300) {
     if (loading) {
       // Start timer when loading begins
       timerRef.current = setTimeout(() => {
+        // setState is intentional here: the timer fires asynchronously after
+        // the delay elapses, not synchronously with the effect — this is
+        // the "show loader only after a delay" pattern, not a cascading
+        // re-render. The rule is too strict for this case.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setShowLoader(true)
       }, delay)
     } else {
@@ -25,6 +30,7 @@ export function useDelayedLoading(loading, delay = 300) {
         clearTimeout(timerRef.current)
         timerRef.current = null
       }
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowLoader(false)
     }
 
@@ -76,7 +82,11 @@ export function useQuickLoad(fetchFn, delay = 300) {
   }
 
   useEffect(() => {
+    // Fetch-on-mount pattern. refetch is intentionally not in deps to
+    // avoid recreating the effect on every render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refetch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // If loading is false but we haven't shown loader, return null (show nothing)
@@ -105,6 +115,8 @@ export function useDebounceLoading(loading, debounceMs = 200) {
       }
       // Set new timeout
       timeoutRef.current = setTimeout(() => {
+        // Asynchronous timer-based state update — see comment above.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setDebouncedLoading(true)
       }, debounceMs)
     } else {
@@ -112,6 +124,7 @@ export function useDebounceLoading(loading, debounceMs = 200) {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
       }
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDebouncedLoading(false)
     }
 

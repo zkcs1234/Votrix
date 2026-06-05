@@ -5,17 +5,8 @@ import { notificationsService } from '@/services/notifications.service'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
-import StatCard from '@/components/ui/StatCard'
 import SearchInput from '@/components/ui/SearchInput'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
-
-const TYPE_TONE = {
-  'organizer.pending': 'warning',
-  'organizer.status': 'default',
-  'event.notification': 'success',
-  'voter.invitation': 'warning',
-  'voter.invitation.resend': 'warning',
-}
 
 function NotificationSkeleton() {
   return (

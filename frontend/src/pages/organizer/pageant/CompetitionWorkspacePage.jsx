@@ -638,7 +638,7 @@ function JudgesTab({ foundation, reload }) {
                     onChange={(e) => setScopeId(e.target.value)}
                   >
                     <option value="">— select —</option>
-                    {(scope === 'category' ? foundation?.categories : foundation?.rounds ?? []).map(
+                    {((scope === 'category' ? foundation?.categories : foundation?.rounds) ?? []).map(
                       (x) => (
                         <option key={x.id} value={x.id}>
                           {x.name}

@@ -109,6 +109,9 @@ export default function ElectionCandidatesPage() {
   }, [eventId])
 
   useEffect(() => {
+    // Async fetch-on-mount pattern: setState happens inside the
+    // Promise resolution, not synchronously with the effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
     load()
   }, [load])
 

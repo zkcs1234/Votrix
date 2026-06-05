@@ -15,15 +15,6 @@ const emptyForm = () => ({
   options: [{ label: '' }, { label: '' }],
 })
 
-const ui = {
-  radio: 'Single choice (radio buttons)',
-  checkbox: 'Multiple selection (checkboxes)',
-  textarea: 'Open text',
-  rating: 'Numeric rating',
-  likert: 'Likert scale',
-  ranking: 'Ranking (drag to order)',
-}
-
 function needsFreeOptions(typeDef) {
   if (!typeDef) return true
   const input = typeDef.ui?.input

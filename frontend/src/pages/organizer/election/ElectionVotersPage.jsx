@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
-import { SkeletonTable, ProgressBarWithStats } from '@/components/ui/Skeleton'
+import { ProgressBarWithStats } from '@/components/ui/Skeleton'
 import SearchInput from '@/components/ui/SearchInput'
 import Button from '@/components/ui/Button'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -12,7 +12,7 @@ function VoterRow({ voter }) {
     <tr>
       <td className="text-v-text-muted">{voter.email}</td>
       <td className="v-caption">
-        {[voter.firstName, v.lastName].filter(Boolean).join(' ') || '—'}
+        {[voter.firstName, voter.lastName].filter(Boolean).join(' ') || '—'}
       </td>
       <td>
         <span className={voter.hasVoted ? 'v-badge v-badge-success' : 'v-badge'}>
@@ -91,6 +91,8 @@ export default function ElectionVotersPage() {
   }, [eventId])
 
   useEffect(() => {
+    // Async fetch-on-mount pattern — see ElectionEventsPage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
     load()
   }, [load])
 

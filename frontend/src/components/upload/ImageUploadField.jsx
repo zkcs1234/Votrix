@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useState } from 'react'
 
 const VARIANT_STYLES = {
   logo: 'h-24 w-24 rounded-xl object-cover',
@@ -15,11 +15,10 @@ export default function ImageUploadField({
   disabled = false,
   accept = 'image/jpeg,image/png,image/webp,image/gif',
 }) {
+  // The local preview is only updated when the user picks a new file.
+  // When the parent passes a new `currentUrl` (e.g. after a successful
+  // upload) we re-derive the preview by remounting the field via a key.
   const [preview, setPreview] = useState(currentUrl ?? null)
-
-  useEffect(() => {
-    setPreview(currentUrl ?? null)
-  }, [currentUrl])
 
   const handleChange = (e) => {
     const file = e.target.files?.[0]

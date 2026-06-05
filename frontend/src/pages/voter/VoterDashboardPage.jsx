@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { voterService } from '@/services/voter.service'
 import { useAuth } from '@/hooks/useAuth'
 import {
-  SkeletonDashboard,
-  SkeletonStatCard,
   SkeletonEventCard,
 } from '@/components/ui/Skeleton'
 import VoterEventCard from '@/components/voter/VoterEventCard'
