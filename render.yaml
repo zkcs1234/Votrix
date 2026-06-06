@@ -20,12 +20,20 @@ services:
         value: 10000
       - key: FRONTEND_URL
         sync: false
-      - key: JWT_SECRET
+      - key: JWT_ACCESS_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
         sync: false
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
       - key: CSRF_SECRET
         sync: false
+      - key: COOKIE_SAME_SITE
+        value: none
+      - key: ALLOW_VERCEL_PREVIEWS
+        value: 'true'
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
