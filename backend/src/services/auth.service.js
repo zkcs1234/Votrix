@@ -29,14 +29,20 @@ function assertAccountActive(user) {
 }
 
 async function loginWithCredentials({ findUser, identifier, password, invalidMessage }) {
+  console.log('[DEBUG loginWithCredentials] identifier =', JSON.stringify(identifier), 'identifier.len =', identifier?.length)
+  console.log('[DEBUG loginWithCredentials] password type =', typeof password, 'len =', password?.length)
+
   const user = await findUser(identifier)
+  console.log('[DEBUG loginWithCredentials] user =', user ? { id: user.id, username: user.username, email: user.email, role: user.role, account_status: user.account_status, has_password: Boolean(user.password), pwd_len: user.password?.length, pwd_prefix: user.password?.slice(0, 7) } : null)
 
   if (!user) {
+    console.log('[DEBUG loginWithCredentials] THROW 401 — user not found')
     throw new ApiError(401, invalidMessage)
   }
 
   const valid = await comparePassword(password, user.password)
   if (!valid) {
+    console.log('[DEBUG loginWithCredentials] THROW 401 — password mismatch')
     throw new ApiError(401, invalidMessage)
   }
 
