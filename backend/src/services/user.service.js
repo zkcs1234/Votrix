@@ -85,7 +85,6 @@ export async function createOrganizer({
 }
 
 export async function updateUserPassword(userId, newPassword, { clearMustChange = true } = {}) {
-  console.log('[DEBUG updateUserPassword] userId =', userId, 'type =', typeof userId)
   const passwordHash = await hashPassword(newPassword)
 
   const updates = { password: passwordHash }
@@ -93,16 +92,12 @@ export async function updateUserPassword(userId, newPassword, { clearMustChange 
     updates.must_change_password = false
   }
 
-  console.log('[DEBUG updateUserPassword] executing update query...')
-  const query = db()
+  const result = await db()
     .from(DB_TABLES.USERS)
     .update(updates)
     .eq('id', userId)
     .select('*')
     .single()
-  console.log('[DEBUG updateUserPassword] awaiting query...')
-  const result = await query
-  console.log('[DEBUG updateUserPassword] result =', result)
 
   const data = await wrap(result, { context: 'user.updateUserPassword' })
   if (!data) throw notFound('User not found')

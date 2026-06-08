@@ -10,21 +10,17 @@ import { mapAuditLog } from '../foundation/mapper.js'
 import { DB_TABLES, USER_ROLES, ACCOUNT_STATUS } from '../utils/constants.js'
 
 export async function getOrganizersList() {
-  const users = await wrap(
-    db()
-      .from(DB_TABLES.USERS)
-      .select('id, email, created_at, updated_at, account_status')
-      .eq('role', USER_ROLES.ORGANIZER)
-      .order('created_at', { ascending: false }),
-    { context: 'admin.getOrganizersList' },
-  )
+  const usersQuery = db()
+    .from(DB_TABLES.USERS)
+    .select('id, email, created_at, updated_at, account_status')
+    .eq('role', USER_ROLES.ORGANIZER)
+    .order('created_at', { ascending: false })
+  const users = await wrap(await usersQuery, { context: 'admin.getOrganizersList' })
 
-  const orgs = await wrap(
-    db()
-      .from(DB_TABLES.ORGANIZATIONS)
-      .select('id, organization_name, status, organizer_id'),
-    { context: 'admin.getOrganizersList.orgs' },
-  )
+  const orgsQuery = db()
+    .from(DB_TABLES.ORGANIZATIONS)
+    .select('id, organization_name, status, organizer_id')
+  const orgs = await wrap(await orgsQuery, { context: 'admin.getOrganizersList.orgs' })
 
   return users.map((orgUser) => {
     const userOrgs = orgs.filter((o) => o.organizer_id === orgUser.id)
@@ -46,49 +42,43 @@ export async function getOrganizersList() {
 }
 
 export async function getGlobalEvents() {
-  return wrap(
-    db()
-      .from(DB_TABLES.EVENTS)
-      .select(`
-        id,
-        title,
-        event_type,
-        status,
-        start_date,
-        end_date,
-        created_at,
-        organization_id,
-        organizations (
-          organization_name
-        )
-      `)
-      .order('created_at', { ascending: false }),
-    { context: 'admin.getGlobalEvents' },
-  )
+  const result = await db()
+    .from(DB_TABLES.EVENTS)
+    .select(`
+      id,
+      title,
+      event_type,
+      status,
+      start_date,
+      end_date,
+      created_at,
+      organization_id,
+      organizations (
+        organization_name
+      )
+    `)
+    .order('created_at', { ascending: false })
+  return wrap(result, { context: 'admin.getGlobalEvents' })
 }
 
 export async function getSystemSettings() {
-  return wrap(
-    db()
-      .from(DB_TABLES.SYSTEM_SETTINGS)
-      .select('*')
-      .order('created_at', { ascending: true }),
-    { context: 'admin.getSystemSettings' },
-  )
+  const result = await db()
+    .from(DB_TABLES.SYSTEM_SETTINGS)
+    .select('*')
+    .order('created_at', { ascending: true })
+  return wrap(result, { context: 'admin.getSystemSettings' })
 }
 
 export async function saveSystemSetting(key, value, description = null) {
-  return wrap(
-    db()
-      .from(DB_TABLES.SYSTEM_SETTINGS)
-      .upsert(
-        { setting_key: key, setting_value: value, description },
-        { onConflict: 'setting_key' },
-      )
-      .select()
-      .single(),
-    { context: 'admin.saveSystemSetting' },
-  )
+  const result = await db()
+    .from(DB_TABLES.SYSTEM_SETTINGS)
+    .upsert(
+      { setting_key: key, setting_value: value, description },
+      { onConflict: 'setting_key' },
+    )
+    .select()
+    .single()
+  return wrap(result, { context: 'admin.saveSystemSetting' })
 }
 
 /**
@@ -115,16 +105,14 @@ export async function updateOrganizerAccountStatus(organizerId, accountStatus) {
     throw badRequest('Invalid account status')
   }
 
-  const data = await wrap(
-    db()
-      .from(DB_TABLES.USERS)
-      .update({ account_status: accountStatus })
-      .eq('id', organizerId)
-      .eq('role', USER_ROLES.ORGANIZER)
-      .select('id, email, account_status')
-      .single(),
-    { context: 'admin.updateOrganizerAccountStatus' },
-  )
+  const result = await db()
+    .from(DB_TABLES.USERS)
+    .update({ account_status: accountStatus })
+    .eq('id', organizerId)
+    .eq('role', USER_ROLES.ORGANIZER)
+    .select('id, email, account_status')
+    .single()
+  const data = await wrap(result, { context: 'admin.updateOrganizerAccountStatus' })
   if (!data) throw notFound('Organizer not found')
   return data
 }
