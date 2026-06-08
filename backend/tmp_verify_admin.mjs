@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt'
 import { createClient } from '@supabase/supabase-js'
 import 'dotenv/config'
 
-const PLAIN = 'VotrixAdmin2026'
+const PLAIN = 'admin123'
 const USERNAME = 'admin'
 
 const client = createClient(

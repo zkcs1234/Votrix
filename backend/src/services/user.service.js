@@ -8,15 +8,13 @@ import { hashPassword } from '../utils/password.js'
 import { sanitizeUser } from '../utils/userMapper.js'
 
 export async function findUserByUsername(username) {
-  return wrap(
-    db()
-      .from(DB_TABLES.USERS)
-      .select('*')
-      .eq('username', username)
-      .eq('role', USER_ROLES.ADMIN)
-      .maybeSingle(),
-    { context: 'user.findUserByUsername' },
-  )
+  const result = await db()
+    .from(DB_TABLES.USERS)
+    .select('*')
+    .eq('username', username)
+    .eq('role', USER_ROLES.ADMIN)
+    .maybeSingle()
+  return wrap(result, { context: 'user.findUserByUsername' })
 }
 
 export async function findUserByEmail(email, role) {
@@ -29,18 +27,17 @@ export async function findUserByEmail(email, role) {
     query = query.eq('role', role)
   }
 
-  return wrap(query.maybeSingle(), { context: 'user.findUserByEmail' })
+  const result = await query.maybeSingle()
+  return wrap(result, { context: 'user.findUserByEmail' })
 }
 
 export async function findUserById(id) {
-  return wrap(
-    db()
-      .from(DB_TABLES.USERS)
-      .select('*')
-      .eq('id', id)
-      .maybeSingle(),
-    { context: 'user.findUserById' },
-  )
+  const result = await db()
+    .from(DB_TABLES.USERS)
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+  return wrap(result, { context: 'user.findUserById' })
 }
 
 export async function createOrganizer({
@@ -88,6 +85,7 @@ export async function createOrganizer({
 }
 
 export async function updateUserPassword(userId, newPassword, { clearMustChange = true } = {}) {
+  console.log('[DEBUG updateUserPassword] userId =', userId, 'type =', typeof userId)
   const passwordHash = await hashPassword(newPassword)
 
   const updates = { password: passwordHash }
@@ -95,15 +93,18 @@ export async function updateUserPassword(userId, newPassword, { clearMustChange 
     updates.must_change_password = false
   }
 
-  const data = await wrap(
-    db()
-      .from(DB_TABLES.USERS)
-      .update(updates)
-      .eq('id', userId)
-      .select('*')
-      .single(),
-    { context: 'user.updateUserPassword' },
-  )
+  console.log('[DEBUG updateUserPassword] executing update query...')
+  const query = db()
+    .from(DB_TABLES.USERS)
+    .update(updates)
+    .eq('id', userId)
+    .select('*')
+    .single()
+  console.log('[DEBUG updateUserPassword] awaiting query...')
+  const result = await query
+  console.log('[DEBUG updateUserPassword] result =', result)
+
+  const data = await wrap(result, { context: 'user.updateUserPassword' })
   if (!data) throw notFound('User not found')
   return sanitizeUser(data)
 }
