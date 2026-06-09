@@ -55,7 +55,6 @@ export function authorize(...roles) {
 
 /** Block dashboard/API access until password is changed (organizer/voter first login). */
 export function requirePasswordChanged(req, _res, next) {
-  console.log('[requirePasswordChanged] mustChangePassword:', req.user?.mustChangePassword)
   if (req.user?.mustChangePassword) {
     return next(
       new ApiError(403, 'You must change your password before continuing', {
@@ -70,15 +69,8 @@ export async function requireActiveAccount(req, _res, next) {
   try {
     const user = await findUserById(req.user?.id)
     if (!user) {
-      console.error('[requireActiveAccount] User not found:', req.user?.id)
       return next(new ApiError(401, 'User not found'))
     }
-
-    console.log('[requireActiveAccount] User account_status:', {
-      userId: user.id,
-      accountStatus: user.account_status,
-      email: user.email,
-    })
 
     if (user.account_status === 'active') {
       return next()
@@ -98,7 +90,6 @@ export async function requireActiveAccount(req, _res, next) {
 
     return next(new ApiError(403, 'Your account is not active'))
   } catch (error) {
-    console.error('[requireActiveAccount] Error:', error.message)
     return next(error)
   }
 }

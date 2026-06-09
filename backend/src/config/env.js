@@ -2,11 +2,23 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
+export const isProduction = process.env.NODE_ENV === 'production'
+
 function requireEnv(name, fallback) {
   const value = process.env[name] ?? fallback
   if (value === undefined || value === '') {
     if (fallback !== undefined) return fallback
     throw new Error(`Missing required environment variable: ${name}`)
+  }
+  return value
+}
+
+function getJwtSecret(name, envVar, fallback) {
+  const value = process.env[envVar] || fallback
+  if (isProduction && (!value || value.includes('dev-') || value.includes('change-me'))) {
+    throw new Error(
+      `JWT ${name} must be configured in production. Set ${envVar} environment variable with a strong secret.`
+    )
   }
   return value
 }
@@ -34,11 +46,8 @@ export const env = {
   clientOrigins,
 
   jwt: {
-    accessSecret: requireEnv('JWT_ACCESS_SECRET', process.env.JWT_SECRET || 'dev-access-secret'),
-    refreshSecret: requireEnv(
-      'JWT_REFRESH_SECRET',
-      process.env.JWT_SECRET || 'dev-refresh-secret-change-me',
-    ),
+    accessSecret: getJwtSecret('access', 'JWT_ACCESS_SECRET', 'dev-access-secret'),
+    refreshSecret: getJwtSecret('refresh', 'JWT_REFRESH_SECRET', 'dev-refresh-secret-change-me'),
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
     accessCookieName: process.env.JWT_ACCESS_COOKIE_NAME || 'votrix_access',
@@ -77,5 +86,3 @@ export const env = {
       'VOTRIX <onboarding@resend.dev>',
   },
 }
-
-export const isProduction = env.nodeEnv === 'production'

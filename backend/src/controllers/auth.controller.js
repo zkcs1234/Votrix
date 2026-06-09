@@ -53,9 +53,7 @@ export const getCsrfToken = asyncHandler(async (_req, res) => {
 })
 
 export const adminLogin = asyncHandler(async (req, res) => {
-  console.log('[DEBUG adminLogin] req.body =', JSON.stringify(req.body))
   const credentials = validateAdminLogin(req.body)
-  console.log('[DEBUG adminLogin] credentials =', { username: credentials.username, hasPassword: Boolean(credentials.password), pwdLen: credentials.password?.length })
   try {
     const tokens = await authService.loginAdmin(credentials)
     await writeAuthAudit({
