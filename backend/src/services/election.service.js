@@ -63,62 +63,75 @@ function mapCandidate(row) {
 // ——— Dashboard ———
 
 export async function getOrganizerDashboard(organizerId) {
-  const org = await getOrCreateElectionOrganization(organizerId)
+  try {
+    if (!organizerId) {
+      throw new ApiError(400, ' organizerId is required')
+    }
 
-  const { data: events, error } = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .select('id, title, status, voting_enabled, event_type')
-    .eq('organization_id', org.id)
-    .eq('event_type', EVENT_TYPES.ELECTION)
-    .order('created_at', { ascending: false })
+    const org = await getOrCreateElectionOrganization(organizerId)
+    if (!org?.id) {
+      throw new ApiError(500, 'Failed to get or create organization')
+    }
 
-  if (error) throw new ApiError(500, error.message)
+    const { data: events, error } = await getClient()
+      .from(DB_TABLES.EVENTS)
+      .select('id, title, status, voting_enabled, event_type')
+      .eq('organization_id', org.id)
+      .eq('event_type', EVENT_TYPES.ELECTION)
+      .order('created_at', { ascending: false })
 
-  const eventIds = (events ?? []).map((e) => e.id)
-  let registeredVoters = 0
-  let votedCount = 0
-  let votesCast = 0
+    if (error) throw new ApiError(500, error.message)
 
-  if (eventIds.length) {
-    const [assignedRes, votedRes, votesRes] = await Promise.all([
-      getClient()
-        .from(DB_TABLES.EVENT_VOTERS)
-        .select('*', { count: 'exact', head: true })
-        .in('event_id', eventIds),
-      getClient()
-        .from(DB_TABLES.EVENT_VOTERS)
-        .select('*', { count: 'exact', head: true })
-        .in('event_id', eventIds)
-        .eq('has_voted', true),
-      getClient()
-        .from(DB_TABLES.ELECTION_VOTES)
-        .select('*', { count: 'exact', head: true })
-        .in('event_id', eventIds),
-    ])
+    const eventIds = (events ?? []).map((e) => e.id)
+    let registeredVoters = 0
+    let votedCount = 0
+    let votesCast = 0
 
-    if (assignedRes.error) throw new ApiError(500, assignedRes.error.message)
-    if (votedRes.error) throw new ApiError(500, votedRes.error.message)
-    if (votesRes.error) throw new ApiError(500, votesRes.error.message)
+    if (eventIds.length) {
+      const [assignedRes, votedRes, votesRes] = await Promise.all([
+        getClient()
+          .from(DB_TABLES.EVENT_VOTERS)
+          .select('*', { count: 'exact', head: true })
+          .in('event_id', eventIds),
+        getClient()
+          .from(DB_TABLES.EVENT_VOTERS)
+          .select('*', { count: 'exact', head: true })
+          .in('event_id', eventIds)
+          .eq('has_voted', true),
+        getClient()
+          .from(DB_TABLES.ELECTION_VOTES)
+          .select('*', { count: 'exact', head: true })
+          .in('event_id', eventIds),
+      ])
 
-    registeredVoters = assignedRes.count ?? 0
-    votedCount = votedRes.count ?? 0
-    votesCast = votesRes.count ?? 0
-  }
+      if (assignedRes.error) throw new ApiError(500, assignedRes.error.message)
+      if (votedRes.error) throw new ApiError(500, votedRes.error.message)
+      if (votesRes.error) throw new ApiError(500, votesRes.error.message)
 
-  const turnoutRate =
-    registeredVoters > 0 ? Math.round((votedCount / registeredVoters) * 10000) / 100 : 0
+      registeredVoters = assignedRes.count ?? 0
+      votedCount = votedRes.count ?? 0
+      votesCast = votesRes.count ?? 0
+    }
 
-  return {
-    organization: mapOrganization(org),
-    events: (events ?? []).map(mapEvent),
-    stats: {
-      totalEvents: events?.length ?? 0,
-      activeVoting: events?.filter((e) => e.voting_enabled).length ?? 0,
-      registeredVoters,
-      votedCount,
-      votesCast,
-      turnoutRate,
-    },
+    const turnoutRate =
+      registeredVoters > 0 ? Math.round((votedCount / registeredVoters) * 10000) / 100 : 0
+
+    return {
+      organization: mapOrganization(org),
+      events: (events ?? []).map(mapEvent),
+      stats: {
+        totalEvents: events?.length ?? 0,
+        activeVoting: events?.filter((e) => e.voting_enabled).length ?? 0,
+        registeredVoters,
+        votedCount,
+        votesCast,
+        turnoutRate,
+      },
+    }
+  } catch (error) {
+    console.error('[getOrganizerDashboard] Error:', error.message)
+    if (error.statusCode) throw error
+    throw new ApiError(500, 'Failed to load dashboard')
   }
 }
 

@@ -218,6 +218,7 @@ export async function getAdminDashboardStats() {
     electionVotesRes,
     judgeScoresRes,
     pollAnswersRes,
+    organizersRes,
   ] = await Promise.all([
     getClient().from(DB_TABLES.ORGANIZATIONS).select('organizer_id, status'),
     getClient().from(DB_TABLES.EVENTS).select('id, status, event_type, created_at'),
@@ -225,6 +226,7 @@ export async function getAdminDashboardStats() {
     getClient().from(DB_TABLES.ELECTION_VOTES).select('*', { count: 'exact', head: true }),
     getClient().from(DB_TABLES.JUDGE_SCORES).select('*', { count: 'exact', head: true }),
     getClient().from(DB_TABLES.POLL_ANSWERS).select('*', { count: 'exact', head: true }),
+    getClient().from(DB_TABLES.USERS).select('id').eq('role', USER_ROLES.ORGANIZER),
   ])
 
   if (organizationsRes.error) throw new ApiError(500, organizationsRes.error.message)
@@ -233,6 +235,7 @@ export async function getAdminDashboardStats() {
   if (electionVotesRes.error) throw new ApiError(500, electionVotesRes.error.message)
   if (judgeScoresRes.error) throw new ApiError(500, judgeScoresRes.error.message)
   if (pollAnswersRes.error) throw new ApiError(500, pollAnswersRes.error.message)
+  if (organizersRes.error) throw new ApiError(500, organizersRes.error.message)
 
   const activeOrganizerIds = new Set(
     (organizationsRes.data ?? [])
@@ -244,6 +247,9 @@ export async function getAdminDashboardStats() {
   const totalVotesCast =
     (electionVotesRes.count ?? 0) + (judgeScoresRes.count ?? 0) + (pollAnswersRes.count ?? 0)
 
+  // Count total organizers - both from users table (more accurate) and active organizations
+  const totalOrganizersCount = (organizersRes.data ?? []).length
+
   const recentActivity = await loadRecentActivity({
     eventIds: events.map((e) => e.id),
     includeOrganizerCreations: true,
@@ -251,7 +257,8 @@ export async function getAdminDashboardStats() {
 
   return {
     stats: {
-      totalOrganizers: activeOrganizerIds.size,
+      totalOrganizers: totalOrganizersCount,
+      activeOrganizations: activeOrganizerIds.size,
       totalEvents: events.length,
       totalElectionEvents: events.filter((e) => e.event_type === EVENT_TYPES.ELECTION).length,
       totalPageantEvents: events.filter((e) => COMPETITION_SCORING_EVENT_TYPES.has(e.event_type)).length,

@@ -4,6 +4,7 @@
 import { db, wrap } from '../foundation/db.js'
 import { mapOrganization as mapOrganizationShared } from '../foundation/mapper.js'
 import { forbidden, badRequest } from '../foundation/errors.js'
+import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, ORG_TYPES } from '../utils/constants.js'
 
 // Re-export the shared mapper so existing imports
@@ -14,14 +15,21 @@ export function mapOrganization(row) {
 }
 
 export async function listOrganizations(organizerId) {
-  return wrap(
-    db()
-      .from(DB_TABLES.ORGANIZATIONS)
-      .select('*')
-      .eq('organizer_id', organizerId)
-      .order('created_at', { ascending: false }),
-    { context: 'organization.listOrganizations' },
-  ) ?? []
+  try {
+    const result = wrap(
+      db()
+        .from(DB_TABLES.ORGANIZATIONS)
+        .select('*')
+        .eq('organizer_id', organizerId)
+        .order('created_at', { ascending: false }),
+      { context: 'organization.listOrganizations' },
+    )
+    return result ?? []
+  } catch (error) {
+    // Return empty array on error to allow fallback behavior
+    console.error('[listOrganizations] Error:', error.message)
+    return []
+  }
 }
 
 export async function createOrganization(organizerId, { organizationName, organizationType }) {
@@ -41,7 +49,11 @@ export async function createOrganization(organizerId, { organizationName, organi
 }
 
 export async function getOrCreateElectionOrganization(organizerId) {
-  const orgs = await listOrganizations(organizerId)
+  if (!organizerId) {
+    throw new ApiError(400, 'organizerId is required')
+  }
+
+  const orgs = (await listOrganizations(organizerId)) ?? []
   const existing = orgs.find((o) => o.organization_type === ORG_TYPES.ELECTION)
   if (existing) return existing
 
