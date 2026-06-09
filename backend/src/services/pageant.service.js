@@ -94,6 +94,9 @@ async function getOrCreateOrg(organizerId) {
 
 export async function getOrganizerDashboard(organizerId) {
   const org = await getOrCreateOrg(organizerId)
+  if (!org?.id) {
+    throw new ApiError(500, 'Failed to get or create organization')
+  }
 
   const { data: events, error } = await getClient()
     .from(DB_TABLES.EVENTS)

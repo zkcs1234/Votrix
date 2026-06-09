@@ -63,15 +63,17 @@ function mapCandidate(row) {
 // ——— Dashboard ———
 
 export async function getOrganizerDashboard(organizerId) {
-  try {
-    if (!organizerId) {
-      throw new ApiError(400, ' organizerId is required')
-    }
+    try {
+      if (!organizerId) {
+        throw new ApiError(400, 'organizerId is required')
+      }
 
-    const org = await getOrCreateElectionOrganization(organizerId)
-    if (!org?.id) {
-      throw new ApiError(500, 'Failed to get or create organization')
-    }
+      const org = await getOrCreateElectionOrganization(organizerId)
+      if (!org?.id) {
+        // Prevent downstream TypeError crashes; return a clear 500.
+        throw new ApiError(500, 'Failed to get or create organization')
+      }
+
 
     const { data: events, error } = await getClient()
       .from(DB_TABLES.EVENTS)

@@ -64,6 +64,10 @@ export async function getOrCreateElectionOrganization(organizerId) {
 }
 
 export async function getOrCreatePollingOrganization(organizerId) {
+  if (!organizerId) {
+    throw new ApiError(400, 'organizerId is required')
+  }
+
   const orgs = await listOrganizations(organizerId)
   const existing = orgs.find((o) => o.organization_type === ORG_TYPES.POLLING)
   if (existing) return existing
@@ -79,6 +83,10 @@ export async function getOrCreatePageantOrganization(organizerId) {
 }
 
 export async function getOrCreateCompetitionScoringOrganization(organizerId) {
+  if (!organizerId) {
+    throw new ApiError(400, 'organizerId is required')
+  }
+
   const orgs = await listOrganizations(organizerId)
   // Prefer the new enum value but fall back to legacy 'pageant' rows so
   // existing organizers keep a single shared organization.

@@ -96,6 +96,9 @@ function isPollOpen(event) {
 
 export async function getOrganizerDashboard(organizerId) {
   const org = await getOrCreatePollingOrganization(organizerId)
+  if (!org?.id) {
+    throw new ApiError(500, 'Failed to get or create organization')
+  }
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
     .select('id, title, status, polling_enabled, poll_expires_at')
