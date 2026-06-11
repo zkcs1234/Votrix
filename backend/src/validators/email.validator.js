@@ -16,7 +16,11 @@ export function validateInviteVoter(body) {
   const email = validateEmailField(body?.email)
   const temporaryPassword = body?.temporaryPassword
 
-  if (temporaryPassword && temporaryPassword.length < 8) {
+  if (!temporaryPassword) {
+    throw new ApiError(400, 'Temporary password is required')
+  }
+
+  if (temporaryPassword.length < 8) {
     throw new ApiError(400, 'Temporary password must be at least 8 characters')
   }
 

@@ -24,8 +24,7 @@ function parseCsvBuffer(buffer) {
 
 function normalizeRow(row, index) {
   const email = (row.email || row.e_mail || '').trim().toLowerCase()
-  const firstName = (row.firstname || row.first_name || '').trim()
-  const lastName = (row.lastname || row.last_name || '').trim()
+  const tempassword = (row.tempassword || row.temporarypassword || row.temp_password || row.temporary_password || '').trim()
 
   if (!email) {
     return { error: `Row ${index + 2}: email is required`, row: null }
@@ -36,8 +35,16 @@ function normalizeRow(row, index) {
     return { error: `Row ${index + 2}: invalid email`, row: null }
   }
 
+  if (!tempassword) {
+    return { error: `Row ${index + 2}: tempassword is required`, row: null }
+  }
+
+  if (tempassword.length < 8) {
+    return { error: `Row ${index + 2}: tempassword must be at least 8 characters`, row: null }
+  }
+
   return {
-    row: { email, firstName, lastName },
+    row: { email, temporaryPassword: tempassword },
     error: null,
   }
 }
@@ -82,18 +89,8 @@ export async function importVotersFromCsv(eventId, organizerId, fileBuffer) {
         eventId,
         email: row.email,
         organizerId,
+        temporaryPassword: row.temporaryPassword,
       })
-
-      if (row.firstName || row.lastName) {
-        await client
-          .from(DB_TABLES.EVENT_VOTERS)
-          .update({
-            first_name: row.firstName || null,
-            last_name: row.lastName || null,
-          })
-          .eq('event_id', eventId)
-          .eq('voter_id', invite.user.id)
-      }
 
       results.push({
         email: row.email,

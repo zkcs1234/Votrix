@@ -20,16 +20,18 @@ function parseCsvBuffer(buffer) {
 }
 
 function normalizeRow(row, index) {
-  const email = (row.email || '').trim().toLowerCase()
-  const firstName = (row.firstname || row.first_name || '').trim()
-  const lastName = (row.lastname || row.last_name || '').trim()
+  const email = (row.email || row.e_mail || '').trim().toLowerCase()
+  const tempassword = (row.tempassword || row.temporarypassword || row.temp_password || row.temporary_password || '').trim()
 
   if (!email) return { error: `Row ${index + 2}: email is required`, row: null }
 
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRe.test(email)) return { error: `Row ${index + 2}: invalid email`, row: null }
 
-  return { row: { email, firstName, lastName }, error: null }
+  if (!tempassword) return { error: `Row ${index + 2}: tempassword is required`, row: null }
+  if (tempassword.length < 8) return { error: `Row ${index + 2}: tempassword must be at least 8 characters`, row: null }
+
+  return { row: { email, temporaryPassword: tempassword }, error: null }
 }
 
 export async function importJudgesFromCsv(eventId, organizerId, fileBuffer) {
@@ -66,8 +68,7 @@ export async function importJudgesFromCsv(eventId, organizerId, fileBuffer) {
     try {
       const invite = await inviteJudge(eventId, organizerId, {
         email: row.email,
-        firstName: row.firstName,
-        lastName: row.lastName,
+        temporaryPassword: row.temporaryPassword,
       })
       results.push({
         email: row.email,

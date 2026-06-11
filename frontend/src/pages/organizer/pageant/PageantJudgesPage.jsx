@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -8,6 +8,7 @@ export default function PageantJudgesPage() {
   const [judges, setJudges] = useState([])
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
+  const [temporaryPassword, setTemporaryPassword] = useState('')
   const [importResult, setImportResult] = useState(null)
 
   const load = () => {
@@ -23,8 +24,9 @@ export default function PageantJudgesPage() {
 
   const invite = async (e) => {
     e.preventDefault()
-    await pageantService.inviteJudge(eventId, { email })
+    await pageantService.inviteJudge(eventId, { email, temporaryPassword })
     setEmail('')
+    setTemporaryPassword('')
     load()
   }
 
@@ -51,7 +53,7 @@ export default function PageantJudgesPage() {
       <p className="text-sm text-v-text-subtle">Judges are voter accounts with scoring access for this competition scoring event.</p>
 
       <div className="v-card p-6">
-        <p className="text-sm text-v-text-muted">CSV: email, firstname, lastname</p>
+        <p className="text-sm text-v-text-muted">CSV: email, tempassword</p>
         <input type="file" accept=".csv" className="mt-2 text-sm text-v-text-subtle" onChange={onCsv} />
         {importResult && (
           <p className="mt-2 text-sm text-v-success">
@@ -67,6 +69,15 @@ export default function PageantJudgesPage() {
           placeholder="judge@email.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <input
+          type="password"
+          className="v-input flex-1"
+          placeholder="Temp Password (min 8 chars)"
+          value={temporaryPassword}
+          onChange={(e) => setTemporaryPassword(e.target.value)}
+          minLength={8}
           required
         />
         <button type="submit" className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white">

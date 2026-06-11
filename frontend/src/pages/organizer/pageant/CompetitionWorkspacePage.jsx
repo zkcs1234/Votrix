@@ -419,6 +419,7 @@ function RoundsTab({ foundation, reload }) {
 function JudgesTab({ foundation, reload }) {
   const { eventId } = useParams()
   const [email, setEmail] = useState('')
+  const [temporaryPassword, setTemporaryPassword] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [role, setRole] = useState('judge')
@@ -437,9 +438,10 @@ function JudgesTab({ foundation, reload }) {
         firstName,
         lastName,
         role,
-        temporaryPassword: undefined,
+        temporaryPassword,
       })
       setEmail('')
+      setTemporaryPassword('')
       setFirstName('')
       setLastName('')
       reload()
@@ -506,6 +508,18 @@ function JudgesTab({ foundation, reload }) {
             className={INPUT_CLASS}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label className={LABEL_CLASS}>Temp Password</label>
+          <input
+            type="password"
+            className={INPUT_CLASS}
+            value={temporaryPassword}
+            onChange={(e) => setTemporaryPassword(e.target.value)}
+            minLength={8}
+            placeholder="Min 8 characters"
             required
           />
         </div>

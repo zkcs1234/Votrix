@@ -68,6 +68,7 @@ export default function ElectionVotersPage() {
   const [voters, setVoters] = useState([])
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
+  const [temporaryPassword, setTemporaryPassword] = useState('')
   const [importResult, setImportResult] = useState(null)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
@@ -108,8 +109,9 @@ export default function ElectionVotersPage() {
     setVoters((prev) => [...prev, newVoter])
 
     try {
-      await electionService.inviteVoter(eventId, { email })
+      await electionService.inviteVoter(eventId, { email, temporaryPassword })
       setEmail('')
+      setTemporaryPassword('')
       load()
       success('Voter invited successfully')
     } catch (err) {
@@ -188,7 +190,7 @@ export default function ElectionVotersPage() {
       <div className="v-card-sm">
         <h3 className="v-label">CSV upload</h3>
         <p className="v-helper-text mb-3">
-          Columns: email, firstname, lastname. Duplicates in file are rejected.
+          Columns: email, tempassword. Duplicates in file are rejected.
         </p>
         <input
           type="file"
@@ -224,6 +226,15 @@ export default function ElectionVotersPage() {
           className="v-input flex-1 min-w-[200px]"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <input
+          type="password"
+          placeholder="Temp Password (min 8 chars)"
+          className="v-input flex-1 min-w-[200px]"
+          value={temporaryPassword}
+          onChange={(e) => setTemporaryPassword(e.target.value)}
+          minLength={8}
           required
         />
         <Button type="submit" loading={inviting}>
