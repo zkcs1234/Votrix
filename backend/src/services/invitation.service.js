@@ -61,6 +61,7 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
   const tempPassword = temporaryPassword || generateTemporaryPassword()
   const { user, isNew } = await ensureVoterAccount(email, tempPassword)
 
+  // Enroll voter in event — required for them to access it
   const { error: evError } = await getClient().from(DB_TABLES.EVENT_VOTERS).upsert(
     {
       event_id: eventId,
@@ -70,20 +71,28 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
     { onConflict: 'event_id,voter_id' },
   )
 
-  if (evError) throw new ApiError(500, evError.message)
+  if (evError) {
+    console.error('[invitation] event_voters upsert failed:', evError.message)
+    throw new ApiError(500, evError.message)
+  }
 
-  const { error: invError } = await getClient().from(DB_TABLES.INVITATIONS).upsert(
-    {
-      event_id: eventId,
-      voter_id: user.id,
-      temp_password: null,
-      invitation_sent: false,
-    },
-    { onConflict: 'event_id,voter_id' },
-  )
+  // Create/reset the invitation tracking record — wrapped so it never blocks the email
+  try {
+    await getClient().from(DB_TABLES.INVITATIONS).upsert(
+      {
+        event_id: eventId,
+        voter_id: user.id,
+        temp_password: null,
+        invitation_sent: false,
+      },
+      { onConflict: 'event_id,voter_id', ignoreDuplicates: false },
+    )
+  } catch (dbErr) {
+    // Non-fatal: log but continue so email is still sent
+    console.error('[invitation] invitations upsert failed (non-fatal):', dbErr.message)
+  }
 
-  if (invError) throw new ApiError(500, invError.message)
-
+  // Send the invitation email — this is the critical step
   const emailResult = await sendVoterInvitationEmail({
     email: user.email,
     temporaryPassword: tempPassword,
@@ -91,27 +100,38 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
     eventTitle: event.title,
   })
 
-  if (emailResult.sent) {
-    await getClient()
-      .from(DB_TABLES.INVITATIONS)
-      .update({ invitation_sent: true })
-      .eq('event_id', eventId)
-      .eq('voter_id', user.id)
+  console.log(`[invitation] email to ${user.email}: sent=${emailResult.sent}`, emailResult.error ?? '')
 
-    await createNotification({
-      userId: user.id,
-      type: 'voter.invitation',
-      title: `You're invited to ${event.title}`,
-      message: `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
-      actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
-        ? `/voter/competition/events/${event.id}/score`
-        : event.event_type === 'polling'
-          ? `/voter/polling/events/${event.id}`
-          : `/voter/events/${event.id}`,
-      entity: 'events',
-      entityId: event.id,
-      metadata: { eventType: event.event_type, organizationName: event.organizations?.organization_name },
-    })
+  if (emailResult.sent) {
+    // Update invitation status to sent — also non-fatal
+    try {
+      await getClient()
+        .from(DB_TABLES.INVITATIONS)
+        .update({ invitation_sent: true })
+        .eq('event_id', eventId)
+        .eq('voter_id', user.id)
+    } catch (dbErr) {
+      console.error('[invitation] failed to mark invitation_sent=true:', dbErr.message)
+    }
+
+    try {
+      await createNotification({
+        userId: user.id,
+        type: 'voter.invitation',
+        title: `You're invited to ${event.title}`,
+        message: `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
+        actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
+          ? `/voter/competition/events/${event.id}/score`
+          : event.event_type === 'polling'
+            ? `/voter/polling/events/${event.id}`
+            : `/voter/events/${event.id}`,
+        entity: 'events',
+        entityId: event.id,
+        metadata: { eventType: event.event_type, organizationName: event.organizations?.organization_name },
+      })
+    } catch (notifErr) {
+      console.error('[invitation] createNotification failed (non-fatal):', notifErr.message)
+    }
   }
 
   return {
