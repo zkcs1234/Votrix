@@ -60,6 +60,15 @@ api.interceptors.request.use(async (config) => {
     }
   }
 
+  // Allow Axios/browser to automatically set Content-Type with boundary for FormData
+  if (config.data instanceof FormData) {
+    if (typeof config.headers.delete === 'function') {
+      config.headers.delete('Content-Type')
+    } else {
+      delete config.headers['Content-Type']
+    }
+  }
+
   const method = config.method?.toLowerCase()
   if (method && MUTATING_METHODS.has(method)) {
     const csrf = (await ensureCsrfToken()) || getCsrfToken()
