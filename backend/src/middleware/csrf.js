@@ -35,6 +35,12 @@ export function csrfProtection(req, res, next) {
     return next()
   }
 
+  // Requests authenticated via a Bearer token are not vulnerable to CSRF
+  // because browsers do not automatically attach the Authorization header to cross-site requests.
+  if (req.headers.authorization?.startsWith('Bearer ')) {
+    return next()
+  }
+
   const cookieToken = req.cookies?.[env.csrf.cookieName]
   const headerToken = req.headers[env.csrf.headerName]
 
