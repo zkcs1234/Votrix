@@ -109,7 +109,17 @@ export default function ElectionVotersPage() {
     setVoters((prev) => [...prev, newVoter])
 
     try {
-      await electionService.inviteVoter(eventId, { email, temporaryPassword })
+      const res = await electionService.inviteVoter(eventId, { email, temporaryPassword })
+      const emailResult = res?.data?.email ?? null
+
+      if (!emailResult?.sent) {
+        // Backend returns { sent:false, skipped:true } when Resend is not configured
+        const reason = emailResult?.reason || emailResult?.error || 'Email was not sent'
+        setError(reason)
+        showError(reason)
+        return
+      }
+
       setEmail('')
       setTemporaryPassword('')
       load()
