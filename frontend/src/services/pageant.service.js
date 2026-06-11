@@ -15,9 +15,7 @@ export const pageantService = {
   uploadOrganizationLogo(file) {
     const form = new FormData()
     form.append('logo', file)
-    return api.post(`${org}/organization/logo`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return api.post(`${org}/organization/logo`, form)
   },
 
   listEvents() {
@@ -43,9 +41,7 @@ export const pageantService = {
   uploadBanner(eventId, file) {
     const form = new FormData()
     form.append('banner', file)
-    return api.post(`${org}/events/${eventId}/banner`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return api.post(`${org}/events/${eventId}/banner`, form)
   },
 
   listContestants(eventId) {
@@ -67,9 +63,7 @@ export const pageantService = {
   uploadContestantPhoto(eventId, contestantId, file) {
     const form = new FormData()
     form.append('photo', file)
-    return api.post(`${org}/events/${eventId}/contestants/${contestantId}/photo`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return api.post(`${org}/events/${eventId}/contestants/${contestantId}/photo`, form)
   },
 
   listCriteria(eventId) {
@@ -99,9 +93,7 @@ export const pageantService = {
   importJudgesCsv(eventId, file) {
     const form = new FormData()
     form.append('file', file)
-    return api.post(`${org}/events/${eventId}/judges/import`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return api.post(`${org}/events/${eventId}/judges/import`, form)
   },
 
   getRankings(eventId) {

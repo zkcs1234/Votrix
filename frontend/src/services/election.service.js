@@ -11,9 +11,7 @@ export const electionService = {
   uploadOrganizationLogo(file) {
     const form = new FormData()
     form.append('logo', file)
-    return api.post(`${base}/organization/logo`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return api.post(`${base}/organization/logo`, form)
   },
 
   listEvents() {
@@ -39,9 +37,7 @@ export const electionService = {
   uploadBanner(eventId, file) {
     const form = new FormData()
     form.append('banner', file)
-    return api.post(`${base}/events/${eventId}/banner`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return api.post(`${base}/events/${eventId}/banner`, form)
   },
 
   listPositions(eventId) {
@@ -81,9 +77,7 @@ export const electionService = {
   uploadCandidatePhoto(eventId, candidateId, file) {
     const form = new FormData()
     form.append('photo', file)
-    return api.post(`${base}/events/${eventId}/candidates/${candidateId}/photo`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return api.post(`${base}/events/${eventId}/candidates/${candidateId}/photo`, form)
   },
 
   listVoters(eventId) {
@@ -97,9 +91,7 @@ export const electionService = {
   importCsv(eventId, file) {
     const form = new FormData()
     form.append('file', file)
-    return api.post(`${base}/events/${eventId}/voters/import`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return api.post(`${base}/events/${eventId}/voters/import`, form)
   },
 
   /**

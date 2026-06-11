@@ -11,17 +11,13 @@ export const pollingService = {
   uploadOrganizationLogo(file) {
     const form = new FormData()
     form.append('logo', file)
-    return api.post(`${org}/organization/logo`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return api.post(`${org}/organization/logo`, form)
   },
 
   uploadBanner(eventId, file) {
     const form = new FormData()
     form.append('banner', file)
-    return api.post(`${org}/events/${eventId}/banner`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return api.post(`${org}/events/${eventId}/banner`, form)
   },
 
   listEvents() {
@@ -71,9 +67,7 @@ export const pollingService = {
   importCsv(eventId, file) {
     const form = new FormData()
     form.append('file', file)
-    return api.post(`${org}/events/${eventId}/respondents/import`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return api.post(`${org}/events/${eventId}/respondents/import`, form)
   },
 
   // Phase 7 — Question type registry (database-driven)

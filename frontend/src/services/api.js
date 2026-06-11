@@ -53,14 +53,22 @@ async function ensureCsrfToken() {
 api.interceptors.request.use(async (config) => {
   const token = getItem(STORAGE_KEYS.ACCESS_TOKEN)
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+    if (typeof config.headers.set === 'function') {
+      config.headers.set('Authorization', `Bearer ${token}`)
+    } else {
+      config.headers.Authorization = `Bearer ${token}`
+    }
   }
 
   const method = config.method?.toLowerCase()
   if (method && MUTATING_METHODS.has(method)) {
     const csrf = (await ensureCsrfToken()) || getCsrfToken()
     if (csrf) {
-      config.headers[CSRF_HEADER] = csrf
+      if (typeof config.headers.set === 'function') {
+        config.headers.set(CSRF_HEADER, csrf)
+      } else {
+        config.headers[CSRF_HEADER] = csrf
+      }
     }
   }
 
@@ -92,7 +100,11 @@ api.interceptors.response.use(
         if (data.csrfToken) {
           setCsrfToken(data.csrfToken)
           original.headers = original.headers || {}
-          original.headers[CSRF_HEADER] = data.csrfToken
+          if (typeof original.headers.set === 'function') {
+            original.headers.set(CSRF_HEADER, data.csrfToken)
+          } else {
+            original.headers[CSRF_HEADER] = data.csrfToken
+          }
         }
 
         return api(original)
@@ -134,9 +146,16 @@ api.interceptors.response.use(
             user: data.user ?? useAuthStore.getState().user,
             csrfToken: data.csrfToken,
           })
-          original.headers.Authorization = `Bearer ${data.accessToken}`
-          if (data.csrfToken) {
-            original.headers[CSRF_HEADER] = data.csrfToken
+          if (typeof original.headers.set === 'function') {
+            original.headers.set('Authorization', `Bearer ${data.accessToken}`)
+            if (data.csrfToken) {
+              original.headers.set(CSRF_HEADER, data.csrfToken)
+            }
+          } else {
+            original.headers.Authorization = `Bearer ${data.accessToken}`
+            if (data.csrfToken) {
+              original.headers[CSRF_HEADER] = data.csrfToken
+            }
           }
         }
 
