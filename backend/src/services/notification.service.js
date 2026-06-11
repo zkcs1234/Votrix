@@ -16,7 +16,7 @@ export async function createNotification({
   metadata = null,
 }) {
   return wrap(
-    db()
+    await db()
       .from(DB_TABLES.NOTIFICATIONS)
       .insert({
         user_id: userId,
@@ -39,7 +39,7 @@ export async function createNotificationsForUsers(userIds, payload) {
   if (!ids.length) return []
 
   return wrap(
-    db()
+    await db()
       .from(DB_TABLES.NOTIFICATIONS)
       .insert(
         ids.map((userId) => ({
@@ -59,8 +59,8 @@ export async function createNotificationsForUsers(userIds, payload) {
 }
 
 export async function createNotificationsForRole(role, payload) {
-  const rows = await wrap(
-    db().from(DB_TABLES.USERS).select('id').eq('role', role),
+  const rows = wrap(
+    await db().from(DB_TABLES.USERS).select('id').eq('role', role),
     { context: 'notification.createNotificationsForRole' },
   )
   return createNotificationsForUsers((rows ?? []).map((row) => row.id), payload)
@@ -87,7 +87,7 @@ export async function listNotifications(
     query = query.eq('entity', entity)
   }
 
-  return wrap(query, { context: 'notification.listNotifications' }) ?? []
+  return wrap(await query, { context: 'notification.listNotifications' }) ?? []
 }
 
 export async function getUnreadNotificationCount(userId) {
@@ -105,8 +105,8 @@ export async function getUnreadNotificationCount(userId) {
 }
 
 export async function markNotificationRead(notificationId, userId) {
-  const data = await wrap(
-    db()
+  const data = wrap(
+    await db()
       .from(DB_TABLES.NOTIFICATIONS)
       .update({ is_read: true })
       .eq('id', notificationId)
@@ -121,7 +121,7 @@ export async function markNotificationRead(notificationId, userId) {
 
 export async function markAllNotificationsRead(userId) {
   return wrap(
-    db()
+    await db()
       .from(DB_TABLES.NOTIFICATIONS)
       .update({ is_read: true })
       .eq('user_id', userId)

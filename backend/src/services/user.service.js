@@ -55,8 +55,8 @@ export async function createOrganizer({
 
   const passwordHash = await hashPassword(password)
 
-  const data = await wrap(
-    db()
+  const data = wrap(
+    await db()
       .from(DB_TABLES.USERS)
       .insert({
         email: normalizedEmail,
@@ -99,7 +99,7 @@ export async function updateUserPassword(userId, newPassword, { clearMustChange 
     .select('*')
     .single()
 
-  const data = await wrap(result, { context: 'user.updateUserPassword' })
+  const data = wrap(result, { context: 'user.updateUserPassword' })
   if (!data) throw notFound('User not found')
   return sanitizeUser(data)
 }

@@ -17,7 +17,7 @@ export function mapOrganization(row) {
 export async function listOrganizations(organizerId) {
   try {
     const result = wrap(
-      db()
+      await db()
         .from(DB_TABLES.ORGANIZATIONS)
         .select('*')
         .eq('organizer_id', organizerId)
@@ -34,7 +34,7 @@ export async function listOrganizations(organizerId) {
 
 export async function createOrganization(organizerId, { organizationName, organizationType }) {
   return wrap(
-    db()
+    await db()
       .from(DB_TABLES.ORGANIZATIONS)
       .insert({
         organization_name: organizationName,
@@ -120,8 +120,8 @@ export async function updateOrganizationLogo(organizerId, organizationType, logo
     throw forbidden('Not allowed to update this organization')
   }
 
-  const data = await wrap(
-    db()
+  const data = wrap(
+    await db()
       .from(DB_TABLES.ORGANIZATIONS)
       .update({ logo: logoUrl })
       .eq('id', org.id)

@@ -9,8 +9,8 @@ import { sendEventNotificationEmail } from './mailer.service.js'
 import { createNotificationsForUsers } from './notification.service.js'
 
 export async function getEventById(eventId) {
-  const data = await wrap(
-    db()
+  const data = wrap(
+    await db()
       .from(DB_TABLES.EVENTS)
       .select(
         `
@@ -38,8 +38,8 @@ export async function assertOrganizerOwnsEvent(eventId, organizerId) {
 }
 
 export async function getEventVoterAccounts(eventId) {
-  const data = await wrap(
-    db()
+  const data = wrap(
+    await db()
       .from(DB_TABLES.EVENT_VOTERS)
       .select(
         `
