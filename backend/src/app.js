@@ -39,12 +39,25 @@ export function createApp() {
 
   app.set('trust proxy', 1)
 
+  // Helpful during CORS issues: echo current allowed origins to logs.
+  app.use((req, _res, next) => {
+    if (req.path.startsWith('/api/auth/csrf')) {
+      console.log('[CORS]', {
+        origin: req.headers.origin,
+        allowed: req.headers.origin ? isAllowedOrigin(req.headers.origin) : true,
+        clientOrigins: env.clientOrigins,
+      })
+    }
+    next()
+  })
+
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
       contentSecurityPolicy: false,
     }),
   )
+
   app.use(
     cors({
       origin(origin, callback) {
@@ -59,11 +72,11 @@ export function createApp() {
         callback(null, false)
       },
       credentials: true,
-      methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
-      allowedHeaders: ['Content-Type','Authorization','x-csrf-token'],
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token', 'X-CSRF-Token'],
     }),
-
   )
+
   app.use(globalLimiter)
   app.use(express.json({ limit: '1mb' }))
   app.use(express.urlencoded({ extended: true }))
