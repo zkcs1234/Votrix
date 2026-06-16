@@ -22,7 +22,7 @@ function sendAuthResponse(res, { accessToken, refreshToken, user }) {
 
   res.json({
     success: true,
-    accessToken,
+    // accessToken now ONLY in HTTP-only cookie - not exposed to JavaScript
     csrfToken,
     user,
   })

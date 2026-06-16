@@ -1,24 +1,23 @@
 import { create } from 'zustand'
 import { STORAGE_KEYS } from '@/utils/constants'
-import { getItem, getJSON, removeItem, setItem, setJSON } from '@/utils/storage'
+import { getJSON, removeItem, setJSON } from '@/utils/storage'
 import { clearCsrfToken, setCsrfToken } from '@/utils/csrf'
 
-const initialToken = getItem(STORAGE_KEYS.ACCESS_TOKEN)
+// Token is now stored in HTTP-only cookie - cannot access via JavaScript
 const initialUser = getJSON(STORAGE_KEYS.USER)
 
 export const useAuthStore = create((set, get) => ({
-  accessToken: initialToken,
+  // accessToken removed - now only in HTTP-only cookie
   user: initialUser,
-  isAuthenticated: Boolean(initialToken),
+  isAuthenticated: Boolean(initialUser), // User presence indicates authenticated
 
-  setSession({ accessToken, user, csrfToken }) {
-    if (accessToken) setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken)
+  setSession({ user, csrfToken }) {
+    // accessToken stored in HTTP-only cookie - no localStorage access
     if (user) setJSON(STORAGE_KEYS.USER, user)
     if (csrfToken) setCsrfToken(csrfToken)
     set({
-      accessToken: accessToken ?? null,
       user: user ?? null,
-      isAuthenticated: Boolean(accessToken),
+      isAuthenticated: Boolean(user),
     })
   },
 
@@ -28,10 +27,10 @@ export const useAuthStore = create((set, get) => ({
   },
 
   clearSession() {
-    removeItem(STORAGE_KEYS.ACCESS_TOKEN)
+    // Token cleared via cookie - only clear local user data
     removeItem(STORAGE_KEYS.USER)
     clearCsrfToken()
-    set({ accessToken: null, user: null, isAuthenticated: false })
+    set({ user: null, isAuthenticated: false })
   },
 
   mustChangePassword() {

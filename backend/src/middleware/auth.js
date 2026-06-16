@@ -4,10 +4,7 @@ import { env } from '../config/env.js'
 import { findUserById } from '../services/user.service.js'
 
 function extractAccessToken(req) {
-  const header = req.headers.authorization
-  if (header?.startsWith('Bearer ')) {
-    return header.slice(7)
-  }
+  // Use HTTP-only cookie only - token no longer stored in localStorage
   return req.cookies?.[env.jwt.accessCookieName] || null
 }
 

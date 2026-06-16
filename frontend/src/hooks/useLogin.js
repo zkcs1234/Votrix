@@ -23,7 +23,7 @@ export function useLogin(loginFn) {
       // don't need a pre-flight round-trip here.
       const { data } = await loginFn(values)
       setSession({
-        accessToken: data.accessToken,
+        // accessToken now in HTTP-only cookie - stored by browser, not JavaScript
         user: data.user,
         csrfToken: data.csrfToken,
       })

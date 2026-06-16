@@ -1,89 +1,195 @@
-# Plan: Fix Notification Modal Mobile Display
+# Plan: Move to HTTP-Only Cookies Only (Option 3)
 
-## Problem
-The notification modal looks bad on mobile screens:
-- Modal positioning overflows on small screens
-- Buttons stack poorly  
-- Content is cramped
-- Overall layout doesn't adapt well to narrow viewports
+## Current State Analysis
 
-## Analysis of Current Code
+**Backend already does:**
+- ✅ Sets HTTP-only cookies for `accessToken` and `refreshToken`
+- ✅ Cookies have `httpOnly: true` (JavaScript cannot read)
 
-### Issues Found in `NotificationsModal.jsx`:
+**But ALSO:**
+- ❌ Returns `accessToken` in JSON response
+- ❌ Frontend stores this token in localStorage
+- ❌ Frontend sends token via Authorization header
 
-1. **Modal positioning** (line 149):
-   - `absolute right-0` - on small screens, this can overflow past the left edge
-   - Need: centered modal on mobile
+**The problem:** Even though cookies are HTTP-only, the token is ALSO in localStorage, defeating the security purpose.
 
-2. **Modal width** (line 149):
-   - `w-[90vw]` - okay, but `w-[95vw] max-w-[400px]` would be better for mobile
+---
 
-3. **Notification card buttons** (line 45):
-   - `flex-wrap gap-2` - buttons wrap but could look cleaner
-   - Need: single row on mobile with smaller buttons
+## Implementation Plan
 
-4. **Search/filter section** (lines 160-192):
-   - Stack could be improved for mobile
+### Phase 1: Backend Changes
 
-## Implementation Steps
+#### Step 1.1: Modify sendAuthResponse (backend/src/controllers/auth.controller.js)
+**Change:** Don't return accessToken in JSON - only set cookies
 
-### Step 1: Fix Modal Positioning and Width
-**File:** `frontend/src/components/ui/NotificationsModal.jsx`
-
-Change the modal container from:
-```jsx
+```javascript
 // BEFORE
-<div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 flex max-h-[85vh] w-[90vw] sm:w-[500px] flex-col overflow-hidden rounded-2xl border border-v-border bg-v-bg shadow-2xl">
+function sendAuthResponse(res, { accessToken, refreshToken, user }) {
+  setAuthCookies(res, { accessToken, refreshToken })
+  const csrfToken = issueCsrfToken(res)
+
+  res.json({
+    success: true,
+    accessToken,          // ❌ Remove this
+    csrfToken,
+    user,
+  })
+}
+
+// AFTER
+function sendAuthResponse(res, { accessToken, refreshToken, user }) {
+  setAuthCookies(res, { accessToken, refreshToken })
+  const csrfToken = issueCsrfToken(res)
+
+  res.json({
+    success: true,
+    // accessToken now ONLY in HTTP-only cookie
+    csrfToken,
+    user,
+  })
+}
 ```
 
-To:
-```jsx
-// AFTER - centered on mobile, right-aligned on larger screens
-<div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:absolute sm:right-0 sm:top-[calc(100%+0.5rem)] sm:ml-auto sm:w-[90vw] md:w-[500px]">
-  <div className="flex max-h-[85vh] w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border border-v-border bg-v-bg shadow-2xl sm:max-h-[85vh]">
+#### Step 1.2: Modify token refresh (same file)
+**Change:** Same - don't return accessToken in refresh response
+
+```javascript
+// AFTER refresh
+res.json({
+  success: true,
+  // accessToken ONLY in cookie now
+  csrfToken: issueCsrfToken(res),
+  user: updated user data,
+})
 ```
 
-Note: The `fixed inset-0` with flex center creates a backdrop overlay on mobile, which is better UX anyway.
+#### Step 1.3: Update auth middleware (backend/src/middleware/auth.js)
+**Change:** Extract token from cookies ONLY (not from Authorization header)
 
-### Step 2: Fix Notification Card Buttons
-**File:** `frontend/src/components/ui/NotificationsModal.jsx`
-
-Change the action buttons section (around line 45):
-```jsx
+```javascript
 // BEFORE
-<div className="flex shrink-0 flex-wrap gap-2 sm:flex-col sm:items-end">
+function extractAccessToken(req) {
+  const header = req.headers.authorization  // ⚠️ Still checks header
+  if (header?.startsWith('Bearer ')) {
+    return header.slice(7)
+  }
+  return req.cookies?.[env.jwt.accessCookieName] || null
+}
 
-// AFTER - smaller buttons on mobile
-<div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:flex-col sm:items-end sm:gap-2">
+// AFTER - Use ONLY cookies
+function extractAccessToken(req) {
+  return req.cookies?.[env.jwt.accessCookieName] || null
+}
 ```
 
-And update button styling:
-```jsx
-// Make "Open" button smaller on mobile
-className="inline-flex items-center justify-center rounded-lg border border-v-border-strong bg-v-surface px-2 py-1 text-xs font-medium text-v-text transition hover:bg-v-surface-elevated sm:px-2.5"
+---
+
+### Phase 2: Frontend Changes
+
+#### Step 2.1: Modify auth.store.js
+**Change:** Remove accessToken storage (keep user for display)
+
+```javascript
+// BEFORE
+setSession({ accessToken, user, csrfToken }) {
+  if (accessToken) setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken)
+  if (user) setJSON(STORAGE_KEYS.USER, user)
+  if (csrfToken) setCsrfToken(csrfToken)
+  // ...
+}
+
+// AFTER
+setSession({ user, csrfToken }) {
+  // accessToken stored in HTTP-only cookie - cannot access via JS
+  if (user) setJSON(STORAGE_KEYS.USER, user)
+  if (csrfToken) setCsrfToken(csrfToken)
+  // ...
+}
 ```
 
-### Step 3: Add Mobile Backdrop
-The modal already has a backdrop (line 148):
-```jsx
-<div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
+#### Step 2.2: Modify API interceptor (frontend/src/services/api.js)
+**Change:** Remove Authorization header - use cookies only
+
+```javascript
+// BEFORE
+api.interceptors.request.use(async (config) => {
+  const token = getItem(STORAGE_KEYS.ACCESS_TOKEN)  // ❌ Remove
+  if (token) {
+    config.headers.set('Authorization', `Bearer ${token}`)
+  }
+  // ...
+})
+
+// AFTER
+api.interceptors.request.use(async (config) => {
+  // No token needed - cookies are sent automatically
+  // Just add CSRF for mutating requests
+  // ...
+})
 ```
 
-This is good - just ensure it works properly with the new layout.
+#### Step 2.3: Update useLogin hook
+**Change:** Don't expect accessToken from login response
 
-## Summary of Changes
+```javascript
+// BEFORE
+const { data } = await loginFn(values)
+setSession({
+  accessToken: data.accessToken,  // ❌ Remove
+  user: data.user,
+  csrfToken: data.csrfToken,
+})
 
-| Component | Mobile Fix |
-|-----------|------------|
-| Modal container | Center with backdrop on mobile, right-dropdown on desktop |
-| Modal width | `max-w-[400px]` with full width on mobile |
-| Buttons | Smaller, tighter spacing on mobile |
-| Backdrop | Keep for better UX |
+// AFTER
+const { data } = await loginFn(values)
+setSession({
+  // accessToken in cookie - no need to store
+  user: data.user,
+  csrfToken: data.csrfToken,
+})
+```
 
-## Testing Checklist
-- [ ] Modal centered on mobile (< 640px)
-- [ ] Modal right-aligned on desktop (≥ 640px)
-- [ ] Notification cards readable on mobile
-- [ ] Buttons fit without overflow
-- [ ] Search/filter section usable on mobile
-- [ ] Close button accessible
+---
+
+### Phase 3: Testing & Verification
+
+#### Test Scenarios:
+1. ✅ Login as Organizer → token in cookie only, NOT in localStorage
+2. ✅ Login as Voter → old token replaced in cookie
+3. ✅ Access /organizer/* as organizer → works
+4. ✅ Access /voter/* as voter → works
+5. ✅ Try to access /organizer/* as voter → blocked
+6. ✅ Logout → cookies cleared
+
+---
+
+## Files to Change
+
+| File | Change |
+|------|--------|
+| `backend/src/controllers/auth.controller.js` | Don't return accessToken in JSON |
+| `backend/src/middleware/auth.js` | Use cookies only for token extraction |
+| `frontend/src/store/auth.store.js` | Remove accessToken storage |
+| `frontend/src/services/api.js` | Remove Authorization header |
+| `frontend/src/hooks/useLogin.js` | Remove accessToken from setSession |
+
+---
+
+## Security Improvement
+
+| Before | After |
+|--------|-------|
+| Token in localStorage + cookies | Token in cookies ONLY |
+| XSS can steal token | XSS cannot steal token |
+| Authorization: Bearer header | Cookies sent automatically |
+
+---
+
+## Rollback Plan
+
+If issues occur:
+1. Revert auth.controller.js - return accessToken in JSON
+2. Revert api.js - add back Authorization header
+3. Revert auth.store.js - store accessToken
+
+Keep middleware change (cookies-only) - it's backward compatible

@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { API_BASE_URL, STORAGE_KEYS } from '@/utils/constants'
 import { CSRF_HEADER, getCsrfToken, setCsrfToken } from '@/utils/csrf'
-import { getItem, removeItem } from '@/utils/storage'
+import { getJSON, removeItem } from '@/utils/storage'
 import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
 
@@ -51,14 +51,8 @@ async function ensureCsrfToken() {
 }
 
 api.interceptors.request.use(async (config) => {
-  const token = getItem(STORAGE_KEYS.ACCESS_TOKEN)
-  if (token) {
-    if (typeof config.headers.set === 'function') {
-      config.headers.set('Authorization', `Bearer ${token}`)
-    } else {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-  }
+  // Token now in HTTP-only cookie - automatically sent with requests via withCredentials
+  // No Authorization header needed - cookies are sent automatically
 
   // Allow Axios/browser to automatically set Content-Type with boundary for FormData
   if (config.data instanceof FormData) {
@@ -148,35 +142,33 @@ api.interceptors.response.use(
 
         const { data } = await refreshPromise
 
-        if (data.accessToken) {
-          if (data.csrfToken) setCsrfToken(data.csrfToken)
-          useAuthStore.getState().setSession({
-            accessToken: data.accessToken,
-            user: data.user ?? useAuthStore.getState().user,
-            csrfToken: data.csrfToken,
-          })
+        // Refresh succeeded - cookies are set by backend
+        // Just update session data
+        if (data.csrfToken) setCsrfToken(data.csrfToken)
+        useAuthStore.getState().setSession({
+          // accessToken now in HTTP-only cookie - not needed here
+          user: data.user ?? useAuthStore.getState().user,
+          csrfToken: data.csrfToken,
+        })
+
+        // Add CSRF to retry request if needed
+        if (data.csrfToken) {
           if (typeof original.headers.set === 'function') {
-            original.headers.set('Authorization', `Bearer ${data.accessToken}`)
-            if (data.csrfToken) {
-              original.headers.set(CSRF_HEADER, data.csrfToken)
-            }
+            original.headers.set(CSRF_HEADER, data.csrfToken)
           } else {
-            original.headers.Authorization = `Bearer ${data.accessToken}`
-            if (data.csrfToken) {
-              original.headers[CSRF_HEADER] = data.csrfToken
-            }
+            original.headers[CSRF_HEADER] = data.csrfToken
           }
         }
 
         return api(original)
       } catch {
-        removeItem(STORAGE_KEYS.ACCESS_TOKEN)
+        // Refresh failed - clear local session data
         removeItem(STORAGE_KEYS.USER)
       }
     }
 
     if (status === 401 && !original?.url?.includes('/auth/')) {
-      removeItem(STORAGE_KEYS.ACCESS_TOKEN)
+      // Clear local session data on 401
       removeItem(STORAGE_KEYS.USER)
     }
 
