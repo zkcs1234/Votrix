@@ -7,7 +7,8 @@ import { env, isProduction } from './env.js'
 export function getCookieOptions(overrides = {}) {
   return {
     secure: isProduction,
-    sameSite: env.cookie.sameSite,
+    // Force SameSite=None in production to support cross-site cookies (Vercel -> API)
+    sameSite: isProduction ? 'none' : env.cookie.sameSite,
     path: '/',
     ...overrides,
   }
