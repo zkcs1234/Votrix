@@ -1,139 +1,89 @@
-# Plan: Remove Voter Dashboard - Direct Login Redirect
+# Plan: Fix Notification Modal Mobile Display
 
 ## Problem
-After voter login, they're taken to a dashboard showing all their events (elections, competitions, polls). This creates friction - voters should go directly to the event they're assigned to.
+The notification modal looks bad on mobile screens:
+- Modal positioning overflows on small screens
+- Buttons stack poorly  
+- Content is cramped
+- Overall layout doesn't adapt well to narrow viewports
 
-## Goal
-When a voter logs in, they should be redirected directly to the event they're assigned to:
-- If assigned to an election → go to election voting page
-- If assigned to competition scoring → go to competition scoring page
-- If assigned to polling → go to poll page
+## Analysis of Current Code
+
+### Issues Found in `NotificationsModal.jsx`:
+
+1. **Modal positioning** (line 149):
+   - `absolute right-0` - on small screens, this can overflow past the left edge
+   - Need: centered modal on mobile
+
+2. **Modal width** (line 149):
+   - `w-[90vw]` - okay, but `w-[95vw] max-w-[400px]` would be better for mobile
+
+3. **Notification card buttons** (line 45):
+   - `flex-wrap gap-2` - buttons wrap but could look cleaner
+   - Need: single row on mobile with smaller buttons
+
+4. **Search/filter section** (lines 160-192):
+   - Stack could be improved for mobile
 
 ## Implementation Steps
 
-### Step 1: Modify Backend - Add Login Redirect Endpoint
-**File:** `backend/src/services/voter.service.js`
+### Step 1: Fix Modal Positioning and Width
+**File:** `frontend/src/components/ui/NotificationsModal.jsx`
 
-Add a new function `getVoterLoginRedirect(voterId)` that:
-1. Fetches all events the voter is assigned to
-2. Filters for **active** events (where voting/scoring/poll is open)
-3. Returns the first active event's redirect path and type
-4. Returns `null` if no active events
-
-```javascript
-export async function getVoterLoginRedirect(voterId) {
-  const dashboard = await getVoterDashboard(voterId)
-  
-  // Priority: active events first
-  if (dashboard.active.length > 0) {
-    const event = dashboard.active[0]
-    return {
-      path: event.actionPath,
-      type: event.eventType,
-      title: event.title
-    }
-  }
-  
-  // If no active events, go to first assigned event
-  if (dashboard.assigned.length > 0) {
-    const event = dashboard.assigned[0]
-    return {
-      path: event.actionPath,
-      type: event.eventType,
-      title: event.title
-    }
-  }
-  
-  // No events at all
-  return null
-}
+Change the modal container from:
+```jsx
+// BEFORE
+<div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 flex max-h-[85vh] w-[90vw] sm:w-[500px] flex-col overflow-hidden rounded-2xl border border-v-border bg-v-bg shadow-2xl">
 ```
 
-### Step 2: Add Backend Controller Route
-**File:** `backend/src/controllers/voter.controller.js`
-
-```javascript
-export const getVoterLoginRedirect = asyncHandler(async (req, res) => {
-  const redirect = await voterService.getVoterLoginRedirect(req.user.id)
-  res.json({ success: true, redirect })
-})
+To:
+```jsx
+// AFTER - centered on mobile, right-aligned on larger screens
+<div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:absolute sm:right-0 sm:top-[calc(100%+0.5rem)] sm:ml-auto sm:w-[90vw] md:w-[500px]">
+  <div className="flex max-h-[85vh] w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border border-v-border bg-v-bg shadow-2xl sm:max-h-[85vh]">
 ```
 
-**File:** `backend/src/routes/voter.routes.js`
+Note: The `fixed inset-0` with flex center creates a backdrop overlay on mobile, which is better UX anyway.
 
-Add route:
-```javascript
-router.get('/login-redirect', authenticate, getVoterLoginRedirect)
+### Step 2: Fix Notification Card Buttons
+**File:** `frontend/src/components/ui/NotificationsModal.jsx`
+
+Change the action buttons section (around line 45):
+```jsx
+// BEFORE
+<div className="flex shrink-0 flex-wrap gap-2 sm:flex-col sm:items-end">
+
+// AFTER - smaller buttons on mobile
+<div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:flex-col sm:items-end sm:gap-2">
 ```
 
-### Step 3: Update Frontend Service
-**File:** `frontend/src/services/voter.service.js`
-
-```javascript
-export const voterService = {
-  // ... existing methods
-  getLoginRedirect() {
-    return api.get('/voter/login-redirect')
-  }
-}
+And update button styling:
+```jsx
+// Make "Open" button smaller on mobile
+className="inline-flex items-center justify-center rounded-lg border border-v-border-strong bg-v-surface px-2 py-1 text-xs font-medium text-v-text transition hover:bg-v-surface-elevated sm:px-2.5"
 ```
 
-### Step 4: Modify Frontend Login Hook
-**File:** `frontend/src/hooks/useLogin.js`
-
-Change voter login redirect logic:
-
-```javascript
-// After successful login
-if (data.user.mustChangePassword) {
-  navigate('/change-password', { replace: true })
-} else if (data.user.role === USER_ROLES.VOTER) {
-  // Get redirect path from server
-  voterService.getLoginRedirect()
-    .then(({ data }) => {
-      if (data.redirect?.path) {
-        navigate(data.redirect.path, { replace: true })
-      } else {
-        // No events - show message or go to simple page
-        navigate('/voter/no-events', { replace: true })
-      }
-    })
-    .catch(() => {
-      // Fallback to dashboard on error
-      navigate('/voter', { replace: true })
-    })
-} else {
-  navigate(getRoleDashboardPath(data.user.role), { replace: true })
-}
+### Step 3: Add Mobile Backdrop
+The modal already has a backdrop (line 148):
+```jsx
+<div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
 ```
 
-### Step 5: Create Simple "No Events" Page (if needed)
-**File:** `frontend/src/pages/voter/NoEventsPage.jsx`
+This is good - just ensure it works properly with the new layout.
 
-Simple page showing:
-- "You have no events assigned yet"
-- Contact organizer message
+## Summary of Changes
 
-Add route in `frontend/src/routes/index.jsx`.
+| Component | Mobile Fix |
+|-----------|------------|
+| Modal container | Center with backdrop on mobile, right-dropdown on desktop |
+| Modal width | `max-w-[400px]` with full width on mobile |
+| Buttons | Smaller, tighter spacing on mobile |
+| Backdrop | Keep for better UX |
 
-### Step 6: Test the Flow
-Test scenarios:
-1. ✅ Voter with active election → redirects to election
-2. ✅ Voter with active competition → redirects to competition scoring
-3. ✅ Voter with active poll → redirects to poll
-4. ✅ Voter with only assigned events → redirects to first assigned
-5. ✅ Voter with no events → shows no events page
-6. ✅ Voter must change password → goes to change password first
-
-## Edge Cases Handled
-
-| Scenario | Behavior |
-|----------|----------|
-| Multiple active events | Go to first one (priority: election → competition → poll) |
-| No active events, has assigned | Go to first assigned event |
-| No events at all | Show "No events" page |
-| API error | Fallback to dashboard (safe fallback) |
-
-## Backward Compatibility
-- The dashboard page still exists for users who directly navigate to `/voter`
-- Can be removed later if not used
+## Testing Checklist
+- [ ] Modal centered on mobile (< 640px)
+- [ ] Modal right-aligned on desktop (≥ 640px)
+- [ ] Notification cards readable on mobile
+- [ ] Buttons fit without overflow
+- [ ] Search/filter section usable on mobile
+- [ ] Close button accessible
