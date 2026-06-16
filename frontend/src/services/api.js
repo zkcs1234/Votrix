@@ -1,7 +1,8 @@
 import axios from 'axios'
 import { API_BASE_URL, STORAGE_KEYS } from '@/utils/constants'
 import { CSRF_HEADER, getCsrfToken, setCsrfToken } from '@/utils/csrf'
-import { getJSON, removeItem } from '@/utils/storage'
+import { removeItem } from '@/utils/storage'
+
 import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
 

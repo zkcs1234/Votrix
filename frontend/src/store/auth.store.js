@@ -1,15 +1,18 @@
 import { create } from 'zustand'
 import { STORAGE_KEYS } from '@/utils/constants'
-import { getJSON, removeItem, setJSON } from '@/utils/storage'
+import { removeItem, setJSON } from '@/utils/storage'
+
 import { clearCsrfToken, setCsrfToken } from '@/utils/csrf'
 
-// Token is now stored in HTTP-only cookie - cannot access via JavaScript
-const initialUser = getJSON(STORAGE_KEYS.USER)
+// Token is now stored in HTTP-only cookie.
+// Do NOT bootstrap user/role from localStorage because that can cause
+// role bleed-through when switching accounts without logout.
+const initialUser = null
 
 export const useAuthStore = create((set, get) => ({
-  // accessToken removed - now only in HTTP-only cookie
   user: initialUser,
-  isAuthenticated: Boolean(initialUser), // User presence indicates authenticated
+  isAuthenticated: false,
+
 
   setSession({ user, csrfToken }) {
     // accessToken stored in HTTP-only cookie - no localStorage access

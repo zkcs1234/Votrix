@@ -6,12 +6,18 @@ import { useToast } from '@/hooks/useToast'
 import { voterService } from '@/services/voter.service'
 import { USER_ROLES } from '@/utils/constants'
 
+
 export function useLogin(loginFn) {
   const navigate = useNavigate()
-  const { setSession } = useAuth()
+  const { setSession, clearSession } = useAuth()
+
+
   const { success, error: toastError } = useToast()
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+
+
+
 
   const handleSubmit = async (values) => {
     setError(null)
@@ -22,13 +28,20 @@ export function useLogin(loginFn) {
       // for any POST. Login endpoints are CSRF-exempt on the server, so we
       // don't need a pre-flight round-trip here.
       const { data } = await loginFn(values)
+
+      // Hard reset local auth state first to avoid role/dashboard bleed-through
+      // when switching accounts without logout.
+      clearSession()
+
+
+      // Now set the session from the login response
       setSession({
-        // accessToken now in HTTP-only cookie - stored by browser, not JavaScript
         user: data.user,
         csrfToken: data.csrfToken,
       })
 
       success('Signed in successfully')
+
 
       if (data.user.mustChangePassword) {
         navigate('/change-password', { replace: true })
