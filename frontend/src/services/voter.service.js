@@ -4,6 +4,9 @@ export const voterService = {
   getOverview() {
     return api.get('/voter/overview')
   },
+  getLoginRedirect() {
+    return api.get('/voter/login-redirect')
+  },
 }
 
 export const EVENT_TYPE_META = {

@@ -117,3 +117,34 @@ export async function getVoterDashboard(voterId) {
     events,
   }
 }
+
+/**
+ * Get the redirect path for a voter after login.
+ * Returns the first active event, or first assigned event, or null.
+ */
+export async function getVoterLoginRedirect(voterId) {
+  const dashboard = await getVoterDashboard(voterId)
+
+  // Priority: active events first
+  if (dashboard.active.length > 0) {
+    const event = dashboard.active[0]
+    return {
+      path: event.actionPath,
+      type: event.eventType,
+      title: event.title,
+    }
+  }
+
+  // If no active events, go to first assigned event
+  if (dashboard.assigned.length > 0) {
+    const event = dashboard.assigned[0]
+    return {
+      path: event.actionPath,
+      type: event.eventType,
+      title: event.title,
+    }
+  }
+
+  // No events at all
+  return null
+}

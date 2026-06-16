@@ -16,5 +16,6 @@ router.use('/competition', pageantJudgeRoutes)
 router.use('/polling', pollingVoterRoutes)
 
 router.get('/overview', voterController.getVoterOverview)
+router.get('/login-redirect', voterController.getVoterLoginRedirect)
 
 export default router

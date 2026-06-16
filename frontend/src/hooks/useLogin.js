@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { getRoleDashboardPath } from '@/utils/auth'
 import { useToast } from '@/hooks/useToast'
+import { voterService } from '@/services/voter.service'
+import { USER_ROLES } from '@/utils/constants'
 
 export function useLogin(loginFn) {
   const navigate = useNavigate()
@@ -30,6 +32,21 @@ export function useLogin(loginFn) {
 
       if (data.user.mustChangePassword) {
         navigate('/change-password', { replace: true })
+      } else if (data.user.role === USER_ROLES.VOTER) {
+        // Get redirect path from server - go directly to assigned event
+        voterService.getLoginRedirect()
+          .then(({ data: res }) => {
+            if (res.redirect?.path) {
+              navigate(res.redirect.path, { replace: true })
+            } else {
+              // No events - go to dashboard
+              navigate('/voter', { replace: true })
+            }
+          })
+          .catch(() => {
+            // Fallback to dashboard on error
+            navigate('/voter', { replace: true })
+          })
       } else {
         navigate(getRoleDashboardPath(data.user.role), { replace: true })
       }
