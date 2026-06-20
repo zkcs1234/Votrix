@@ -24,10 +24,10 @@ export default function VotrixLogo({
         <VotrixMark className={`${config.mark} shrink-0`} title="" />
         {variant === 'full' && (
           <span
-            className={`${config.text} font-bold tracking-[0.14em] leading-none text-v-text`}
+            className={`${config.text} font-bold tracking-[0.14em] leading-none`}
           >
             VOTR
-            <span className="text-v-primary">I</span>
+            <span className={`text-v-primary`}>I</span>
             X
           </span>
         )}
