@@ -20,14 +20,15 @@ export default function VotrixLogo({
 
   const logo = (
     <div className={`inline-flex flex-col items-center ${showTagline ? 'gap-2' : ''}`}>
-      <div className={`inline-flex items-center ${config.gap} ${toneClass}`}>
-        <VotrixMark className={`${config.mark} shrink-0`} title="" />
+      <div className={`inline-flex items-center ${config.gap}`} style={toneClass.includes('text-white') ? { color: 'white' } : {}}>
+        <VotrixMark className={`${config.mark} shrink-0`} style={toneClass.includes('text-white') ? { color: 'white' } : {}} title="" />
         {variant === 'full' && (
           <span
-            className={`${config.text} font-bold tracking-[0.14em] leading-none ${toneClass}`}
+            className={`${config.text} font-bold tracking-[0.14em] leading-none`}
+            style={{ color: toneClass.includes('text-white') ? 'white' : undefined }}
           >
             VOTR
-            <span className={`text-v-primary`}>I</span>
+            <span className="text-v-primary">I</span>
             X
           </span>
         )}
