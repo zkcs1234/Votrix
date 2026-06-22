@@ -173,7 +173,7 @@ export default function VoterDashboardPage() {
 
       {stats.total === 0 && (
         <Card padding="sm" className="text-center">
-          <p className="v-caption">No events available. Create your first event to begin.</p>
+          <p className="v-caption">No events assigned to you yet. Check back when an organizer invites you.</p>
         </Card>
       )}
     </div>

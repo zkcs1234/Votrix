@@ -48,7 +48,6 @@ export default function ChangePasswordPage() {
       await ensureCsrfToken()
       const { data } = await authService.changePassword(values)
       setSession({
-        accessToken: data.accessToken,
         user: data.user,
         csrfToken: data.csrfToken,
       })

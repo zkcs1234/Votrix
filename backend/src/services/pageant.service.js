@@ -21,6 +21,7 @@ import {
   mergeScoringConfig,
   isScoreInBounds,
 } from '../modules/scoring-engine.js'
+import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
 
 function getClient() {
   const client = getSupabase()
@@ -606,7 +607,7 @@ export async function getJudgeScoringSheet(eventId, judgeId) {
     criteria: (criteria.data ?? []).map(mapCriteria),
     existingScores: scoreMap,
     hasScored: enrollment.has_scored,
-    scoringOpen: Boolean(event.scoring_enabled),
+    scoringOpen: isCompetitionScoringOpen(event),
   }
 }
 
@@ -614,7 +615,16 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
   await assertJudgeEnrolled(eventId, judgeId)
 
   const event = await getEventById(eventId)
-  if (!event.scoring_enabled) {
+  if (!isCompetitionScoringOpen(event)) {
+    if (!event.scoring_enabled) {
+      throw new ApiError(403, 'Scoring is not open for this event')
+    }
+    if (event.start_date && new Date(event.start_date) > new Date()) {
+      throw new ApiError(403, 'Scoring has not started yet for this event')
+    }
+    if (event.end_date && new Date(event.end_date) < new Date()) {
+      throw new ApiError(403, 'Scoring has ended for this event')
+    }
     throw new ApiError(403, 'Scoring is not open for this event')
   }
 

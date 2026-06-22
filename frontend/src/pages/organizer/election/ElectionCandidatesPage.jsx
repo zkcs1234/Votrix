@@ -4,6 +4,7 @@ import { electionService } from '@/services/election.service'
 import { SkeletonGrid } from '@/components/ui/Skeleton'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { useToast } from '@/hooks/useToast'
 
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
@@ -89,6 +90,7 @@ export default function ElectionCandidatesPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [photoFile, setPhotoFile] = useState(null)
   const [saving, setSaving] = useState(false)
+  const { error: showError } = useToast()
 
   const showLoader = useDelayedLoading(loading, 300)
 
@@ -148,7 +150,7 @@ export default function ElectionCandidatesPage() {
       setPhotoFile(null)
     } catch (err) {
       setCandidates((prev) => prev.filter((c) => c.id !== tempId))
-      console.error('Failed to create candidate:', err)
+      showError(err.response?.data?.message || 'Failed to create candidate')
     } finally {
       setSaving(false)
     }
@@ -162,7 +164,7 @@ export default function ElectionCandidatesPage() {
       await electionService.deleteCandidate(eventId, id)
     } catch (err) {
       setCandidates(previousCandidates)
-      console.error('Failed to delete candidate:', err)
+      showError(err.response?.data?.message || 'Failed to delete candidate')
     }
   }
 

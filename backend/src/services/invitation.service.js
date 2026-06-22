@@ -151,6 +151,18 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
     throw new ApiError(404, 'Voter not found')
   }
 
+  const { data: enrollment, error: enrollmentError } = await getClient()
+    .from(DB_TABLES.EVENT_VOTERS)
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('voter_id', voterId)
+    .maybeSingle()
+
+  if (enrollmentError) throw new ApiError(500, enrollmentError.message)
+  if (!enrollment) {
+    throw new ApiError(404, 'Voter is not enrolled in this event')
+  }
+
   const tempPassword = generateTemporaryPassword()
   const passwordHash = await hashPassword(tempPassword)
 

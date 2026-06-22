@@ -3,20 +3,22 @@ import { authService } from '@/services/auth.service'
 import { useAuthStore } from '@/store/auth.store'
 
 export function useAuthBootstrap() {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const updateUser = useAuthStore((s) => s.updateUser)
+  const setSession = useAuthStore((s) => s.setSession)
   const clearSession = useAuthStore((s) => s.clearSession)
+  const finishBootstrap = useAuthStore((s) => s.finishBootstrap)
 
   useEffect(() => {
-    if (!isAuthenticated) return
-
     authService
-      .getMe()
+      .refresh()
       .then(({ data }) => {
-        if (data.user) updateUser(data.user)
+        if (data?.user) {
+          setSession({ user: data.user, csrfToken: data.csrfToken })
+        } else {
+          finishBootstrap()
+        }
       })
       .catch(() => {
         clearSession()
       })
-  }, [isAuthenticated, updateUser, clearSession])
+  }, [setSession, clearSession, finishBootstrap])
 }

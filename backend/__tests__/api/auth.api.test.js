@@ -76,20 +76,20 @@ describe('Auth API Endpoints', () => {
   })
 
   describe('POST /api/auth/forgot-password', () => {
-    test('should return 403 without CSRF token (CSRF protection', async () => {
+    test('should not require CSRF token (public password recovery)', async () => {
       const response = await request(app)
         .post('/api/auth/forgot-password')
         .send({ email: 'invalid-email' })
-      expect(response.status).toBe(403)
+      expect(response.status).toBe(400)
     })
   })
 
   describe('POST /api/auth/reset-password', () => {
-    test('should return 403 without CSRF token (CSRF protection)', async () => {
+    test('should not require CSRF token (public password recovery)', async () => {
       const response = await request(app)
         .post('/api/auth/reset-password')
         .send({ token: 'reset-token', newPassword: 'short', confirmPassword: 'short' })
-      expect(response.status).toBe(403)
+      expect(response.status).toBe(400)
     })
   })
 

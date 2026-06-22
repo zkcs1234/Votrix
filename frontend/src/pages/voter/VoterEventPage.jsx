@@ -6,9 +6,13 @@ import ElectionPositionSection from '@/components/voter/election/ElectionPositio
 import Button from '@/components/ui/Button'
 
 function validateSelections(positions, selections) {
+  let hasAtLeastOneVote = false
+
   for (const position of positions) {
     const selected = selections[position.id] ?? []
     const count = selected.length
+
+    if (count > 0) hasAtLeastOneVote = true
 
     if (count === 0 && position.allowSkip) continue
     if (count === 0) {
@@ -21,7 +25,92 @@ function validateSelections(positions, selections) {
       return `${position.name}: select at most ${position.maxVote} candidate(s).`
     }
   }
+
+  if (!hasAtLeastOneVote) {
+    return 'Your ballot must include at least one selection.'
+  }
+
   return null
+}
+
+function BallotSubmittedScreen({ ballot, eventId }) {
+  const [results, setResults] = useState(null)
+  const [resultsLoading, setResultsLoading] = useState(Boolean(ballot?.canViewResults))
+  const [resultsMessage, setResultsMessage] = useState(null)
+
+  useEffect(() => {
+    if (!ballot?.canViewResults) return undefined
+
+    let alive = true
+    electionService
+      .getResults(eventId)
+      .then(({ data }) => {
+        if (alive) setResults(data.results ?? null)
+      })
+      .catch((err) => {
+        if (alive) {
+          setResultsMessage(err.response?.data?.message || 'Results are not available yet.')
+        }
+      })
+      .finally(() => {
+        if (alive) setResultsLoading(false)
+      })
+
+    return () => {
+      alive = false
+    }
+  }, [ballot?.canViewResults, eventId])
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div className="v-card-lg text-center border-v-success">
+        <p className="v-page-title text-v-success">Ballot submitted</p>
+        <p className="v-caption mt-2">
+          Your vote for {ballot?.event?.title} has been recorded and locked.
+        </p>
+        <Link to="/voter" className="v-btn-tertiary mt-6 inline-block">
+          Back to dashboard
+        </Link>
+      </div>
+
+      {ballot?.canViewResults && (
+        <div className="v-card p-6 space-y-4">
+          <h3 className="text-lg font-semibold text-v-text">Election results</h3>
+          {resultsLoading && <LoadingSpinner />}
+          {!resultsLoading && resultsMessage && (
+            <p className="text-sm text-v-text-subtle">{resultsMessage}</p>
+          )}
+          {!resultsLoading && results?.positionSummaries?.map((position) => (
+            <div key={position.positionId} className="rounded-xl border border-v-border p-4">
+              <p className="font-medium text-v-text">{position.positionName}</p>
+              <ul className="mt-3 space-y-2">
+                {(position.candidates ?? []).map((candidate) => (
+                  <li
+                    key={candidate.candidateId}
+                    className="flex items-center justify-between text-sm text-v-text-muted"
+                  >
+                    <span>{candidate.candidateName}</span>
+                    <span>
+                      {candidate.votes} vote{candidate.votes === 1 ? '' : 's'}
+                      {candidate.votePercentage !== undefined
+                        ? ` (${candidate.votePercentage}%)`
+                        : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {ballot?.resultsVisibility === 'public' && !ballot?.canViewResults && (
+        <p className="text-center text-sm text-v-text-subtle">
+          Results will be available once voting closes.
+        </p>
+      )}
+    </div>
+  )
 }
 
 export default function VoterEventPage() {
@@ -137,17 +226,7 @@ export default function VoterEventPage() {
   }
 
   if (done || ballot?.hasVoted) {
-    return (
-      <div className="mx-auto max-w-lg v-card-lg text-center border-v-success">
-        <p className="v-page-title text-v-success">Ballot submitted</p>
-        <p className="v-caption mt-2">
-          Your vote for {ballot?.event?.title} has been recorded and locked.
-        </p>
-        <Link to="/voter" className="v-btn-tertiary mt-6 inline-block">
-          Back to dashboard
-        </Link>
-      </div>
-    )
+    return <BallotSubmittedScreen ballot={ballot} eventId={eventId} />
   }
 
   if (!ballot?.votingOpen) {

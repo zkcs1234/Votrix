@@ -6,6 +6,7 @@ const router = Router()
 
 router.get('/events', ctrl.listMyEvents)
 router.get('/events/:eventId/ballot', ctrl.getBallot)
+router.get('/events/:eventId/results', ctrl.getResults)
 router.post('/events/:eventId/vote', voteLimiters.ip, voteLimiters.user, ctrl.submitVote)
 
 export default router

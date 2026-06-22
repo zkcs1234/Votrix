@@ -50,6 +50,7 @@ export const env = {
     refreshSecret: getJwtSecret('refresh', 'JWT_REFRESH_SECRET', 'dev-refresh-secret-change-me'),
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    rememberRefreshExpiresIn: process.env.JWT_REMEMBER_REFRESH_EXPIRES_IN || '30d',
     accessCookieName: process.env.JWT_ACCESS_COOKIE_NAME || 'votrix_access',
     refreshCookieName: process.env.JWT_REFRESH_COOKIE_NAME || 'votrix_refresh',
   },

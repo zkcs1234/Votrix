@@ -16,8 +16,8 @@ import {
 import * as passwordResetService from '../services/password-reset.service.js'
 import { createAuditLog } from '../services/admin.service.js'
 
-function sendAuthResponse(res, { accessToken, refreshToken, user }) {
-  setAuthCookies(res, { accessToken, refreshToken })
+function sendAuthResponse(res, { accessToken, refreshToken, user }, { remember = false } = {}) {
+  setAuthCookies(res, { accessToken, refreshToken }, { remember })
   const csrfToken = issueCsrfToken(res)
 
   res.json({
@@ -66,7 +66,7 @@ export const adminLogin = asyncHandler(async (req, res) => {
         userAgent: req.get('user-agent') ?? null,
       },
     })
-    return sendAuthResponse(res, tokens)
+    return sendAuthResponse(res, tokens, { remember: credentials.remember })
   } catch (error) {
     await writeAuthAudit({
       action: 'ADMIN_LOGIN_FAILED',
@@ -95,7 +95,7 @@ export const organizerLogin = asyncHandler(async (req, res) => {
         userAgent: req.get('user-agent') ?? null,
       },
     })
-    return sendAuthResponse(res, tokens)
+    return sendAuthResponse(res, tokens, { remember: credentials.remember })
   } catch (error) {
     await writeAuthAudit({
       action: 'ORGANIZER_LOGIN_FAILED',
@@ -124,7 +124,7 @@ export const voterLogin = asyncHandler(async (req, res) => {
         userAgent: req.get('user-agent') ?? null,
       },
     })
-    return sendAuthResponse(res, tokens)
+    return sendAuthResponse(res, tokens, { remember: credentials.remember })
   } catch (error) {
     await writeAuthAudit({
       action: 'VOTER_LOGIN_FAILED',
@@ -148,7 +148,7 @@ export const refresh = asyncHandler(async (req, res) => {
   }
 
   const decoded = verifyRefreshToken(token)
-  const tokens = await authService.refreshSession(decoded.sub)
+  const tokens = await authService.refreshSession(decoded.sub, decoded.tokenVersion)
   sendAuthResponse(res, tokens)
 })
 
@@ -159,13 +159,16 @@ export const logout = asyncHandler(async (_req, res) => {
       ? _req.headers.authorization.slice(7)
       : null)
 
+  let userId = null
+
   if (token) {
     try {
       const decoded = verifyAccessToken(token)
+      userId = decoded.sub ?? null
       await writeAuthAudit({
         action: 'USER_LOGOUT',
-        userId: decoded.sub ?? null,
-        entityId: decoded.sub ?? null,
+        userId,
+        entityId: userId,
         details: {
           role: decoded.role ?? null,
           username: decoded.username ?? null,
@@ -176,6 +179,14 @@ export const logout = asyncHandler(async (_req, res) => {
       })
     } catch {
       // Ignore invalid/expired tokens during logout cleanup.
+    }
+  }
+
+  if (userId) {
+    try {
+      await authService.revokeSession(userId)
+    } catch {
+      // Still clear cookies even if revocation fails.
     }
   }
 
@@ -205,15 +216,14 @@ export const changePassword = asyncHandler(async (req, res) => {
   const payload = validateChangePassword(req.body)
   const user = await authService.changePassword(req.user.id, payload)
 
-  const tokens = await authService.refreshSession(req.user.id)
+  const tokens = await authService.issueSessionForUser(user.id)
 
   setAuthCookies(res, tokens)
   const csrfToken = issueCsrfToken(res)
   res.json({
     success: true,
     message: 'Password updated successfully',
-    accessToken: tokens.accessToken,
     csrfToken,
-    user,
+    user: tokens.user,
   })
 })

@@ -27,7 +27,10 @@ export function useLogin(loginFn) {
       // The `api` request interceptor fetches a CSRF token automatically
       // for any POST. Login endpoints are CSRF-exempt on the server, so we
       // don't need a pre-flight round-trip here.
-      const { data } = await loginFn(values)
+      const { data } = await loginFn({
+        ...values,
+        remember: Boolean(values.remember),
+      })
 
       // Hard reset local auth state first to avoid role/dashboard bleed-through
       // when switching accounts without logout.

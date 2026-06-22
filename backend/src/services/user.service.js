@@ -104,4 +104,21 @@ export async function updateUserPassword(userId, newPassword, { clearMustChange 
   return sanitizeUser(data)
 }
 
+export async function incrementTokenVersion(userId) {
+  const user = await findUserById(userId)
+  if (!user) throw notFound('User not found')
+
+  const nextVersion = Number(user.token_version ?? 0) + 1
+
+  const result = await db()
+    .from(DB_TABLES.USERS)
+    .update({ token_version: nextVersion })
+    .eq('id', userId)
+    .select('*')
+    .single()
+
+  const data = wrap(result, { context: 'user.incrementTokenVersion' })
+  return sanitizeUser(data)
+}
+
 export { sanitizeUser }

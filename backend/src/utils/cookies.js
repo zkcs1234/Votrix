@@ -1,10 +1,12 @@
 import { env } from '../config/env.js'
 import { getAuthCookieOptions } from '../config/cookieOptions.js'
 
-export function setAuthCookies(res, { accessToken, refreshToken }) {
+export function setAuthCookies(res, { accessToken, refreshToken }, { remember = false } = {}) {
   const options = getAuthCookieOptions()
   const accessMaxAge = parseExpiryMs(env.jwt.accessExpiresIn)
-  const refreshMaxAge = parseExpiryMs(env.jwt.refreshExpiresIn)
+  const refreshMaxAge = remember
+    ? parseExpiryMs(env.jwt.rememberRefreshExpiresIn)
+    : parseExpiryMs(env.jwt.refreshExpiresIn)
 
   res.cookie(env.jwt.accessCookieName, accessToken, {
     ...options,

@@ -1,7 +1,6 @@
 import axios from 'axios'
-import { API_BASE_URL, STORAGE_KEYS } from '@/utils/constants'
+import { API_BASE_URL } from '@/utils/constants'
 import { CSRF_HEADER, getCsrfToken, setCsrfToken } from '@/utils/csrf'
-import { removeItem } from '@/utils/storage'
 
 import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
@@ -30,10 +29,6 @@ const api = axios.create({
   },
 })
 
-let refreshPromise = null
-
-const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete'])
-
 async function ensureCsrfToken() {
   const existingToken = getCsrfToken()
   if (existingToken) return existingToken
@@ -50,6 +45,12 @@ async function ensureCsrfToken() {
 
   return null
 }
+
+let refreshPromise = null
+
+const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete'])
+
+export { ensureCsrfToken }
 
 api.interceptors.request.use(async (config) => {
   // Token now in HTTP-only cookie - automatically sent with requests via withCredentials
@@ -163,14 +164,12 @@ api.interceptors.response.use(
 
         return api(original)
       } catch {
-        // Refresh failed - clear local session data
-        removeItem(STORAGE_KEYS.USER)
+        useAuthStore.getState().clearSession()
       }
     }
 
     if (status === 401 && !original?.url?.includes('/auth/')) {
-      // Clear local session data on 401
-      removeItem(STORAGE_KEYS.USER)
+      useAuthStore.getState().clearSession()
     }
 
     maybeToastError(error)

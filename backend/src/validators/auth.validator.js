@@ -4,17 +4,17 @@ import { sanitizeEmail, sanitizeString } from '../utils/sanitize.js'
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function validateAdminLogin(body) {
-  const { username, password } = body ?? {}
+  const { username, password, remember } = body ?? {}
 
   if (!username?.trim() || !password) {
     throw new ApiError(400, 'Username and password are required')
   }
 
-  return { username: sanitizeString(username, 64), password }
+  return { username: sanitizeString(username, 64), password, remember: Boolean(remember) }
 }
 
 export function validateEmailLogin(body) {
-  const { email, password } = body ?? {}
+  const { email, password, remember } = body ?? {}
 
   if (!email?.trim() || !password) {
     throw new ApiError(400, 'Email and password are required')
@@ -24,7 +24,7 @@ export function validateEmailLogin(body) {
     throw new ApiError(400, 'Invalid email format')
   }
 
-  return { email: sanitizeEmail(email), password }
+  return { email: sanitizeEmail(email), password, remember: Boolean(remember) }
 }
 
 export function validateChangePassword(body) {

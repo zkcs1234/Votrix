@@ -1,4 +1,5 @@
-import api from '@/services/api'
+import api, { ensureCsrfToken } from '@/services/api'
+import { CSRF_HEADER } from '@/utils/csrf'
 
 const base = '/organizer/election'
 const voterBase = '/voter/election'
@@ -110,7 +111,6 @@ export const electionService = {
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable && onProgress) {
-          // Estimate total based on file size (rough estimate)
           const estimatedTotal = Math.max(event.total, file.size * 2)
           onProgress({
             processed: event.loaded,
@@ -140,10 +140,14 @@ export const electionService = {
         })
       }
 
-      xhr.open('POST', `${api.defaults.baseURL}${base}/events/${eventId}/voters/import`)
-      xhr.setRequestHeader('Authorization', `Bearer ${api.defaults.headers.Authorization?.replace('Bearer ', '')}`)
-      xhr.withCredentials = true
-      xhr.send(form)
+      ensureCsrfToken()
+        .then((csrf) => {
+          xhr.open('POST', `${api.defaults.baseURL}${base}/events/${eventId}/voters/import`)
+          if (csrf) xhr.setRequestHeader(CSRF_HEADER, csrf)
+          xhr.withCredentials = true
+          xhr.send(form)
+        })
+        .catch((err) => reject(err))
     })
   },
 
@@ -162,5 +166,9 @@ export const electionService = {
 
   submitVote(eventId, selections) {
     return api.post(`${voterBase}/events/${eventId}/vote`, { selections })
+  },
+
+  getResults(eventId) {
+    return api.get(`${voterBase}/events/${eventId}/results`)
   },
 }

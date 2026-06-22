@@ -8,8 +8,16 @@ export default function ProtectedRoute({
   allowedRoles,
   allowPasswordChange = false,
 }) {
-  const { isAuthenticated, role, mustChangePassword } = useAuth()
+  const { isAuthenticated, role, mustChangePassword, isBootstrapping } = useAuth()
   const location = useLocation()
+
+  if (isBootstrapping) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     const loginPath = allowedRoles?.length === 1 ? getRoleLoginPath(allowedRoles[0]) : '/'

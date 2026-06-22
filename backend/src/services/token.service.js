@@ -9,6 +9,7 @@ export function buildTokenPayload(user) {
     email: user.email ?? undefined,
     accountStatus: user.account_status ?? 'active',
     mustChangePassword: Boolean(user.must_change_password),
+    tokenVersion: Number(user.token_version ?? 0),
   }
 }
 

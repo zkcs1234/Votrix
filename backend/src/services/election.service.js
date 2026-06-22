@@ -1,6 +1,7 @@
 import { getSupabase } from '../config/database.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, EVENT_TYPES } from '../utils/constants.js'
+import { isElectionVotingOpen, canVoterViewElectionResults } from '../utils/eventSchedule.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { getOrCreateElectionOrganization, mapOrganization } from './organization.service.js'
 
@@ -177,7 +178,13 @@ export async function createElectionEvent(organizerId, payload) {
 }
 
 export async function updateElectionEvent(eventId, organizerId, payload) {
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  const event = await assertOrganizerOwnsEvent(eventId, organizerId)
+
+  const nextStart = payload.startDate !== undefined ? payload.startDate : event.start_date
+  const nextEnd = payload.endDate !== undefined ? payload.endDate : event.end_date
+  if (nextStart && nextEnd && new Date(nextEnd) < new Date(nextStart)) {
+    throw new ApiError(400, 'End date must be on or after start date')
+  }
 
   const updates = {}
   if (payload.title !== undefined) updates.title = payload.title
@@ -203,6 +210,35 @@ export async function updateElectionEvent(eventId, organizerId, payload) {
 
 export async function setEventVoting(eventId, organizerId, votingEnabled) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
+
+  if (votingEnabled) {
+    const { data: positions, error: posErr } = await getClient()
+      .from(DB_TABLES.POSITIONS)
+      .select('id')
+      .eq('event_id', eventId)
+
+    if (posErr) throw new ApiError(500, posErr.message)
+    if (!positions?.length) {
+      throw new ApiError(400, 'Add at least one position before opening voting')
+    }
+
+    const positionIds = positions.map((p) => p.id)
+    const { data: candidates, error: candErr } = await getClient()
+      .from(DB_TABLES.CANDIDATES)
+      .select('position_id')
+      .in('position_id', positionIds)
+
+    if (candErr) throw new ApiError(500, candErr.message)
+
+    const positionsWithCandidates = new Set((candidates ?? []).map((c) => c.position_id))
+    const missing = positions.filter((p) => !positionsWithCandidates.has(p.id))
+    if (missing.length) {
+      throw new ApiError(
+        400,
+        'Every position must have at least one candidate before opening voting',
+      )
+    }
+  }
 
   const updates = {
     voting_enabled: Boolean(votingEnabled),
@@ -313,6 +349,17 @@ export async function updatePosition(eventId, organizerId, positionId, payload) 
 export async function deletePosition(eventId, organizerId, positionId) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
 
+  const { count: voteCount, error: voteErr } = await getClient()
+    .from(DB_TABLES.ELECTION_VOTES)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .eq('position_id', positionId)
+
+  if (voteErr) throw new ApiError(500, voteErr.message)
+  if ((voteCount ?? 0) > 0) {
+    throw new ApiError(409, 'Cannot delete a position that already has votes recorded')
+  }
+
   const { error } = await getClient()
     .from(DB_TABLES.POSITIONS)
     .delete()
@@ -422,6 +469,16 @@ export async function deleteCandidate(eventId, organizerId, candidateId) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   await assertCandidateInEvent(eventId, candidateId)
 
+  const { count: voteCount, error: voteErr } = await getClient()
+    .from(DB_TABLES.ELECTION_VOTES)
+    .select('*', { count: 'exact', head: true })
+    .eq('candidate_id', candidateId)
+
+  if (voteErr) throw new ApiError(500, voteErr.message)
+  if ((voteCount ?? 0) > 0) {
+    throw new ApiError(409, 'Cannot delete a candidate that already has votes recorded')
+  }
+
   const { error } = await getClient().from(DB_TABLES.CANDIDATES).delete().eq('id', candidateId)
   if (error) throw new ApiError(500, error.message)
 }
@@ -526,7 +583,9 @@ export async function getVoterBallot(eventId, voterId) {
     event: mapEvent(event),
     positions: byPosition,
     hasVoted: enrollment.has_voted,
-    votingOpen: Boolean(event.voting_enabled),
+    votingOpen: isElectionVotingOpen(event),
+    resultsVisibility: event.results_visibility ?? 'public',
+    canViewResults: canVoterViewElectionResults(event),
   }
 }
 
@@ -559,7 +618,16 @@ export async function submitBallot(eventId, voterId, selections) {
 
   const event = await getEventById(eventId)
 
-  if (!event.voting_enabled) {
+  if (!isElectionVotingOpen(event)) {
+    if (!event.voting_enabled) {
+      throw new ApiError(403, 'Voting is not open for this event')
+    }
+    if (event.start_date && new Date(event.start_date) > new Date()) {
+      throw new ApiError(403, 'Voting has not started yet for this event')
+    }
+    if (event.end_date && new Date(event.end_date) < new Date()) {
+      throw new ApiError(403, 'Voting has ended for this event')
+    }
     throw new ApiError(403, 'Voting is not open for this event')
   }
 
@@ -611,6 +679,10 @@ export async function submitBallot(eventId, voterId, selections) {
         candidate_id: candidateId,
       })
     }
+  }
+
+  if (!voteRows.length) {
+    throw new ApiError(400, 'Your ballot must include at least one selection')
   }
 
   const { data: locked, error: lockErr } = await getClient()
@@ -680,19 +752,17 @@ export async function listVoterElectionEvents(voterId) {
 
 // ——— Analytics ———
 
-export async function getElectionAnalytics(eventId, organizerId) {
-  await assertOrganizerOwnsEvent(eventId, organizerId)
-
+async function fetchElectionResultsData(eventId) {
   const [
     { count: totalVoters, error: evErr },
     { count: votedCount, error: votedErr },
     { data: voteRows, error: voteErr },
-    { data: candidates, error: candErr }
+    { data: candidates, error: candErr },
   ] = await Promise.all([
     getClient().from(DB_TABLES.EVENT_VOTERS).select('*', { count: 'exact', head: true }).eq('event_id', eventId),
     getClient().from(DB_TABLES.EVENT_VOTERS).select('*', { count: 'exact', head: true }).eq('event_id', eventId).eq('has_voted', true),
     getClient().from(DB_TABLES.ELECTION_VOTES).select('candidate_id, position_id').eq('event_id', eventId),
-    getClient().from(DB_TABLES.CANDIDATES).select('id, name, position_id, positions!inner(event_id)').eq('positions.event_id', eventId)
+    getClient().from(DB_TABLES.CANDIDATES).select('id, name, position_id, positions!inner(event_id)').eq('positions.event_id', eventId),
   ])
 
   if (evErr) throw new ApiError(500, evErr.message)
@@ -720,7 +790,15 @@ export async function getElectionAnalytics(eventId, organizerId) {
 
   const liveTotalVotes = voteRows?.length ?? 0
 
-  const positions = await listPositions(eventId, organizerId)
+  const { data: positionRows, error: posListErr } = await getClient()
+    .from(DB_TABLES.POSITIONS)
+    .select('*')
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+
+  if (posListErr) throw new ApiError(500, posListErr.message)
+
+  const positions = (positionRows ?? []).map(mapPosition)
   const positionSummaries = positions.map((position) => {
     const inPosition = candidateResults.filter((c) => c.positionId === position.id)
     const totalPositionVotes = inPosition.reduce((s, c) => s + c.votes, 0)
@@ -748,4 +826,24 @@ export async function getElectionAnalytics(eventId, organizerId) {
     candidateResults,
     positionSummaries,
   }
+}
+
+export async function getVoterElectionResults(eventId, voterId) {
+  await assertVoterEnrolled(eventId, voterId)
+  const event = await getEventById(eventId)
+
+  if (event.event_type !== EVENT_TYPES.ELECTION) {
+    throw new ApiError(400, 'Not an election event')
+  }
+
+  if (!canVoterViewElectionResults(event)) {
+    throw new ApiError(403, 'Results are not available yet')
+  }
+
+  return fetchElectionResultsData(eventId)
+}
+
+export async function getElectionAnalytics(eventId, organizerId) {
+  await assertOrganizerOwnsEvent(eventId, organizerId)
+  return fetchElectionResultsData(eventId)
 }

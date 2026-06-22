@@ -4,11 +4,10 @@ import { env } from '../config/env.js'
 import { findUserById } from '../services/user.service.js'
 
 function extractAccessToken(req) {
-  // Use HTTP-only cookie only - token no longer stored in localStorage
   return req.cookies?.[env.jwt.accessCookieName] || null
 }
 
-export function authenticate(req, _res, next) {
+export async function authenticate(req, _res, next) {
   try {
     const token = extractAccessToken(req)
     if (!token) {
@@ -16,6 +15,16 @@ export function authenticate(req, _res, next) {
     }
 
     const decoded = verifyAccessToken(token)
+    const user = await findUserById(decoded.sub)
+
+    if (!user) {
+      throw new ApiError(401, 'User not found')
+    }
+
+    if (Number(user.token_version ?? 0) !== Number(decoded.tokenVersion ?? 0)) {
+      throw new ApiError(401, 'Session has been revoked')
+    }
+
     req.user = {
       id: decoded.sub,
       role: decoded.role,
@@ -23,6 +32,7 @@ export function authenticate(req, _res, next) {
       email: decoded.email,
       accountStatus: decoded.accountStatus,
       mustChangePassword: Boolean(decoded.mustChangePassword),
+      tokenVersion: decoded.tokenVersion ?? 0,
     }
     next()
   } catch (error) {
@@ -67,6 +77,10 @@ export async function requireActiveAccount(req, _res, next) {
     const user = await findUserById(req.user?.id)
     if (!user) {
       return next(new ApiError(401, 'User not found'))
+    }
+
+    if (Number(user.token_version ?? 0) !== Number(req.user?.tokenVersion ?? 0)) {
+      return next(new ApiError(401, 'Session has been revoked'))
     }
 
     if (user.account_status === 'active') {

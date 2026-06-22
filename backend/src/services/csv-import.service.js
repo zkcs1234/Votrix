@@ -49,6 +49,19 @@ function normalizeRow(row, index) {
   }
 }
 
+async function rollbackCsvEnrollments(eventId, voterIds) {
+  if (!voterIds.length) return
+
+  const client = getSupabase()
+  if (!client) return
+
+  await client
+    .from(DB_TABLES.EVENT_VOTERS)
+    .delete()
+    .eq('event_id', eventId)
+    .in('voter_id', voterIds)
+}
+
 export async function importVotersFromCsv(eventId, organizerId, fileBuffer) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
 
@@ -79,12 +92,11 @@ export async function importVotersFromCsv(eventId, organizerId, fileBuffer) {
     throw new ApiError(400, 'CSV validation failed', { errors })
   }
 
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
   const results = []
+  const enrolledVoterIds = []
 
-  for (const row of parsed) {
-    try {
+  try {
+    for (const row of parsed) {
       const invite = await inviteVoterToEvent({
         eventId,
         email: row.email,
@@ -92,28 +104,31 @@ export async function importVotersFromCsv(eventId, organizerId, fileBuffer) {
         temporaryPassword: row.temporaryPassword,
       })
 
+      enrolledVoterIds.push(invite.user.id)
+
+      if (!invite.email?.sent) {
+        throw new ApiError(400, `Invitation email was not sent for ${row.email}`, {
+          reason: invite.email?.reason || invite.email?.error || 'Email delivery failed',
+        })
+      }
+
       results.push({
         email: row.email,
         success: true,
         isNewVoter: invite.isNewVoter,
-        emailSent: invite.email?.sent,
-      })
-    } catch (err) {
-      results.push({
-        email: row.email,
-        success: false,
-        error: err.message,
+        emailSent: true,
       })
     }
+  } catch (err) {
+    await rollbackCsvEnrollments(eventId, enrolledVoterIds)
+    if (err instanceof ApiError) throw err
+    throw new ApiError(500, err.message || 'CSV import failed')
   }
-
-  const succeeded = results.filter((r) => r.success).length
-  const failed = results.length - succeeded
 
   return {
     total: parsed.length,
-    succeeded,
-    failed,
+    succeeded: results.length,
+    failed: 0,
     results,
   }
 }

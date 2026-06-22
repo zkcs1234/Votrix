@@ -2,7 +2,7 @@ import { getSupabase } from '../config/database.js'
 import { ApiError } from '../utils/ApiError.js'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import { findUserByEmail } from './user.service.js'
-import { updateUserPassword } from './user.service.js'
+import { updateUserPassword, incrementTokenVersion } from './user.service.js'
 import { sendPasswordResetEmail } from './mailer.service.js'
 import { env } from '../config/env.js'
 
@@ -69,6 +69,7 @@ export async function resetPasswordWithToken({ token, newPassword }) {
   }
 
   await updateUserPassword(row.user_id, newPassword, { clearMustChange: false })
+  await incrementTokenVersion(row.user_id)
 
   await getClient()
     .from(TABLE)

@@ -10,7 +10,7 @@ describe('Auth Validators', () => {
   describe('validateAdminLogin', () => {
     test('should return sanitized credentials for valid input', () => {
       const result = validateAdminLogin({ username: '  admin  ', password: 'password123' })
-      expect(result).toEqual({ username: 'admin', password: 'password123' })
+      expect(result).toEqual({ username: 'admin', password: 'password123', remember: false })
     })
 
     test('should throw error when username is missing', () => {
@@ -33,7 +33,7 @@ describe('Auth Validators', () => {
   describe('validateEmailLogin', () => {
     test('should return sanitized email and password for valid input', () => {
       const result = validateEmailLogin({ email: '  TEST@Example.COM  ', password: 'password123' })
-      expect(result).toEqual({ email: 'test@example.com', password: 'password123' })
+      expect(result).toEqual({ email: 'test@example.com', password: 'password123', remember: false })
     })
 
     test('should throw error when email is missing', () => {

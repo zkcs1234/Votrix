@@ -6,6 +6,7 @@ import {
   findUserByEmail,
   findUserById,
   updateUserPassword,
+  incrementTokenVersion,
   sanitizeUser,
 } from './user.service.js'
 import { issueTokenPair } from './token.service.js'
@@ -72,13 +73,34 @@ export async function loginVoter({ email, password }) {
   })
 }
 
-export async function refreshSession(userId) {
+export async function refreshSession(userId, tokenVersion) {
+  const user = await findUserById(userId)
+  if (!user) {
+    throw new ApiError(401, 'User not found')
+  }
+
+  if (
+    tokenVersion !== undefined &&
+    Number(user.token_version ?? 0) !== Number(tokenVersion ?? 0)
+  ) {
+    throw new ApiError(401, 'Session has been revoked')
+  }
+
+  assertAccountActive(user)
+  return issueTokenPair(user)
+}
+
+export async function issueSessionForUser(userId) {
   const user = await findUserById(userId)
   if (!user) {
     throw new ApiError(401, 'User not found')
   }
   assertAccountActive(user)
   return issueTokenPair(user)
+}
+
+export async function revokeSession(userId) {
+  return incrementTokenVersion(userId)
 }
 
 export async function getCurrentUser(userId) {
@@ -104,5 +126,8 @@ export async function changePassword(userId, { currentPassword, newPassword }) {
     throw new ApiError(400, 'New password must be different from current password')
   }
 
-  return updateUserPassword(userId, newPassword, { clearMustChange: true })
+  await updateUserPassword(userId, newPassword, { clearMustChange: true })
+  await incrementTokenVersion(userId)
+  const refreshed = await findUserById(userId)
+  return sanitizeUser(refreshed)
 }

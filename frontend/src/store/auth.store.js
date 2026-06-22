@@ -4,6 +4,8 @@ import { removeItem, setJSON } from '@/utils/storage'
 
 import { clearCsrfToken, setCsrfToken } from '@/utils/csrf'
 
+import { clearVotrixDrafts } from '@/utils/draftStorage'
+
 // Token is now stored in HTTP-only cookie.
 // Do NOT bootstrap user/role from localStorage because that can cause
 // role bleed-through when switching accounts without logout.
@@ -12,6 +14,7 @@ const initialUser = null
 export const useAuthStore = create((set, get) => ({
   user: initialUser,
   isAuthenticated: false,
+  isBootstrapping: true,
 
 
   setSession({ user, csrfToken }) {
@@ -21,6 +24,7 @@ export const useAuthStore = create((set, get) => ({
     set({
       user: user ?? null,
       isAuthenticated: Boolean(user),
+      isBootstrapping: false,
     })
   },
 
@@ -33,7 +37,12 @@ export const useAuthStore = create((set, get) => ({
     // Token cleared via cookie - only clear local user data
     removeItem(STORAGE_KEYS.USER)
     clearCsrfToken()
-    set({ user: null, isAuthenticated: false })
+    clearVotrixDrafts()
+    set({ user: null, isAuthenticated: false, isBootstrapping: false })
+  },
+
+  finishBootstrap() {
+    set({ isBootstrapping: false })
   },
 
   mustChangePassword() {

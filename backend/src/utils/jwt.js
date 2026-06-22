@@ -16,7 +16,12 @@ export function signAccessToken(payload) {
 
 export function signRefreshToken(payload) {
   return jwt.sign(
-    { sub: payload.sub, role: payload.role, type: TOKEN_TYPES.REFRESH },
+    {
+      sub: payload.sub,
+      role: payload.role,
+      tokenVersion: payload.tokenVersion ?? 0,
+      type: TOKEN_TYPES.REFRESH,
+    },
     env.jwt.refreshSecret,
     { expiresIn: env.jwt.refreshExpiresIn },
   )

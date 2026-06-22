@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
+import { validatePollAnswers } from '@/utils/pollValidation'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import PollQuestionField from '@/components/voter/polling/PollQuestionField'
 
@@ -53,6 +54,13 @@ export default function VoterPollPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    const validationError = validatePollAnswers(questions, answers)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
     setSubmitting(true)
     setError(null)
 

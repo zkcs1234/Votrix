@@ -12,6 +12,11 @@ export const getBallot = asyncHandler(async (req, res) => {
   res.json({ success: true, ...ballot })
 })
 
+export const getResults = asyncHandler(async (req, res) => {
+  const results = await electionService.getVoterElectionResults(req.params.eventId, req.user.id)
+  res.json({ success: true, results })
+})
+
 export const submitVote = asyncHandler(async (req, res) => {
   const selections = validateBallot(req.body)
   const result = await electionService.submitBallot(

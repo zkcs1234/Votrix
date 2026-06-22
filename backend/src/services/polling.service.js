@@ -15,6 +15,7 @@ import {
   validateTypeConfig,
   buildAnalytics,
 } from '../modules/poll-question-types.js'
+import { isPollOpen as isPollOpenForEvent } from '../utils/eventSchedule.js'
 
 // Phase 7 — Polling question types are now registry-driven. The legacy
 // POLL_QUESTION_TYPES constants and the `multiple_choice` alias are kept in
@@ -87,9 +88,7 @@ async function getPollingOrgId(organizerId) {
 }
 
 function isPollOpen(event) {
-  if (!event.polling_enabled) return false
-  if (event.poll_expires_at && new Date(event.poll_expires_at) < new Date()) return false
-  return true
+  return isPollOpenForEvent(event)
 }
 
 // ——— Organizer: events ———

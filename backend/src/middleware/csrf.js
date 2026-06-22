@@ -12,6 +12,8 @@ const EXEMPT_PATHS = new Set([
   '/auth/refresh',
   '/auth/change-password',
   '/auth/logout',
+  '/auth/forgot-password',
+  '/auth/reset-password',
   '/admin/organizers',
   '/health',
   '/health/',

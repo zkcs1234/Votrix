@@ -113,8 +113,8 @@ export default function ElectionVotersPage() {
       const emailResult = res?.data?.email ?? null
 
       if (!emailResult?.sent) {
-        // Backend returns { sent:false, skipped:true } when Resend is not configured
         const reason = emailResult?.reason || emailResult?.error || 'Email was not sent'
+        setVoters((prev) => prev.filter((v) => v.id !== tempId))
         setError(reason)
         showError(reason)
         return

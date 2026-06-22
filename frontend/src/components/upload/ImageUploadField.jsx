@@ -24,6 +24,13 @@ export default function ImageUploadField({
     const file = e.target.files?.[0]
     if (!file) return
 
+    const maxBytes = 5 * 1024 * 1024
+    if (file.size > maxBytes) {
+      window.alert('Image must be 5 MB or smaller.')
+      e.target.value = ''
+      return
+    }
+
     if (preview?.startsWith('blob:')) {
       URL.revokeObjectURL(preview)
     }

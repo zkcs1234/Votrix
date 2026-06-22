@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { useToast } from '@/hooks/useToast'
 
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
@@ -18,6 +19,7 @@ export default function ElectionPositionsPage() {
   const [displayOrder, setDisplayOrder] = useState('')
   const [allowSkip, setAllowSkip] = useState(false)
   const [saving, setSaving] = useState(false)
+  const { error: showError } = useToast()
 
   const load = () => {
     electionService
@@ -42,6 +44,12 @@ export default function ElectionPositionsPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault()
+
+    if (Number(minVote) > Number(maxVote)) {
+      showError('Minimum votes cannot exceed maximum votes.')
+      return
+    }
+
     setSaving(true)
     try {
       await electionService.createPosition(eventId, {
@@ -56,6 +64,8 @@ export default function ElectionPositionsPage() {
       resetForm()
       setLoading(true)
       load()
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to create position')
     } finally {
       setSaving(false)
     }
@@ -63,14 +73,22 @@ export default function ElectionPositionsPage() {
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this position and all its candidates?')) return
-    await electionService.deletePosition(eventId, id)
-    load()
+    try {
+      await electionService.deletePosition(eventId, id)
+      load()
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to delete position')
+    }
   }
 
   const handleMove = async (position, delta) => {
     const target = Math.max(0, (position.displayOrder ?? 0) + delta)
-    await electionService.updatePosition(eventId, position.id, { displayOrder: target })
-    load()
+    try {
+      await electionService.updatePosition(eventId, position.id, { displayOrder: target })
+      load()
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to reorder position')
+    }
   }
 
   if (loading) {

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { useToast } from '@/hooks/useToast'
 
 function EventCard({ event, onToggleVoting }) {
   const [toggling, setToggling] = useState(false)
@@ -74,6 +75,7 @@ function EventCardSkeleton() {
 export default function ElectionEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const { error: showError } = useToast()
 
   // Use delayed loading
   const showLoader = useDelayedLoading(loading, 300)
@@ -114,12 +116,11 @@ export default function ElectionEventsPage() {
       try {
         await electionService.setVoting(event.id, !event.votingEnabled)
       } catch (err) {
-        // Rollback on error
         setEvents(previousEvents)
-        throw err
+        showError(err.response?.data?.message || 'Failed to update voting status')
       }
     },
-    [events]
+    [events, showError]
   )
 
   // Show nothing under 300ms

@@ -73,6 +73,12 @@ export default function ElectionEventFormPage() {
     setSaving(true)
     setError(null)
 
+    if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+      setError('End date must be on or after start date.')
+      setSaving(false)
+      return
+    }
+
     try {
       const payload = {
         title,

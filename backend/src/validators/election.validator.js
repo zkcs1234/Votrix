@@ -14,14 +14,23 @@ function normalizeResultsVisibility(value) {
   return value
 }
 
+function assertValidDateRange(startDate, endDate) {
+  if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+    throw new ApiError(400, 'End date must be on or after start date')
+  }
+}
+
 export function validateCreateEvent(body) {
   if (!body?.title?.trim()) throw new ApiError(400, 'Event title is required')
+  const startDate = body.startDate || null
+  const endDate = body.endDate || null
+  assertValidDateRange(startDate, endDate)
   return {
     title: body.title.trim(),
     description: body.description?.trim() || null,
     banner: body.banner || null,
-    startDate: body.startDate || null,
-    endDate: body.endDate || null,
+    startDate,
+    endDate,
     status: body.status || 'draft',
     resultsVisibility: normalizeResultsVisibility(body.resultsVisibility) ?? 'public',
   }
@@ -38,15 +47,20 @@ export function validateUpdateEvent(body) {
   if (body.resultsVisibility !== undefined) {
     payload.resultsVisibility = normalizeResultsVisibility(body.resultsVisibility)
   }
+
   return payload
 }
 
 export function validatePosition(body) {
   if (!body?.name?.trim()) throw new ApiError(400, 'Position name is required')
+  const allowSkip = Boolean(body.allowSkip)
   const minVote = Number(body.minVote ?? 1)
   const maxVote = Number(body.maxVote ?? 1)
   if (Number.isNaN(minVote) || Number.isNaN(maxVote) || minVote < 0 || maxVote < minVote) {
     throw new ApiError(400, 'Invalid vote range')
+  }
+  if (!allowSkip && minVote < 1) {
+    throw new ApiError(400, 'minVote must be at least 1 when skipping is not allowed')
   }
 
   const numberOfWinners = Number(body.numberOfWinners ?? 1)
@@ -69,7 +83,7 @@ export function validatePosition(body) {
     maxVote,
     numberOfWinners,
     displayOrder,
-    allowSkip: Boolean(body.allowSkip),
+    allowSkip,
   }
 }
 
