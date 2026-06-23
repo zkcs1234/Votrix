@@ -147,32 +147,32 @@ async function authedAgent(user) {
     mustChangePassword: false,
   })
 
+  // Set token as cookie (votrix_access) instead of Authorization header
+  // The system now extracts tokens from HTTP-only cookies
+  const accessCookie = `votrix_access=${jwtToken}`
+
   return {
     get: (url) =>
-      request(app).get(url).set('Authorization', `Bearer ${jwtToken}`).set('Cookie', csrfCookie),
+      request(app).get(url).set('Cookie', `${csrfCookie}; ${accessCookie}`),
     post: (url) =>
       request(app)
         .post(url)
-        .set('Authorization', `Bearer ${jwtToken}`)
-        .set('Cookie', csrfCookie)
+        .set('Cookie', `${csrfCookie}; ${accessCookie}`)
         .set('x-csrf-token', csrfToken),
     patch: (url) =>
       request(app)
         .patch(url)
-        .set('Authorization', `Bearer ${jwtToken}`)
-        .set('Cookie', csrfCookie)
+        .set('Cookie', `${csrfCookie}; ${accessCookie}`)
         .set('x-csrf-token', csrfToken),
     put: (url) =>
       request(app)
         .put(url)
-        .set('Authorization', `Bearer ${jwtToken}`)
-        .set('Cookie', csrfCookie)
+        .set('Cookie', `${csrfCookie}; ${accessCookie}`)
         .set('x-csrf-token', csrfToken),
     delete: (url) =>
       request(app)
         .delete(url)
-        .set('Authorization', `Bearer ${jwtToken}`)
-        .set('Cookie', csrfCookie)
+        .set('Cookie', `${csrfCookie}; ${accessCookie}`)
         .set('x-csrf-token', csrfToken),
   }
 }
@@ -355,9 +355,14 @@ describe('E2E submission paths', () => {
         mustChangePassword: false,
       })
 
+      // Get CSRF cookie but don't send the CSRF token header
+      const csrfRes = await request(app).get('/api/auth/csrf')
+      const csrfCookie = csrfRes.headers['set-cookie']?.[0]?.split(';')[0] ?? ''
+      const accessCookie = `votrix_access=${jwtToken}`
+
       const res = await request(app)
         .post(`/api/voter/election/events/${eventId}/vote`)
-        .set('Authorization', `Bearer ${jwtToken}`)
+        .set('Cookie', `${csrfCookie}; ${accessCookie}`)
         .send({ selections: {} })
 
       expect(res.status).toBe(403)

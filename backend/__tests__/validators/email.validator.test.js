@@ -36,9 +36,8 @@ describe('Email Validators', () => {
   })
 
   describe('validateInviteVoter', () => {
-    test('should return sanitized data for valid input without password', () => {
-      const result = validateInviteVoter({ email: '  VOTER@Example.COM  ' })
-      expect(result).toEqual({ email: 'voter@example.com', temporaryPassword: undefined })
+    test('should throw error when password is missing (Invite New requires password)', () => {
+      expect(() => validateInviteVoter({ email: 'voter@example.com' })).toThrow(ApiError)
     })
 
     test('should return data with password when provided', () => {
