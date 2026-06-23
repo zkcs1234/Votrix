@@ -273,7 +273,7 @@ export default function ElectionVotersPage() {
           onChange={(e) => setRegisteredEmail(e.target.value)}
           required
         />
-        <Button type="submit" loading={invitingRegistered} variant="secondary">
+        <Button type="submit" loading={invitingRegistered}>
           Invite Registered
         </Button>
       </form>
