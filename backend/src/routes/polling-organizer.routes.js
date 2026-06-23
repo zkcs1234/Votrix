@@ -29,6 +29,7 @@ router.patch('/question-types/custom/:typeId', ctrl.updateCustomQuestionType)
 router.delete('/question-types/custom/:typeId', ctrl.deleteCustomQuestionType)
 
 router.post('/events/:eventId/respondents/invite', emailLimiter, ctrl.inviteRespondent)
+router.post('/events/:eventId/respondents/invite-existing', emailLimiter, ctrl.inviteExistingRespondent)
 router.post('/events/:eventId/respondents/import', csvImportLimiter, uploadSingle('file'), ctrl.importRespondentsCsv)
 
 export default router

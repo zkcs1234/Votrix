@@ -5,7 +5,7 @@ import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
 import { findUserByEmail, findUserById, sanitizeUser } from './user.service.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
-import { sendVoterInvitationEmail } from './mailer.service.js'
+import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './mailer.service.js'
 import { createNotification } from './notification.service.js'
 
 function getClient() {
@@ -140,6 +140,55 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
     isNewVoter: isNew,
     email: emailResult,
   }
+}
+
+/**
+ * Invite an already registered voter to an event.
+ * Does NOT create new account or reset password.
+ * Simply enrolls the voter in the event.
+ */
+export async function inviteRegisteredVoter({ eventId, email, organizerId }) {
+  await assertOrganizerOwnsEvent(eventId, organizerId)
+  const event = await getEventById(eventId)
+
+  // Find voter by email
+  const voter = await findUserByEmail(email.toLowerCase().trim())
+
+  if (!voter) {
+    throw new ApiError(404, 'Voter not found. Use the "Invite New" method to create a new voter account.')
+  }
+
+  if (voter.role !== USER_ROLES.VOTER) {
+    throw new ApiError(400, 'This email belongs to a different account type')
+  }
+
+  // Check if already enrolled
+  const { data: existing } = await getClient()
+    .from(DB_TABLES.EVENT_VOTERS)
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('voter_id', voter.id)
+    .maybeSingle()
+
+  if (existing) {
+    throw new ApiError(409, 'Voter is already enrolled in this event')
+  }
+
+  // Enroll voter in event
+  await getClient().from(DB_TABLES.EVENT_VOTERS).insert({
+    event_id: eventId,
+    voter_id: voter.id,
+    has_voted: false,
+  })
+
+  // Send invitation email (no password)
+  await sendVoterInvitationEmailRegistered({
+    email: voter.email,
+    eventId: event.id,
+    eventTitle: event.title,
+  })
+
+  return { user: voter, event: { id: event.id, title: event.title } }
 }
 
 export async function resendVoterInvitation({ eventId, voterId, organizerId }) {

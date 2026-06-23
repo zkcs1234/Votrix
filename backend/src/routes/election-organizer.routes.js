@@ -32,6 +32,7 @@ router.post(
 
 router.get('/events/:eventId/voters', ctrl.listVoters)
 router.post('/events/:eventId/voters/invite', emailLimiter, ctrl.inviteVoter)
+router.post('/events/:eventId/voters/invite-existing', emailLimiter, ctrl.inviteExistingVoter)
 router.post('/events/:eventId/voters/import', csvImportLimiter, uploadSingle('file'), ctrl.importCsv)
 
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)

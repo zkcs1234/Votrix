@@ -3,6 +3,7 @@ import { env } from '../config/env.js'
 import { sendEmail } from './email.service.js'
 import { organizerInvitationTemplate } from '../templates/email/organizerInvitation.js'
 import { voterInvitationTemplate } from '../templates/email/voterInvitation.js'
+import { voterInvitationRegisteredTemplate } from '../templates/email/voterInvitationRegistered.js'
 import { passwordResetTemplate } from '../templates/email/passwordReset.js'
 import { eventNotificationTemplate } from '../templates/email/eventNotification.js'
 import { judgeInvitationTemplate } from '../templates/email/judgeInvitation.js'
@@ -58,6 +59,26 @@ export async function sendVoterInvitationEmail({
   const html = voterInvitationTemplate({
     email,
     temporaryPassword,
+    eventLink: link,
+    eventTitle,
+    loginUrl: voterLoginUrl(),
+  })
+
+  return sendWorkflowEmail({
+    to: email,
+    subject: `You're invited: ${eventTitle}`,
+    html,
+  })
+}
+
+export async function sendVoterInvitationEmailRegistered({
+  email,
+  eventId,
+  eventTitle,
+}) {
+  const link = eventUrl(eventId)
+  const html = voterInvitationRegisteredTemplate({
+    email,
     eventLink: link,
     eventTitle,
     loginUrl: voterLoginUrl(),

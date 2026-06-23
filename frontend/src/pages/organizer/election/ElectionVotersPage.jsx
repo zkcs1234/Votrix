@@ -69,10 +69,12 @@ export default function ElectionVotersPage() {
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [temporaryPassword, setTemporaryPassword] = useState('')
+  const [registeredEmail, setRegisteredEmail] = useState('')
   const [importResult, setImportResult] = useState(null)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [inviting, setInviting] = useState(false)
+  const [invitingRegistered, setInvitingRegistered] = useState(false)
   const [importProgress, setImportProgress] = useState(null)
 
   const { success, error: showError } = useToast()
@@ -131,6 +133,25 @@ export default function ElectionVotersPage() {
       showError(err.response?.data?.message || 'Invite failed')
     } finally {
       setInviting(false)
+    }
+  }
+
+  // Handler for inviting already registered voters
+  const handleInviteRegistered = async (e) => {
+    e.preventDefault()
+    setError(null)
+    setInvitingRegistered(true)
+
+    try {
+      await electionService.inviteExistingVoter(eventId, registeredEmail)
+      setRegisteredEmail('')
+      load()
+      success('Registered voter invited successfully')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invite failed')
+      showError(err.response?.data?.message || 'Invite failed')
+    } finally {
+      setInvitingRegistered(false)
     }
   }
 
@@ -200,7 +221,11 @@ export default function ElectionVotersPage() {
       <div className="v-card-sm">
         <h3 className="v-label">CSV upload</h3>
         <p className="v-helper-text mb-3">
-          Columns: email, tempassword. Duplicates in file are rejected.
+          Columns: email (required), tempassword (optional).
+          <br />
+          If tempassword provided: Creates new voter with that password.
+          <br />
+          If tempassword empty: Enrolls existing voter only.
         </p>
         <input
           type="file"
@@ -248,7 +273,21 @@ export default function ElectionVotersPage() {
           required
         />
         <Button type="submit" loading={inviting}>
-          Invite
+          Invite New
+        </Button>
+      </form>
+
+      <form onSubmit={handleInviteRegistered} className="flex flex-wrap gap-3">
+        <input
+          type="email"
+          placeholder="voter@email.com"
+          className="v-input flex-1 min-w-[200px]"
+          value={registeredEmail}
+          onChange={(e) => setRegisteredEmail(e.target.value)}
+          required
+        />
+        <Button type="submit" loading={invitingRegistered} variant="secondary">
+          Invite Registered
         </Button>
       </form>
 

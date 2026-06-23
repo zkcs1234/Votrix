@@ -89,6 +89,10 @@ export const electionService = {
     return api.post(`${base}/events/${eventId}/voters/invite`, payload)
   },
 
+  inviteExistingVoter(eventId, email) {
+    return api.post(`${base}/events/${eventId}/voters/invite-existing`, { email })
+  },
+
   importCsv(eventId, file) {
     const form = new FormData()
     form.append('file', file)

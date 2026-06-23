@@ -64,6 +64,10 @@ export const pollingService = {
     return api.post(`${org}/events/${eventId}/respondents/invite`, payload)
   },
 
+  inviteExistingRespondent(eventId, email) {
+    return api.post(`${org}/events/${eventId}/respondents/invite-existing`, { email })
+  },
+
   importCsv(eventId, file) {
     const form = new FormData()
     form.append('file', file)

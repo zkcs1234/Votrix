@@ -6,9 +6,11 @@ export default function PollingRespondentsPage() {
   const { eventId } = useParams()
   const [email, setEmail] = useState('')
   const [temporaryPassword, setTemporaryPassword] = useState('')
+  const [registeredEmail, setRegisteredEmail] = useState('')
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [importResult, setImportResult] = useState(null)
+  const [invitingRegistered, setInvitingRegistered] = useState(false)
 
   const handleInvite = async (e) => {
     e.preventDefault()
@@ -21,6 +23,21 @@ export default function PollingRespondentsPage() {
       setSuccess('Invitation sent')
     } catch (err) {
       setError(err.response?.data?.message || 'Invite failed')
+    }
+  }
+
+  const handleInviteRegistered = async (e) => {
+    e.preventDefault()
+    setError(null)
+    setInvitingRegistered(true)
+    try {
+      await pollingService.inviteExistingRespondent(eventId, registeredEmail)
+      setRegisteredEmail('')
+      setSuccess('Registered respondent invited successfully')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invite failed')
+    } finally {
+      setInvitingRegistered(false)
     }
   }
 
@@ -50,7 +67,11 @@ export default function PollingRespondentsPage() {
       <div className="v-card p-6">
         <h3 className="text-sm font-medium text-v-text-muted">CSV upload</h3>
         <p className="mt-1 text-xs text-v-text-subtle">
-          Columns: email, tempassword
+          Columns: email (required), tempassword (optional).
+          <br />
+          If tempassword provided: Creates new respondent with that password.
+          <br />
+          If tempassword empty: Enrolls existing respondent only.
         </p>
         <input type="file" accept=".csv" className="mt-3 text-sm text-v-text-subtle" onChange={handleCsv} />
         {importResult && (
@@ -79,7 +100,21 @@ export default function PollingRespondentsPage() {
           className="flex-1 min-w-[200px] rounded-lg border border-v-border-strong bg-v-surface-elevated px-3 py-2 text-white"
         />
         <button type="submit" className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white">
-          Send invite
+          Invite New
+        </button>
+      </form>
+
+      <form onSubmit={handleInviteRegistered} className="flex flex-wrap gap-2">
+        <input
+          type="email"
+          required
+          placeholder="respondent@email.com"
+          value={registeredEmail}
+          onChange={(e) => setRegisteredEmail(e.target.value)}
+          className="flex-1 min-w-[200px] rounded-lg border border-v-border-strong bg-v-surface-elevated px-3 py-2 text-white"
+        />
+        <button type="submit" disabled={invitingRegistered} className="rounded-lg bg-v-secondary px-4 py-2 text-sm text-white">
+          Invite Registered
         </button>
       </form>
 

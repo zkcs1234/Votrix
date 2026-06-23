@@ -2,7 +2,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import * as pollingService from '../services/polling.service.js'
 import { importVotersFromCsv } from '../services/csv-import.service.js'
-import { inviteVoterToEvent } from '../services/invitation.service.js'
+import { inviteVoterToEvent, inviteRegisteredVoter } from '../services/invitation.service.js'
 import {
   validatePollEvent,
   validateQuestion,
@@ -124,6 +124,26 @@ export const inviteRespondent = asyncHandler(async (req, res) => {
     temporaryPassword: payload.temporaryPassword,
   })
   res.status(201).json({ success: true, ...result })
+})
+
+export const inviteExistingRespondent = asyncHandler(async (req, res) => {
+  const { email } = req.body
+
+  if (!email) {
+    throw new ApiError(400, 'Email is required')
+  }
+
+  const result = await inviteRegisteredVoter({
+    eventId: req.params.eventId,
+    email,
+    organizerId: req.user.id,
+  })
+
+  res.json({
+    success: true,
+    message: 'Respondent invited successfully',
+    voter: result.user,
+  })
 })
 
 export const importRespondentsCsv = asyncHandler(async (req, res) => {

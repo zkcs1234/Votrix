@@ -13,7 +13,7 @@ import {
   validateVotingToggle,
 } from '../validators/election.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
-import { inviteVoterToEvent } from '../services/invitation.service.js'
+import { inviteVoterToEvent, inviteRegisteredVoter } from '../services/invitation.service.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const data = await electionService.getOrganizerDashboard(req.user.id)
@@ -178,6 +178,26 @@ export const inviteVoter = asyncHandler(async (req, res) => {
     temporaryPassword: payload.temporaryPassword,
   })
   res.status(201).json({ success: true, ...result })
+})
+
+export const inviteExistingVoter = asyncHandler(async (req, res) => {
+  const { email } = req.body
+
+  if (!email) {
+    throw new ApiError(400, 'Email is required')
+  }
+
+  const result = await inviteRegisteredVoter({
+    eventId: req.params.eventId,
+    email,
+    organizerId: req.user.id,
+  })
+
+  res.json({
+    success: true,
+    message: 'Voter invited successfully',
+    voter: result.user,
+  })
 })
 
 export const importCsv = asyncHandler(async (req, res) => {

@@ -2,7 +2,7 @@ import { Readable } from 'stream'
 import csv from 'csv-parser'
 import { ApiError } from '../utils/ApiError.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
-import { inviteVoterToEvent } from './invitation.service.js'
+import { inviteVoterToEvent, inviteRegisteredVoter } from './invitation.service.js'
 import { getSupabase } from '../config/database.js'
 import { DB_TABLES } from '../utils/constants.js'
 
@@ -35,16 +35,20 @@ function normalizeRow(row, index) {
     return { error: `Row ${index + 2}: invalid email`, row: null }
   }
 
-  if (!tempassword) {
-    return { error: `Row ${index + 2}: tempassword is required`, row: null }
+  // Auto-detect: if tempassword provided → new voter, if not → registered voter
+  if (tempassword && tempassword.length > 0) {
+    if (tempassword.length < 8) {
+      return { error: `Row ${index + 2}: tempassword must be at least 8 characters`, row: null }
+    }
+    return {
+      row: { email, type: 'new', temporaryPassword: tempassword },
+      error: null,
+    }
   }
 
-  if (tempassword.length < 8) {
-    return { error: `Row ${index + 2}: tempassword must be at least 8 characters`, row: null }
-  }
-
+  // No tempassword → register existing voter
   return {
-    row: { email, temporaryPassword: tempassword },
+    row: { email, type: 'existing' },
     error: null,
   }
 }
@@ -97,27 +101,54 @@ export async function importVotersFromCsv(eventId, organizerId, fileBuffer) {
 
   try {
     for (const row of parsed) {
-      const invite = await inviteVoterToEvent({
-        eventId,
-        email: row.email,
-        organizerId,
-        temporaryPassword: row.temporaryPassword,
-      })
+      let invite
 
-      enrolledVoterIds.push(invite.user.id)
+      if (row.type === 'new') {
+        // Create new voter with temp password
+        invite = await inviteVoterToEvent({
+          eventId,
+          email: row.email,
+          organizerId,
+          temporaryPassword: row.temporaryPassword,
+        })
 
-      if (!invite.email?.sent) {
-        throw new ApiError(400, `Invitation email was not sent for ${row.email}`, {
-          reason: invite.email?.reason || invite.email?.error || 'Email delivery failed',
+        enrolledVoterIds.push(invite.user.id)
+
+        if (!invite.email?.sent) {
+          throw new ApiError(400, `Invitation email was not sent for ${row.email}`, {
+            reason: invite.email?.reason || invite.email?.error || 'Email delivery failed',
+          })
+        }
+
+        results.push({
+          email: row.email,
+          success: true,
+          isNewVoter: true,
+          emailSent: true,
+        })
+      } else {
+        // Enroll existing voter
+        invite = await inviteRegisteredVoter({
+          eventId,
+          email: row.email,
+          organizerId,
+        })
+
+        enrolledVoterIds.push(invite.user.id)
+
+        if (!invite.email?.sent) {
+          throw new ApiError(400, `Invitation email was not sent for ${row.email}`, {
+            reason: invite.email?.reason || invite.email?.error || 'Email delivery failed',
+          })
+        }
+
+        results.push({
+          email: row.email,
+          success: true,
+          isNewVoter: false,
+          emailSent: true,
         })
       }
-
-      results.push({
-        email: row.email,
-        success: true,
-        isNewVoter: invite.isNewVoter,
-        emailSent: true,
-      })
     }
   } catch (err) {
     await rollbackCsvEnrollments(eventId, enrolledVoterIds)
