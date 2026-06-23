@@ -11,9 +11,6 @@ function VoterRow({ voter }) {
   return (
     <tr>
       <td className="text-v-text-muted">{voter.email}</td>
-      <td className="v-caption">
-        {[voter.firstName, voter.lastName].filter(Boolean).join(' ') || '—'}
-      </td>
       <td>
         <span className={voter.hasVoted ? 'v-badge v-badge-success' : 'v-badge'}>
           {voter.hasVoted ? 'Voted' : 'Pending'}
@@ -36,9 +33,6 @@ function TableSkeleton() {
               <div className="h-4 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
             </th>
             <th>
-              <div className="h-4 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
-            </th>
-            <th>
               <div className="h-4 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
             </th>
           </tr>
@@ -48,9 +42,6 @@ function TableSkeleton() {
             <tr key={i}>
               <td>
                 <div className="h-4 w-40 animate-pulse rounded-lg bg-v-surface-elevated" />
-              </td>
-              <td>
-                <div className="h-4 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
               </td>
               <td>
                 <div className="h-6 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
@@ -192,11 +183,7 @@ export default function ElectionVotersPage() {
 
   const filteredVoters = voters.filter((v) => {
     const searchLower = search.toLowerCase()
-    return (
-      v.email.toLowerCase().includes(searchLower) ||
-      (v.firstName && v.firstName.toLowerCase().includes(searchLower)) ||
-      (v.lastName && v.lastName.toLowerCase().includes(searchLower))
-    )
+    return v.email.toLowerCase().includes(searchLower)
   })
 
   // Show nothing under 300ms
@@ -296,7 +283,7 @@ export default function ElectionVotersPage() {
       <div className="v-table-wrap">
         <div className="p-4 border-b border-v-border">
           <SearchInput
-            placeholder="Search voters by email or name..."
+            placeholder="Search voters by email"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-xs"
@@ -306,14 +293,13 @@ export default function ElectionVotersPage() {
           <thead>
             <tr>
               <th>Email</th>
-              <th>Name</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
             {filteredVoters.length === 0 ? (
               <tr>
-                <td colSpan={3} className="text-center v-caption py-8">
+                <td colSpan={2} className="text-center v-caption py-8">
                   {search ? 'No voters found matching your search' : 'No voters yet'}
                 </td>
               </tr>

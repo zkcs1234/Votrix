@@ -89,7 +89,6 @@ export default function PageantJudgesPage() {
         <thead>
           <tr className="border-b border-v-border text-v-text-subtle">
             <th className="py-2">Email</th>
-            <th>Name</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -97,9 +96,6 @@ export default function PageantJudgesPage() {
           {judges.map((j) => (
             <tr key={j.id} className="border-b border-v-border/50">
               <td className="py-3 text-v-text-muted">{j.email}</td>
-              <td className="text-v-text-subtle">
-                {[j.firstName, j.lastName].filter(Boolean).join(' ') || 'â€”'}
-              </td>
               <td className={j.hasScored ? 'text-v-success' : 'text-v-text-subtle'}>
                 {j.hasScored ? 'Submitted' : 'Pending'}
               </td>

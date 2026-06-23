@@ -10,7 +10,7 @@ import { withPercentage, topN, sumBy } from '@/modules/analytics/utils/aggregati
 import { safePercentage } from '@/modules/analytics/utils/format'
 
 const QUESTION_TYPE_LABEL = {
-  single_choice: 'Multiple choice',
+  single_choice: 'Single choice',
   checkbox: 'Checkbox',
   yes_no: 'Yes / No',
   text: 'Text',
