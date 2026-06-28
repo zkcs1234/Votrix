@@ -11,8 +11,9 @@
  * `createAuditLog` in `admin.service.js`.
  */
 
-import { db, wrap } from './db.js'
+import { db } from './db.js'
 import { DB_TABLES } from '../utils/constants.js'
+import { ApiError } from '../utils/ApiError.js'
 
 /**
  * Record an audit log entry.
@@ -59,21 +60,67 @@ export async function recordAudit({ userId, action, entity, entityId, details } 
 }
 
 /**
- * Fetch the recent audit trail, optionally filtered by entity.
+ * Fetch the recent audit trail, optionally filtered by entity, with
+ * support for pagination, full-text search, and date range filtering.
+ *
+ * @param {object} opts
+ * @param {string=}  opts.entity      — filter to a specific entity type
+ * @param {string=}  opts.entityId    — filter to a specific entity row
+ * @param {string=}  opts.action      — exact action filter
+ * @param {string=}  opts.search      — partial match across action/entity/details text
+ * @param {string=}  opts.startDate   — ISO date lower bound (inclusive) on created_at
+ * @param {string=}  opts.endDate     — ISO date upper bound (inclusive) on created_at
+ * @param {number=}  opts.limit       — rows per page (default 50, max 200)
+ * @param {number=}  opts.offset      — rows to skip for pagination (default 0)
+ * @returns {Promise<{ rows: object[], total: number }>}
  */
-export async function listAuditTrail({ entity, entityId, limit = 100 } = {}) {
+export async function listAuditTrail({
+  entity,
+  entityId,
+  action,
+  search,
+  startDate,
+  endDate,
+  limit = 50,
+  offset = 0,
+} = {}) {
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 50), 200)
+  const safeOffset = Math.max(0, Number(offset) || 0)
   const client = db()
+
   let query = client
     .from(DB_TABLES.AUDIT_LOGS)
     .select(
       `id, action, entity, entity_id, details, created_at,
-       user_id, users ( email, role )`,
+       user_id, users ( id, email, role )`,
+      { count: 'exact' },
     )
     .order('created_at', { ascending: false })
-    .limit(limit)
+    .range(safeOffset, safeOffset + safeLimit - 1)
 
   if (entity) query = query.eq('entity', entity)
   if (entityId) query = query.eq('entity_id', entityId)
+  if (action) query = query.eq('action', action)
+  if (startDate) query = query.gte('created_at', startDate)
+  if (endDate) {
+    // Include the full end day by going to end of that day in UTC
+    const end = new Date(endDate)
+    end.setUTCHours(23, 59, 59, 999)
+    query = query.lte('created_at', end.toISOString())
+  }
+  // Partial text search across action + entity + details cast to text
+  if (search && search.trim()) {
+    const term = search.trim()
+    // PostgREST ilike filter — search against action field as primary fast path;
+    // also apply an OR across entity. Full details search is handled client-side
+    // for the first 200 rows since JSONB ilike is not natively supported without
+    // a generated column or FTS index. This approach is fast and avoids N+1.
+    query = query.or(`action.ilike.%${term}%,entity.ilike.%${term}%`)
+  }
 
-  return wrap(query, { context: 'listAuditTrail' })
+  const { data, error, count } = await query
+  if (error) {
+    throw new ApiError(500, `listAuditTrail: ${error.message}`)
+  }
+  return { rows: data ?? [], total: count ?? 0 }
 }

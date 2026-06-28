@@ -132,9 +132,41 @@ export const updateSystemSettings = asyncHandler(async (req, res) => {
   res.json({ success: true, setting: updatedSetting })
 })
 
-export const getAuditLogs = asyncHandler(async (_req, res) => {
-  const logs = await fetchAuditLogs()
-  res.json({ success: true, logs })
+export const getAuditLogs = asyncHandler(async (req, res) => {
+  const {
+    page = '1',
+    limit = '50',
+    search = '',
+    action,
+    entity,
+    startDate,
+    endDate,
+  } = req.query ?? {}
+
+  const safeLimit = Math.min(Math.max(1, parseInt(limit, 10) || 50), 200)
+  const safePage  = Math.max(1, parseInt(page, 10) || 1)
+  const offset    = (safePage - 1) * safeLimit
+
+  const { logs, total } = await fetchAuditLogs({
+    search: search || undefined,
+    action: action || undefined,
+    entity: entity || undefined,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+    limit: safeLimit,
+    offset,
+  })
+
+  res.json({
+    success: true,
+    logs,
+    pagination: {
+      total,
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit),
+    },
+  })
 })
 
 export const getAdminOverview = asyncHandler(async (_req, res) => {

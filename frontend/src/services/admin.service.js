@@ -27,7 +27,7 @@ export const adminService = {
   updateSystemSetting(data) {
     return api.put(`${base}/settings`, data)
   },
-  getAuditLogs() {
-    return api.get(`${base}/audit-logs`)
+  getAuditLogs(params = {}) {
+    return api.get(`${base}/audit-logs`, { params })
   }
 }

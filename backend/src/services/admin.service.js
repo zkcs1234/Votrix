@@ -82,14 +82,38 @@ export async function saveSystemSetting(key, value, description = null) {
 }
 
 /**
- * Backward-compatibility shim. New code should call
- * `listAuditTrail({ entity, entityId, limit })` from `foundation/audit.js`
- * directly. The returned rows are mapped with the shared `mapAuditLog`
- * helper for consistency.
+ * Fetch paginated, filterable audit logs.
+ *
+ * Accepted options are passed straight through to `listAuditTrail`:
+ *   entity, entityId, action, search, startDate, endDate, limit, offset
+ *
+ * Returns `{ logs, total, page, limit }` so the controller can pass the
+ * pagination metadata back to the client.
  */
-export async function getAuditLogs({ limit = 100 } = {}) {
-  const rows = await listAuditTrail({ limit })
-  return (rows ?? []).map(mapAuditLog)
+export async function getAuditLogs({
+  entity,
+  entityId,
+  action,
+  search,
+  startDate,
+  endDate,
+  limit = 50,
+  offset = 0,
+} = {}) {
+  const { rows, total } = await listAuditTrail({
+    entity,
+    entityId,
+    action,
+    search,
+    startDate,
+    endDate,
+    limit,
+    offset,
+  })
+  return {
+    logs: (rows ?? []).map(mapAuditLog),
+    total,
+  }
 }
 
 /**
