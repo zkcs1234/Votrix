@@ -1,30 +1,37 @@
 import { useParams } from 'react-router-dom'
+import {
+  LayoutDashboard, CalendarDays, Trophy, Users, BarChart3, MapPin,
+} from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 
 const navItems = [
-  { label: 'Dashboard', path: '/organizer/election' },
-  { label: 'Events', path: '/organizer/election/events' },
+  { label: 'Dashboard', path: '/organizer/election', icon: LayoutDashboard },
+  { label: 'Events', path: '/organizer/election/events', icon: CalendarDays },
   {
     label: 'Positions',
     path: 'positions',
+    icon: MapPin,
     scoped: true,
     basePath: '/organizer/election/events',
   },
   {
     label: 'Candidates',
     path: 'candidates',
+    icon: Users,
     scoped: true,
     basePath: '/organizer/election/events',
   },
   {
     label: 'Voters',
     path: 'voters',
+    icon: Users,
     scoped: true,
     basePath: '/organizer/election/events',
   },
   {
     label: 'Analytics',
     path: 'analytics',
+    icon: BarChart3,
     scoped: true,
     basePath: '/organizer/election/events',
   },

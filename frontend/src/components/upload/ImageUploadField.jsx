@@ -1,4 +1,5 @@
 ﻿import { useState } from 'react'
+import { Upload, ImageIcon } from 'lucide-react'
 
 const VARIANT_STYLES = {
   logo: 'h-24 w-24 rounded-xl object-cover',
@@ -48,10 +49,15 @@ export default function ImageUploadField({
           <img src={preview} alt="" className={VARIANT_STYLES[variant] ?? VARIANT_STYLES.photo} />
         )}
         <label
-          className={`cursor-pointer rounded-lg border border-dashed border-v-border-strong px-4 py-3 text-sm text-v-text-subtle hover:border-v-border-strong hover:text-v-text-muted ${
+          className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-v-border-strong px-4 py-3 text-sm text-v-text-subtle hover:border-v-border-strong hover:text-v-text-muted ${
             disabled ? 'pointer-events-none opacity-50' : ''
           }`}
         >
+          {preview ? (
+            <ImageIcon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+          ) : (
+            <Upload className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+          )}
           {preview ? 'Change image' : 'Choose image'}
           <input
             type="file"

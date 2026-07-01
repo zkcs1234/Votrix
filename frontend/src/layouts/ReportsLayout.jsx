@@ -1,7 +1,8 @@
+import { BarChart3, ArrowLeft } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 
 const navItems = [
-  { label: 'Overview', path: '/organizer/reports' },
+  { label: 'Overview', path: '/organizer/reports', icon: BarChart3 },
 ]
 
 export default function ReportsLayout() {

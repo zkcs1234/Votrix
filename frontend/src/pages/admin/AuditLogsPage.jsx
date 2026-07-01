@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
+import { RefreshCw, Download, X, ClipboardList, AlertTriangle, FileSearch, ChevronUp, ChevronDown, Copy, Check } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import { useToast } from '@/hooks/useToast'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -160,16 +161,18 @@ function AuditDetailModal({ log, onClose }) {
                 onClick={handleCopy}
                 className="!text-xs"
               >
-                {copied ? '✓ Copied' : 'Copy JSON'}
+                {copied ? (
+                  <><Check className="h-3.5 w-3.5" strokeWidth={2} /> Copied</>
+                ) : (
+                  <><Copy className="h-3.5 w-3.5" strokeWidth={1.5} /> Copy JSON</>
+                )}
               </Button>
               <button
                 onClick={onClose}
                 className="rounded-lg p-1.5 text-v-text-muted hover:bg-v-surface-elevated hover:text-v-text"
                 aria-label="Close"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="h-4 w-4" strokeWidth={2} />
               </button>
             </div>
           </div>
@@ -377,18 +380,11 @@ export default function AuditLogsPage() {
             disabled={loading}
             title="Refresh"
           >
-            <svg
-              className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 4v5h.582M20 20v-5h-.581M5.418 9A8 8 0 0 1 19.938 12M18.582 15A8 8 0 0 1 4.062 12" />
-            </svg>
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={2} />
             Refresh
           </Button>
           <Button size="sm" variant="secondary" onClick={exportCSV} disabled={logs.length === 0}>
+            <Download className="h-4 w-4" strokeWidth={1.5} />
             Export CSV
           </Button>
         </div>
@@ -406,10 +402,7 @@ export default function AuditLogsPage() {
       <Card>
         {error ? (
           <div className="flex flex-col items-center gap-4 p-8 text-center">
-            <svg className="h-10 w-10 text-v-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-            </svg>
+            <AlertTriangle className="h-10 w-10 text-v-danger" strokeWidth={1.5} />
             <div>
               <p className="font-medium text-v-danger">{error}</p>
               <p className="mt-1 text-sm text-v-text-muted">Check the console for more details.</p>
@@ -499,9 +492,13 @@ export default function AuditLogsPage() {
                       onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
                       title="Sort by timestamp"
                     >
-                      Timestamp{' '}
-                      <span className="text-v-text-subtle">
-                        {sortDir === 'desc' ? '↓' : '↑'}
+                      <span className="inline-flex items-center gap-1">
+                        Timestamp
+                        {sortDir === 'desc' ? (
+                          <ChevronDown className="h-3.5 w-3.5 text-v-text-subtle" strokeWidth={2} />
+                        ) : (
+                          <ChevronUp className="h-3.5 w-3.5 text-v-text-subtle" strokeWidth={2} />
+                        )}
                       </span>
                     </th>
                     <th>Action</th>
@@ -519,10 +516,7 @@ export default function AuditLogsPage() {
                     <tr>
                       <td colSpan={6} className="py-16 text-center text-v-text-subtle">
                         <div className="flex flex-col items-center gap-3">
-                          <svg className="h-12 w-12 text-v-border" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                              d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z" />
-                          </svg>
+                          <FileSearch className="h-12 w-12 text-v-border" strokeWidth={1} />
                           <p className="text-sm font-medium">No audit logs found</p>
                           {activeFilterCount > 0 && (
                             <p className="text-xs">

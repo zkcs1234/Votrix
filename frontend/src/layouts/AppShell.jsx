@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Menu, Bell, LogOut } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { authService } from '@/services/auth.service'
 import { notificationsService } from '@/services/notifications.service'
@@ -19,13 +20,16 @@ function NavLinks({ items, eventId, location, onNavigate }) {
   return (
     <nav className="space-y-0.5">
       {items.map((item) => {
+        const Icon = item.icon ?? null
+
         if (item.scoped && !eventId) {
           return (
             <span
               key={item.label}
-              className="block cursor-not-allowed rounded-lg px-3 py-2.5 text-sm text-gray-600"
+              className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-600"
               title="Select an event first"
             >
+              {Icon && <Icon className="h-4 w-4 shrink-0 opacity-40" strokeWidth={1.5} aria-hidden />}
               {item.label}
             </span>
           )
@@ -43,6 +47,7 @@ function NavLinks({ items, eventId, location, onNavigate }) {
 
         return (
           <Link key={item.label} to={href} onClick={onNavigate} className={linkClass(active)}>
+            {Icon && <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} aria-hidden />}
             {item.label}
           </Link>
         )
@@ -198,9 +203,7 @@ export default function AppShell({
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <Menu className="h-5 w-5" strokeWidth={1.5} />
           </button>
 
           <div className="min-w-0 flex-1">
@@ -222,9 +225,7 @@ export default function AppShell({
                 }`}
                 aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.857 17.082a2.142 2.142 0 0 1-4.714 0m8.285-4.66v-2.29A6.428 6.428 0 0 0 12 3.704a6.428 6.428 0 0 0-6.428 6.428v2.29c0 .972-.387 1.904-1.075 2.593L3 16.51h18l-1.497-1.497a3.66 3.66 0 0 1-1.075-2.593Z" />
-                </svg>
+                <Bell className="h-5 w-5" strokeWidth={1.5} />
                 {unreadCount > 0 && (
                   <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-v-danger px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
                     {unreadCount > 99 ? '99+' : unreadCount}
@@ -257,9 +258,7 @@ export default function AppShell({
               className="rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated sm:hidden"
               aria-label="Sign out"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              <LogOut className="h-5 w-5" strokeWidth={1.5} />
             </button>
           </div>
         </header>

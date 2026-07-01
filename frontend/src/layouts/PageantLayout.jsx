@@ -1,30 +1,37 @@
 import { useParams } from 'react-router-dom'
+import {
+  LayoutDashboard, CalendarDays, Users, Star, ListChecks, Award, BarChart3,
+} from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 
 const navItems = [
-  { label: 'Competition Scoring Dashboard', path: '/organizer/competition' },
-  { label: 'Competition Scoring Events', path: '/organizer/competition/events' },
+  { label: 'Competition Scoring Dashboard', path: '/organizer/competition', icon: LayoutDashboard },
+  { label: 'Competition Scoring Events', path: '/organizer/competition/events', icon: CalendarDays },
   {
     label: 'Contestants',
     path: 'contestants',
+    icon: Users,
     scoped: true,
     basePath: '/organizer/competition/events',
   },
   {
     label: 'Criteria',
     path: 'criteria',
+    icon: ListChecks,
     scoped: true,
     basePath: '/organizer/competition/events',
   },
   {
     label: 'Judges',
     path: 'judges',
+    icon: Star,
     scoped: true,
     basePath: '/organizer/competition/events',
   },
   {
     label: 'Rankings',
     path: 'rankings',
+    icon: Award,
     scoped: true,
     basePath: '/organizer/competition/events',
   },

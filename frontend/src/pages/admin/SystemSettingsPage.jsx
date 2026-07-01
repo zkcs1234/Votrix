@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Settings, ToggleLeft, Hash, Save, ShieldAlert } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -190,23 +191,29 @@ export default function SystemSettingsPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="v-page-title">System settings</h1>
+        <div className="flex items-center gap-2">
+          <Settings className="h-5 w-5 text-v-text-subtle" strokeWidth={1.5} />
+          <h1 className="v-page-title">System settings</h1>
+        </div>
         <p className="v-caption">
           Configure platform-wide behavior without changing the database schema.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Settings" value={summary.total} />
-        <StatCard label="Boolean flags" value={summary.enabled} />
-        <StatCard label="Numeric values" value={summary.numeric} />
+        <StatCard label="Settings" value={summary.total} icon={Settings} />
+        <StatCard label="Boolean flags" value={summary.enabled} icon={ToggleLeft} />
+        <StatCard label="Numeric values" value={summary.numeric} icon={Hash} />
         <StatCard label="Editable now" value={settings.length > 0 ? 'Yes' : 'No'} />
       </div>
 
       <Card>
         <form onSubmit={handleSave} className="space-y-6 p-6">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="warning">Admin only</Badge>
+            <Badge tone="warning">
+              <ShieldAlert className="mr-1 h-3 w-3" strokeWidth={2} aria-hidden />
+              Admin only
+            </Badge>
             <span className="v-caption">
               Changes take effect immediately after saving.
             </span>
@@ -267,6 +274,7 @@ export default function SystemSettingsPage() {
 
           <div className="flex justify-end border-t border-v-border pt-4">
             <Button type="submit" loading={saving}>
+              <Save className="h-4 w-4" strokeWidth={2} />
               Save changes
             </Button>
           </div>

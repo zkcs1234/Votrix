@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
+import { X, UserPlus, CheckCircle, AlertCircle, Mail } from 'lucide-react'
 import { createOrganizerSchema } from '@/schemas/auth.schemas'
 import { adminService } from '@/services/admin.service'
 import AuthFormField from '@/components/auth/AuthFormField'
@@ -71,12 +72,13 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess }) {
           className="absolute top-4 right-4 p-1 text-v-text-muted hover:text-v-text"
           aria-label="Close"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X className="h-5 w-5" strokeWidth={2} />
         </button>
 
-        <h2 className="v-page-title">Create Organizer</h2>
+        <div className="flex items-center gap-2">
+          <UserPlus className="h-5 w-5 text-v-text-muted" strokeWidth={1.5} />
+          <h2 className="v-page-title">Create Organizer</h2>
+        </div>
         <p className="v-caption mt-1">
           New organizer accounts start in pending review, and the organizer must change this password on first login.
         </p>
@@ -95,17 +97,20 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess }) {
           </AuthFormField>
 
           {error && (
-            <p className="rounded-lg border border-v-danger bg-v-danger-bg px-3 py-2 text-sm text-v-danger">
+            <p className="flex items-center gap-2 rounded-lg border border-v-danger bg-v-danger-bg px-3 py-2 text-sm text-v-danger">
+              <AlertCircle className="h-4 w-4 shrink-0" strokeWidth={2} />
               {error}
             </p>
           )}
           {success && (
-            <p className="rounded-lg border border-v-success bg-v-success-bg px-3 py-2 text-sm text-v-success">
+            <p className="flex items-center gap-2 rounded-lg border border-v-success bg-v-success-bg px-3 py-2 text-sm text-v-success">
+              <CheckCircle className="h-4 w-4 shrink-0" strokeWidth={2} />
               {success}
             </p>
           )}
           {emailStatus && (
-            <p className="rounded-lg border border-v-border-strong bg-v-surface-elevated/50 px-3 py-2 text-sm text-v-text-muted">
+            <p className="flex items-center gap-2 rounded-lg border border-v-border-strong bg-v-surface-elevated/50 px-3 py-2 text-sm text-v-text-muted">
+              <Mail className="h-4 w-4 shrink-0" strokeWidth={1.5} />
               {emailStatus}
             </p>
           )}

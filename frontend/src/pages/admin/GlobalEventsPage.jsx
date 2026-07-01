@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { CalendarDays, Zap, Clock, CheckCircle2, Vote, Trophy, BarChart2 } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Card from '@/components/ui/Card'
 import { format } from 'date-fns'
@@ -102,10 +103,10 @@ export default function GlobalEventsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total events" value={stats.total} />
-        <StatCard label="Active" value={stats.active} />
-        <StatCard label="Scheduled" value={stats.scheduled} />
-        <StatCard label="Completed" value={stats.completed} />
+        <StatCard label="Total events" value={stats.total} icon={CalendarDays} />
+        <StatCard label="Active" value={stats.active} icon={Zap} />
+        <StatCard label="Scheduled" value={stats.scheduled} icon={Clock} />
+        <StatCard label="Completed" value={stats.completed} icon={CheckCircle2} />
       </div>
 
       <Card>
@@ -219,7 +220,14 @@ export default function GlobalEventsPage() {
                       <tr key={event.id} className="hover:bg-v-surface-elevated/50">
                         <td className="font-medium text-v-text">{event.title}</td>
                         <td className="capitalize">
-                          <Badge>{event.event_type}</Badge>
+                          <Badge>
+                            <span className="inline-flex items-center gap-1.5">
+                              {event.event_type === 'election' && <Vote className="h-3 w-3" strokeWidth={2} />}
+                              {(event.event_type === 'competition_scoring' || event.event_type === 'pageant') && <Trophy className="h-3 w-3" strokeWidth={2} />}
+                              {event.event_type === 'polling' && <BarChart2 className="h-3 w-3" strokeWidth={2} />}
+                              {event.event_type}
+                            </span>
+                          </Badge>
                         </td>
                         <td>{event.organizations?.organization_name || 'N/A'}</td>
                         <td className="capitalize">

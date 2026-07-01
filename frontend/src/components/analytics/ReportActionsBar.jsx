@@ -1,3 +1,5 @@
+import { RefreshCw, FileText, FileSpreadsheet, FileDown, Braces } from 'lucide-react'
+
 /**
  * ReportActionsBar — toolbar of report actions (refresh + exports).
  * Pure: each handler is provided by the caller. Components never assume
@@ -18,8 +20,9 @@ export default function ReportActionsBar({
         <button
           type="button"
           onClick={onRefresh}
-          className="rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated"
         >
+          <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} />
           Refresh
         </button>
       )}
@@ -28,8 +31,9 @@ export default function ReportActionsBar({
           type="button"
           onClick={onExportCsv}
           disabled={busy}
-          className="rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
         >
+          <FileText className="h-3.5 w-3.5" strokeWidth={1.5} />
           Export CSV
         </button>
       )}
@@ -38,8 +42,9 @@ export default function ReportActionsBar({
           type="button"
           onClick={onExportExcel}
           disabled={busy}
-          className="rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
         >
+          <FileSpreadsheet className="h-3.5 w-3.5" strokeWidth={1.5} />
           Export Excel
         </button>
       )}
@@ -48,8 +53,9 @@ export default function ReportActionsBar({
           type="button"
           onClick={onExportPdf}
           disabled={busy}
-          className="rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
         >
+          <FileDown className="h-3.5 w-3.5" strokeWidth={1.5} />
           Export PDF
         </button>
       )}
@@ -58,8 +64,9 @@ export default function ReportActionsBar({
           type="button"
           onClick={onExportJson}
           disabled={busy}
-          className="rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
         >
+          <Braces className="h-3.5 w-3.5" strokeWidth={1.5} />
           Export JSON
         </button>
       )}

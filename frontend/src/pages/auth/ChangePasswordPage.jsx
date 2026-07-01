@@ -3,17 +3,16 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
+import { Lock, ShieldCheck, AlertCircle } from 'lucide-react'
 import { changePasswordSchema } from '@/schemas/auth.schemas'
 import { authService } from '@/services/auth.service'
 import { useAuth } from '@/hooks/useAuth'
 import { getRoleDashboardPath } from '@/utils/auth'
 import AuthFormField from '@/components/auth/AuthFormField'
 import SubmitButton from '@/components/auth/SubmitButton'
+import PasswordInput from '@/components/ui/PasswordInput'
 import { API_BASE_URL } from '@/utils/constants'
 import { clearCsrfToken, setCsrfToken } from '@/utils/csrf'
-
-import { INPUT_CLASS } from '@/utils/uiClasses'
-const inputClass = INPUT_CLASS
 
 async function ensureCsrfToken() {
   clearCsrfToken()
@@ -61,57 +60,58 @@ export default function ChangePasswordPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-v-text">Change your password</h2>
+      <div className="flex items-center gap-2">
+        <Lock className="h-5 w-5 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
+        <h2 className="text-xl font-semibold text-v-text">Change your password</h2>
+      </div>
       <p className="mt-2 text-sm text-v-text-subtle">
         You must set a new password before accessing your {role} dashboard.
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
-          <AuthFormField
-            label="Current password"
+        <AuthFormField
+          label="Current password"
+          id="currentPassword"
+          error={errors.currentPassword?.message}
+        >
+          <PasswordInput
             id="currentPassword"
-            error={errors.currentPassword?.message}
-          >
-            <input
-              id="currentPassword"
-              type="password"
-              autoComplete="current-password"
-              className={inputClass}
-              {...register('currentPassword')}
-            />
-          </AuthFormField>
+            autoComplete="current-password"
+            {...register('currentPassword')}
+          />
+        </AuthFormField>
 
-          <AuthFormField label="New password" id="newPassword" error={errors.newPassword?.message}>
-            <input
-              id="newPassword"
-              type="password"
-              autoComplete="new-password"
-              className={inputClass}
-              {...register('newPassword')}
-            />
-          </AuthFormField>
+        <AuthFormField label="New password" id="newPassword" error={errors.newPassword?.message}>
+          <PasswordInput
+            id="newPassword"
+            autoComplete="new-password"
+            {...register('newPassword')}
+          />
+        </AuthFormField>
 
-          <AuthFormField
-            label="Confirm new password"
+        <AuthFormField
+          label="Confirm new password"
+          id="confirmPassword"
+          error={errors.confirmPassword?.message}
+        >
+          <PasswordInput
             id="confirmPassword"
-            error={errors.confirmPassword?.message}
-          >
-            <input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              className={inputClass}
-              {...register('confirmPassword')}
-            />
-          </AuthFormField>
+            autoComplete="new-password"
+            {...register('confirmPassword')}
+          />
+        </AuthFormField>
 
-          {error && (
-            <p className="rounded-lg border px-3 py-2 text-sm text-v-danger bg-v-danger-bg">
-              {error}
-            </p>
-          )}
+        {error && (
+          <p className="flex items-center gap-2 rounded-lg border border-v-danger bg-v-danger-bg px-3 py-2 text-sm text-v-danger">
+            <AlertCircle className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            {error}
+          </p>
+        )}
 
-        <SubmitButton loading={loading}>Update password</SubmitButton>
+        <SubmitButton loading={loading}>
+          <ShieldCheck className="h-4 w-4" strokeWidth={2} />
+          Update password
+        </SubmitButton>
       </form>
     </div>
   )

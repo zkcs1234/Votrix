@@ -2,6 +2,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { getRoleDashboardPath } from '@/utils/auth'
 import { USER_ROLES } from '@/utils/constants'
 import AppShell from '@/layouts/AppShell'
+import {
+  LayoutDashboard, Users, CalendarDays, Settings, ClipboardList,
+} from 'lucide-react'
 
 export default function DashboardLayout({ title = 'Dashboard' }) {
   const { role } = useAuth()
@@ -11,6 +14,7 @@ export default function DashboardLayout({ title = 'Dashboard' }) {
     {
       label: 'Overview',
       path: home,
+      icon: LayoutDashboard,
       isActive: (loc) => loc.pathname === home,
     },
 
@@ -19,22 +23,25 @@ export default function DashboardLayout({ title = 'Dashboard' }) {
           {
             label: 'Organizer Management',
             path: '/admin/organizers',
+            icon: Users,
             isActive: (loc) => loc.pathname.startsWith('/admin/organizers'),
           },
           {
             label: 'Global Events',
             path: '/admin/events',
+            icon: CalendarDays,
             isActive: (loc) => loc.pathname.startsWith('/admin/events'),
           },
           {
             label: 'System Settings',
             path: '/admin/settings',
+            icon: Settings,
             isActive: (loc) => loc.pathname.startsWith('/admin/settings'),
           },
-
           {
             label: 'Audit Logs',
             path: '/admin/audit-logs',
+            icon: ClipboardList,
             isActive: (loc) => loc.pathname.startsWith('/admin/audit-logs'),
           },
         ]

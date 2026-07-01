@@ -1,12 +1,21 @@
 ﻿import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { CalendarDays, Zap, Users, Star, CheckSquare, UserCheck, Percent, Building2, Plus } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
-import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import PageLoader from '@/components/ui/PageLoader'
+import StatCard from '@/components/ui/StatCard'
+import Card from '@/components/ui/Card'
+import PageHeader from '@/components/ui/PageHeader'
+import Button from '@/components/ui/Button'
 import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 export default function PageantDashboardPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  // Use delayed loading - only show skeleton after 300ms
+  const showLoader = useDelayedLoading(loading, 300)
 
   useEffect(() => {
     let alive = true
@@ -30,38 +39,50 @@ export default function PageantDashboardPage() {
     }
   }, [])
 
-  if (loading) {
+  // Show nothing under 300ms
+  if (loading && !showLoader) return null
+
+  // Show skeleton after 300ms
+  if (loading || showLoader) {
     return (
-      <div className="flex justify-center py-20">
-        <LoadingSpinner />
+      <div className="space-y-6">
+        <div className="h-8 w-72 animate-pulse rounded-lg bg-v-surface-elevated" />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-v-text">Competition Scoring dashboard</h2>
-        <Link
-          to="/organizer/competition/events/new"
-          className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white hover:bg-v-primary-hover"
-        >
-          Create Competition Scoring Event
-        </Link>
-      </div>
+      <PageHeader
+        title="Competition Scoring dashboard"
+        description="Manage contestants, criteria, and judge scoring."
+        actions={
+          <Link to="/organizer/competition/events/new">
+            <Button>
+              <Plus className="h-4 w-4" strokeWidth={2} />
+              Create Event
+            </Button>
+          </Link>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Events" value={data?.stats?.totalEvents} />
-        <Stat label="Scoring active" value={data?.stats?.activeScoring} />
-        <Stat label="Total contestants" value={data?.stats?.totalContestants} />
-        <Stat label="Total judges" value={data?.stats?.totalJudges} />
-        <Stat label="Scores submitted" value={data?.stats?.scoresSubmitted} />
-        <Stat label="Completed judges" value={data?.stats?.completedJudges} />
-        <Stat label="Judge completion" value={`${data?.stats?.judgeCompletionRate ?? 0}%`} />
-        <Stat
+        <StatCard label="Events" value={data?.stats?.totalEvents ?? 0} icon={CalendarDays} />
+        <StatCard label="Scoring active" value={data?.stats?.activeScoring ?? 0} icon={Zap} />
+        <StatCard label="Total contestants" value={data?.stats?.totalContestants ?? 0} icon={Users} />
+        <StatCard label="Total judges" value={data?.stats?.totalJudges ?? 0} icon={Star} />
+        <StatCard label="Scores submitted" value={data?.stats?.scoresSubmitted ?? 0} icon={CheckSquare} />
+        <StatCard label="Completed judges" value={data?.stats?.completedJudges ?? 0} icon={UserCheck} />
+        <StatCard label="Judge completion" value={`${data?.stats?.judgeCompletionRate ?? 0}%`} icon={Percent} />
+        <StatCard
           label="Organization"
-          value={data?.organization?.organizationName ?? data?.organization?.organization_name}
-          small
+          value={data?.organization?.organizationName ?? data?.organization?.organization_name ?? '—'}
+          icon={Building2}
         />
       </div>
 
@@ -74,15 +95,16 @@ export default function PageantDashboardPage() {
         accentClass="text-v-text-muted"
       />
 
-      <div className="v-card p-6">
-        <h3 className="font-medium text-v-text">Recent Competition Scoring events</h3>
-
-        <ul className="mt-4 space-y-2">
+      <Card padding={false}>
+        <div className="border-b border-v-border px-6 py-4">
+          <h3 className="font-medium text-v-text">Recent Competition Scoring events</h3>
+        </div>
+        <ul className="divide-y divide-v-border">
           {(data?.events ?? []).slice(0, 5).map((e) => (
             <li key={e.id}>
               <Link
                 to={`/organizer/competition/events/${e.id}/contestants`}
-                className="flex justify-between rounded-lg border border-v-border px-4 py-3 hover:bg-v-surface-elevated"
+                className="flex justify-between px-6 py-4 transition hover:bg-v-surface-elevated"
               >
                 <span className="text-v-text-muted">{e.title}</span>
                 <span className={e.scoringEnabled ? 'text-v-success text-xs' : 'text-v-text-subtle text-xs'}>
@@ -97,16 +119,7 @@ export default function PageantDashboardPage() {
             </li>
           )}
         </ul>
-      </div>
-    </div>
-  )
-}
-
-function Stat({ label, value, small }) {
-  return (
-    <div className="v-card p-6">
-      <p className="text-sm text-v-text-subtle">{label}</p>
-      <p className={`mt-2 font-bold text-white ${small ? 'text-lg' : 'text-3xl'}`}>{value ?? 0}</p>
+      </Card>
     </div>
   )
 }

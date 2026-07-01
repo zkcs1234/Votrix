@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { User, Mail, LogIn, Home } from 'lucide-react'
 import AuthFormField from '@/components/auth/AuthFormField'
 import Input from '@/components/ui/Input'
 import PasswordInput from '@/components/ui/PasswordInput'
@@ -25,11 +26,17 @@ export default function LoginForm({
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
           {usernameField ? (
             <AuthFormField label="Username" id="username" error={errors.username?.message}>
-              <Input id="username" type="text" autoComplete="username" {...register('username')} />
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
+                <Input id="username" type="text" autoComplete="username" className="pl-9" {...register('username')} />
+              </div>
             </AuthFormField>
           ) : (
             <AuthFormField label="Email" id="email" error={errors.email?.message}>
-              <Input id="email" type="email" autoComplete="email" {...register('email')} />
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
+                <Input id="email" type="email" autoComplete="email" className="pl-9" {...register('email')} />
+              </div>
             </AuthFormField>
           )}
 
@@ -63,13 +70,15 @@ export default function LoginForm({
           )}
 
           <SubmitButton loading={loading} className="w-full">
+            <LogIn className="h-4 w-4" strokeWidth={2} />
             Sign in
           </SubmitButton>
         </form>
       </Card>
 
       <p className="mt-6 text-center text-sm">
-        <Link to="/" className="v-btn-tertiary">
+        <Link to="/" className="v-btn-tertiary inline-flex items-center gap-1.5">
+          <Home className="h-3.5 w-3.5" strokeWidth={2} />
           Back to home
         </Link>
       </p>

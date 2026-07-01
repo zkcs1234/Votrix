@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Plus, Edit2 } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
@@ -41,8 +42,9 @@ export default function PageantEventsPage() {
         <h2 className="text-xl font-semibold text-v-text">Competition Scoring events</h2>
         <Link
           to="/organizer/competition/events/new"
-          className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white"
+          className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white"
         >
+          <Plus className="h-4 w-4" strokeWidth={2} />
           New event
         </Link>
       </div>
@@ -72,8 +74,9 @@ export default function PageantEventsPage() {
             </button>
             <Link
               to={`/organizer/competition/events/${event.id}/edit`}
-              className="rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
             >
+              <Edit2 className="h-3.5 w-3.5" strokeWidth={2} />
               Edit
             </Link>
           </div>

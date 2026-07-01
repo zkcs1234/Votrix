@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { Vote, Trophy, BarChart2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 
@@ -7,14 +8,17 @@ const cards = [
   {
     title: 'Elections',
     description: 'Run secure digital elections with audit-ready results and turnout analytics.',
+    icon: Vote,
   },
   {
     title: 'Competitions',
     description: 'Score competitions with weighted criteria, judge panels, and live rankings.',
+    icon: Trophy,
   },
   {
     title: 'Polling',
     description: 'Launch surveys and gather structured responses with clean analytics.',
+    icon: BarChart2,
   },
 ]
 
@@ -59,7 +63,10 @@ export default function HomePage() {
             transition={{ delay: 0.15 + index * 0.08 }}
           >
             <Card className="h-full transition hover:border-v-border-strong">
-              <h2 className="v-section-title">{card.title}</h2>
+              <div className="flex items-center gap-2">
+                <card.icon className="h-5 w-5 text-v-text-subtle" strokeWidth={1.5} />
+                <h2 className="v-section-title">{card.title}</h2>
+              </div>
               <p className="v-caption mt-3 leading-relaxed">
                 {card.description}
               </p>

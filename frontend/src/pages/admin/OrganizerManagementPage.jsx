@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
+import { Users, UserCheck, Clock, ShieldOff, UserPlus } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import CreateOrganizerModal from '@/components/admin/CreateOrganizerModal'
 import Button from '@/components/ui/Button'
@@ -183,14 +184,17 @@ export default function OrganizerManagementPage() {
             Review organizer accounts, approve new access, and suspend accounts when needed.
           </p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>Create organizer</Button>
+        <Button onClick={() => setIsModalOpen(true)}>
+          <UserPlus className="h-4 w-4" strokeWidth={2} />
+          Create organizer
+        </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total organizers" value={summary.total} />
-        <StatCard label="Pending review" value={summary.pending} />
-        <StatCard label="Active" value={summary.active} />
-        <StatCard label="Suspended" value={summary.suspended} />
+        <StatCard label="Total organizers" value={summary.total} icon={Users} />
+        <StatCard label="Pending review" value={summary.pending} icon={Clock} />
+        <StatCard label="Active" value={summary.active} icon={UserCheck} />
+        <StatCard label="Suspended" value={summary.suspended} icon={ShieldOff} />
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

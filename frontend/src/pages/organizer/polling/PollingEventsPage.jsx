@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Plus, Settings2 } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
@@ -41,8 +42,9 @@ export default function PollingEventsPage() {
         <h2 className="text-xl font-semibold text-v-text">Polls</h2>
         <Link
           to="/organizer/polling/events/new"
-          className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white"
+          className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white"
         >
+          <Plus className="h-4 w-4" strokeWidth={2} />
           New poll
         </Link>
       </div>
@@ -68,8 +70,9 @@ export default function PollingEventsPage() {
             </button>
             <Link
               to={`/organizer/polling/events/${event.id}/settings`}
-              className="rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
             >
+              <Settings2 className="h-3.5 w-3.5" strokeWidth={2} />
               Settings
             </Link>
           </div>

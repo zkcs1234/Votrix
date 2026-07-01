@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
+import { X } from 'lucide-react'
 import { notificationsService } from '@/services/notifications.service'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -162,14 +163,7 @@ export default function NotificationsModal({ onClose }) {
           <div className="flex shrink-0 items-center justify-between border-b border-v-border p-4">
             <h2 className="text-lg font-semibold text-v-text">Notifications</h2>
             <Button size="sm" variant="secondary" onClick={onClose} className="!p-1">
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="h-4 w-4" strokeWidth={2} />
             </Button>
           </div>
 

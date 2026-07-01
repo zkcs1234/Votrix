@@ -2,13 +2,12 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { KeyRound, ShieldCheck, AlertCircle, RefreshCcw } from 'lucide-react'
 import { resetPasswordSchema } from '@/schemas/auth.schemas'
 import { authService } from '@/services/auth.service'
 import AuthFormField from '@/components/auth/AuthFormField'
 import SubmitButton from '@/components/auth/SubmitButton'
-
-import { INPUT_CLASS } from '@/utils/uiClasses'
-const inputClass = INPUT_CLASS
+import PasswordInput from '@/components/ui/PasswordInput'
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
@@ -51,47 +50,51 @@ export default function ResetPasswordPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-v-text">Set a new password</h2>
+      <div className="flex items-center gap-2">
+        <KeyRound className="h-5 w-5 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
+        <h2 className="text-xl font-semibold text-v-text">Set a new password</h2>
+      </div>
       <p className="mt-2 text-sm text-v-text-subtle">Choose a strong password for your account.</p>
 
       <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
-          <AuthFormField label="New password" id="newPassword" error={errors.newPassword?.message}>
-            <input
-              id="newPassword"
-              type="password"
-              autoComplete="new-password"
-              className={inputClass}
-              disabled={!token}
-              {...register('newPassword')}
-            />
-          </AuthFormField>
+        <AuthFormField label="New password" id="newPassword" error={errors.newPassword?.message}>
+          <PasswordInput
+            id="newPassword"
+            autoComplete="new-password"
+            disabled={!token}
+            {...register('newPassword')}
+          />
+        </AuthFormField>
 
-          <AuthFormField
-            label="Confirm password"
+        <AuthFormField
+          label="Confirm password"
+          id="confirmPassword"
+          error={errors.confirmPassword?.message}
+        >
+          <PasswordInput
             id="confirmPassword"
-            error={errors.confirmPassword?.message}
-          >
-            <input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              className={inputClass}
-              disabled={!token}
-              {...register('confirmPassword')}
-            />
-          </AuthFormField>
+            autoComplete="new-password"
+            disabled={!token}
+            {...register('confirmPassword')}
+          />
+        </AuthFormField>
 
-          {error && (
-            <p className="rounded-lg border rounded-lg border px-3 py-2 text-sm text-v-danger bg-v-danger-bg">
-              {error}
-            </p>
-          )}
+        {error && (
+          <p className="flex items-center gap-2 rounded-lg border border-v-danger bg-v-danger-bg px-3 py-2 text-sm text-v-danger">
+            <AlertCircle className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            {error}
+          </p>
+        )}
 
-          <SubmitButton loading={loading}>Update password</SubmitButton>
-        </form>
+        <SubmitButton loading={loading}>
+          <ShieldCheck className="h-4 w-4" strokeWidth={2} />
+          Update password
+        </SubmitButton>
+      </form>
 
       <p className="mt-4 text-center text-sm text-v-text-subtle">
-        <Link to="/forgot-password" className="text-v-text-muted hover:text-v-text">
+        <Link to="/forgot-password" className="inline-flex items-center gap-1 text-v-text-muted hover:text-v-text">
+          <RefreshCcw className="h-3.5 w-3.5" strokeWidth={2} />
           Request a new link
         </Link>
       </p>

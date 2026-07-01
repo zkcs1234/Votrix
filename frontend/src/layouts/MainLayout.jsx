@@ -1,5 +1,6 @@
 import { Outlet, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { LogIn } from 'lucide-react'
 import VotrixLogo from '@/components/brand/VotrixLogo'
 import Button from '@/components/ui/Button'
 
@@ -22,6 +23,7 @@ export default function MainLayout() {
             </Link>
             <Link to="/login/admin">
               <Button variant="brand" size="sm">
+                <LogIn className="h-4 w-4" strokeWidth={2} />
                 Admin
               </Button>
             </Link>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { CalendarDays, Zap, CheckCircle2, Users, Vote, Trophy, BarChart2, BarChart3, ArrowRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import StatCard from '@/components/ui/StatCard'
 import Card from '@/components/ui/Card'
@@ -157,10 +158,10 @@ export default function OrganizerDashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total events" value={stats?.totalEvents ?? 0} />
-        <StatCard label="Active events" value={stats?.activeEvents ?? 0} />
-        <StatCard label="Finished events" value={stats?.finishedEvents ?? 0} />
-        <StatCard label="Assigned voters" value={stats?.totalAssignedVoters ?? 0} />
+        <StatCard label="Total events" value={stats?.totalEvents ?? 0} icon={CalendarDays} />
+        <StatCard label="Active events" value={stats?.activeEvents ?? 0} icon={Zap} />
+        <StatCard label="Finished events" value={stats?.finishedEvents ?? 0} icon={CheckCircle2} />
+        <StatCard label="Assigned voters" value={stats?.totalAssignedVoters ?? 0} icon={Users} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -168,7 +169,10 @@ export default function OrganizerDashboardPage() {
           to="/organizer/election"
           className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
         >
-          <h3 className="v-section-title">Election module</h3>
+          <div className="flex items-center gap-2">
+            <Vote className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
+            <h3 className="v-section-title">Election module</h3>
+          </div>
           <p className="v-caption">
             Manage events, positions, candidates, and voters.
           </p>
@@ -177,7 +181,10 @@ export default function OrganizerDashboardPage() {
           to="/organizer/competition"
           className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
         >
-          <h3 className="v-section-title">Competition Scoring module</h3>
+          <div className="flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
+            <h3 className="v-section-title">Competition Scoring module</h3>
+          </div>
           <p className="v-caption">
             Contestants, criteria, judge scoring, and rankings.
           </p>
@@ -186,7 +193,10 @@ export default function OrganizerDashboardPage() {
           to="/organizer/polling"
           className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
         >
-          <h3 className="v-section-title">Polling module</h3>
+          <div className="flex items-center gap-2">
+            <BarChart2 className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
+            <h3 className="v-section-title">Polling module</h3>
+          </div>
           <p className="v-caption">
             Build surveys, configure settings, and view analytics.
           </p>
@@ -197,7 +207,10 @@ export default function OrganizerDashboardPage() {
         to="/organizer/reports"
         className="v-card-md block transition hover:border-v-border-strong"
       >
-        <h3 className="v-section-title">Analytics & reports</h3>
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
+          <h3 className="v-section-title">Analytics &amp; reports</h3>
+        </div>
         <p className="v-caption mt-2">
           Turnout reports, vote summaries, competition rankings, and polling charts.
         </p>

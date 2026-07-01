@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  Users, CalendarDays, UserCheck, Zap, CheckSquare,
+  Settings, ClipboardList, ArrowRight, LayoutDashboard,
+} from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import Card from '@/components/ui/Card'
 import StatCard from '@/components/ui/StatCard'
@@ -172,11 +176,11 @@ export default function AdminDashboardPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Total organizers" value={stats?.totalOrganizers ?? 0} />
-        <StatCard label="Total events" value={stats?.totalEvents ?? 0} />
-        <StatCard label="Total voters" value={stats?.totalVoters ?? 0} />
-        <StatCard label="Active events" value={stats?.activeEvents ?? 0} />
-        <StatCard label="Votes cast" value={stats?.totalVotesCast ?? 0} />
+        <StatCard label="Total organizers" value={stats?.totalOrganizers ?? 0} icon={Users} />
+        <StatCard label="Total events" value={stats?.totalEvents ?? 0} icon={CalendarDays} />
+        <StatCard label="Total voters" value={stats?.totalVoters ?? 0} icon={UserCheck} />
+        <StatCard label="Active events" value={stats?.activeEvents ?? 0} icon={Zap} />
+        <StatCard label="Votes cast" value={stats?.totalVotesCast ?? 0} icon={CheckSquare} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -184,7 +188,10 @@ export default function AdminDashboardPage() {
           to="/admin/organizers"
           className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
         >
-          <h3 className="v-section-title">Organizers</h3>
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
+            <h3 className="v-section-title">Organizers</h3>
+          </div>
           <p className="v-caption">
             {stats?.totalOrganizers ?? 0} total accounts
           </p>
@@ -193,7 +200,10 @@ export default function AdminDashboardPage() {
           to="/admin/events"
           className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
         >
-          <h3 className="v-section-title">Events</h3>
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
+            <h3 className="v-section-title">Events</h3>
+          </div>
           <p className="v-caption">
             {stats?.totalEvents ?? 0} across all modules
           </p>
@@ -202,45 +212,55 @@ export default function AdminDashboardPage() {
           to="/admin/settings"
           className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
         >
-          <h3 className="v-section-title">Settings</h3>
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
+            <h3 className="v-section-title">Settings</h3>
+          </div>
           <p className="v-caption">System configuration</p>
         </Link>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card padding="sm">
-          <h3 className="v-section-title">Quick actions</h3>
+          <div className="flex items-center gap-2">
+            <LayoutDashboard className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
+            <h3 className="v-section-title">Quick actions</h3>
+          </div>
           <ul className="mt-3 space-y-2 text-sm">
             <li>
               <Link
                 to="/admin/organizers"
-                className="v-btn-tertiary"
+                className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
-                Create organizer account →
+                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+                Create organizer account
               </Link>
             </li>
             <li>
               <Link
                 to="/admin/events"
-                className="v-btn-tertiary"
+                className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
-                View all events →
+                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+                View all events
               </Link>
             </li>
             <li>
               <Link
                 to="/admin/audit-logs"
-                className="v-btn-tertiary"
+                className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
-                Review audit logs →
+                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+                Review audit logs
               </Link>
             </li>
             <li>
               <Link
                 to="/admin/settings"
-                className="v-btn-tertiary"
+                className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
-                Update system settings →
+                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+                Update system settings
               </Link>
             </li>
           </ul>

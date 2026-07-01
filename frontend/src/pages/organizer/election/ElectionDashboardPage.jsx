@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { CalendarDays, Vote, Users, CheckSquare, Percent, Building2, Plus } from 'lucide-react'
 import { electionService } from '@/services/election.service'
 import PageLoader from '@/components/ui/PageLoader'
 import PageHeader from '@/components/ui/PageHeader'
@@ -44,25 +45,30 @@ export default function ElectionDashboardPage() {
         description="Manage events, ballots, and voter turnout."
         actions={
           <Link to="/organizer/election/events/new">
-            <Button>Create event</Button>
+            <Button>
+              <Plus className="h-4 w-4" strokeWidth={2} />
+              Create event
+            </Button>
           </Link>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total events" value={data?.stats?.totalEvents ?? 0} />
+        <StatCard label="Total events" value={data?.stats?.totalEvents ?? 0} icon={CalendarDays} />
         <StatCard
           label="Voting active"
           value={data?.stats?.activeVoting ?? 0}
           hint="Events accepting votes"
+          icon={Vote}
         />
-        <StatCard label="Registered voters" value={data?.stats?.registeredVoters ?? 0} />
-        <StatCard label="Votes cast" value={data?.stats?.votesCast ?? 0} />
-        <StatCard label="Voters who voted" value={data?.stats?.votedCount ?? 0} />
-        <StatCard label="Turnout" value={`${data?.stats?.turnoutRate ?? 0}%`} />
+        <StatCard label="Registered voters" value={data?.stats?.registeredVoters ?? 0} icon={Users} />
+        <StatCard label="Votes cast" value={data?.stats?.votesCast ?? 0} icon={CheckSquare} />
+        <StatCard label="Voters who voted" value={data?.stats?.votedCount ?? 0} icon={Users} />
+        <StatCard label="Turnout" value={`${data?.stats?.turnoutRate ?? 0}%`} icon={Percent} />
         <StatCard
           label="Organization"
           value={data?.organization?.organizationName ?? data?.organization?.organization_name ?? '—'}
+          icon={Building2}
         />
       </div>
 
