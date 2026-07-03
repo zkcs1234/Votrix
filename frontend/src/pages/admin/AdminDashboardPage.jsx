@@ -11,6 +11,7 @@ import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import { adminService } from '@/services/admin.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 function StatCardSkeleton() {
   return (
@@ -93,12 +94,15 @@ export default function AdminDashboardPage() {
     }
 
     load()
-    const id = setInterval(load, 30000)
     return () => {
       alive = false
-      clearInterval(id)
     }
   }, [])
+
+  // Real-time updates via WebSocket - no more polling!
+  useSocketEvent('platform:stats-updated', () => {
+    adminService.getDashboard().then(({ data }) => setDashboard(data))
+  })
 
   // Show nothing under 300ms
   if (loading && !showLoader) {

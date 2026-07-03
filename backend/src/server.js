@@ -1,9 +1,15 @@
 import { createApp } from './app.js'
 import { env, isProduction } from './config/env.js'
 
-const app = createApp()
+import { createServer } from 'http'
+import { attachWebSocketServer } from './websocket/ws-server.js'
 
-app.listen(env.port, '0.0.0.0', () => {
+const app = createApp()
+const httpServer = createServer(app)
+
+attachWebSocketServer(httpServer)
+
+httpServer.listen(env.port, '0.0.0.0', () => {
   console.log(`[votrix] API listening on port ${env.port}`)
   console.log(`[votrix] Environment: ${env.nodeEnv}`)
   console.log(`[votrix] Frontend URL: ${env.clientUrl}`)

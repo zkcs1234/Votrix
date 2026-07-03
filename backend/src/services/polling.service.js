@@ -16,6 +16,7 @@ import {
   buildAnalytics,
 } from '../modules/poll-question-types.js'
 import { isPollOpen as isPollOpenForEvent } from '../utils/eventSchedule.js'
+import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
 
 // Phase 7 — Polling question types are now registry-driven. The legacy
 // POLL_QUESTION_TYPES constants and the `multiple_choice` alias are kept in
@@ -229,6 +230,12 @@ export async function setPollOpen(eventId, organizerId, pollingEnabled) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  emitToEvent(eventId, 'poll:polling-toggled', {
+    eventId,
+    pollingEnabled: Boolean(pollingEnabled),
+  })
+
   return mapPollEvent(data)
 }
 
@@ -601,6 +608,44 @@ export async function submitPollResponse(eventId, voterId, answers) {
       .eq('event_id', eventId)
       .eq('voter_id', voterId)
   }
+
+  // Fetch updated stats for real-time dashboard update
+  const { count: respondedCount } = await getClient()
+    .from(DB_TABLES.EVENT_VOTERS)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .eq('has_voted', true)
+
+  const { count: totalVoters } = await getClient()
+    .from(DB_TABLES.EVENT_VOTERS)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+
+  const { count: responsesSubmitted } = await getClient()
+    .from(DB_TABLES.POLL_SUBMISSIONS)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+
+  const participationRate = totalVoters > 0 ? ((respondedCount / totalVoters) * 100).toFixed(1) : '0.0'
+
+  emitToEventOrganizer(eventId, 'poll:response-submitted', {
+    eventId,
+    responsesSubmitted: responsesSubmitted ?? 0,
+    respondedCount: respondedCount ?? 0,
+    totalVoters: totalVoters ?? 0,
+    participationRate: parseFloat(participationRate),
+  })
+
+  // Trigger organizer dashboard stats refresh
+  const organizerId = event.organizations?.organizer_id
+  if (organizerId) {
+    const { emitToUser } = await import('../websocket/ws-emitter.js')
+    emitToUser(organizerId, 'organizer:stats-updated', { eventId })
+  }
+
+  // Trigger admin platform stats refresh
+  const { emitToRole } = await import('../websocket/ws-emitter.js')
+  emitToRole('admin', 'platform:stats-updated', {})
 
   return { success: true, submissionId: submission.id, message: 'Response submitted' }
 }

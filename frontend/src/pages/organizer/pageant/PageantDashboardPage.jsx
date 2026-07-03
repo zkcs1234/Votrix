@@ -9,6 +9,7 @@ import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
 import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 export default function PageantDashboardPage() {
   const [data, setData] = useState(null)
@@ -32,12 +33,19 @@ export default function PageantDashboardPage() {
     }
 
     load()
-    const id = setInterval(load, 30000)
     return () => {
       alive = false
-      clearInterval(id)
     }
   }, [])
+
+  // Real-time updates via WebSocket - no more polling!
+  useSocketEvent('rankings:updated', () => {
+    pageantService.getDashboard().then(({ data }) => setData(data))
+  })
+
+  useSocketEvent('competition:scoring-toggled', () => {
+    pageantService.getDashboard().then(({ data }) => setData(data))
+  })
 
   // Show nothing under 300ms
   if (loading && !showLoader) return null

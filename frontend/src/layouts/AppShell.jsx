@@ -8,6 +8,7 @@ import VotrixLogo from '@/components/brand/VotrixLogo'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import Button from '@/components/ui/Button'
 import NotificationsModal from '@/components/ui/NotificationsModal'
+import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 function NavLinks({ items, eventId, location, onNavigate }) {
   const linkClass = (active) =>
@@ -146,20 +147,21 @@ export default function AppShell({
     }
 
     void loadUnreadCount()
-    const intervalId = setInterval(loadUnreadCount, 30000)
 
     const handleUpdate = () => {
       void loadUnreadCount()
     }
-
     window.addEventListener('votrix-notifications-updated', handleUpdate)
 
     return () => {
       alive = false
-      clearInterval(intervalId)
       window.removeEventListener('votrix-notifications-updated', handleUpdate)
     }
   }, [user, location.pathname])
+
+  useSocketEvent('notification:created', () => {
+    setUnreadCount((c) => c + 1)
+  })
 
   const sidebar = (
     <SidebarContent

@@ -5,6 +5,8 @@ import { db, wrap } from '../foundation/db.js'
 import { notFound } from '../foundation/errors.js'
 import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
 
+import { emitToUser } from '../websocket/ws-emitter.js'
+
 export async function createNotification({
   userId,
   type,
@@ -15,7 +17,7 @@ export async function createNotification({
   entityId = null,
   metadata = null,
 }) {
-  return wrap(
+  const notification = wrap(
     await db()
       .from(DB_TABLES.NOTIFICATIONS)
       .insert({
@@ -32,13 +34,26 @@ export async function createNotification({
       .single(),
     { context: 'notification.createNotification' },
   )
+
+  if (notification) {
+    emitToUser(userId, 'notification:created', {
+      id: notification.id,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      actionUrl: notification.action_url,
+      createdAt: notification.created_at,
+    })
+  }
+
+  return notification
 }
 
 export async function createNotificationsForUsers(userIds, payload) {
   const ids = (userIds ?? []).filter(Boolean)
   if (!ids.length) return []
 
-  return wrap(
+  const notifications = wrap(
     await db()
       .from(DB_TABLES.NOTIFICATIONS)
       .insert(
@@ -56,6 +71,19 @@ export async function createNotificationsForUsers(userIds, payload) {
       .select('*'),
     { context: 'notification.createNotificationsForUsers' },
   ) ?? []
+
+  for (const notification of notifications) {
+    emitToUser(notification.user_id, 'notification:created', {
+      id: notification.id,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      actionUrl: notification.action_url,
+      createdAt: notification.created_at,
+    })
+  }
+
+  return notifications
 }
 
 export async function createNotificationsForRole(role, payload) {

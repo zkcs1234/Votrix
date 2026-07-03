@@ -1,8 +1,9 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Settings2 } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 export default function PollingEventsPage() {
   const [events, setEvents] = useState([])
@@ -18,6 +19,14 @@ export default function PollingEventsPage() {
   useEffect(() => {
     load()
   }, [])
+
+  useSocketEvent('poll:polling-toggled', ({ eventId, pollingEnabled }) => {
+    setEvents((prev) =>
+      prev.map((e) =>
+        e.id === eventId ? { ...e, pollingEnabled } : e
+      )
+    )
+  })
 
   const toggle = async (event) => {
     try {

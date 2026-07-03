@@ -22,6 +22,7 @@ import {
   isScoreInBounds,
 } from '../modules/scoring-engine.js'
 import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
+import { emitToEvent } from '../websocket/ws-emitter.js'
 
 function getClient() {
   const client = getSupabase()
@@ -266,6 +267,12 @@ export async function setEventScoring(eventId, organizerId, scoringEnabled) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+  
+  emitToEvent(eventId, 'competition:scoring-toggled', {
+    eventId,
+    scoringEnabled: Boolean(scoringEnabled),
+  })
+  
   return mapEvent(data)
 }
 
@@ -744,6 +751,18 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
         throw new ApiError(409, 'You have already submitted scores for this event')
       }
       throw new ApiError(500, insertErr.message)
+    }
+    
+    if (event.organizations?.organizer_id) {
+      const rankings = await getLiveRankings(eventId, event.organizations.organizer_id)
+      emitToEvent(eventId, 'rankings:updated', { eventId, rankings })
+      
+      // Trigger organizer dashboard stats refresh
+      const { emitToUser, emitToRole } = await import('../websocket/ws-emitter.js')
+      emitToUser(event.organizations.organizer_id, 'organizer:stats-updated', { eventId })
+      
+      // Trigger admin platform stats refresh
+      emitToRole('admin', 'platform:stats-updated', {})
     }
   } catch (err) {
     await getClient()

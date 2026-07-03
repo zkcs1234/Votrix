@@ -4,6 +4,7 @@ import { DB_TABLES, EVENT_TYPES } from '../utils/constants.js'
 import { isElectionVotingOpen, canVoterViewElectionResults } from '../utils/eventSchedule.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { getOrCreateElectionOrganization, mapOrganization } from './organization.service.js'
+import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
 
 
 function getClient() {
@@ -253,6 +254,12 @@ export async function setEventVoting(eventId, organizerId, votingEnabled) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+  
+  emitToEvent(eventId, 'election:voting-toggled', {
+    eventId,
+    votingEnabled: Boolean(votingEnabled),
+  })
+  
   return mapEvent(data)
 }
 
@@ -716,6 +723,44 @@ export async function submitBallot(eventId, voterId, selections) {
       .eq('voter_id', voterId)
     throw err
   }
+
+  // Fetch updated stats for real-time dashboard update
+  const { count: votedCount } = await getClient()
+    .from(DB_TABLES.EVENT_VOTERS)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .eq('has_voted', true)
+
+  const { count: totalVoters } = await getClient()
+    .from(DB_TABLES.EVENT_VOTERS)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+
+  const { count: votesCast } = await getClient()
+    .from(DB_TABLES.ELECTION_VOTES)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+
+  const turnoutRate = totalVoters > 0 ? ((votedCount / totalVoters) * 100).toFixed(1) : '0.0'
+
+  emitToEventOrganizer(eventId, 'election:vote-submitted', {
+    eventId,
+    votesCast: votesCast ?? 0,
+    votedCount: votedCount ?? 0,
+    totalVoters: totalVoters ?? 0,
+    turnoutRate: parseFloat(turnoutRate),
+  })
+
+  // Trigger organizer dashboard stats refresh
+  const organizerId = event.organizations?.organizer_id
+  if (organizerId) {
+    const { emitToUser } = await import('../websocket/ws-emitter.js')
+    emitToUser(organizerId, 'organizer:stats-updated', { eventId })
+  }
+
+  // Trigger admin platform stats refresh
+  const { emitToRole } = await import('../websocket/ws-emitter.js')
+  emitToRole('admin', 'platform:stats-updated', {})
 
   return { success: true, message: 'Ballot submitted successfully', locked: true }
 }

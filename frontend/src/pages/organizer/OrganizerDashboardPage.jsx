@@ -6,6 +6,7 @@ import StatCard from '@/components/ui/StatCard'
 import Card from '@/components/ui/Card'
 import { organizerService } from '@/services/organizer.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 function StatCardSkeleton() {
   return (
@@ -89,12 +90,15 @@ export default function OrganizerDashboardPage() {
     }
 
     load()
-    const id = setInterval(load, 30000)
     return () => {
       alive = false
-      clearInterval(id)
     }
   }, [])
+
+  // Real-time updates via WebSocket - no more polling!
+  useSocketEvent('organizer:stats-updated', () => {
+    organizerService.getDashboard().then(({ data }) => setDashboard(data))
+  })
 
   // Show nothing under 300ms
   if (loading && !showLoader) {

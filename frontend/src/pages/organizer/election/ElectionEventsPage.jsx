@@ -4,6 +4,7 @@ import { Plus, Edit2, Vote, CheckCircle2 } from 'lucide-react'
 import { electionService } from '@/services/election.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
+import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 function EventCard({ event, onToggleVoting }) {
   const [toggling, setToggling] = useState(false)
@@ -98,10 +99,17 @@ export default function ElectionEventsPage() {
     // The setState calls inside `load()` are the "fetch on mount" pattern:
     // the effect runs once and triggers an async fetch, which is the
     // legitimate way to load data in a React component. The rule
-    // can't infer this and flags it as cascading renders.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
+
+  useSocketEvent('election:voting-toggled', ({ eventId, votingEnabled }) => {
+    setEvents((prev) =>
+      prev.map((e) =>
+        e.id === eventId ? { ...e, votingEnabled } : e
+      )
+    )
+  })
 
   // Optimistic toggle - update UI immediately, rollback on error
   const handleToggleVoting = useCallback(

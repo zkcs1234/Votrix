@@ -1,8 +1,9 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Edit2 } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 export default function PageantEventsPage() {
   const [events, setEvents] = useState([])
@@ -18,6 +19,14 @@ export default function PageantEventsPage() {
   useEffect(() => {
     load()
   }, [])
+
+  useSocketEvent('competition:scoring-toggled', ({ eventId, scoringEnabled }) => {
+    setEvents((prev) =>
+      prev.map((e) =>
+        e.id === eventId ? { ...e, scoringEnabled } : e
+      )
+    )
+  })
 
   const toggle = async (event) => {
     try {

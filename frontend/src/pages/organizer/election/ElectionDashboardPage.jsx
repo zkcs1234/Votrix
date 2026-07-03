@@ -9,32 +9,25 @@ import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
+import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 export default function ElectionDashboardPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const load = () => {
+    electionService
+      .getDashboard()
+      .then(({ data: res }) => setData(res))
+      .finally(() => setLoading(false))
+  }
+
   useEffect(() => {
-    let alive = true
-
-    const load = () => {
-      electionService
-        .getDashboard()
-        .then(({ data: res }) => {
-          if (alive) setData(res)
-        })
-        .finally(() => {
-          if (alive) setLoading(false)
-        })
-    }
-
     load()
-    const id = setInterval(load, 30000)
-    return () => {
-      alive = false
-      clearInterval(id)
-    }
   }, [])
+
+  useSocketEvent('election:vote-submitted', () => load())
+  useSocketEvent('election:voting-toggled', () => load())
 
   if (loading) return <PageLoader label="Loading dashboard…" />
 

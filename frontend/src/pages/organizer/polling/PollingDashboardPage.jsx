@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BarChart2, Zap, Send, Users, UserCheck, Percent, Plus } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
@@ -8,6 +8,7 @@ import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
 import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 export default function PollingDashboardPage() {
   const [data, setData] = useState(null)
@@ -16,27 +17,19 @@ export default function PollingDashboardPage() {
   // Use delayed loading - only show skeleton after 300ms
   const showLoader = useDelayedLoading(loading, 300)
 
+  const load = () => {
+    pollingService
+      .getDashboard()
+      .then(({ data: res }) => setData(res))
+      .finally(() => setLoading(false))
+  }
+
   useEffect(() => {
-    let alive = true
-
-    const load = () => {
-      pollingService
-        .getDashboard()
-        .then(({ data: res }) => {
-          if (alive) setData(res)
-        })
-        .finally(() => {
-          if (alive) setLoading(false)
-        })
-    }
-
     load()
-    const id = setInterval(load, 30000)
-    return () => {
-      alive = false
-      clearInterval(id)
-    }
   }, [])
+
+  useSocketEvent('poll:response-submitted', () => load())
+  useSocketEvent('poll:polling-toggled', () => load())
 
   // Show nothing under 300ms
   if (loading && !showLoader) return null

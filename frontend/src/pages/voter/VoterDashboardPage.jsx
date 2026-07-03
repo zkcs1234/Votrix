@@ -8,6 +8,7 @@ import {
 import VoterEventCard from '@/components/voter/VoterEventCard'
 import Card from '@/components/ui/Card'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 function EventSection({ title, description, events }) {
   if (!events?.length) return null
@@ -98,12 +99,20 @@ export default function VoterDashboardPage() {
     }
 
     load()
-    const id = setInterval(load, 30000)
     return () => {
       alive = false
-      clearInterval(id)
     }
   }, [])
+
+  const reload = () => {
+    voterService.getOverview().then(({ data: res }) => {
+      setData(res)
+    })
+  }
+
+  useSocketEvent('election:voting-toggled', reload)
+  useSocketEvent('poll:polling-toggled', reload)
+  useSocketEvent('competition:scoring-toggled', reload)
 
   // Show nothing under 300ms - prevents loading flicker
   if (loading && !showLoader) {
