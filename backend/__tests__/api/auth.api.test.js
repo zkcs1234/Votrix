@@ -24,6 +24,15 @@ describe('Auth API Endpoints', () => {
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('success', true)
     })
+
+    test('should not allow vercel preview origins by default', async () => {
+      const response = await request(app)
+        .get('/api/health')
+        .set('Origin', 'https://preview-example.vercel.app')
+
+      expect(response.status).toBe(200)
+      expect(response.headers['access-control-allow-origin']).toBeUndefined()
+    })
   })
 
   describe('GET /api/auth/csrf', () => {

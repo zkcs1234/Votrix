@@ -45,6 +45,11 @@ export function wrap(result, { notFoundMessage, transform, context } = {}) {
     if (error.code === 'PGRST116' && notFoundMessage) {
       throw new ApiError(404, notFoundMessage)
     }
+
+    if (error.message?.includes('fetch failed') || error.message?.includes('Failed to fetch')) {
+      throw new ApiError(503, `${context ? `${context}: ` : ''}Database unavailable`)
+    }
+
     throw new ApiError(500, `${context ? `${context}: ` : ''}${error.message}`)
   }
   return transform ? transform(data) : data

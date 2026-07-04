@@ -24,7 +24,7 @@ export function createApp() {
       return true
     }
 
-    const allowVercelPreviews = (process.env.ALLOW_VERCEL_PREVIEWS || 'true').toLowerCase() !== 'false'
+    const allowVercelPreviews = (process.env.ALLOW_VERCEL_PREVIEWS || 'false').toLowerCase() !== 'false'
     if (allowVercelPreviews) {
       try {
         const url = new URL(normalizedOrigin)

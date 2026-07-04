@@ -41,7 +41,6 @@
     "ws": "^8.13.0"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
     "supertest": "^7.0.0",
     "vitest": "^4.1.7"
   }
