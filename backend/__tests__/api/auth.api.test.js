@@ -1,6 +1,10 @@
 import request from 'supertest'
 import { createApp } from '../../src/app.js'
 
+const TEST_CREDENTIALS = {
+  wrongPassword: 'wrongpassword',
+}
+
 describe('Auth API Endpoints', () => {
   let app
 
@@ -61,7 +65,7 @@ describe('Auth API Endpoints', () => {
     test('should reject invalid credentials', async () => {
       const response = await request(app)
         .post('/api/auth/admin/login')
-        .send({ username: 'admin', password: 'wrongpassword' })
+        .send({ username: 'admin', password: TEST_CREDENTIALS.wrongPassword })
       expect([401, 503]).toContain(response.status)
     })
   })
@@ -70,7 +74,7 @@ describe('Auth API Endpoints', () => {
     test('should reject invalid credentials', async () => {
       const response = await request(app)
         .post('/api/auth/organizer/login')
-        .send({ email: 'nonexistent@example.com', password: 'wrongpassword' })
+        .send({ email: 'nonexistent@example.com', password: TEST_CREDENTIALS.wrongPassword })
       expect([401, 503]).toContain(response.status)
     })
   })
@@ -79,7 +83,7 @@ describe('Auth API Endpoints', () => {
     test('should reject invalid credentials', async () => {
       const response = await request(app)
         .post('/api/auth/voter/login')
-        .send({ email: 'nonexistent@example.com', password: 'wrongpassword' })
+        .send({ email: 'nonexistent@example.com', password: TEST_CREDENTIALS.wrongPassword })
       expect([401, 503]).toContain(response.status)
     })
   })

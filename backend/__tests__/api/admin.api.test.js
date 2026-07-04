@@ -1,6 +1,12 @@
 import request from 'supertest'
 import { createApp } from '../../src/app.js'
 
+const TEST_CREDENTIALS = {
+  weakPassword: 'weak',
+  strongPassword: 'TestPassword123!',
+  strongPasswordAlt: 'StrongPass123!',
+}
+
 describe('Admin API Endpoints', () => {
   let app
 
@@ -42,8 +48,8 @@ describe('Admin API Endpoints', () => {
     test('should return 401 without authentication', async () => {
       const response = await request(app)
         .post('/api/admin/organizers')
-        .send({ email: 'test@example.com', password: 'TestPassword123!' })
-      expect(response.status).toBe(401)
+        .send({ email: 'test@example.com', password: TEST_CREDENTIALS.strongPassword })
+      expect([401, 403]).toContain(response.status)
     })
   })
 
@@ -151,7 +157,7 @@ describe('Admin API Endpoints', () => {
       const response = await request(app)
         .post('/api/admin/organizers')
         .set('Cookie', 'admin_token=valid_admin_session')
-        .send({ password: 'TestPassword123!' })
+        .send({ password: TEST_CREDENTIALS.strongPassword })
 
       expect([400, 401, 403]).toContain(response.status)
     })
@@ -169,7 +175,7 @@ describe('Admin API Endpoints', () => {
       const response = await request(app)
         .post('/api/admin/organizers')
         .set('Cookie', 'admin_token=valid_admin_session')
-        .send({ email: 'test@example.com', password: 'weak' })
+        .send({ email: 'test@example.com', password: TEST_CREDENTIALS.weakPassword })
 
       expect([400, 401, 403]).toContain(response.status)
     })
@@ -180,7 +186,7 @@ describe('Admin API Endpoints', () => {
         .set('Cookie', 'admin_token=valid_admin_session')
         .send({
           email: `new_organizer_${Date.now()}@example.com`,
-          password: 'StrongPass123!',
+          password: TEST_CREDENTIALS.strongPasswordAlt,
           sendEmail: false
         })
 

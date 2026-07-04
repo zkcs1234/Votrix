@@ -69,7 +69,7 @@ describe('foundation/audit.listAuditTrail', () => {
     expect(fromMock).toHaveBeenCalledWith(DB_TABLES.AUDIT_LOGS)
     expect(select).toHaveBeenCalled()
     expect(order).toHaveBeenCalledWith('created_at', { ascending: false })
-    expect(limit).toHaveBeenCalledWith(100)
+    expect(limit).toHaveBeenCalledWith(50)
   })
 
   test('applies entity and entityId filters when provided', async () => {

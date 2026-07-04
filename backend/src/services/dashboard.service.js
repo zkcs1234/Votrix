@@ -1,4 +1,4 @@
-import { getSupabase } from '../config/database.js'
+import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import {
   DB_TABLES,
@@ -8,11 +8,6 @@ import {
   USER_ROLES,
 } from '../utils/constants.js'
 
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
 
 function monthKey(dateLike) {
   const d = new Date(dateLike)
@@ -222,11 +217,11 @@ export async function getAdminDashboardStats() {
   ] = await Promise.all([
     getClient().from(DB_TABLES.ORGANIZATIONS).select('organizer_id, status'),
     getClient().from(DB_TABLES.EVENTS).select('id, status, event_type, created_at'),
-    getClient().from(DB_TABLES.USERS).select('id, role').eq('role', USER_ROLES.VOTER),
+    getClient().from(DB_TABLES.USERS).select('id', { count: 'exact', head: true }).eq('role', USER_ROLES.VOTER),
     getClient().from(DB_TABLES.ELECTION_VOTES).select('*', { count: 'exact', head: true }),
     getClient().from(DB_TABLES.JUDGE_SCORES).select('*', { count: 'exact', head: true }),
     getClient().from(DB_TABLES.POLL_ANSWERS).select('*', { count: 'exact', head: true }),
-    getClient().from(DB_TABLES.USERS).select('id').eq('role', USER_ROLES.ORGANIZER),
+    getClient().from(DB_TABLES.USERS).select('id', { count: 'exact', head: true }).eq('role', USER_ROLES.ORGANIZER),
   ])
 
   if (organizationsRes.error) throw new ApiError(500, organizationsRes.error.message)
@@ -248,7 +243,7 @@ export async function getAdminDashboardStats() {
     (electionVotesRes.count ?? 0) + (judgeScoresRes.count ?? 0) + (pollAnswersRes.count ?? 0)
 
   // Count total organizers - both from users table (more accurate) and active organizations
-  const totalOrganizersCount = (organizersRes.data ?? []).length
+  const totalOrganizersCount = organizersRes.count ?? 0
 
   const recentActivity = await loadRecentActivity({
     eventIds: events.map((e) => e.id),
@@ -265,7 +260,7 @@ export async function getAdminDashboardStats() {
       totalPollingEvents: events.filter((e) => e.event_type === EVENT_TYPES.POLLING).length,
       activeEvents: events.filter((e) => e.status === EVENT_STATUS.ACTIVE).length,
       finishedEvents: events.filter((e) => e.status === EVENT_STATUS.COMPLETED).length,
-      totalVoters: (usersRes.data ?? []).length,
+      totalVoters: usersRes.count ?? 0,
       totalVotesCast,
     },
     recentActivity,

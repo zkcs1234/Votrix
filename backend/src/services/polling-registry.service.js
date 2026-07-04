@@ -1,4 +1,4 @@
-import { getSupabase } from '../config/database.js'
+import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES } from '../utils/constants.js'
 
@@ -7,11 +7,6 @@ import { DB_TABLES } from '../utils/constants.js'
 // for an admin who does not pass an organization). Built-ins are always
 // included; per-organization overrides shadow built-ins with the same key.
 
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
 
 const BUILTIN_FALLBACKS = [
   // The engine falls back to a minimal built-in list if the registry table

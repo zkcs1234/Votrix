@@ -14,6 +14,9 @@ import {
 } from '../validators/election.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
 import { inviteVoterToEvent, inviteRegisteredVoter } from '../services/invitation.service.js'
+import { sanitizeEmail, validateUUID } from '../utils/sanitize.js'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const data = await electionService.getOrganizerDashboard(req.user.id)
@@ -181,10 +184,16 @@ export const inviteVoter = asyncHandler(async (req, res) => {
 })
 
 export const inviteExistingVoter = asyncHandler(async (req, res) => {
-  const { email } = req.body
-
-  if (!email) {
+  // CWE-20: Validate email format before passing to the invitation service.
+  // The previous check only tested for presence, allowing malformed strings
+  // (e.g. "<script>", excessively long values) to reach the email layer.
+  const rawEmail = req.body?.email
+  if (!rawEmail) {
     throw new ApiError(400, 'Email is required')
+  }
+  const email = sanitizeEmail(rawEmail)
+  if (!EMAIL_RE.test(email)) {
+    throw new ApiError(400, 'Invalid email format')
   }
 
   const result = await inviteRegisteredVoter({

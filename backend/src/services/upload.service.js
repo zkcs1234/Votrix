@@ -40,6 +40,13 @@ export function assertImageFile(file) {
 }
 
 export async function uploadImageBuffer(buffer, { kind, publicId }) {
+  // CWE-918: Reject non-Buffer inputs before piping to Cloudinary's upload
+  // stream. A non-buffer value (e.g. a URL string) could be used to trigger
+  // SSRF via the stream pipeline.
+  if (!Buffer.isBuffer(buffer)) {
+    throw new ApiError(400, 'Invalid upload data')
+  }
+
   const config = UPLOAD_CONFIG[kind]
   if (!config) {
     throw new ApiError(500, 'Unknown upload kind')

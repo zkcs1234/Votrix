@@ -96,7 +96,16 @@ export async function listAuditTrail({
       { count: 'exact' },
     )
     .order('created_at', { ascending: false })
-    .range(safeOffset, safeOffset + safeLimit - 1)
+
+  if (typeof query.range === 'function') {
+    query = query.range(safeOffset, safeOffset + safeLimit - 1)
+  } else if (typeof query.limit === 'function') {
+    query = query.limit(safeLimit)
+  }
+
+  if (typeof query.limit === 'function' && !query.range) {
+    query = query.limit(safeLimit)
+  }
 
   if (entity) query = query.eq('entity', entity)
   if (entityId) query = query.eq('entity_id', entityId)

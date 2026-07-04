@@ -3,7 +3,7 @@ import csv from 'csv-parser'
 import { ApiError } from '../utils/ApiError.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
 import { inviteVoterToEvent, inviteRegisteredVoter } from './invitation.service.js'
-import { getSupabase } from '../config/database.js'
+import { db as getClient } from '../foundation/db.js'
 import { DB_TABLES } from '../utils/constants.js'
 
 function parseCsvBuffer(buffer) {
@@ -56,7 +56,7 @@ function normalizeRow(row, index) {
 async function rollbackCsvEnrollments(eventId, voterIds) {
   if (!voterIds.length) return
 
-  const client = getSupabase()
+  const client = getClient()
   if (!client) return
 
   await client
@@ -67,6 +67,13 @@ async function rollbackCsvEnrollments(eventId, voterIds) {
 }
 
 export async function importVotersFromCsv(eventId, organizerId, fileBuffer) {
+  // CWE-918: Reject non-Buffer inputs before passing to Readable.from().
+  // A non-buffer value (e.g. a URL string) could be used to trigger SSRF
+  // via the stream pipeline.
+  if (!Buffer.isBuffer(fileBuffer)) {
+    throw new ApiError(400, 'Invalid file data')
+  }
+
   await assertOrganizerOwnsEvent(eventId, organizerId)
 
   const rawRows = await parseCsvBuffer(fileBuffer)

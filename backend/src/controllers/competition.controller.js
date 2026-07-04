@@ -1,7 +1,4 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
-import { ApiError } from '../utils/ApiError.js'
-import { getSupabase } from '../config/database.js'
-import { DB_TABLES } from '../utils/constants.js'
 import * as competitionService from '../services/competition.service.js'
 import {
   validateCategory,
@@ -11,12 +8,6 @@ import {
   validateAssignment,
 } from '../validators/competition.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
-
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
 
 // ---------------------------------------------------------------------------
 // Categories
@@ -125,40 +116,14 @@ export const removeRoundCriteria = asyncHandler(async (req, res) => {
 // Scoring config (Phase 5)
 // ---------------------------------------------------------------------------
 export const getScoringConfig = asyncHandler(async (req, res) => {
-  await competitionService.assertCompetitionEvent(req.params.eventId, req.user.id)
-  const { data, error } = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .select('scoring_config')
-    .eq('id', req.params.eventId)
-    .single()
-  if (error) throw new ApiError(500, error.message)
-  res.json({
-    success: true,
-    config: competitionService.mergeScoringConfig(data.scoring_config),
-  })
+  const config = await competitionService.getScoringConfig(req.params.eventId, req.user.id)
+  res.json({ success: true, config })
 })
 
 export const setScoringConfig = asyncHandler(async (req, res) => {
-  await competitionService.assertCompetitionEvent(req.params.eventId, req.user.id)
   const partial = validateScoringConfig(req.body)
-  const current = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .select('scoring_config')
-    .eq('id', req.params.eventId)
-    .single()
-  if (current.error) throw new ApiError(500, current.error.message)
-  const merged = competitionService.mergeScoringConfig({
-    ...(current.data?.scoring_config ?? {}),
-    ...partial,
-  })
-  const { data, error } = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .update({ scoring_config: merged })
-    .eq('id', req.params.eventId)
-    .select('scoring_config')
-    .single()
-  if (error) throw new ApiError(500, error.message)
-  res.json({ success: true, config: merged })
+  const config = await competitionService.setScoringConfig(req.params.eventId, req.user.id, partial)
+  res.json({ success: true, config })
 })
 
 // ---------------------------------------------------------------------------
@@ -243,65 +208,6 @@ export const deleteJudgeAssignment = asyncHandler(async (req, res) => {
 // dynamic structure without N+1 calls.
 // ---------------------------------------------------------------------------
 export const getFoundation = asyncHandler(async (req, res) => {
-  const eventId = req.params.eventId
-  await competitionService.assertCompetitionEvent(eventId, req.user.id)
-
-  const [eventRes, cats, rounds, criteria, contestants, judges, assignments, roundLinks] =
-    await Promise.all([
-      getClient()
-        .from(DB_TABLES.EVENTS)
-        .select('id, title, scoring_config, scoring_enabled, event_type')
-        .eq('id', eventId)
-        .single(),
-      competitionService.listCategories(eventId, req.user.id),
-      competitionService.listRounds(eventId, req.user.id),
-      getClient()
-        .from(DB_TABLES.CRITERIA)
-        .select('*')
-        .eq('event_id', eventId)
-        .order('display_order', { ascending: true })
-        .order('created_at', { ascending: true }),
-      getClient()
-        .from(DB_TABLES.CONTESTANTS)
-        .select('*')
-        .eq('event_id', eventId)
-        .order('contestant_number', { ascending: true }),
-      competitionService.listCompetitionJudges(eventId, req.user.id),
-      getClient()
-        .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
-        .select('id, judge_id, scope, scope_id, competition_judges!inner(event_id)')
-        .eq('competition_judges.event_id', eventId),
-      Promise.all([
-        getClient().from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS).select('round_id, contestant_id'),
-        getClient().from(DB_TABLES.COMPETITION_ROUND_CRITERIA).select('round_id, criteria_id'),
-      ]).then(([rc, cr]) => ({ contestants: rc.data ?? [], criteria: cr.data ?? [] })),
-    ])
-
-  if (eventRes.error) throw new ApiError(500, eventRes.error.message)
-  if (criteria.error) throw new ApiError(500, criteria.error.message)
-  if (contestants.error) throw new ApiError(500, contestants.error.message)
-  if (assignments.error) throw new ApiError(500, assignments.error.message)
-
-  res.json({
-    success: true,
-    foundation: {
-      event: eventRes.data,
-      scoringConfig: competitionService.mergeScoringConfig(eventRes.data.scoring_config),
-      categories: cats,
-      rounds: rounds.map((r) => ({
-        ...r,
-        contestantIds: roundLinks.contestants.filter((x) => x.round_id === r.id).map((x) => x.contestant_id),
-        criteriaIds: roundLinks.criteria.filter((x) => x.round_id === r.id).map((x) => x.criteria_id),
-      })),
-      criteria: criteria.data ?? [],
-      contestants: contestants.data ?? [],
-      judges,
-      assignments: (assignments.data ?? []).map((a) => ({
-        id: a.id,
-        judgeId: a.judge_id,
-        scope: a.scope,
-        scopeId: a.scope_id,
-      })),
-    },
-  })
+  const foundation = await competitionService.getCompetitionFoundation(req.params.eventId, req.user.id)
+  res.json({ success: true, foundation })
 })

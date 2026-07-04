@@ -1,4 +1,4 @@
-import { getSupabase } from '../config/database.js'
+import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import { findUserByEmail } from './user.service.js'
@@ -9,11 +9,6 @@ import { env } from '../config/env.js'
 const RESET_EXPIRY_MINUTES = Number(process.env.PASSWORD_RESET_EXPIRY_MINUTES) || 60
 const TABLE = 'password_reset_tokens'
 
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
 
 export async function requestPasswordReset(email) {
   const normalizedEmail = email.toLowerCase().trim()

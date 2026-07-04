@@ -1,6 +1,20 @@
 import { ApiError } from '../utils/ApiError.js'
+import { EVENT_STATUS } from '../utils/constants.js'
 
 export const ELECTION_RESULTS_VISIBILITY = ['real_time', 'hidden', 'public']
+const ALLOWED_EVENT_STATUSES = new Set(Object.values(EVENT_STATUS))
+
+function normalizeEventStatus(value, fallback = undefined) {
+  if (value === undefined || value === null || value === '') {
+    return fallback ?? EVENT_STATUS.DRAFT
+  }
+
+  const normalized = String(value).trim().toLowerCase()
+  if (!ALLOWED_EVENT_STATUSES.has(normalized)) {
+    throw new ApiError(400, `status must be one of ${Array.from(ALLOWED_EVENT_STATUSES).join(', ')}`)
+  }
+  return normalized
+}
 
 function normalizeResultsVisibility(value) {
   if (value === undefined) return undefined
@@ -31,7 +45,7 @@ export function validateCreateEvent(body) {
     banner: body.banner || null,
     startDate,
     endDate,
-    status: body.status || 'draft',
+    status: normalizeEventStatus(body.status, EVENT_STATUS.DRAFT),
     resultsVisibility: normalizeResultsVisibility(body.resultsVisibility) ?? 'public',
   }
 }
@@ -43,7 +57,7 @@ export function validateUpdateEvent(body) {
   if (body.banner !== undefined) payload.banner = body.banner
   if (body.startDate !== undefined) payload.startDate = body.startDate
   if (body.endDate !== undefined) payload.endDate = body.endDate
-  if (body.status !== undefined) payload.status = body.status
+  if (body.status !== undefined) payload.status = normalizeEventStatus(body.status)
   if (body.resultsVisibility !== undefined) {
     payload.resultsVisibility = normalizeResultsVisibility(body.resultsVisibility)
   }

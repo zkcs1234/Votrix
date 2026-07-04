@@ -1,4 +1,4 @@
-import { getSupabase } from '../config/database.js'
+import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import {
   DB_TABLES,
@@ -23,30 +23,9 @@ import {
 } from '../modules/scoring-engine.js'
 import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
 import { emitToEvent } from '../websocket/ws-emitter.js'
+import { mapEvent } from '../foundation/mapper.js'
 
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
 
-function mapEvent(row) {
-  if (!row) return null
-  return {
-    id: row.id,
-    organizationId: row.organization_id,
-    title: row.title,
-    description: row.description,
-    banner: row.banner,
-    startDate: row.start_date,
-    endDate: row.end_date,
-    status: row.status,
-    eventType: row.event_type,
-    scoringEnabled: Boolean(row.scoring_enabled),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
-}
 
 function mapContestant(row) {
   return {
@@ -171,14 +150,15 @@ export async function listPageantEvents(organizerId) {
   return listCompetitionEvents(organizerId)
 }
 
-export async function listCompetitionEvents(organizerId) {
+export async function listCompetitionEvents(organizerId, { limit = 200, offset = 0 } = {}) {
   const org = await getOrCreateOrg(organizerId)
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
-    .select('*')
+    .select('id, title, description, banner, status, scoring_enabled, event_type, start_date, end_date, created_at, organization_id, organizations, scoring_config')
     .eq('organization_id', org.id)
     .in('event_type', Array.from(COMPETITION_SCORING_EVENT_TYPES))
     .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
 
   if (error) throw new ApiError(500, error.message)
   return (data ?? []).map(mapEvent)
@@ -283,7 +263,7 @@ export async function listContestants(eventId, organizerId) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
-    .select('*')
+    .select('id, event_id, name, photo, contestant_number')
     .eq('event_id', eventId)
     .order('contestant_number', { ascending: true })
 
@@ -354,7 +334,7 @@ export async function listCriteria(eventId, organizerId) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.CRITERIA)
-    .select('*')
+    .select('id, event_id, name, percentage, min_score, max_score')
     .eq('event_id', eventId)
     .order('created_at', { ascending: true })
 
@@ -521,7 +501,7 @@ export async function listJudges(eventId, organizerId) {
 export async function assertJudgeEnrolled(eventId, judgeId) {
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_VOTERS)
-    .select('*')
+    .select('id, event_id, voter_id, is_judge, has_scored, has_voted')
     .eq('event_id', eventId)
     .eq('voter_id', judgeId)
     .eq('is_judge', true)
@@ -587,8 +567,8 @@ export async function getJudgeScoringSheet(eventId, judgeId) {
   }
 
   const [contestants, criteria] = await Promise.all([
-    getClient().from(DB_TABLES.CONTESTANTS).select('*').eq('event_id', eventId).order('contestant_number'),
-    getClient().from(DB_TABLES.CRITERIA).select('*').eq('event_id', eventId),
+    getClient().from(DB_TABLES.CONTESTANTS).select('id, event_id, name, photo, contestant_number').eq('event_id', eventId).order('contestant_number'),
+    getClient().from(DB_TABLES.CRITERIA).select('id, event_id, name, percentage, min_score, max_score').eq('event_id', eventId),
   ])
 
   if (contestants.error) throw new ApiError(500, contestants.error.message)
@@ -596,7 +576,7 @@ export async function getJudgeScoringSheet(eventId, judgeId) {
 
   const { data: existingScores } = await getClient()
     .from(DB_TABLES.JUDGE_SCORES)
-    .select('*')
+    .select('contestant_id, criteria_id, score')
     .eq('judge_id', judgeId)
     .in(
       'contestant_id',
@@ -655,7 +635,7 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
     .select('id')
     .eq('event_id', eventId)
 
-  const criteria = await getClient().from(DB_TABLES.CRITERIA).select('*').eq('event_id', eventId)
+  const criteria = await getClient().from(DB_TABLES.CRITERIA).select('id, event_id, name, percentage, min_score, max_score').eq('event_id', eventId)
 
   if (contestants.error || criteria.error) {
     throw new ApiError(500, 'Failed to load competition scoring data')
@@ -821,8 +801,8 @@ export async function getLiveRankings(eventId, organizerId) {
         .select('scoring_config')
         .eq('id', eventId)
         .single(),
-      getClient().from(DB_TABLES.CONTESTANTS).select('*').eq('event_id', eventId),
-      getClient().from(DB_TABLES.CRITERIA).select('*').eq('event_id', eventId),
+      getClient().from(DB_TABLES.CONTESTANTS).select('id, event_id, name, photo, contestant_number').eq('event_id', eventId),
+      getClient().from(DB_TABLES.CRITERIA).select('id, event_id, name, percentage, min_score, max_score').eq('event_id', eventId),
       getClient()
         .from(DB_TABLES.EVENT_VOTERS)
         .select('id', { count: 'exact', head: true })

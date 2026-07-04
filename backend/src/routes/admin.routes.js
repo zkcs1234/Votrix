@@ -3,8 +3,10 @@ import { authenticate, authorize, requirePasswordChanged } from '../middleware/a
 import { USER_ROLES } from '../utils/constants.js'
 import { adminActionLimiter } from '../middleware/rateLimiter.js'
 import * as adminController from '../controllers/admin.controller.js'
+import { validateRouteUUIDParams } from '../utils/sanitize.js'
 
 const router = Router()
+router.use(validateRouteUUIDParams)
 
 router.use(authenticate, authorize(USER_ROLES.ADMIN), requirePasswordChanged)
 

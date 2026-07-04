@@ -1,7 +1,15 @@
+import crypto from 'crypto'
 import { ApiError } from '../utils/ApiError.js'
 import { verifyAccessToken } from '../utils/jwt.js'
 import { env } from '../config/env.js'
 import { findUserById } from '../services/user.service.js'
+
+// CWE-208: Constant-time integer comparison for token version.
+// Converts both sides to a fixed 16-byte hex string before comparing.
+function tokenVersionEqual(a, b) {
+  const buf = (n) => Buffer.from(String(Number(n ?? 0)).padStart(16, '0'))
+  return crypto.timingSafeEqual(buf(a), buf(b))
+}
 
 function extractAccessToken(req) {
   return req.cookies?.[env.jwt.accessCookieName] || null
@@ -21,7 +29,7 @@ export async function authenticate(req, _res, next) {
       throw new ApiError(401, 'User not found')
     }
 
-    if (Number(user.token_version ?? 0) !== Number(decoded.tokenVersion ?? 0)) {
+    if (!tokenVersionEqual(user.token_version, decoded.tokenVersion)) {
       throw new ApiError(401, 'Session has been revoked')
     }
 
@@ -79,7 +87,7 @@ export async function requireActiveAccount(req, _res, next) {
       return next(new ApiError(401, 'User not found'))
     }
 
-    if (Number(user.token_version ?? 0) !== Number(req.user?.tokenVersion ?? 0)) {
+    if (!tokenVersionEqual(user.token_version, req.user?.tokenVersion)) {
       return next(new ApiError(401, 'Session has been revoked'))
     }
 

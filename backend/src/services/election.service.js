@@ -1,36 +1,12 @@
-import { getSupabase } from '../config/database.js'
+import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, EVENT_TYPES } from '../utils/constants.js'
 import { isElectionVotingOpen, canVoterViewElectionResults } from '../utils/eventSchedule.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { getOrCreateElectionOrganization, mapOrganization } from './organization.service.js'
 import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
+import { mapEvent } from '../foundation/mapper.js'
 
-
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
-
-function mapEvent(row) {
-  if (!row) return null
-  return {
-    id: row.id,
-    organizationId: row.organization_id,
-    title: row.title,
-    description: row.description,
-    banner: row.banner,
-    startDate: row.start_date,
-    endDate: row.end_date,
-    status: row.status,
-    eventType: row.event_type,
-    votingEnabled: Boolean(row.voting_enabled),
-    resultsVisibility: row.results_visibility ?? 'public',
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
-}
 
 function mapPosition(row) {
   return {
@@ -141,14 +117,15 @@ export async function getOrganizerDashboard(organizerId) {
 
 // ——— Events ———
 
-export async function listElectionEvents(organizerId) {
+export async function listElectionEvents(organizerId, { limit = 200, offset = 0 } = {}) {
   const org = await getOrCreateElectionOrganization(organizerId)
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
-    .select('*')
+    .select('id, title, description, banner, status, voting_enabled, event_type, results_visibility, start_date, end_date, created_at, organization_id, organizations')
     .eq('organization_id', org.id)
     .eq('event_type', EVENT_TYPES.ELECTION)
     .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
 
   if (error) throw new ApiError(500, error.message)
   return (data ?? []).map(mapEvent)
@@ -278,7 +255,7 @@ export async function listPositions(eventId, organizerId) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POSITIONS)
-    .select('*')
+    .select('id, event_id, name, description, min_vote, max_vote, number_of_winners, display_order, allow_skip')
     .eq('event_id', eventId)
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
@@ -393,7 +370,7 @@ export async function listCandidates(eventId, organizerId, positionId = null) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.CANDIDATES)
-    .select('*')
+    .select('id, position_id, name, photo, description, biography, platform, partylist')
     .in('position_id', positionIds)
 
   if (error) throw new ApiError(500, error.message)
@@ -541,7 +518,7 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
 export async function assertVoterEnrolled(eventId, voterId) {
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_VOTERS)
-    .select('*')
+    .select('id, event_id, voter_id, has_voted, first_name, last_name')
     .eq('event_id', eventId)
     .eq('voter_id', voterId)
     .maybeSingle()
@@ -561,7 +538,7 @@ export async function getVoterBallot(eventId, voterId) {
 
   const { data: positions, error: posErr } = await getClient()
     .from(DB_TABLES.POSITIONS)
-    .select('*')
+    .select('id, event_id, name, description, min_vote, max_vote, number_of_winners, display_order, allow_skip')
     .eq('event_id', eventId)
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
@@ -574,7 +551,7 @@ export async function getVoterBallot(eventId, voterId) {
   if (positionIds.length) {
     const { data: cands, error: candErr } = await getClient()
       .from(DB_TABLES.CANDIDATES)
-      .select('*')
+      .select('id, position_id, name, photo, description, biography, platform, partylist')
       .in('position_id', positionIds)
 
     if (candErr) throw new ApiError(500, candErr.message)
@@ -644,7 +621,7 @@ export async function submitBallot(eventId, voterId, selections) {
 
   const { data: positions, error: posErr } = await getClient()
     .from(DB_TABLES.POSITIONS)
-    .select('*')
+    .select('id, event_id, name, description, min_vote, max_vote, number_of_winners, display_order, allow_skip')
     .eq('event_id', eventId)
 
   if (posErr) throw new ApiError(500, posErr.message)
@@ -837,7 +814,7 @@ async function fetchElectionResultsData(eventId) {
 
   const { data: positionRows, error: posListErr } = await getClient()
     .from(DB_TABLES.POSITIONS)
-    .select('*')
+    .select('id, event_id, name, description, min_vote, max_vote, number_of_winners, display_order, allow_skip')
     .eq('event_id', eventId)
     .order('display_order', { ascending: true })
 

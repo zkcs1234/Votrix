@@ -2,7 +2,7 @@ import { WebSocketServer } from 'ws'
 import { verifyAccessToken } from '../utils/jwt.js'
 import { env } from '../config/env.js'
 import { joinRoom, leaveAllRooms, broadcast } from './ws-rooms.js'
-import { getSupabase } from '../config/database.js'
+import { db as getClient } from '../foundation/db.js'
 
 const HEARTBEAT_INTERVAL = 25_000  // 25s ping/pong
 const AUTH_TIMEOUT = 10_000        // close unauthenticated sockets after 10s
@@ -130,7 +130,7 @@ async function setupRooms(ws) {
 
   // Organizers join their active event rooms
   if (role === 'organizer' && organizationId) {
-    const db = getSupabase()
+    const db = getClient()
     const { data: events } = await db
       .from('events')
       .select('id')
@@ -144,7 +144,7 @@ async function setupRooms(ws) {
 
   // Voters join rooms for their assigned events
   if (role === 'voter') {
-    const db = getSupabase()
+    const db = getClient()
     const { data: assignments } = await db
       .from('event_voters')
       .select('event_id')

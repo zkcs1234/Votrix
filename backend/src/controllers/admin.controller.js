@@ -3,16 +3,52 @@ import { createOrganizer } from '../services/user.service.js'
 import { validateCreateOrganizer } from '../validators/auth.validator.js'
 import { getAdminDashboardStats, getAdminAnalytics } from '../services/dashboard.service.js'
 import { ACCOUNT_STATUS } from '../utils/constants.js'
-import { 
-  getOrganizersList, 
-  getGlobalEvents as fetchGlobalEvents, 
-  getSystemSettings as fetchSystemSettings, 
-  saveSystemSetting, 
+import {
+  getOrganizersList,
+  getGlobalEvents as fetchGlobalEvents,
+  getSystemSettings as fetchSystemSettings,
+  saveSystemSetting,
   getAuditLogs as fetchAuditLogs,
   createAuditLog,
   updateOrganizerAccountStatus,
 } from '../services/admin.service.js'
 import { createAdminAlert, createNotification } from '../services/notification.service.js'
+import { ApiError } from '../utils/ApiError.js'
+import { validateUUID } from '../utils/sanitize.js'
+
+// CWE-20: Allowlist for system setting keys — alphanumeric + underscores only.
+const SETTING_KEY_RE = /^[a-zA-Z0-9_]{1,100}$/
+
+function isSerializableSettingValue(value) {
+  if (value === null) return true
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return true
+  }
+  if (Array.isArray(value)) {
+    return value.every(isSerializableSettingValue)
+  }
+  if (typeof value === 'object') {
+    return Object.values(value).every((entry) => isSerializableSettingValue(entry))
+  }
+  return false
+}
+
+function validateSystemSetting(body) {
+  const { key, value, description } = body ?? {}
+  if (!key || value === undefined) {
+    throw new ApiError(400, 'Key and value are required')
+  }
+  if (typeof key !== 'string' || !SETTING_KEY_RE.test(key)) {
+    throw new ApiError(400, 'Setting key must be alphanumeric with underscores only (max 100 chars)')
+  }
+  if (typeof description === 'string' && description.length > 500) {
+    throw new ApiError(400, 'Description must be 500 characters or fewer')
+  }
+  if (!isSerializableSettingValue(value)) {
+    throw new ApiError(400, 'Setting value must be a JSON-serializable primitive or object')
+  }
+  return { key, value, description }
+}
 
 export const createOrganizerAccount = asyncHandler(async (req, res) => {
   const payload = validateCreateOrganizer(req.body)
@@ -51,7 +87,7 @@ export const createOrganizerAccount = asyncHandler(async (req, res) => {
 })
 
 export const updateOrganizerStatus = asyncHandler(async (req, res) => {
-  const { organizerId } = req.params
+  const organizerId = validateUUID(req.params.organizerId, 'organizerId')
   const { accountStatus } = req.body ?? {}
 
   if (!Object.values(ACCOUNT_STATUS).includes(accountStatus)) {
@@ -113,11 +149,7 @@ export const getSystemSettings = asyncHandler(async (_req, res) => {
 })
 
 export const updateSystemSettings = asyncHandler(async (req, res) => {
-  const { key, value, description } = req.body
-  
-  if (!key || value === undefined) {
-    return res.status(400).json({ success: false, message: 'Key and value are required' })
-  }
+  const { key, value, description } = validateSystemSetting(req.body)
 
   const updatedSetting = await saveSystemSetting(key, value, description)
 

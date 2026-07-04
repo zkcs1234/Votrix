@@ -1,4 +1,4 @@
-import { getSupabase } from '../config/database.js'
+import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, USER_ROLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
 import { hashPassword } from '../utils/password.js'
@@ -8,11 +8,6 @@ import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './mailer.service.js'
 import { createNotification } from './notification.service.js'
 
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
 
 async function ensureVoterAccount(email, plainPassword) {
   const normalizedEmail = email.toLowerCase().trim()

@@ -1,11 +1,13 @@
 import { Router } from 'express'
 import { emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/competition.controller.js'
+import { validateRouteUUIDParams } from '../utils/sanitize.js'
 
 // All routes are mounted under /api/organizer/competition/events/:eventId
 // (see pageant-organizer.routes.js) and share the same auth middleware.
 
 const router = Router({ mergeParams: true })
+router.use(validateRouteUUIDParams)
 
 // Categories
 router.get('/categories', ctrl.listCategories)

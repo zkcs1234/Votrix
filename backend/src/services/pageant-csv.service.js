@@ -35,6 +35,11 @@ function normalizeRow(row, index) {
 }
 
 export async function importJudgesFromCsv(eventId, organizerId, fileBuffer) {
+  // CWE-918: Reject non-Buffer inputs before passing to Readable.from().
+  if (!Buffer.isBuffer(fileBuffer)) {
+    throw new ApiError(400, 'Invalid file data')
+  }
+
   await assertOrganizerOwnsEvent(eventId, organizerId)
 
   const rawRows = await parseCsvBuffer(fileBuffer)

@@ -2,12 +2,7 @@ import multer from 'multer'
 import { ApiError } from '../utils/ApiError.js'
 
 const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
-const CSV_MIME_TYPES = new Set([
-  'text/csv',
-  'application/csv',
-  'text/plain',
-  'application/vnd.ms-excel',
-])
+const CSV_MIME_TYPES = new Set(['text/csv', 'application/csv', 'application/vnd.ms-excel'])
 
 const storage = multer.memoryStorage()
 
@@ -43,4 +38,4 @@ export const csvUpload = multer({
 
 export const uploadSingle = (fieldName) => csvUpload.single(fieldName)
 export const uploadImage = (fieldName) => imageUpload.single(fieldName)
-export const uploadMultiple = (fieldName, maxCount = 10) => imageUpload.array(fieldName, maxCount)
+export const uploadMultiple = (fieldName, maxCount = 10) => imageUpload.array(fieldName, Math.min(maxCount, 20))

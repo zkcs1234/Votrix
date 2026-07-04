@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { ApiError } from '../utils/ApiError.js'
 import { env } from '../config/env.js'
 
@@ -14,7 +15,6 @@ const EXEMPT_PATHS = new Set([
   '/auth/logout',
   '/auth/forgot-password',
   '/auth/reset-password',
-  '/admin/organizers',
   '/health',
   '/health/',
 ])
@@ -51,9 +51,21 @@ export function csrfProtection(req, res, next) {
     !headerToken ||
     typeof cookieToken !== 'string' ||
     typeof headerToken !== 'string' ||
-    cookieToken.length < 32 ||
-    cookieToken !== headerToken
+    cookieToken.length < 32
   ) {
+    return next(new ApiError(403, 'Invalid or missing CSRF token'))
+  }
+
+  // CWE-208: Use constant-time comparison to prevent timing attacks.
+  // Pad both buffers to the same length before comparing so unequal-length
+  // tokens also take constant time (the length check above already rejects
+  // short tokens, but we normalise here for defence-in-depth).
+  const a = Buffer.from(cookieToken)
+  const b = Buffer.from(headerToken)
+  const maxLen = Math.max(a.length, b.length)
+  const aPadded = Buffer.concat([a, Buffer.alloc(maxLen - a.length)])
+  const bPadded = Buffer.concat([b, Buffer.alloc(maxLen - b.length)])
+  if (!crypto.timingSafeEqual(aPadded, bPadded)) {
     return next(new ApiError(403, 'Invalid or missing CSRF token'))
   }
 

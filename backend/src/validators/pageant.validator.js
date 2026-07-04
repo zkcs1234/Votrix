@@ -1,4 +1,19 @@
 import { ApiError } from '../utils/ApiError.js'
+import { EVENT_STATUS } from '../utils/constants.js'
+
+const ALLOWED_EVENT_STATUSES = new Set(Object.values(EVENT_STATUS))
+
+function normalizeEventStatus(value) {
+  if (value === undefined || value === null || value === '') {
+    return undefined
+  }
+
+  const normalized = String(value).trim().toLowerCase()
+  if (!ALLOWED_EVENT_STATUSES.has(normalized)) {
+    throw new ApiError(400, `status must be one of ${Array.from(ALLOWED_EVENT_STATUSES).join(', ')}`)
+  }
+  return normalized
+}
 
 export function validatePageantEvent(body, isCreate = false) {
   if (isCreate && !body?.title?.trim()) {
@@ -11,7 +26,7 @@ export function validatePageantEvent(body, isCreate = false) {
   if (body.banner !== undefined) payload.banner = body.banner
   if (body.startDate !== undefined) payload.startDate = body.startDate
   if (body.endDate !== undefined) payload.endDate = body.endDate
-  if (body.status !== undefined) payload.status = body.status
+  if (body.status !== undefined) payload.status = normalizeEventStatus(body.status)
 
   return payload
 }

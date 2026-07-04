@@ -1,4 +1,4 @@
-import { getSupabase } from '../config/database.js'
+import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, EVENT_TYPES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
@@ -24,11 +24,6 @@ import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
 // question creation / validation / analytics paths now go through
 // poll-question-types.js so a new type is a single SQL INSERT away.
 
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
 
 function mapPollEvent(row) {
   return {
@@ -156,14 +151,15 @@ export async function getOrganizerDashboard(organizerId) {
   }
 }
 
-export async function listPollEvents(organizerId) {
+export async function listPollEvents(organizerId, { limit = 200, offset = 0 } = {}) {
   const org = await getOrCreatePollingOrganization(organizerId)
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
-    .select('*')
+    .select('id, title, description, banner, status, event_type, polling_enabled, poll_anonymous, poll_allow_multiple_submissions, poll_expires_at, start_date, end_date')
     .eq('organization_id', org.id)
     .eq('event_type', EVENT_TYPES.POLLING)
     .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
 
   if (error) throw new ApiError(500, error.message)
   return (data ?? []).map(mapPollEvent)
@@ -251,7 +247,7 @@ async function loadOptionsForQuestions(questionIds) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POLL_OPTIONS)
-    .select('*')
+    .select('id, question_id, label, sort_order')
     .in('question_id', questionIds)
     .order('sort_order', { ascending: true })
 
@@ -272,7 +268,7 @@ export async function listQuestions(eventId, organizerId) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
-    .select('*')
+    .select('id, event_id, question, type, sort_order, required, type_config')
     .eq('event_id', eventId)
     .order('sort_order', { ascending: true })
 
@@ -445,7 +441,7 @@ async function upsertQuestionOptions(questionId, typeDef, typeConfig, optionsInp
 export async function assertVoterCanRespond(eventId, voterId) {
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_VOTERS)
-    .select('*')
+    .select('id, event_id, voter_id, has_voted')
     .eq('event_id', eventId)
     .eq('voter_id', voterId)
     .maybeSingle()
@@ -492,7 +488,7 @@ async function listQuestionsPublic(eventId, registry = null) {
   registry = registry ?? (await loadQuestionTypeRegistry())
   const { data, error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
-    .select('*')
+    .select('id, event_id, question, type, sort_order, required, type_config')
     .eq('event_id', eventId)
     .order('sort_order', { ascending: true })
 

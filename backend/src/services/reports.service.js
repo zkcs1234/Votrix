@@ -1,4 +1,4 @@
-import { getSupabase } from '../config/database.js'
+import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import {
   DB_TABLES,
@@ -10,11 +10,6 @@ import { listElectionEvents, getElectionAnalytics, listPositions } from './elect
 import { listCompetitionEvents, getLiveRankings } from './pageant.service.js'
 import { listPollEvents, getPollAnalytics } from './polling.service.js'
 
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
 
 function pct(part, total) {
   return total > 0 ? Math.round((part / total) * 10000) / 100 : 0
@@ -76,23 +71,24 @@ async function loadElectionStats(eventIds) {
   const map = {}
   if (!eventIds.length) return map
 
+  const [totalRes, votedRes] = await Promise.all([
+    getClient().from(DB_TABLES.EVENT_VOTERS).select('event_id', { count: 'exact' }).in('event_id', eventIds),
+    getClient().from(DB_TABLES.EVENT_VOTERS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('has_voted', true),
+  ])
+
+  const totalByEvent = {}
+  for (const row of totalRes.data ?? []) {
+    totalByEvent[row.event_id] = (totalByEvent[row.event_id] ?? 0) + 1
+  }
+  const votedByEvent = {}
+  for (const row of votedRes.data ?? []) {
+    votedByEvent[row.event_id] = (votedByEvent[row.event_id] ?? 0) + 1
+  }
+
   for (const eventId of eventIds) {
-    const { count: total } = await getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
-      .select('*', { count: 'exact', head: true })
-      .eq('event_id', eventId)
-
-    const { count: voted } = await getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
-      .select('*', { count: 'exact', head: true })
-      .eq('event_id', eventId)
-      .eq('has_voted', true)
-
-    map[eventId] = {
-      totalVoters: total ?? 0,
-      votedCount: voted ?? 0,
-      turnoutPercentage: pct(voted ?? 0, total ?? 0),
-    }
+    const total = totalByEvent[eventId] ?? 0
+    const voted = votedByEvent[eventId] ?? 0
+    map[eventId] = { totalVoters: total, votedCount: voted, turnoutPercentage: pct(voted, total) }
   }
   return map
 }
@@ -101,25 +97,24 @@ async function loadCompetitionStats(eventIds) {
   const map = {}
   if (!eventIds.length) return map
 
+  const [totalRes, submittedRes] = await Promise.all([
+    getClient().from(DB_TABLES.EVENT_VOTERS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('is_judge', true),
+    getClient().from(DB_TABLES.EVENT_VOTERS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('is_judge', true).eq('has_scored', true),
+  ])
+
+  const totalByEvent = {}
+  for (const row of totalRes.data ?? []) {
+    totalByEvent[row.event_id] = (totalByEvent[row.event_id] ?? 0) + 1
+  }
+  const submittedByEvent = {}
+  for (const row of submittedRes.data ?? []) {
+    submittedByEvent[row.event_id] = (submittedByEvent[row.event_id] ?? 0) + 1
+  }
+
   for (const eventId of eventIds) {
-    const { count: total } = await getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
-      .select('*', { count: 'exact', head: true })
-      .eq('event_id', eventId)
-      .eq('is_judge', true)
-
-    const { count: submitted } = await getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
-      .select('*', { count: 'exact', head: true })
-      .eq('event_id', eventId)
-      .eq('is_judge', true)
-      .eq('has_scored', true)
-
-    map[eventId] = {
-      totalJudges: total ?? 0,
-      submittedCount: submitted ?? 0,
-      turnoutPercentage: pct(submitted ?? 0, total ?? 0),
-    }
+    const total = totalByEvent[eventId] ?? 0
+    const submitted = submittedByEvent[eventId] ?? 0
+    map[eventId] = { totalJudges: total, submittedCount: submitted, turnoutPercentage: pct(submitted, total) }
   }
   return map
 }
@@ -128,22 +123,24 @@ async function loadPollStats(eventIds) {
   const map = {}
   if (!eventIds.length) return map
 
+  const [submissionsRes, respondentsRes] = await Promise.all([
+    getClient().from(DB_TABLES.POLL_SUBMISSIONS).select('event_id', { count: 'exact' }).in('event_id', eventIds),
+    getClient().from(DB_TABLES.EVENT_VOTERS).select('event_id', { count: 'exact' }).in('event_id', eventIds),
+  ])
+
+  const submissionsByEvent = {}
+  for (const row of submissionsRes.data ?? []) {
+    submissionsByEvent[row.event_id] = (submissionsByEvent[row.event_id] ?? 0) + 1
+  }
+  const respondentsByEvent = {}
+  for (const row of respondentsRes.data ?? []) {
+    respondentsByEvent[row.event_id] = (respondentsByEvent[row.event_id] ?? 0) + 1
+  }
+
   for (const eventId of eventIds) {
-    const { count } = await getClient()
-      .from(DB_TABLES.POLL_SUBMISSIONS)
-      .select('*', { count: 'exact', head: true })
-      .eq('event_id', eventId)
-
-    const { count: respondents } = await getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
-      .select('*', { count: 'exact', head: true })
-      .eq('event_id', eventId)
-
-    map[eventId] = {
-      totalSubmissions: count ?? 0,
-      totalRespondents: respondents ?? 0,
-      responseRate: pct(count ?? 0, respondents ?? 0),
-    }
+    const count = submissionsByEvent[eventId] ?? 0
+    const respondents = respondentsByEvent[eventId] ?? 0
+    map[eventId] = { totalSubmissions: count, totalRespondents: respondents, responseRate: pct(count, respondents) }
   }
   return map
 }

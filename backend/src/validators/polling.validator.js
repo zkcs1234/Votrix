@@ -47,9 +47,30 @@ export async function validateQuestion(body, organizationId) {
 
 export function validatePollAnswers(body) {
   const answers = body?.answers
-  if (!answers || typeof answers !== 'object') {
+  if (answers === undefined || answers === null) {
     throw new ApiError(400, 'answers object is required')
   }
+
+  const answerEntries = Array.isArray(answers) ? answers : Object.entries(answers)
+  const totalEntries = Array.isArray(answers) ? answers.length : answerEntries.length
+  if (totalEntries > 200) {
+    throw new ApiError(400, 'Too many answers provided')
+  }
+
+  const values = Array.isArray(answers) ? answers : Object.values(answers)
+  for (const value of values) {
+    if (typeof value === 'string' && value.length > 10_000) {
+      throw new ApiError(400, 'Answer value exceeds 10,000 characters')
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item === 'string' && item.length > 10_000) {
+          throw new ApiError(400, 'Answer value exceeds 10,000 characters')
+        }
+      }
+    }
+  }
+
   return answers
 }
 

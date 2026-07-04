@@ -3,8 +3,10 @@ import { uploadSingle, uploadImage } from '../middleware/upload.js'
 import { uploadLimiter, csvImportLimiter, emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/pageant-organizer.controller.js'
 import competitionRoutes from './competition-organizer.routes.js'
+import { validateRouteUUIDParams } from '../utils/sanitize.js'
 
 const router = Router()
+router.use(validateRouteUUIDParams)
 
 router.get('/dashboard', ctrl.getDashboard)
 router.post('/organization/logo', uploadLimiter, uploadImage('logo'), ctrl.uploadOrganizationLogo)

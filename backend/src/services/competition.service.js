@@ -1,4 +1,4 @@
-import { getSupabase } from '../config/database.js'
+import { db as getClient } from '../foundation/index.js'
 import { ApiError } from '../utils/ApiError.js'
 import {
   DB_TABLES,
@@ -14,12 +14,6 @@ import { assertOrganizerOwnsEvent } from './event.service.js'
 // Adds dynamic Categories, Rounds, and a first-class judge model on top of
 // the existing contestant / criteria / scores tables.
 // ---------------------------------------------------------------------------
-
-function getClient() {
-  const client = getSupabase()
-  if (!client) throw new ApiError(503, 'Database is not configured')
-  return client
-}
 
 async function assertCompetitionEvent(eventId, organizerId) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
@@ -508,4 +502,101 @@ export async function deleteJudgeAssignment(eventId, organizerId, judgeId, assig
     .eq('judge_id', judgeId)
   if (error) throw new ApiError(500, error.message)
   return { success: true }
+}
+
+// ---------------------------------------------------------------------------
+// DB operations extracted from competition.controller.js
+// ---------------------------------------------------------------------------
+
+export async function getScoringConfig(eventId, organizerId) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const { data, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .select('scoring_config')
+    .eq('id', eventId)
+    .single()
+  if (error) throw new ApiError(500, error.message)
+  return mergeScoringConfig(data.scoring_config)
+}
+
+export async function setScoringConfig(eventId, organizerId, partialConfig) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const current = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .select('scoring_config')
+    .eq('id', eventId)
+    .single()
+  if (current.error) throw new ApiError(500, current.error.message)
+  const merged = mergeScoringConfig({
+    ...(current.data?.scoring_config ?? {}),
+    ...partialConfig,
+  })
+  const { data, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({ scoring_config: merged })
+    .eq('id', eventId)
+    .select('scoring_config')
+    .single()
+  if (error) throw new ApiError(500, error.message)
+  return merged
+}
+
+export async function getCompetitionFoundation(eventId, organizerId) {
+  await assertCompetitionEvent(eventId, organizerId)
+
+  const [eventRes, cats, rounds, criteria, contestants, judges, assignments, roundLinks] =
+    await Promise.all([
+      getClient()
+        .from(DB_TABLES.EVENTS)
+        .select('id, title, scoring_config, scoring_enabled, event_type')
+        .eq('id', eventId)
+        .single(),
+      listCategories(eventId, organizerId),
+      listRounds(eventId, organizerId),
+      getClient()
+        .from(DB_TABLES.CRITERIA)
+        .select('*')
+        .eq('event_id', eventId)
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: true }),
+      getClient()
+        .from(DB_TABLES.CONTESTANTS)
+        .select('*')
+        .eq('event_id', eventId)
+        .order('contestant_number', { ascending: true }),
+      listCompetitionJudges(eventId, organizerId),
+      getClient()
+        .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
+        .select('id, judge_id, scope, scope_id, competition_judges!inner(event_id)')
+        .eq('competition_judges.event_id', eventId),
+      Promise.all([
+        getClient().from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS).select('round_id, contestant_id'),
+        getClient().from(DB_TABLES.COMPETITION_ROUND_CRITERIA).select('round_id, criteria_id'),
+      ]).then(([rc, cr]) => ({ contestants: rc.data ?? [], criteria: cr.data ?? [] })),
+    ])
+
+  if (eventRes.error) throw new ApiError(500, eventRes.error.message)
+  if (criteria.error) throw new ApiError(500, criteria.error.message)
+  if (contestants.error) throw new ApiError(500, contestants.error.message)
+  if (assignments.error) throw new ApiError(500, assignments.error.message)
+
+  return {
+    event: eventRes.data,
+    scoringConfig: mergeScoringConfig(eventRes.data.scoring_config),
+    categories: cats,
+    rounds: rounds.map((r) => ({
+      ...r,
+      contestantIds: roundLinks.contestants.filter((x) => x.round_id === r.id).map((x) => x.contestant_id),
+      criteriaIds: roundLinks.criteria.filter((x) => x.round_id === r.id).map((x) => x.criteria_id),
+    })),
+    criteria: criteria.data ?? [],
+    contestants: contestants.data ?? [],
+    judges,
+    assignments: (assignments.data ?? []).map((a) => ({
+      id: a.id,
+      judgeId: a.judge_id,
+      scope: a.scope,
+      scopeId: a.scope_id,
+    })),
+  }
 }
