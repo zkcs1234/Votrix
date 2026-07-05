@@ -30,7 +30,6 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  defs,
 } from 'recharts'
 import ChartTooltip from './ChartTooltip'
 import {
