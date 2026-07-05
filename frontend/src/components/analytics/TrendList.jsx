@@ -1,24 +1,20 @@
 /**
- * TrendList — list of trend points with sparkline bars.
- * Useful for "Voting Progress", "Participation Trends", "Response Rate Over Time".
+ * TrendList.jsx
  *
- * Pure: takes items shaped { id, label, value, sublabel? } and renders them.
+ * List of trend/time-series data with chart visualization.
+ * Previously rendered a vertical bar chart — now renders an AreaChart
+ * which is semantically correct for trend data.
  *
- * Now uses Recharts for enhanced visualization
+ * Falls back to BarChartView when `chartType="bar"` is explicitly passed,
+ * so any caller that wants bars can still get them.
+ *
+ * All original props are preserved for backward compatibility.
  */
-import { useState } from 'react'
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { memo, useMemo } from 'react'
+import { AreaChartView, BarChartView } from '@/components/charts'
+import { getChartColor } from '@/components/charts/chartTokens'
 
-const COLORS = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-]
-
-export default function TrendList({
+const TrendList = memo(function TrendList({
   title,
   description,
   items = [],
@@ -26,33 +22,32 @@ export default function TrendList({
   labelKey = 'label',
   emptyMessage = 'No trend data yet.',
   barClass = 'bg-v-primary',
+  chartType = 'area',   // 'area' | 'bar' | 'line'
   className = '',
 }) {
-  const [hoveredIndex, setHoveredIndex] = useState(null)
+  const seriesColor = useMemo(() => {
+    if (barClass.includes('success')) return getChartColor('success')
+    if (barClass.includes('warning')) return getChartColor('warning')
+    if (barClass.includes('danger'))  return getChartColor('danger')
+    return getChartColor('primary')
+  }, [barClass])
+
+  const data = useMemo(
+    () =>
+      items.map((item) => ({
+        name: item?.[labelKey] ?? '—',
+        value: Number(item?.[valueKey] ?? 0),
+        sublabel: item?.sublabel,
+        fill: seriesColor,
+      })),
+    [items, valueKey, labelKey, seriesColor],
+  )
 
   if (!items.length) {
     return <p className="text-sm text-v-text-subtle">{emptyMessage}</p>
   }
 
-  // Determine color based on barClass prop
-  const getColor = () => {
-    if (barClass.includes('success')) return '#10b981'
-    if (barClass.includes('warning')) return '#f59e0b'
-    if (barClass.includes('danger')) return '#ef4444'
-    if (barClass.includes('primary')) return '#3b82f6'
-    return '#3b82f6'
-  }
-
-  const barColor = getColor()
-
-  // Transform items for Recharts
-  const data = items.map((item, index) => ({
-    id: item?.id ?? `${item?.[labelKey]}-${index}`,
-    name: item?.[labelKey] ?? '—',
-    value: Number(item?.[valueKey] ?? 0),
-    sublabel: item?.sublabel,
-    fill: COLORS[index % COLORS.length],
-  }))
+  const chartHeight = 160
 
   return (
     <section className={`v-card p-6 ${className}`}>
@@ -80,60 +75,31 @@ export default function TrendList({
         })}
       </ul>
 
-      {/* Recharts visualization */}
-      <div className="mt-4 h-40">
-        <ResponsiveContainer width="100%" height="100%">
-          <RechartsBarChart
+      {/* Chart visualization */}
+      <div className="mt-4">
+        {chartType === 'bar' ? (
+          <BarChartView
             data={data}
+            dataKey="value"
+            nameKey="name"
             layout="vertical"
-            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-            onMouseLeave={() => setHoveredIndex(null)}
-          >
-            <XAxis
-              type="number"
-              tick={{ fill: '#9ca3af', fontSize: 11 }}
-              axisLine={{ stroke: '#374151' }}
-              tickLine={{ stroke: '#374151' }}
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              tick={{ fill: '#9ca3af', fontSize: 11 }}
-              axisLine={{ stroke: '#374151' }}
-              tickLine={false}
-              width={80}
-            />
-            <Tooltip
-              content={({ active, payload }) => {
-                if (active && payload && payload.length) {
-                  const item = payload[0].payload
-                  return (
-                    <div className="rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 shadow-lg">
-                      <p className="text-sm font-medium text-v-text">{item.name}</p>
-                      <p className="text-sm text-v-text-subtle">{item.value}</p>
-                    </div>
-                  )
-                }
-                return null
-              }}
-            />
-            <Bar
-              dataKey="value"
-              radius={[0, 4, 4, 0]}
-              barSize={14}
-              onMouseEnter={(_, index) => setHoveredIndex(index)}
-              onMouseLeave={() => setHoveredIndex(null)}
-            >
-              {data.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={hoveredIndex === index ? '#60a5fa' : entry.fill || barColor}
-                />
-              ))}
-            </Bar>
-          </RechartsBarChart>
-        </ResponsiveContainer>
+            height={chartHeight}
+            barSize={14}
+            colors={[seriesColor]}
+          />
+        ) : (
+          <AreaChartView
+            data={data}
+            areas={[{ dataKey: 'value', name: title ?? 'Value', color: seriesColor }]}
+            xAxisKey="name"
+            height={chartHeight}
+            showDots={data.length <= 12}
+            showLegend={false}
+          />
+        )}
       </div>
     </section>
   )
-}
+})
+
+export default TrendList

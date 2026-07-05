@@ -1,13 +1,35 @@
-﻿import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+﻿/**
+ * TurnoutReport.jsx
+ *
+ * Stat cards grid + a single-bar progress indicator.
+ * Now uses BarChartView from the unified chart system.
+ *
+ * Props are unchanged — backward compatible.
+ */
+import { memo, useMemo } from 'react'
 import StatCard from '@/components/reports/StatCard'
+import { BarChartView } from '@/components/charts'
+import { getChartColor } from '@/components/charts/chartTokens'
 
-export default function TurnoutReport({
+const TurnoutReport = memo(function TurnoutReport({
   title,
   stats,
   accentClass = 'text-v-success',
   barColorClass = 'bg-emerald-500',
 }) {
   if (!stats) return null
+
+  const progressColor = useMemo(() => {
+    if (barColorClass.includes('emerald') || barColorClass.includes('success')) return getChartColor('success')
+    if (barColorClass.includes('warning')) return getChartColor('warning')
+    if (barColorClass.includes('danger'))  return getChartColor('danger')
+    return getChartColor('primary')
+  }, [barColorClass])
+
+  const progressData = useMemo(
+    () => [{ name: 'Progress', value: Math.min(stats.turnoutPercentage ?? 0, 100) }],
+    [stats.turnoutPercentage],
+  )
 
   return (
     <section className="v-card p-6">
@@ -51,46 +73,26 @@ export default function TurnoutReport({
 
       {stats.turnoutPercentage !== undefined && (
         <div className="mt-6">
-          <div className="flex justify-between text-xs text-v-text-subtle mb-2">
+          <div className="mb-2 flex justify-between text-xs text-v-text-subtle">
             <span>0%</span>
             <span className="font-medium">{stats.turnoutPercentage}%</span>
             <span>100%</span>
           </div>
-          <div className="h-8">
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart
-                data={[
-                  { name: 'Progress', value: Math.min(stats.turnoutPercentage, 100) },
-                ]}
-                layout="vertical"
-                margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-              >
-                <XAxis type="number" domain={[0, 100]} hide />
-                <YAxis type="category" dataKey="name" hide />
-                <Tooltip
-                  content={({ active }) => {
-                    if (active) {
-                      return (
-                        <div className="rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 shadow-lg">
-                          <p className="text-sm font-medium text-v-text">{stats.turnoutPercentage}%</p>
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                />
-                <Bar
-                  dataKey="value"
-                  radius={[4, 4, 4, 4]}
-                  barSize={24}
-                >
-                  <Cell fill={barColorClass.includes('emerald') ? '#10b981' : '#3b82f6'} />
-                </Bar>
-              </RechartsBarChart>
-            </ResponsiveContainer>
-          </div>
+          <BarChartView
+            data={progressData}
+            dataKey="value"
+            nameKey="name"
+            layout="vertical"
+            height={40}
+            barSize={24}
+            showGrid={false}
+            colors={[progressColor]}
+            valueFormatter={(v) => `${v}%`}
+          />
         </div>
       )}
     </section>
   )
-}
+})
+
+export default TurnoutReport

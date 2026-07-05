@@ -1,27 +1,21 @@
 /**
- * DistributionList — horizontal-bar list used for "votes per candidate",
- * "most selected choices", "rating distributions", etc.
+ * DistributionList.jsx
  *
- * Accepts items shaped as { id, label, value, percentage?, sublabel? }.
- * No module knowledge — the caller maps its data to this shape.
+ * Horizontal-bar list used for "votes per candidate", "most selected choices",
+ * "rating distributions", etc.
  *
- * Now uses Recharts for enhanced visualization
+ * Now powered by the unified chart system.
+ * Supports an optional `chartType` prop to switch between:
+ *   'bar' (default) — horizontal bar chart, great for rankings/categorical
+ *   'pie'           — pie chart, great for composition/vote-share
+ *
+ * All original props are preserved for backward compatibility.
  */
-import { useState } from 'react'
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { memo, useMemo } from 'react'
+import { BarChartView, PieChartView } from '@/components/charts'
+import { CHART_COLORS_HEX_LIST, getChartColor } from '@/components/charts/chartTokens'
 
-const COLORS = [
-  '#3b82f6', // blue-500
-  '#10b981', // emerald-500
-  '#f59e0b', // amber-500
-  '#ef4444', // red-500
-  '#8b5cf6', // violet-500
-  '#ec4899', // pink-500
-  '#06b6d4', // cyan-500
-  '#84cc16', // lime-500
-]
-
-export default function DistributionList({
+const DistributionList = memo(function DistributionList({
   items = [],
   valueKey = 'value',
   labelKey = 'label',
@@ -29,39 +23,40 @@ export default function DistributionList({
   showCount = true,
   showPercentage = true,
   barClass = 'bg-v-primary',
+  chartType = 'bar',         // 'bar' | 'pie'
+  showChart = true,
   emptyMessage = 'No data yet.',
   className = '',
 }) {
-  const [hoveredIndex, setHoveredIndex] = useState(null)
-
   if (!items.length) {
     return <p className="text-sm text-v-text-subtle">{emptyMessage}</p>
   }
 
-  // Determine color based on barClass prop
-  const getColor = () => {
-    if (barClass.includes('success')) return '#10b981'
-    if (barClass.includes('warning')) return '#f59e0b'
-    if (barClass.includes('danger')) return '#ef4444'
-    if (barClass.includes('primary')) return '#3b82f6'
-    return '#3b82f6'
-  }
+  // Resolve semantic base color from legacy barClass prop
+  const baseColor = useMemo(() => {
+    if (barClass.includes('success')) return getChartColor('success')
+    if (barClass.includes('warning')) return getChartColor('warning')
+    if (barClass.includes('danger'))  return getChartColor('danger')
+    return getChartColor('primary')
+  }, [barClass])
 
-  const barColor = getColor()
-
-  // Transform items for Recharts
-  const data = items.map((item, index) => ({
-    id: item?.[idKey] ?? `${item?.[labelKey]}-${index}`,
-    name: item?.[labelKey] ?? '—',
-    value: Number(item?.[valueKey] ?? 0),
-    sublabel: item?.sublabel,
-    percentage: item?.percentage,
-    fill: COLORS[index % COLORS.length],
-  }))
+  // Normalize items for chart views
+  const data = useMemo(
+    () =>
+      items.map((item, idx) => ({
+        id: item?.[idKey] ?? `${item?.[labelKey]}-${idx}`,
+        name: item?.[labelKey] ?? '—',
+        value: Number(item?.[valueKey] ?? 0),
+        sublabel: item?.sublabel,
+        percentage: item?.percentage,
+        fill: idx === 0 ? baseColor : CHART_COLORS_HEX_LIST[idx % CHART_COLORS_HEX_LIST.length],
+      })),
+    [items, valueKey, labelKey, idKey, baseColor],
+  )
 
   return (
     <div className={className}>
-      {/* Legend table */}
+      {/* Summary legend */}
       <ul className="mb-4 space-y-2">
         {items.map((item, idx) => {
           const id = item?.[idKey] ?? `${item?.[labelKey]}-${idx}`
@@ -72,13 +67,18 @@ export default function DistributionList({
 
           return (
             <li key={id} className="flex items-center justify-between text-sm">
-              <div className="min-w-0">
-                <span className="text-v-text-muted">{label}</span>
+              {/* Color dot aligned with chart series */}
+              <div className="flex min-w-0 items-center gap-2">
+                <span
+                  className="inline-block h-2 w-2 flex-shrink-0 rounded-full"
+                  style={{ backgroundColor: data[idx]?.fill }}
+                />
+                <span className="text-v-text-muted truncate">{label}</span>
                 {sublabel && (
-                  <span className="ml-2 text-xs text-v-text-subtle">{sublabel}</span>
+                  <span className="ml-1 text-xs text-v-text-subtle">{sublabel}</span>
                 )}
               </div>
-              <span className="text-v-text-subtle ml-4">
+              <span className="ml-4 flex-shrink-0 text-v-text-subtle">
                 {showCount && value}
                 {showPercentage && percentage !== undefined ? ` (${percentage}%)` : ''}
               </span>
@@ -87,63 +87,37 @@ export default function DistributionList({
         })}
       </ul>
 
-      {/* Recharts visualization */}
-      <div className="h-48">
-        <ResponsiveContainer width="100%" height="100%">
-          <RechartsBarChart
-            data={data}
-            layout="vertical"
-            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-            onMouseLeave={() => setHoveredIndex(null)}
-          >
-            <XAxis
-              type="number"
-              tick={{ fill: '#9ca3af', fontSize: 11 }}
-              axisLine={{ stroke: '#374151' }}
-              tickLine={{ stroke: '#374151' }}
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              tick={{ fill: '#9ca3af', fontSize: 11 }}
-              axisLine={{ stroke: '#374151' }}
-              tickLine={false}
-              width={100}
-            />
-            <Tooltip
-              content={({ active, payload }) => {
-                if (active && payload && payload.length) {
-                  const item = payload[0].payload
-                  return (
-                    <div className="rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 shadow-lg">
-                      <p className="text-sm font-medium text-v-text">{item.name}</p>
-                      <p className="text-sm text-v-text-subtle">
-                        {item.value}
-                        {item.percentage !== undefined ? ` (${item.percentage}%)` : ''}
-                      </p>
-                    </div>
-                  )
-                }
-                return null
+      {/* Chart visualization */}
+      {showChart && (
+        <>
+          {chartType === 'pie' ? (
+            <PieChartView
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              height={200}
+              showLegend={false}
+              valueFormatter={(value, _name) => {
+                const total = data.reduce((s, d) => s + d.value, 0)
+                const pct = total > 0 ? ((value / total) * 100).toFixed(1) : 0
+                return `${value} (${pct}%)`
               }}
             />
-            <Bar
+          ) : (
+            <BarChartView
+              data={data}
               dataKey="value"
-              radius={[0, 4, 4, 0]}
+              nameKey="name"
+              layout="vertical"
+              height={Math.max(160, data.length * 32)}
               barSize={16}
-              onMouseEnter={(_, index) => setHoveredIndex(index)}
-              onMouseLeave={() => setHoveredIndex(null)}
-            >
-              {data.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={hoveredIndex === index ? '#60a5fa' : entry.fill || barColor}
-                />
-              ))}
-            </Bar>
-          </RechartsBarChart>
-        </ResponsiveContainer>
-      </div>
+              valueFormatter={(value, _name) => String(value)}
+            />
+          )}
+        </>
+      )}
     </div>
   )
-}
+})
+
+export default DistributionList
