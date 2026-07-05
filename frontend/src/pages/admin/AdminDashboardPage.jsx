@@ -188,7 +188,7 @@ export default function AdminDashboardPage() {
             <LayoutDashboard className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
             <h3 className="v-section-title">Quick actions</h3>
           </div>
-          <ul className="mt-3 space-y-2 text-sm">
+          <ul className="mt-3 space-y-1 text-sm">
             <li>
               <Link
                 to="/admin/organizers"
@@ -216,15 +216,6 @@ export default function AdminDashboardPage() {
                 Review audit logs
               </Link>
             </li>
-            <li>
-              <Link
-                to="/admin/settings"
-                className="v-btn-tertiary inline-flex items-center gap-1.5"
-              >
-                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                Update system settings
-              </Link>
-            </li>
           </ul>
         </Card>
 
@@ -233,9 +224,9 @@ export default function AdminDashboardPage() {
           {!recentActivity.length ? (
             <p className="v-caption mt-3">No recent activity</p>
           ) : (
-            <ul className="mt-3 space-y-2 text-sm">
-              {recentActivity.slice(0, 5).map((item, idx) => (
-                <li key={`${item.type}-${item.timestamp}-${idx}`} className="rounded-lg border border-v-border px-3 py-2">
+            <ul className="mt-3 space-y-1 text-sm">
+              {recentActivity.slice(0, 3).map((item, idx) => (
+                <li key={`${item.type}-${item.timestamp}-${idx}`} className="rounded-lg border border-v-border px-3 py-1.5">
                   <p className="v-body-text">{item.label}</p>
                   <p className="v-caption">
                     {new Date(item.timestamp).toLocaleString()}

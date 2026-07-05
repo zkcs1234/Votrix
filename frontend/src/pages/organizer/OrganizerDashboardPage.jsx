@@ -183,9 +183,9 @@ export default function OrganizerDashboardPage() {
           {!(dashboard?.recentActivity ?? []).length ? (
             <p className="v-caption mt-3">No recent activity</p>
           ) : (
-            <ul className="mt-3 space-y-2 text-sm">
-              {(dashboard?.recentActivity ?? []).slice(0, 5).map((item, idx) => (
-                <li key={`${item.type}-${item.timestamp}-${idx}`} className="rounded-lg border border-v-border px-3 py-2">
+            <ul className="mt-3 space-y-1 text-sm">
+              {(dashboard?.recentActivity ?? []).slice(0, 3).map((item, idx) => (
+                <li key={`${item.type}-${item.timestamp}-${idx}`} className="rounded-lg border border-v-border px-3 py-1.5">
                   <p className="v-body-text">{item.label}</p>
                   <p className="v-caption">{new Date(item.timestamp).toLocaleString()}</p>
                 </li>
@@ -203,7 +203,7 @@ export default function OrganizerDashboardPage() {
               <AreaChartView
                 data={monthlyEvents.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
                 areas={[{ dataKey: 'value', name: 'Events', color: '#818cf8' }]}
-                height={220}
+                height={180}
                 showLegend={false}
               />
             </div>
