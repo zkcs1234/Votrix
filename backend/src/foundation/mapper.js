@@ -45,6 +45,11 @@ export function mapEvent(row) {
     endDate: row.end_date ?? null,
     status: row.status,
     eventType: row.event_type,
+    // voting_enabled and results_visibility are present on election events
+    // and on the events table generally — map them so callers don't have to
+    // reach into raw DB rows.
+    votingEnabled: row.voting_enabled ?? false,
+    resultsVisibility: row.results_visibility ?? 'public',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

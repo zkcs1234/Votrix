@@ -121,7 +121,7 @@ export async function listElectionEvents(organizerId, { limit = 200, offset = 0 
   const org = await getOrCreateElectionOrganization(organizerId)
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
-    .select('id, title, description, banner, status, voting_enabled, event_type, results_visibility, start_date, end_date, created_at, organization_id, organizations')
+    .select('id, title, description, banner, status, voting_enabled, event_type, results_visibility, start_date, end_date, created_at, updated_at, organization_id')
     .eq('organization_id', org.id)
     .eq('event_type', EVENT_TYPES.ELECTION)
     .order('created_at', { ascending: false })

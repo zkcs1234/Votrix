@@ -154,7 +154,7 @@ export async function listCompetitionEvents(organizerId, { limit = 200, offset =
   const org = await getOrCreateOrg(organizerId)
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
-    .select('id, title, description, banner, status, scoring_enabled, event_type, start_date, end_date, created_at, organization_id, organizations, scoring_config')
+    .select('id, title, description, banner, status, scoring_enabled, event_type, start_date, end_date, created_at, updated_at, organization_id, scoring_config')
     .eq('organization_id', org.id)
     .in('event_type', Array.from(COMPETITION_SCORING_EVENT_TYPES))
     .order('created_at', { ascending: false })
