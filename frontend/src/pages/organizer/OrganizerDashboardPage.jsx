@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Zap, CheckCircle2, Users, Vote, Trophy, BarChart2, BarChart3, ArrowRight } from 'lucide-react'
+import { CalendarDays, Zap, CheckCircle2, Users, Vote, Trophy, BarChart2, BarChart3 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import StatCard from '@/components/ui/StatCard'
 import Card from '@/components/ui/Card'
@@ -10,6 +10,7 @@ import {
   SkeletonList,
   SkeletonChart,
 } from '@/components/ui/Skeleton'
+import BarChart from '@/components/reports/BarChart'
 import { organizerService } from '@/services/organizer.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
@@ -198,14 +199,14 @@ export default function OrganizerDashboardPage() {
           {!monthlyEvents.length ? (
             <p className="v-caption mt-3">No event data yet</p>
           ) : (
-            <ul className="mt-3 space-y-2 text-sm">
-              {monthlyEvents.slice(0, 6).map((point) => (
-                <li key={point.key} className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2">
-                  <span className="v-caption">{point.label}</span>
-                  <span className="v-body-text font-medium">{point.value}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-3">
+              <BarChart
+                items={monthlyEvents.slice(0, 6)}
+                valueKey="value"
+                labelKey="label"
+                colorClass="bg-v-primary"
+              />
+            </div>
           )}
         </Card>
       </div>
@@ -215,16 +216,25 @@ export default function OrganizerDashboardPage() {
         {!participation.length ? (
           <p className="v-caption mt-3">No participation data yet</p>
         ) : (
-          <ul className="mt-3 space-y-2 text-sm">
-            {participation.map((row) => (
-              <li key={row.module} className="rounded-lg border border-v-border px-3 py-2">
-                <p className="v-body-text font-medium">{row.module}</p>
-                <p className="v-caption">
-                  Participated: {row.participated} / {row.assigned} ({row.rate}%)
+          <div className="mt-3">
+            <BarChart
+              items={participation.map((row) => ({
+                label: row.module,
+                value: row.participated,
+              }))}
+              valueKey="value"
+              labelKey="label"
+              colorClass="bg-v-success"
+            />
+            {/* Show the rate below each */}
+            <div className="mt-2 space-y-1 text-xs">
+              {participation.map((row) => (
+                <p key={row.module} className="v-caption">
+                  {row.module}: {row.rate}% ({row.participated}/{row.assigned})
                 </p>
-              </li>
-            ))}
-          </ul>
+              ))}
+            </div>
+          </div>
         )}
       </Card>
     </div>

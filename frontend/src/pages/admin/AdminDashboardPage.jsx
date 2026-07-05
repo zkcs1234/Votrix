@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Users, CalendarDays, UserCheck, Zap, CheckSquare,
-  Settings, ClipboardList, ArrowRight, LayoutDashboard,
+  Settings, ArrowRight, LayoutDashboard,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import Card from '@/components/ui/Card'
 import StatCard from '@/components/ui/StatCard'
 import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
+import BarChart from '@/components/reports/BarChart'
 import {
   SkeletonStatCard,
   SkeletonModuleLink,
@@ -252,14 +253,14 @@ export default function AdminDashboardPage() {
           {!monthlyEvents.length ? (
             <p className="v-caption mt-3">No event data yet</p>
           ) : (
-            <ul className="mt-3 space-y-2 text-sm">
-              {monthlyEvents.slice(0, 6).map((point) => (
-                <li key={point.key} className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2">
-                  <span className="v-caption">{point.label}</span>
-                  <span className="v-body-text font-medium">{point.value}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-3">
+              <BarChart
+                items={monthlyEvents.slice(0, 6)}
+                valueKey="value"
+                labelKey="label"
+                colorClass="bg-v-primary"
+              />
+            </div>
           )}
         </Card>
         <Card padding="sm">
@@ -267,14 +268,14 @@ export default function AdminDashboardPage() {
           {!voterGrowth.length ? (
             <p className="v-caption mt-3">No voter data yet</p>
           ) : (
-            <ul className="mt-3 space-y-2 text-sm">
-              {voterGrowth.slice(0, 6).map((point) => (
-                <li key={point.key} className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2">
-                  <span className="v-caption">{point.label}</span>
-                  <span className="v-body-text font-medium">{point.value}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-3">
+              <BarChart
+                items={voterGrowth.slice(0, 6)}
+                valueKey="value"
+                labelKey="label"
+                colorClass="bg-v-success"
+              />
+            </div>
           )}
         </Card>
       </div>
