@@ -9,7 +9,7 @@ import Card from '@/components/ui/Card'
 import StatCard from '@/components/ui/StatCard'
 import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
-import BarChart from '@/components/reports/BarChart'
+import { AreaChartView } from '@/components/charts'
 import {
   SkeletonStatCard,
   SkeletonModuleLink,
@@ -254,11 +254,11 @@ export default function AdminDashboardPage() {
             <p className="v-caption mt-3">No event data yet</p>
           ) : (
             <div className="mt-3">
-              <BarChart
-                items={monthlyEvents.slice(0, 6)}
-                valueKey="value"
-                labelKey="label"
-                colorClass="bg-v-primary"
+              <AreaChartView
+                data={monthlyEvents.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
+                areas={[{ dataKey: 'value', name: 'Events', color: '#818cf8' }]}
+                height={220}
+                showLegend={false}
               />
             </div>
           )}
@@ -269,11 +269,11 @@ export default function AdminDashboardPage() {
             <p className="v-caption mt-3">No voter data yet</p>
           ) : (
             <div className="mt-3">
-              <BarChart
-                items={voterGrowth.slice(0, 6)}
-                valueKey="value"
-                labelKey="label"
-                colorClass="bg-v-success"
+              <AreaChartView
+                data={voterGrowth.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
+                areas={[{ dataKey: 'value', name: 'Voters', color: '#34d399' }]}
+                height={220}
+                showLegend={false}
               />
             </div>
           )}

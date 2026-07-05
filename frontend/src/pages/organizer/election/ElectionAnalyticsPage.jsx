@@ -118,6 +118,7 @@ export default function ElectionAnalyticsPage() {
             items={position.candidates}
             valueKey="value"
             labelKey="label"
+            chartType="pie"
             emptyMessage="No candidates for this position."
           />
         </AnalyticsSection>

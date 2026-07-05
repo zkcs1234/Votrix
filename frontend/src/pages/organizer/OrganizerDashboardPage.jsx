@@ -10,7 +10,7 @@ import {
   SkeletonList,
   SkeletonChart,
 } from '@/components/ui/Skeleton'
-import BarChart from '@/components/reports/BarChart'
+import { AreaChartView, PieChartView } from '@/components/charts'
 import { organizerService } from '@/services/organizer.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
@@ -200,11 +200,11 @@ export default function OrganizerDashboardPage() {
             <p className="v-caption mt-3">No event data yet</p>
           ) : (
             <div className="mt-3">
-              <BarChart
-                items={monthlyEvents.slice(0, 6)}
-                valueKey="value"
-                labelKey="label"
-                colorClass="bg-v-primary"
+              <AreaChartView
+                data={monthlyEvents.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
+                areas={[{ dataKey: 'value', name: 'Events', color: '#818cf8' }]}
+                height={220}
+                showLegend={false}
               />
             </div>
           )}
@@ -217,23 +217,20 @@ export default function OrganizerDashboardPage() {
           <p className="v-caption mt-3">No participation data yet</p>
         ) : (
           <div className="mt-3">
-            <BarChart
-              items={participation.map((row) => ({
-                label: row.module,
+            <PieChartView
+              data={participation.map((row) => ({
+                name: row.module,
                 value: row.participated,
               }))}
-              valueKey="value"
-              labelKey="label"
-              colorClass="bg-v-success"
+              dataKey="value"
+              nameKey="name"
+              height={240}
+              showLegend
+              valueFormatter={(value, name) => {
+                const row = participation.find((r) => r.module === name)
+                return row ? `${value} (${row.rate}%)` : String(value)
+              }}
             />
-            {/* Show the rate below each */}
-            <div className="mt-2 space-y-1 text-xs">
-              {participation.map((row) => (
-                <p key={row.module} className="v-caption">
-                  {row.module}: {row.rate}% ({row.participated}/{row.assigned})
-                </p>
-              ))}
-            </div>
           </div>
         )}
       </Card>

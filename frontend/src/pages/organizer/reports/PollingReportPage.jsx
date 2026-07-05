@@ -120,6 +120,7 @@ export default function PollingReportPage() {
               }))}
               valueKey="value"
               labelKey="label"
+              chartType="pie"
               emptyMessage="No answers yet."
             />
           )}
@@ -137,6 +138,7 @@ export default function PollingReportPage() {
                 }))}
                 valueKey="value"
                 labelKey="label"
+                chartType="bar"
                 emptyMessage="No rating responses yet."
               />
             </>

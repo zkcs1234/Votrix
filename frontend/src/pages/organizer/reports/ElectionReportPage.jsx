@@ -127,6 +127,7 @@ export default function ElectionReportPage() {
           }))}
           valueKey="value"
           labelKey="label"
+          chartType="pie"
           emptyMessage="No candidate data."
         />
       </AnalyticsSection>
@@ -165,6 +166,7 @@ export default function ElectionReportPage() {
             }))}
             valueKey="value"
             labelKey="label"
+            chartType="pie"
             emptyMessage="No candidates for this position."
           />
         </AnalyticsSection>

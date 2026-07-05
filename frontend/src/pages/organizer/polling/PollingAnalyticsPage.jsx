@@ -131,6 +131,7 @@ export default function PollingAnalyticsPage() {
                     items={q.contestants}
                     valueKey="value"
                     labelKey="label"
+                    chartType="pie"
                     emptyMessage="No answers yet."
                   />
                 </div>

@@ -108,6 +108,7 @@ export default function CompetitionAnalyticsPage() {
                   items={cat.contestants}
                   valueKey="value"
                   labelKey="label"
+                  chartType="bar"
                   emptyMessage="No contestants in this category."
                 />
               </div>
