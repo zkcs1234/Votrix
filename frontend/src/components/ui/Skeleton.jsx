@@ -72,6 +72,15 @@ export function SkeletonStatCard() {
   )
 }
 
+export function SkeletonModuleLink() {
+  return (
+    <div className="v-card-md flex flex-col gap-2">
+      <Skeleton className="h-5 w-32" />
+      <Skeleton className="h-4 w-24" />
+    </div>
+  )
+}
+
 /**
  * Event card skeleton - use for event lists (election, polling, competition)
  */

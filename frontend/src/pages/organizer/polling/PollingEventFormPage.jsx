@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { pollingService } from '@/services/polling.service'
+import { pollingEventSchemaStep1 } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 import DateTimeInput from '@/components/ui/DateTimeInput'
 import Button from '@/components/ui/Button'
@@ -14,53 +17,71 @@ export default function PollingEventFormPage() {
   const navigate = useNavigate()
 
   const [step, setStep] = useState(1)
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    pollAnonymous: false,
-    pollAllowMultipleSubmissions: false,
-    pollExpiresAt: '',
-  })
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!isNew)
   const [error, setError] = useState(null)
 
+  const {
+    register,
+    handleSubmit: rhfHandleSubmit,
+    formState: { errors },
+    trigger,
+    reset,
+  } = useForm({
+    resolver: zodResolver(pollingEventSchemaStep1),
+    defaultValues: {
+      title: '',
+      description: '',
+      pollAnonymous: false,
+      pollAllowMultipleSubmissions: false,
+      pollExpiresAt: '',
+    },
+  })
+
   useEffect(() => {
     if (isNew) return
     pollingService.getSettings(eventId).then(({ data }) => {
       const e = data.event
-      setForm({
-        title: e.title,
+      reset({
+        title: e.title || '',
         description: e.description || '',
-        pollAnonymous: e.pollAnonymous,
-        pollAllowMultipleSubmissions: e.pollAllowMultipleSubmissions,
+        pollAnonymous: e.pollAnonymous || false,
+        pollAllowMultipleSubmissions: e.pollAllowMultipleSubmissions || false,
         pollExpiresAt: e.pollExpiresAt ? e.pollExpiresAt.slice(0, 16) : '',
       })
       setBanner(e.banner)
     }).finally(() => setLoading(false))
-  }, [eventId, isNew])
+  }, [eventId, isNew, reset])
 
-  const handleNext = (e) => {
+  const handleNext = async (e) => {
     e.preventDefault()
-    setStep(step + 1)
+    let isValid = false
+    if (step === 1) {
+      isValid = await trigger(['title'])
+    }
+    if (isValid) {
+      setStep(step + 1)
+    }
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const onSubmit = async (data) => {
     setSaving(true)
     setError(null)
-    
+
     try {
       const payload = {
-        ...form,
-        pollExpiresAt: form.pollExpiresAt ? new Date(form.pollExpiresAt).toISOString() : null,
+        title: data.title,
+        description: data.description,
+        pollAnonymous: data.pollAnonymous || false,
+        pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions || false,
+        pollExpiresAt: data.pollExpiresAt ? new Date(data.pollExpiresAt).toISOString() : null,
       }
       let id = eventId
       if (isNew) {
-        const { data } = await pollingService.createEvent(payload)
-        id = data.event.id
+        const { data: res } = await pollingService.createEvent(payload)
+        id = res.event.id
       } else {
         await pollingService.updateEvent(eventId, payload)
       }
@@ -91,7 +112,7 @@ export default function PollingEventFormPage() {
 
       <Card padding="md">
         {step === 1 && (
-          <form className="space-y-4" onSubmit={handleNext}>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNext(e) }}>
             <div className="v-form-field">
               <label className={LABEL_CLASS} htmlFor="title">
                 Poll title
@@ -100,10 +121,9 @@ export default function PollingEventFormPage() {
                 id="title"
                 className={INPUT_CLASS}
                 placeholder="Enter poll title"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                required
+                {...register('title')}
               />
+              {errors.title && <p className="v-error-text">{errors.title.message}</p>}
             </div>
 
             <div className="v-form-field">
@@ -115,9 +135,9 @@ export default function PollingEventFormPage() {
                 className={INPUT_CLASS}
                 rows={3}
                 placeholder="Enter poll description (optional)"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                {...register('description')}
               />
+              {errors.description && <p className="v-error-text">{errors.description.message}</p>}
             </div>
 
             <div className="v-form-actions">
@@ -127,7 +147,7 @@ export default function PollingEventFormPage() {
         )}
 
         {step === 2 && (
-          <form className="space-y-4" onSubmit={handleNext}>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNext(e) }}>
             <ImageUploadField
               label="Poll banner (optional)"
               hint="Wide image for poll headers."
@@ -150,14 +170,13 @@ export default function PollingEventFormPage() {
         )}
 
         {step === 3 && (
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={rhfHandleSubmit(onSubmit)}>
             <div className="space-y-3 pt-2">
               <label className="flex items-center gap-3 text-sm text-v-text-muted">
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-v-border-strong"
-                  checked={form.pollAnonymous}
-                  onChange={(e) => setForm({ ...form, pollAnonymous: e.target.checked })}
+                  {...register('pollAnonymous')}
                 />
                 <span>Anonymous responses</span>
               </label>
@@ -167,10 +186,7 @@ export default function PollingEventFormPage() {
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-v-border-strong"
-                  checked={form.pollAllowMultipleSubmissions}
-                  onChange={(e) =>
-                    setForm({ ...form, pollAllowMultipleSubmissions: e.target.checked })
-                  }
+                  {...register('pollAllowMultipleSubmissions')}
                 />
                 <span>Allow multiple submissions</span>
               </label>
@@ -183,8 +199,7 @@ export default function PollingEventFormPage() {
               </label>
               <DateTimeInput
                 id="pollExpiresAt"
-                value={form.pollExpiresAt}
-                onChange={(val) => setForm({ ...form, pollExpiresAt: val })}
+                {...register('pollExpiresAt')}
               />
               <p className={HELPER_TEXT}>Poll will close after this date</p>
             </div>

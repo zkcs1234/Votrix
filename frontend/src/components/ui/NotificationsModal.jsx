@@ -196,6 +196,7 @@ export default function NotificationsModal({ onClose }) {
                     key={item}
                     type="button"
                     onClick={() => setFilter(item)}
+                    aria-pressed={filter === item}
                     className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
                       filter === item
                         ? 'bg-v-primary text-white'

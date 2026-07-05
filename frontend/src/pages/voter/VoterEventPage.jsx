@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
+import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ElectionPositionSection from '@/components/voter/election/ElectionPositionSection'
 import Button from '@/components/ui/Button'
@@ -115,10 +116,12 @@ function BallotSubmittedScreen({ ballot, eventId }) {
 
 export default function VoterEventPage() {
   const { eventId } = useParams()
+  const draftKey = getDraftStorageKey('electionDraft', eventId)
+  const skippedDraftKey = getDraftStorageKey('electionSkipped', eventId)
   const [ballot, setBallot] = useState(null)
   const [selections, setSelections] = useState(() => {
     try {
-      const saved = localStorage.getItem(`votrix_election_draft_${eventId}`)
+      const saved = localStorage.getItem(draftKey)
       return saved ? JSON.parse(saved) : {}
     } catch {
       return {}
@@ -126,7 +129,7 @@ export default function VoterEventPage() {
   })
   const [skippedPositions, setSkippedPositions] = useState(() => {
     try {
-      const saved = localStorage.getItem(`votrix_election_skipped_${eventId}`)
+      const saved = localStorage.getItem(skippedDraftKey)
       return saved ? new Set(JSON.parse(saved)) : new Set()
     } catch {
       return new Set()
@@ -138,12 +141,9 @@ export default function VoterEventPage() {
   const [done, setDone] = useState(false)
 
   useEffect(() => {
-    localStorage.setItem(`votrix_election_draft_${eventId}`, JSON.stringify(selections))
-    localStorage.setItem(
-      `votrix_election_skipped_${eventId}`,
-      JSON.stringify(Array.from(skippedPositions))
-    )
-  }, [eventId, selections, skippedPositions])
+    localStorage.setItem(draftKey, JSON.stringify(selections))
+    localStorage.setItem(skippedDraftKey, JSON.stringify(Array.from(skippedPositions)))
+  }, [draftKey, skippedDraftKey, selections, skippedPositions])
 
   useEffect(() => {
     electionService
@@ -207,8 +207,8 @@ export default function VoterEventPage() {
 
     try {
       await electionService.submitVote(eventId, selections)
-      localStorage.removeItem(`votrix_election_draft_${eventId}`)
-      localStorage.removeItem(`votrix_election_skipped_${eventId}`)
+      localStorage.removeItem(draftKey)
+      localStorage.removeItem(skippedDraftKey)
       setDone(true)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit ballot')
@@ -258,7 +258,14 @@ export default function VoterEventPage() {
           <span className="v-caption">Ballot progress</span>
           <span className="v-caption">{progress}%</span>
         </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated">
+        <div
+          className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progress}
+          aria-label="Ballot progress"
+        >
           <div className="h-full bg-v-primary transition-all" style={{ width: `${progress}%` }} />
         </div>
         <p className="v-caption mt-2">

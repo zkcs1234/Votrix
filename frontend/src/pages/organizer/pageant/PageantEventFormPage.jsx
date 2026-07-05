@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { pageantService } from '@/services/pageant.service'
+import { pageantEventSchemaStep1 } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import DateTimeInput from '@/components/ui/DateTimeInput'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 
@@ -14,48 +16,58 @@ export default function PageantEventFormPage() {
   const navigate = useNavigate()
 
   const [step, setStep] = useState(1)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!isNew)
   const [error, setError] = useState(null)
 
+  const {
+    register,
+    handleSubmit: rhfHandleSubmit,
+    formState: { errors },
+    trigger,
+    reset,
+  } = useForm({
+    resolver: zodResolver(pageantEventSchemaStep1),
+    defaultValues: {
+      title: '',
+      description: '',
+    },
+  })
+
   useEffect(() => {
     if (isNew) return
     pageantService.getEvent(eventId).then(({ data }) => {
-      setTitle(data.event.title)
-      setDescription(data.event.description || '')
-      setStartDate(data.event.start_date ? data.event.start_date.slice(0, 16) : '')
-      setEndDate(data.event.end_date ? data.event.end_date.slice(0, 16) : '')
+      reset({
+        title: data.event.title || '',
+        description: data.event.description || '',
+      })
       setBanner(data.event.banner)
     }).finally(() => setLoading(false))
-  }, [eventId, isNew])
+  }, [eventId, isNew, reset])
 
-  const handleNext = (e) => {
+  const handleNext = async (e) => {
     e.preventDefault()
-    setStep(2)
+    const isValid = await trigger(['title'])
+    if (isValid) {
+      setStep(2)
+    }
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const onSubmit = async (data) => {
     setSaving(true)
     setError(null)
 
     try {
       const payload = {
-        title,
-        description,
-        startDate: startDate ? new Date(startDate).toISOString() : null,
-        endDate: endDate ? new Date(endDate).toISOString() : null,
+        title: data.title,
+        description: data.description,
       }
       let id = eventId
       if (isNew) {
-        const { data } = await pageantService.createEvent(payload)
-        id = data.event.id
+        const { data: res } = await pageantService.createEvent(payload)
+        id = res.event.id
       } else {
         await pageantService.updateEvent(eventId, payload)
       }
@@ -83,7 +95,7 @@ export default function PageantEventFormPage() {
 
       <Card padding="md">
         {step === 1 ? (
-          <form className="space-y-4" onSubmit={handleNext}>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNext(e) }}>
             <div className="v-form-field">
               <label className={LABEL_CLASS} htmlFor="title">
                 Title
@@ -91,11 +103,10 @@ export default function PageantEventFormPage() {
               <input
                 id="title"
                 className={INPUT_CLASS}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                {...register('title')}
                 placeholder="Enter competition title"
-                required
               />
+              {errors.title && <p className="v-error-text">{errors.title.message}</p>}
             </div>
 
             <div className="v-form-field">
@@ -106,35 +117,11 @@ export default function PageantEventFormPage() {
                 id="description"
                 className={INPUT_CLASS}
                 rows={4}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                {...register('description')}
                 placeholder="Enter competition description (optional)"
               />
+              {errors.description && <p className="v-error-text">{errors.description.message}</p>}
               <p className={HELPER_TEXT}>Optional description for judges and contestants</p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="v-form-field">
-                <label className={LABEL_CLASS} htmlFor="startDate">
-                  Start Date (Optional)
-                </label>
-                <DateTimeInput
-                  id="startDate"
-                  value={startDate}
-                  onChange={setStartDate}
-                />
-              </div>
-
-              <div className="v-form-field">
-                <label className={LABEL_CLASS} htmlFor="endDate">
-                  End Date (Optional)
-                </label>
-                <DateTimeInput
-                  id="endDate"
-                  value={endDate}
-                  onChange={setEndDate}
-                />
-              </div>
             </div>
 
             <div className="v-form-actions">
@@ -142,7 +129,7 @@ export default function PageantEventFormPage() {
             </div>
           </form>
         ) : (
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={rhfHandleSubmit(onSubmit)}>
             <ImageUploadField
               label="Event banner"
               hint="Wide image for event headers."

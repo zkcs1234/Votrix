@@ -1,7 +1,6 @@
 ﻿import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import { Lock, ShieldCheck, AlertCircle } from 'lucide-react'
 import { changePasswordSchema } from '@/schemas/auth.schemas'
@@ -11,19 +10,6 @@ import { getRoleDashboardPath } from '@/utils/auth'
 import AuthFormField from '@/components/auth/AuthFormField'
 import SubmitButton from '@/components/auth/SubmitButton'
 import PasswordInput from '@/components/ui/PasswordInput'
-import { API_BASE_URL } from '@/utils/constants'
-import { clearCsrfToken, setCsrfToken } from '@/utils/csrf'
-
-async function ensureCsrfToken() {
-  clearCsrfToken()
-
-  const { data } = await axios.get(`${API_BASE_URL}/auth/csrf`, {
-    withCredentials: true,
-    params: { t: Date.now() },
-  })
-
-  if (data.csrfToken) setCsrfToken(data.csrfToken)
-}
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate()
@@ -44,7 +30,6 @@ export default function ChangePasswordPage() {
     setLoading(true)
 
     try {
-      await ensureCsrfToken()
       const { data } = await authService.changePassword(values)
       setSession({
         user: data.user,

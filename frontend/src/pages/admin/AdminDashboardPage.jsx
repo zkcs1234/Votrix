@@ -9,58 +9,15 @@ import Card from '@/components/ui/Card'
 import StatCard from '@/components/ui/StatCard'
 import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
+import {
+  SkeletonStatCard,
+  SkeletonModuleLink,
+  SkeletonList,
+  SkeletonChart,
+} from '@/components/ui/Skeleton'
 import { adminService } from '@/services/admin.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
-
-function StatCardSkeleton() {
-  return (
-    <div className="v-card-sm">
-      <div className="h-4 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
-      <div className="mt-2 h-8 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
-    </div>
-  )
-}
-
-function ModuleLinkSkeleton() {
-  return (
-    <div className="v-card-md flex flex-col gap-2">
-      <div className="h-5 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-      <div className="h-4 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
-    </div>
-  )
-}
-
-function ListSkeleton({ count = 5 }) {
-  return (
-    <ul className="mt-3 space-y-2">
-      {Array.from({ length: count }).map((_, i) => (
-        <li
-          key={i}
-          className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2"
-        >
-          <div className="space-y-1">
-            <div className="h-4 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-            <div className="h-3 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
-          </div>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-function ChartSkeleton() {
-  return (
-    <ul className="mt-3 space-y-2">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <li key={i} className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2">
-          <div className="h-4 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
-          <div className="h-4 w-12 animate-pulse rounded-lg bg-v-surface-elevated" />
-        </li>
-      ))}
-    </ul>
-  )
-}
 
 export default function AdminDashboardPage() {
   const { user } = useAuth()
@@ -119,39 +76,39 @@ export default function AdminDashboardPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <StatCardSkeleton />
-          <StatCardSkeleton />
-          <StatCardSkeleton />
-          <StatCardSkeleton />
-          <StatCardSkeleton />
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+          <SkeletonStatCard />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <ModuleLinkSkeleton />
-          <ModuleLinkSkeleton />
-          <ModuleLinkSkeleton />
+          <SkeletonModuleLink />
+          <SkeletonModuleLink />
+          <SkeletonModuleLink />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Card padding="sm">
             <div className="h-5 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-            <ListSkeleton count={3} />
+            <SkeletonList count={3} />
           </Card>
 
           <Card padding="sm">
             <div className="h-5 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-            <ListSkeleton count={3} />
+            <SkeletonList count={3} />
           </Card>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Card padding="sm">
             <div className="h-5 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-            <ChartSkeleton />
+            <SkeletonChart />
           </Card>
           <Card padding="sm">
             <div className="h-5 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-            <ChartSkeleton />
+            <SkeletonChart />
           </Card>
         </div>
       </div>

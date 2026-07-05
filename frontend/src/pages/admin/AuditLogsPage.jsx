@@ -488,18 +488,24 @@ export default function AuditLogsPage() {
                 <thead>
                   <tr>
                     <th
-                      className="cursor-pointer select-none whitespace-nowrap"
-                      onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+                      className="whitespace-nowrap"
                       title="Sort by timestamp"
+                      scope="col"
                     >
-                      <span className="inline-flex items-center gap-1">
-                        Timestamp
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 text-left"
+                        onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+                        aria-label={`Sort by timestamp ${sortDir === 'desc' ? 'ascending' : 'descending'}`}
+                        aria-pressed={sortDir === 'asc'}
+                      >
+                        <span>Timestamp</span>
                         {sortDir === 'desc' ? (
                           <ChevronDown className="h-3.5 w-3.5 text-v-text-subtle" strokeWidth={2} />
                         ) : (
                           <ChevronUp className="h-3.5 w-3.5 text-v-text-subtle" strokeWidth={2} />
                         )}
-                      </span>
+                      </button>
                     </th>
                     <th>Action</th>
                     <th>User</th>

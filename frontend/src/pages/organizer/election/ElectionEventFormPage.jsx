@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { electionService } from '@/services/election.service'
+import { electionEventSchemaStep1 } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 import DateTimeInput from '@/components/ui/DateTimeInput'
 import Button from '@/components/ui/Button'
@@ -32,16 +35,31 @@ export default function ElectionEventFormPage() {
   const navigate = useNavigate()
 
   const [step, setStep] = useState(1)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [resultsVisibility, setResultsVisibility] = useState('public')
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+
+  const {
+    register,
+    handleSubmit: rhfHandleSubmit,
+    formState: { errors },
+    trigger,
+    setValue,
+    watch,
+    reset,
+  } = useForm({
+    resolver: zodResolver(electionEventSchemaStep1),
+    defaultValues: {
+      title: '',
+      description: '',
+      startDate: '',
+      endDate: '',
+    },
+  })
+
+  const resultsVisibility = watch('resultsVisibility', 'public')
 
   useEffect(() => {
     if (isNew) return
@@ -49,48 +67,42 @@ export default function ElectionEventFormPage() {
       .getEvent(eventId)
       .then(({ data }) => {
         const ev = data.event
-        setTitle(ev.title)
-        setDescription(ev.description || '')
-        // The mapper returns camelCase, but legacy snake_case keys may still
-        // be present on cached responses — support both for safety.
-        const start = ev.startDate ?? ev.start_date
-        const end = ev.endDate ?? ev.end_date
-        setStartDate(start ? start.slice(0, 16) : '')
-        setEndDate(end ? end.slice(0, 16) : '')
+        reset({
+          title: ev.title || '',
+          description: ev.description || '',
+          startDate: ev.startDate ? ev.startDate.slice(0, 16) : '',
+          endDate: ev.endDate ? ev.endDate.slice(0, 16) : '',
+        })
         setBanner(ev.banner)
-        setResultsVisibility(ev.resultsVisibility ?? ev.results_visibility ?? 'public')
+        setValue('resultsVisibility', ev.resultsVisibility ?? ev.results_visibility ?? 'public')
       })
       .finally(() => setLoading(false))
-  }, [eventId, isNew])
+  }, [eventId, isNew, reset, setValue])
 
-  const handleNext = (e) => {
+  const handleNext = async (e) => {
     e.preventDefault()
-    setStep(2)
+    const isValid = await trigger(['title'])
+    if (isValid) {
+      setStep(2)
+    }
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const onSubmit = async (data) => {
     setSaving(true)
     setError(null)
 
-    if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
-      setError('End date must be on or after start date.')
-      setSaving(false)
-      return
-    }
-
     try {
       const payload = {
-        title,
-        description,
-        startDate: startDate ? new Date(startDate).toISOString() : null,
-        endDate: endDate ? new Date(endDate).toISOString() : null,
-        resultsVisibility,
+        title: data.title,
+        description: data.description,
+        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
+        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
+        resultsVisibility: data.resultsVisibility,
       }
       let id = eventId
       if (isNew) {
-        const { data } = await electionService.createEvent(payload)
-        id = data.event.id
+        const { data: res } = await electionService.createEvent(payload)
+        id = res.event.id
       } else {
         await electionService.updateEvent(eventId, payload)
       }
@@ -120,7 +132,7 @@ export default function ElectionEventFormPage() {
 
       <Card padding="md">
         {step === 1 ? (
-          <form className="space-y-4" onSubmit={handleNext}>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNext(e) }}>
             <div className="v-form-field">
               <label className={LABEL_CLASS} htmlFor="title">
                 Title
@@ -128,11 +140,10 @@ export default function ElectionEventFormPage() {
               <input
                 id="title"
                 className={INPUT_CLASS}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                {...register('title')}
                 placeholder="Enter election title"
-                required
               />
+              {errors.title && <p className="v-error-text">{errors.title.message}</p>}
             </div>
 
             <div className="v-form-field">
@@ -143,10 +154,10 @@ export default function ElectionEventFormPage() {
                 id="description"
                 className={INPUT_CLASS}
                 rows={4}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                {...register('description')}
                 placeholder="Enter election description (optional)"
               />
+              {errors.description && <p className="v-error-text">{errors.description.message}</p>}
               <p className={HELPER_TEXT}>Optional description for voters</p>
             </div>
 
@@ -157,9 +168,9 @@ export default function ElectionEventFormPage() {
                 </label>
                 <DateTimeInput
                   id="startDate"
-                  value={startDate}
-                  onChange={setStartDate}
+                  {...register('startDate')}
                 />
+                {errors.startDate && <p className="v-error-text">{errors.startDate.message}</p>}
               </div>
 
               <div className="v-form-field">
@@ -168,9 +179,9 @@ export default function ElectionEventFormPage() {
                 </label>
                 <DateTimeInput
                   id="endDate"
-                  value={endDate}
-                  onChange={setEndDate}
+                  {...register('endDate')}
                 />
+                {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
               </div>
             </div>
 
@@ -188,11 +199,9 @@ export default function ElectionEventFormPage() {
                   >
                     <input
                       type="radio"
-                      name="resultsVisibility"
                       className="mt-1"
                       value={opt.value}
-                      checked={resultsVisibility === opt.value}
-                      onChange={(e) => setResultsVisibility(e.target.value)}
+                      {...register('resultsVisibility')}
                     />
                     <span>
                       <span className="block text-sm font-medium text-v-text">{opt.label}</span>
@@ -208,7 +217,7 @@ export default function ElectionEventFormPage() {
             </div>
           </form>
         ) : (
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={rhfHandleSubmit(onSubmit)}>
             <ImageUploadField
               label="Event banner"
               hint="Wide image for event headers (stored on Cloudinary)."

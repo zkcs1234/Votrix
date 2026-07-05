@@ -1,4 +1,11 @@
-export default function StatCard({ label, value, hint, icon: Icon, className = '' }) {
+export default function StatCard({
+  label,
+  value,
+  hint,
+  icon: Icon,
+  className = '',
+  valueClassName = '',
+}) {
   return (
     <div className={`v-card-sm ${className}`}>
       <div className="flex items-center justify-between">
@@ -7,7 +14,9 @@ export default function StatCard({ label, value, hint, icon: Icon, className = '
           <Icon className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
         )}
       </div>
-      <p className="mt-2 text-3xl font-bold tracking-tight text-v-text">{value}</p>
+      <p className={`mt-2 text-3xl font-bold tracking-tight ${valueClassName || 'text-v-text'}`}>
+        {value}
+      </p>
       {hint && <p className="v-caption mt-1">{hint}</p>}
     </div>
   )

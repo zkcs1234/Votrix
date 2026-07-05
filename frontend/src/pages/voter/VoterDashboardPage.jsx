@@ -4,7 +4,9 @@ import { voterService } from '@/services/voter.service'
 import { useAuth } from '@/hooks/useAuth'
 import {
   SkeletonEventCard,
+  SkeletonStatCard,
 } from '@/components/ui/Skeleton'
+import StatCard from '@/components/ui/StatCard'
 import VoterEventCard from '@/components/voter/VoterEventCard'
 import Card from '@/components/ui/Card'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -27,27 +29,6 @@ function EventSection({ title, description, events }) {
         ))}
       </ul>
     </section>
-  )
-}
-
-function StatCard({ label, value, accent, icon: Icon }) {
-  return (
-    <div className="v-card-sm">
-      <div className="flex items-center justify-between">
-        <p className="v-caption">{label}</p>
-        {Icon && <Icon className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />}
-      </div>
-      <p className={`mt-2 text-3xl font-bold tracking-tight ${accent}`}>{value}</p>
-    </div>
-  )
-}
-
-function StatCardSkeleton() {
-  return (
-    <div className="v-card-sm">
-      <div className="h-4 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
-      <div className="mt-2 h-8 w-12 animate-pulse rounded-lg bg-v-surface-elevated" />
-    </div>
   )
 }
 
@@ -129,10 +110,10 @@ export default function VoterDashboardPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCardSkeleton />
-          <StatCardSkeleton />
-          <StatCardSkeleton />
-          <StatCardSkeleton />
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+          <SkeletonStatCard />
         </div>
 
         <EventSectionSkeleton />
@@ -160,10 +141,10 @@ export default function VoterDashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Assigned" value={stats.assigned} accent="v-stat-accent" icon={CalendarCheck2} />
-        <StatCard label="Active now" value={stats.active} accent="v-stat-success" icon={Zap} />
-        <StatCard label="Completed" value={stats.completed} accent="v-stat-muted" icon={CheckCircle2} />
-        <StatCard label="Total" value={stats.total} accent="v-text" icon={CalendarDays} />
+        <StatCard label="Assigned" value={stats.assigned} valueClassName="v-stat-accent" icon={CalendarCheck2} />
+        <StatCard label="Active now" value={stats.active} valueClassName="v-stat-success" icon={Zap} />
+        <StatCard label="Completed" value={stats.completed} valueClassName="v-stat-muted" icon={CheckCircle2} />
+        <StatCard label="Total" value={stats.total} valueClassName="text-v-text" icon={CalendarDays} />
       </div>
 
       <EventSection

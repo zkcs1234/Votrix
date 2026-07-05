@@ -212,6 +212,7 @@ export default function OrganizerManagementPage() {
               type="button"
               variant={statusFilter === status ? 'primary' : 'secondary'}
               onClick={() => setStatusFilter(status)}
+              aria-pressed={statusFilter === status}
             >
               {status === 'all' ? 'All' : getStatusLabel(status)}
             </Button>

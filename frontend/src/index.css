@@ -235,7 +235,7 @@
 
   /* Table styles */
   .v-table-wrap {
-    overflow: hidden;
+    overflow-x: auto;
     border-radius: 0.75rem;
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);

@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
+import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import Button from '@/components/ui/Button'
 import PageantScoringForm from '@/components/voter/pageant/PageantScoringForm'
 
 export default function JudgeScoringPage() {
   const { eventId } = useParams()
+  const competitionDraftKey = getDraftStorageKey('competitionDraft', eventId)
+  const pageantDraftKey = getDraftStorageKey('pageantDraft', eventId)
   const [sheet, setSheet] = useState(null)
   const [scores, setScores] = useState({})
   const [loading, setLoading] = useState(true)
@@ -22,8 +26,7 @@ export default function JudgeScoringPage() {
         
         try {
           const savedStr =
-            localStorage.getItem(`votrix_competition_draft_${eventId}`) ??
-            localStorage.getItem(`votrix_pageant_draft_${eventId}`)
+            localStorage.getItem(competitionDraftKey) ?? localStorage.getItem(pageantDraftKey)
           const saved = savedStr ? JSON.parse(savedStr) : {}
           setScores({ ...data.existingScores, ...saved })
         } catch {
@@ -35,9 +38,9 @@ export default function JudgeScoringPage() {
 
   useEffect(() => {
     if (Object.keys(scores).length > 0) {
-      localStorage.setItem(`votrix_competition_draft_${eventId}`, JSON.stringify(scores))
+      localStorage.setItem(competitionDraftKey, JSON.stringify(scores))
     }
-  }, [eventId, scores])
+  }, [competitionDraftKey, scores])
 
   const setScore = (contestantId, criteriaId, value) => {
     const key = `${contestantId}:${criteriaId}`
@@ -68,7 +71,7 @@ export default function JudgeScoringPage() {
         const num = Number(val)
         if (Number.isNaN(num) || num < crit.minScore || num > crit.maxScore) {
           setError(
-            `Score for ${contestant.name} â€” ${crit.name} must be between ${crit.minScore} and ${crit.maxScore}.`,
+            `Score for ${contestant.name} — ${crit.name} must be between ${crit.minScore} and ${crit.maxScore}.`,
           )
           setSubmitting(false)
           return
@@ -83,8 +86,8 @@ export default function JudgeScoringPage() {
 
     try {
       await pageantService.submitScores(eventId, payload)
-      localStorage.removeItem(`votrix_competition_draft_${eventId}`)
-      localStorage.removeItem(`votrix_pageant_draft_${eventId}`)
+      localStorage.removeItem(competitionDraftKey)
+      localStorage.removeItem(pageantDraftKey)
       setDone(true)
     } catch (err) {
       setError(err.response?.data?.message || 'Submit failed')
@@ -128,10 +131,10 @@ export default function JudgeScoringPage() {
     <div className="mx-auto max-w-4xl space-y-6 pb-24">
       <div>
         <Link to="/voter" className="text-sm text-v-text-subtle hover:text-v-text-muted">
-          â† Dashboard
+          ← Dashboard
         </Link>
         <h2 className="mt-2 text-xl font-semibold text-v-text">{sheet.event.title}</h2>
-        <p className="text-sm text-v-text-muted/90">Judge scoring â€” one submission only</p>
+        <p className="text-sm text-v-text-muted/90">Judge scoring — one submission only</p>
       </div>
 
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-sm">
@@ -153,14 +156,9 @@ export default function JudgeScoringPage() {
 
       {error && <p className="text-sm text-v-danger">{error}</p>}
 
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={submitting}
-        className="w-full rounded-lg bg-v-primary py-3 font-medium text-white hover:bg-v-primary-hover disabled:opacity-60"
-      >
-        {submitting ? 'Submittingâ€¦' : 'Submit all scores (locked)'}
-      </button>
+      <Button type="button" onClick={handleSubmit} loading={submitting} className="w-full">
+        {submitting ? 'Submitting…' : 'Submit all scores (locked)'}
+      </Button>
     </div>
   )
 }

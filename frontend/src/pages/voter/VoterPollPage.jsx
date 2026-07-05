@@ -2,15 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import { validatePollAnswers } from '@/utils/pollValidation'
+import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import Button from '@/components/ui/Button'
 import PollQuestionField from '@/components/voter/polling/PollQuestionField'
 
 export default function VoterPollPage() {
   const { eventId } = useParams()
+  const draftKey = getDraftStorageKey('pollDraft', eventId)
   const [poll, setPoll] = useState(null)
   const [answers, setAnswers] = useState(() => {
     try {
-      const saved = localStorage.getItem(`votrix_poll_draft_${eventId}`)
+      const saved = localStorage.getItem(draftKey)
       return saved ? JSON.parse(saved) : {}
     } catch {
       return {}
@@ -34,8 +37,8 @@ export default function VoterPollPage() {
   }, [eventId])
 
   useEffect(() => {
-    localStorage.setItem(`votrix_poll_draft_${eventId}`, JSON.stringify(answers))
-  }, [eventId, answers])
+    localStorage.setItem(draftKey, JSON.stringify(answers))
+  }, [draftKey, answers])
 
   const questions = useMemo(() => poll?.questions ?? [], [poll])
 
@@ -66,7 +69,7 @@ export default function VoterPollPage() {
 
     try {
       await pollingService.submitPoll(eventId, answers)
-      localStorage.removeItem(`votrix_poll_draft_${eventId}`)
+      localStorage.removeItem(draftKey)
       setDone(true)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit')
@@ -140,7 +143,7 @@ export default function VoterPollPage() {
     <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-6 pb-24">
       <div>
         <Link to="/voter" className="text-sm text-v-text-subtle hover:text-v-text-muted">
-          â† Dashboard
+          ← Dashboard
         </Link>
         <h2 className="mt-2 text-xl font-semibold text-v-text">{poll.event.title}</h2>
         {poll.event.description && (
@@ -170,13 +173,9 @@ export default function VoterPollPage() {
 
       {error && <p className="text-sm text-v-danger">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full rounded-lg bg-v-primary py-3 font-medium text-white hover:bg-v-primary-hover disabled:opacity-60"
-      >
-        {submitting ? 'Submittingâ€¦' : 'Submit response'}
-      </button>
+      <Button type="submit" loading={submitting} className="w-full">
+        {submitting ? 'Submitting…' : 'Submit response'}
+      </Button>
     </form>
   )
 }

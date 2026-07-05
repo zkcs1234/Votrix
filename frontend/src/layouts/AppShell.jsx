@@ -29,6 +29,7 @@ function NavLinks({ items, eventId, location, onNavigate }) {
               key={item.label}
               className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-600"
               title="Select an event first"
+              aria-disabled="true"
             >
               {Icon && <Icon className="h-4 w-4 shrink-0 opacity-40" strokeWidth={1.5} aria-hidden />}
               {item.label}
