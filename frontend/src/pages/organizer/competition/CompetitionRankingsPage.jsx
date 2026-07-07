@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -6,32 +6,25 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import { subscribeRoom } from '@/services/socket.service'
 
-export default function PageantRankingsPage() {
+export default function CompetitionRankingsPage() {
   const { eventId } = useParams()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const load = () => {
+  const load = useCallback(() => {
     pageantService
       .getRankings(eventId)
       .then(({ data }) => setData(data))
       .finally(() => setLoading(false))
-  }
+  }, [eventId])
 
   useEffect(() => {
     load()
     subscribeRoom(`event:${eventId}:organizer`)
-  }, [eventId])
+  }, [eventId, load])
 
   useSocketEvent('rankings:updated', ({ rankings }) => {
-    if (rankings?.eventId === eventId || true) {
-      // Actually we just call load() or set rankings.
-      // WEBSOCKETS.md says: if (rankings?.[0]?.eventId === eventId) setData({ rankings }) 
-      // but getLiveRankings returns an object { rankings, judges, etc }.
-      // To keep it simple and ensure all derived state (judges submitted count, etc.) is updated,
-      // it's safest to just re-load() or handle the full payload. 
-      // Since rankings:updated passes `{ eventId, rankings }` where rankings is the FULL object from `getLiveRankings`.
-      // Let's just setData(rankings) assuming rankings is the full response object from getLiveRankings.
+    if (rankings) {
       setData(rankings)
     }
   }, [eventId])

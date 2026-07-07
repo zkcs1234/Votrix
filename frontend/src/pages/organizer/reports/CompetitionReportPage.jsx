@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/Skeleton'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
-export default function PageantReportPage() {
+export default function CompetitionReportPage() {
   const { eventId } = useParams()
   const { report, loading, refresh, lastUpdated } = useModuleAnalytics({
     moduleId: 'competition',

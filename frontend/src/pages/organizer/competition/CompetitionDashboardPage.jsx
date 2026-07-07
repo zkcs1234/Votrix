@@ -11,7 +11,7 @@ import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
-export default function PageantDashboardPage() {
+export default function CompetitionDashboardPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 

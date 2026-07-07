@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -6,22 +6,22 @@ import { INPUT_CLASS } from '@/utils/uiClasses'
 
 const inputClass = `${INPUT_CLASS} w-full`
 
-export default function PageantCriteriaPage() {
+export default function CompetitionCriteriaPage() {
   const { eventId } = useParams()
   const [list, setList] = useState([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ name: '', percentage: 33.33, minScore: 0, maxScore: 100 })
 
-  const load = () => {
+  const load = useCallback(() => {
     pageantService
       .listCriteria(eventId)
       .then(({ data }) => setList(data.criteria ?? []))
       .finally(() => setLoading(false))
-  }
+  }, [eventId])
 
   useEffect(() => {
     load()
-  }, [eventId])
+  }, [load])
 
   const totalPct = list.reduce((s, c) => s + c.percentage, 0)
 

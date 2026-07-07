@@ -47,22 +47,24 @@ const ElectionAnalyticsPage = lazy(
   () => import('@/pages/organizer/election/ElectionAnalyticsPage'),
 )
 
-const PageantDashboardPage = lazy(
-  () => import('@/pages/organizer/pageant/PageantDashboardPage'),
+const CompetitionDashboardPage = lazy(
+  () => import('@/pages/organizer/competition/CompetitionDashboardPage'),
 )
-const PageantEventsPage = lazy(() => import('@/pages/organizer/pageant/PageantEventsPage'))
-const PageantEventFormPage = lazy(() => import('@/pages/organizer/pageant/PageantEventFormPage'))
-const PageantContestantsPage = lazy(
-  () => import('@/pages/organizer/pageant/PageantContestantsPage'),
+const CompetitionEventsPage = lazy(() => import('@/pages/organizer/competition/CompetitionEventsPage'))
+const CompetitionEventFormPage = lazy(
+  () => import('@/pages/organizer/competition/CompetitionEventFormPage'),
 )
-const PageantCriteriaPage = lazy(() => import('@/pages/organizer/pageant/PageantCriteriaPage'))
-const PageantJudgesPage = lazy(() => import('@/pages/organizer/pageant/PageantJudgesPage'))
-const PageantRankingsPage = lazy(() => import('@/pages/organizer/pageant/PageantRankingsPage'))
+const CompetitionContestantsPage = lazy(
+  () => import('@/pages/organizer/competition/CompetitionContestantsPage'),
+)
+const CompetitionCriteriaPage = lazy(() => import('@/pages/organizer/competition/CompetitionCriteriaPage'))
+const CompetitionJudgesPage = lazy(() => import('@/pages/organizer/competition/CompetitionJudgesPage'))
+const CompetitionRankingsPage = lazy(() => import('@/pages/organizer/competition/CompetitionRankingsPage'))
 const CompetitionWorkspacePage = lazy(
-  () => import('@/pages/organizer/pageant/CompetitionWorkspacePage'),
+  () => import('@/pages/organizer/competition/CompetitionWorkspacePage'),
 )
 const CompetitionAnalyticsPage = lazy(
-  () => import('@/pages/organizer/pageant/CompetitionAnalyticsPage'),
+  () => import('@/pages/organizer/competition/CompetitionAnalyticsPage'),
 )
 const JudgeScoringPage = lazy(() => import('@/pages/voter/JudgeScoringPage'))
 
@@ -80,7 +82,7 @@ const VoterPollPage = lazy(() => import('@/pages/voter/VoterPollPage'))
 
 const ReportsOverviewPage = lazy(() => import('@/pages/organizer/reports/ReportsOverviewPage'))
 const ElectionReportPage = lazy(() => import('@/pages/organizer/reports/ElectionReportPage'))
-const PageantReportPage = lazy(() => import('@/pages/organizer/reports/PageantReportPage'))
+const CompetitionReportPage = lazy(() => import('@/pages/organizer/reports/CompetitionReportPage'))
 const PollingReportPage = lazy(() => import('@/pages/organizer/reports/PollingReportPage'))
 
 export const routeConfig = [
@@ -176,24 +178,6 @@ export const routeConfig = [
     ],
   },
   {
-    path: '/organizer/pageant',
-    element: (
-      <ProtectedRoute allowedRoles={[USER_ROLES.ORGANIZER]}>
-        <PageantLayout />
-      </ProtectedRoute>
-    ),
-    children: [
-      { index: true, element: <PageantDashboardPage /> },
-      { path: 'events', element: <PageantEventsPage /> },
-      { path: 'events/new', element: <PageantEventFormPage /> },
-      { path: 'events/:eventId/edit', element: <PageantEventFormPage /> },
-      { path: 'events/:eventId/contestants', element: <PageantContestantsPage /> },
-      { path: 'events/:eventId/criteria', element: <PageantCriteriaPage /> },
-      { path: 'events/:eventId/judges', element: <PageantJudgesPage /> },
-      { path: 'events/:eventId/rankings', element: <PageantRankingsPage /> },
-    ],
-  },
-  {
     path: '/organizer/competition',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.ORGANIZER]}>
@@ -201,15 +185,15 @@ export const routeConfig = [
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <PageantDashboardPage /> },
-      { path: 'events', element: <PageantEventsPage /> },
-      { path: 'events/new', element: <PageantEventFormPage /> },
-      { path: 'events/:eventId/edit', element: <PageantEventFormPage /> },
+      { index: true, element: <CompetitionDashboardPage /> },
+      { path: 'events', element: <CompetitionEventsPage /> },
+      { path: 'events/new', element: <CompetitionEventFormPage /> },
+      { path: 'events/:eventId/edit', element: <CompetitionEventFormPage /> },
       { path: 'events/:eventId/workspace', element: <CompetitionWorkspacePage /> },
-      { path: 'events/:eventId/contestants', element: <PageantContestantsPage /> },
-      { path: 'events/:eventId/criteria', element: <PageantCriteriaPage /> },
-      { path: 'events/:eventId/judges', element: <PageantJudgesPage /> },
-      { path: 'events/:eventId/rankings', element: <PageantRankingsPage /> },
+      { path: 'events/:eventId/contestants', element: <CompetitionContestantsPage /> },
+      { path: 'events/:eventId/criteria', element: <CompetitionCriteriaPage /> },
+      { path: 'events/:eventId/judges', element: <CompetitionJudgesPage /> },
+      { path: 'events/:eventId/rankings', element: <CompetitionRankingsPage /> },
       { path: 'events/:eventId/analytics', element: <CompetitionAnalyticsPage /> },
     ],
   },
@@ -240,8 +224,7 @@ export const routeConfig = [
     children: [
       { index: true, element: <ReportsOverviewPage /> },
       { path: 'election/:eventId', element: <ElectionReportPage /> },
-      { path: 'pageant/:eventId', element: <PageantReportPage /> },
-      { path: 'competition/:eventId', element: <PageantReportPage /> },
+      { path: 'competition/:eventId', element: <CompetitionReportPage /> },
       { path: 'polling/:eventId', element: <PollingReportPage /> },
     ],
   },
@@ -273,7 +256,7 @@ export const routeConfig = [
     children: [{ index: true, element: <VoterPollPage /> }],
   },
   {
-    path: '/voter/pageant/events/:eventId/score',
+    path: '/voter/competition/events/:eventId/score',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
         <DashboardLayout title="Judge scoring" />

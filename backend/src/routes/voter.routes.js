@@ -11,7 +11,7 @@ const router = Router()
 router.use(authenticate, authorize(USER_ROLES.VOTER), requireActiveAccount, requirePasswordChanged)
 
 router.use('/election', electionVoterRoutes)
-router.use('/pageant', pageantJudgeRoutes)
+// Competition scoring routes for judges
 router.use('/competition', pageantJudgeRoutes)
 router.use('/polling', pollingVoterRoutes)
 

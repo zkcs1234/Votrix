@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -7,7 +7,7 @@ import ImageUploadField from '@/components/upload/ImageUploadField'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
 
-export default function PageantContestantsPage() {
+export default function CompetitionContestantsPage() {
   const { eventId } = useParams()
   const [list, setList] = useState([])
   const [loading, setLoading] = useState(true)
@@ -15,16 +15,16 @@ export default function PageantContestantsPage() {
   const [number, setNumber] = useState(1)
   const [photoFile, setPhotoFile] = useState(null)
 
-  const load = () => {
+  const load = useCallback(() => {
     pageantService
       .listContestants(eventId)
       .then(({ data }) => setList(data.contestants ?? []))
       .finally(() => setLoading(false))
-  }
+  }, [eventId])
 
   useEffect(() => {
     load()
-  }, [eventId])
+  }, [load])
 
   const handleCreate = async (e) => {
     e.preventDefault()

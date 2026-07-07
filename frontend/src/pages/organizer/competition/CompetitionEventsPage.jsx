@@ -5,7 +5,7 @@ import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
-export default function PageantEventsPage() {
+export default function CompetitionEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
 

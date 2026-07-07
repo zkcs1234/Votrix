@@ -4,7 +4,7 @@ import { pageantService } from '@/services/pageant.service'
 import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
-import PageantScoringForm from '@/components/voter/pageant/PageantScoringForm'
+import CompetitionScoringForm from '@/components/voter/competition/CompetitionScoringForm'
 
 export default function JudgeScoringPage() {
   const { eventId } = useParams()
@@ -34,7 +34,7 @@ export default function JudgeScoringPage() {
         }
       })
       .finally(() => setLoading(false))
-  }, [eventId])
+  }, [competitionDraftKey, eventId, pageantDraftKey])
 
   useEffect(() => {
     if (Object.keys(scores).length > 0) {
@@ -147,7 +147,7 @@ export default function JudgeScoringPage() {
         </p>
       </div>
 
-      <PageantScoringForm
+      <CompetitionScoringForm
         sheet={sheet}
         scores={scores}
         onScoreChange={setScore}

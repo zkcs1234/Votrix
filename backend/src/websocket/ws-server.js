@@ -36,6 +36,13 @@ export function attachWebSocketServer(httpServer) {
 
   // Upgrade handler — validate origin BEFORE the socket is created
   httpServer.on('upgrade', (req, socket, head) => {
+    // Only handle WebSocket upgrades on the /ws path
+    if (req.url !== '/ws') {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n')
+      socket.destroy()
+      return
+    }
+
     const origin = req.headers.origin
     if (origin && !isAllowedOrigin(origin)) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')

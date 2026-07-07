@@ -1,12 +1,12 @@
 import ScoreInput from '@/components/ui/ScoreInput'
 
-export default function PageantScoringForm({ sheet, scores, onScoreChange, disabled }) {
+export default function CompetitionScoringForm({ sheet, scores, onScoreChange, disabled }) {
   const { contestants, criteria } = sheet
 
   return (
     <div className="space-y-6">
       <div className="hidden overflow-x-auto rounded-2xl border border-v-border md:block">
-        <table className="w-full min-w-[600px] text-sm">
+        <table className="w-full min-w-150 text-sm">
           <thead>
             <tr className="border-b border-v-border bg-v-surface-elevated">
               <th className="p-3 text-left v-caption">Contestant</th>

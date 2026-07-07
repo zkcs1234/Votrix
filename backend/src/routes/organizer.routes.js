@@ -13,7 +13,7 @@ const router = Router()
 router.use(authenticate, authorize(USER_ROLES.ORGANIZER), requireActiveAccount, requirePasswordChanged)
 
 router.use('/election', electionOrganizerRoutes)
-router.use('/pageant', pageantOrganizerRoutes)
+// Competition module routes (renamed from 'pageant')
 router.use('/competition', pageantOrganizerRoutes)
 router.use('/polling', pollingOrganizerRoutes)
 router.use('/reports', reportsOrganizerRoutes)

@@ -10,7 +10,7 @@ import Card from '@/components/ui/Card'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
-export default function PageantEventFormPage() {
+export default function CompetitionEventFormPage() {
   const { eventId } = useParams()
   const isNew = !eventId || eventId === 'new'
   const navigate = useNavigate()

@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
-export default function PageantJudgesPage() {
+export default function CompetitionJudgesPage() {
   const { eventId } = useParams()
   const [judges, setJudges] = useState([])
   const [loading, setLoading] = useState(true)
@@ -11,16 +11,16 @@ export default function PageantJudgesPage() {
   const [temporaryPassword, setTemporaryPassword] = useState('')
   const [importResult, setImportResult] = useState(null)
 
-  const load = () => {
+  const load = useCallback(() => {
     pageantService
       .listJudges(eventId)
       .then(({ data }) => setJudges(data.judges ?? []))
       .finally(() => setLoading(false))
-  }
+  }, [eventId])
 
   useEffect(() => {
     load()
-  }, [eventId])
+  }, [load])
 
   const invite = async (e) => {
     e.preventDefault()
