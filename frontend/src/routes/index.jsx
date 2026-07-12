@@ -154,7 +154,7 @@ export const routeConfig = [
     path: '/organizer',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.ORGANIZER]}>
-        <DashboardLayout title="Organizer" />
+        <DashboardLayout title="Organizer" showSidebar={false} />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <OrganizerDashboardPage /> }],
@@ -232,7 +232,7 @@ export const routeConfig = [
     path: '/voter',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
-        <DashboardLayout title="Voter" />
+        <DashboardLayout title="Voter" showSidebar={false} />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <VoterDashboardPage /> }],
@@ -241,7 +241,7 @@ export const routeConfig = [
     path: '/voter/events/:eventId',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
-        <DashboardLayout title="Vote" />
+        <DashboardLayout title="Vote" showSidebar={false} showBackButton={true} backButtonPath="/voter" />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <VoterEventPage /> }],
@@ -250,7 +250,7 @@ export const routeConfig = [
     path: '/voter/polling/events/:eventId',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
-        <DashboardLayout title="Poll" />
+        <DashboardLayout title="Poll" showSidebar={false} showBackButton={true} backButtonPath="/voter" />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <VoterPollPage /> }],
@@ -259,16 +259,7 @@ export const routeConfig = [
     path: '/voter/competition/events/:eventId/score',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
-        <DashboardLayout title="Judge scoring" />
-      </ProtectedRoute>
-    ),
-    children: [{ index: true, element: <JudgeScoringPage /> }],
-  },
-  {
-    path: '/voter/competition/events/:eventId/score',
-    element: (
-      <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
-        <DashboardLayout title="Judge scoring" />
+        <DashboardLayout title="Judge scoring" showSidebar={false} showBackButton={true} backButtonPath="/voter" />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <JudgeScoringPage /> }],

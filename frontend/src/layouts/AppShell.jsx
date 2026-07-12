@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Bell, LogOut } from 'lucide-react'
+import { Menu, Bell, LogOut, ChevronLeft } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { authService } from '@/services/auth.service'
 import { notificationsService } from '@/services/notifications.service'
@@ -105,6 +105,9 @@ export default function AppShell({
   navItems = [],
   eventId,
   footerLink,
+  showSidebar = true,
+  showBackButton = false,
+  backButtonPath = '/voter',
   children,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -178,11 +181,13 @@ export default function AppShell({
 
   return (
     <div className="flex min-h-screen bg-v-bg">
-      <aside className="hidden w-64 shrink-0 bg-v-sidebar p-6 md:block">
-        <div className="h-full flex flex-col">
-          {sidebar}
-        </div>
-      </aside>
+      {showSidebar && (
+        <aside className="hidden w-64 shrink-0 bg-v-sidebar p-6 md:block">
+          <div className="h-full flex flex-col">
+            {sidebar}
+          </div>
+        </aside>
+      )}
 
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
@@ -210,6 +215,15 @@ export default function AppShell({
           </button>
 
           <div className="min-w-0 flex-1">
+            {showBackButton && (
+              <Link
+                to={backButtonPath}
+                className="mb-1 inline-flex items-center gap-1 text-sm text-v-text-subtle hover:text-v-text"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back to dashboard
+              </Link>
+            )}
             <h1 className="truncate text-base font-semibold text-v-text sm:text-lg">
               {title}
             </h1>

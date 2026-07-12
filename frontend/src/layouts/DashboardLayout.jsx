@@ -6,7 +6,12 @@ import {
   LayoutDashboard, Users, CalendarDays, Settings, ClipboardList,
 } from 'lucide-react'
 
-export default function DashboardLayout({ title = 'Dashboard' }) {
+export default function DashboardLayout({
+  title = 'Dashboard',
+  showSidebar = true,
+  showBackButton = false,
+  backButtonPath = '/voter',
+}) {
   const { role } = useAuth()
   const home = getRoleDashboardPath(role)
 
@@ -54,6 +59,9 @@ export default function DashboardLayout({ title = 'Dashboard' }) {
       moduleLabel={role}
       homeLink={home}
       navItems={navItems}
+      showSidebar={showSidebar}
+      showBackButton={showBackButton}
+      backButtonPath={backButtonPath}
     />
   )
 }
