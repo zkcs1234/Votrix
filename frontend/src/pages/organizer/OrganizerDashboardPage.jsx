@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Zap, CheckCircle2, Users, Vote, Trophy, BarChart2, BarChart3 } from 'lucide-react'
+import { CalendarDays, Zap, CheckCircle2, Users, Vote, Trophy, BarChart2, BarChart3, ArrowRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import StatCard from '@/components/ui/StatCard'
 import Card from '@/components/ui/Card'
@@ -14,6 +14,11 @@ import { AreaChartView, PieChartView } from '@/components/charts'
 import { organizerService } from '@/services/organizer.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
+
+// SVG Illustrations
+import ElectionSVG from '@/assets/module/undraw_voting_3ygx.svg'
+import CompetitionSVG from '@/assets/module/pageant-amico.svg'
+import PollingSVG from '@/assets/module/undraw_data_25jw.svg'
 
 export default function OrganizerDashboardPage() {
   const { user } = useAuth()
@@ -126,10 +131,17 @@ export default function OrganizerDashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Link
-          to="/organizer/election"
-          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
-        >
+        <div className="v-card-md flex flex-col gap-3">
+          {/* SVG Illustration */}
+          <div className="relative h-24 w-full overflow-hidden rounded-lg bg-vote-gradient opacity-90">
+            <img
+              src={ElectionSVG}
+              alt="Election"
+              className="h-full w-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-v-surface/80 to-transparent" />
+          </div>
+
           <div className="flex items-center gap-2">
             <Vote className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
             <h3 className="v-section-title">Election module</h3>
@@ -137,11 +149,28 @@ export default function OrganizerDashboardPage() {
           <p className="v-caption">
             Manage events, positions, candidates, and voters.
           </p>
-        </Link>
-        <Link
-          to="/organizer/competition"
-          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
-        >
+
+          {/* Action Button - Navigation is here */}
+          <Link
+            to="/organizer/election"
+            className="mt-auto flex items-center justify-center gap-2 rounded-lg bg-v-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-v-primary/90"
+          >
+            <span>Manage Election</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="v-card-md flex flex-col gap-3">
+          {/* SVG Illustration */}
+          <div className="relative h-24 w-full overflow-hidden rounded-lg bg-comp-gradient opacity-90">
+            <img
+              src={CompetitionSVG}
+              alt="Competition"
+              className="h-full w-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-v-surface/80 to-transparent" />
+          </div>
+
           <div className="flex items-center gap-2">
             <Trophy className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
             <h3 className="v-section-title">Competition Scoring module</h3>
@@ -149,11 +178,28 @@ export default function OrganizerDashboardPage() {
           <p className="v-caption">
             Contestants, criteria, judge scoring, and rankings.
           </p>
-        </Link>
-        <Link
-          to="/organizer/polling"
-          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
-        >
+
+          {/* Action Button - Navigation is here */}
+          <Link
+            to="/organizer/competition"
+            className="mt-auto flex items-center justify-center gap-2 rounded-lg bg-v-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-v-primary/90"
+          >
+            <span>Manage Competition</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="v-card-md flex flex-col gap-3">
+          {/* SVG Illustration */}
+          <div className="relative h-24 w-full overflow-hidden rounded-lg bg-poll-gradient opacity-90">
+            <img
+              src={PollingSVG}
+              alt="Polling"
+              className="h-full w-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-v-surface/80 to-transparent" />
+          </div>
+
           <div className="flex items-center gap-2">
             <BarChart2 className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
             <h3 className="v-section-title">Polling module</h3>
@@ -161,7 +207,16 @@ export default function OrganizerDashboardPage() {
           <p className="v-caption">
             Build surveys, configure settings, and view analytics.
           </p>
-        </Link>
+
+          {/* Action Button - Navigation is here */}
+          <Link
+            to="/organizer/polling"
+            className="mt-auto flex items-center justify-center gap-2 rounded-lg bg-v-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-v-primary/90"
+          >
+            <span>Create Poll</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
 
       <Link
