@@ -133,13 +133,12 @@ export default function OrganizerDashboardPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <div className="v-card-md flex flex-col gap-3">
           {/* SVG Illustration */}
-          <div className="relative h-24 w-full overflow-hidden rounded-lg bg-vote-gradient opacity-90">
+          <div className="relative h-52 w-full overflow-hidden rounded-lg bg-vote-gradient">
             <img
               src={ElectionSVG}
               alt="Election"
-              className="h-full w-full object-cover object-center"
+              className="h-full w-full object-contain p-4"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-v-surface/80 to-transparent" />
           </div>
 
           <div className="flex items-center gap-2">
@@ -162,13 +161,12 @@ export default function OrganizerDashboardPage() {
 
         <div className="v-card-md flex flex-col gap-3">
           {/* SVG Illustration */}
-          <div className="relative h-24 w-full overflow-hidden rounded-lg bg-comp-gradient opacity-90">
+          <div className="relative h-52 w-full overflow-hidden rounded-lg bg-comp-gradient">
             <img
               src={CompetitionSVG}
               alt="Competition"
-              className="h-full w-full object-cover object-center"
+              className="h-full w-full object-contain p-4"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-v-surface/80 to-transparent" />
           </div>
 
           <div className="flex items-center gap-2">
@@ -191,13 +189,12 @@ export default function OrganizerDashboardPage() {
 
         <div className="v-card-md flex flex-col gap-3">
           {/* SVG Illustration */}
-          <div className="relative h-24 w-full overflow-hidden rounded-lg bg-poll-gradient opacity-90">
+          <div className="relative h-52 w-full overflow-hidden rounded-lg bg-poll-gradient">
             <img
               src={PollingSVG}
               alt="Polling"
-              className="h-full w-full object-cover object-center"
+              className="h-full w-full object-contain p-4"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-v-surface/80 to-transparent" />
           </div>
 
           <div className="flex items-center gap-2">
