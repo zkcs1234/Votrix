@@ -130,10 +130,10 @@ export default function OrganizerDashboardPage() {
         <StatCard label="Assigned voters" value={stats?.totalAssignedVoters ?? 0} icon={Users} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="v-card-md flex flex-col gap-3">
-          {/* SVG Illustration */}
-          <div className="relative h-52 w-full overflow-hidden rounded-lg bg-vote-gradient">
+      <div className="grid gap-5 md:grid-cols-3">
+        {/* Election Module Card */}
+        <div className="v-module-card">
+          <div className="v-module-card__illustration bg-vote-gradient">
             <img
               src={ElectionSVG}
               alt="Election"
@@ -141,27 +141,23 @@ export default function OrganizerDashboardPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <Vote className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
-            <h3 className="v-section-title">Election module</h3>
-          </div>
-          <p className="v-caption">
-            Manage events, positions, candidates, and voters.
-          </p>
+          <div className="v-module-card__body">
+            <Vote className="v-module-card__icon" strokeWidth={1.5} />
+            <h3 className="v-module-card__title">Election module</h3>
+            <p className="v-module-card__desc">
+              Manage events, positions, candidates, and voters.
+            </p>
 
-          {/* Action Button - Navigation is here */}
-          <Link
-            to="/organizer/election"
-            className="mt-auto flex items-center justify-center gap-2 rounded-lg bg-v-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-v-primary/90"
-          >
-            <span>Manage Election</span>
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+            <Link to="/organizer/election" className="v-module-card__btn v-press">
+              <span>Manage Election</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
 
-        <div className="v-card-md flex flex-col gap-3">
-          {/* SVG Illustration */}
-          <div className="relative h-52 w-full overflow-hidden rounded-lg bg-comp-gradient">
+        {/* Competition Scoring Module Card */}
+        <div className="v-module-card">
+          <div className="v-module-card__illustration bg-comp-gradient">
             <img
               src={CompetitionSVG}
               alt="Competition"
@@ -169,27 +165,23 @@ export default function OrganizerDashboardPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
-            <h3 className="v-section-title">Competition Scoring module</h3>
-          </div>
-          <p className="v-caption">
-            Contestants, criteria, judge scoring, and rankings.
-          </p>
+          <div className="v-module-card__body">
+            <Trophy className="v-module-card__icon" strokeWidth={1.5} />
+            <h3 className="v-module-card__title">Competition Scoring module</h3>
+            <p className="v-module-card__desc">
+              Contestants, criteria, judge scoring, and rankings.
+            </p>
 
-          {/* Action Button - Navigation is here */}
-          <Link
-            to="/organizer/competition"
-            className="mt-auto flex items-center justify-center gap-2 rounded-lg bg-v-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-v-primary/90"
-          >
-            <span>Manage Competition</span>
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+            <Link to="/organizer/competition" className="v-module-card__btn v-press">
+              <span>Manage Competition</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
 
-        <div className="v-card-md flex flex-col gap-3">
-          {/* SVG Illustration */}
-          <div className="relative h-52 w-full overflow-hidden rounded-lg bg-poll-gradient">
+        {/* Polling Module Card */}
+        <div className="v-module-card">
+          <div className="v-module-card__illustration bg-poll-gradient">
             <img
               src={PollingSVG}
               alt="Polling"
@@ -197,22 +189,18 @@ export default function OrganizerDashboardPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <BarChart2 className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
-            <h3 className="v-section-title">Polling module</h3>
-          </div>
-          <p className="v-caption">
-            Build surveys, configure settings, and view analytics.
-          </p>
+          <div className="v-module-card__body">
+            <BarChart2 className="v-module-card__icon" strokeWidth={1.5} />
+            <h3 className="v-module-card__title">Polling module</h3>
+            <p className="v-module-card__desc">
+              Build surveys, configure settings, and view analytics.
+            </p>
 
-          {/* Action Button - Navigation is here */}
-          <Link
-            to="/organizer/polling"
-            className="mt-auto flex items-center justify-center gap-2 rounded-lg bg-v-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-v-primary/90"
-          >
-            <span>Create Poll</span>
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+            <Link to="/organizer/polling" className="v-module-card__btn v-press">
+              <span>Create Poll</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </div>
 
