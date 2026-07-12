@@ -159,7 +159,7 @@ export default function NotificationsModal({ onClose }) {
       <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:absolute sm:right-0 sm:top-[calc(100%+0.5rem)] sm:block sm:p-0">
-        <div className="flex w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border border-v-border bg-v-bg shadow-2xl sm:w-[90vw] md:w-[500px]">
+        <div className="flex w-full flex-col overflow-hidden rounded-2xl border border-v-border bg-v-surface shadow-v-shadow-xl sm:w-[380px] max-h-[85vh]">
           <div className="flex shrink-0 items-center justify-between border-b border-v-border p-4">
             <h2 className="text-lg font-semibold text-v-text">Notifications</h2>
             <Button size="sm" variant="secondary" onClick={onClose} className="!p-1">
