@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Bell, LogOut, ChevronLeft } from 'lucide-react'
+import { Menu, Bell, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { authService } from '@/services/auth.service'
 import { notificationsService } from '@/services/notifications.service'
@@ -10,16 +10,18 @@ import Button from '@/components/ui/Button'
 import NotificationsModal from '@/components/ui/NotificationsModal'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
-function NavLinks({ items, eventId, location, onNavigate }) {
+function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
   const linkClass = (active) =>
-    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition duration-150 ${
+    `group relative flex items-center rounded-lg text-sm transition-colors duration-150 ${
+      isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5 w-full'
+    } ${
       active
         ? 'bg-white/10 font-medium text-v-sidebar-active'
         : 'text-v-sidebar-text hover:bg-white/5 hover:text-white'
     }`
 
   return (
-    <nav className="space-y-0.5">
+    <nav className={`space-y-0.5 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
       {items.map((item) => {
         const Icon = item.icon ?? null
 
@@ -27,12 +29,19 @@ function NavLinks({ items, eventId, location, onNavigate }) {
           return (
             <span
               key={item.label}
-              className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-600"
-              title="Select an event first"
+              className={`group relative flex cursor-not-allowed items-center rounded-lg text-sm text-gray-600 transition-colors duration-150 ${
+                isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5 w-full'
+              }`}
+              title={isCollapsed ? undefined : 'Select an event first'}
               aria-disabled="true"
             >
-              {Icon && <Icon className="h-4 w-4 shrink-0 opacity-40" strokeWidth={1.5} aria-hidden />}
-              {item.label}
+              {Icon && <Icon className={`shrink-0 opacity-40 ${isCollapsed ? 'h-5 w-5' : 'h-4 w-4'}`} strokeWidth={1.5} aria-hidden />}
+              {!isCollapsed && <span className="truncate">{item.label}</span>}
+              {isCollapsed && (
+                <div className="absolute left-full ml-4 rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none z-[100] whitespace-nowrap shadow-lg">
+                  {item.label} (Select event first)
+                </div>
+              )}
             </span>
           )
         }
@@ -48,9 +57,14 @@ function NavLinks({ items, eventId, location, onNavigate }) {
             : location.pathname === item.path
 
         return (
-          <Link key={item.label} to={href} onClick={onNavigate} className={linkClass(active)}>
-            {Icon && <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} aria-hidden />}
-            {item.label}
+          <Link key={item.label} to={href} onClick={onNavigate} className={linkClass(active)} aria-current={active ? 'page' : undefined}>
+            {Icon && <Icon className={`shrink-0 ${isCollapsed ? 'h-5 w-5' : 'h-4 w-4'}`} strokeWidth={1.5} aria-hidden />}
+            {!isCollapsed && <span className="truncate">{item.label}</span>}
+            {isCollapsed && (
+              <div className="absolute left-full ml-4 rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none z-[100] whitespace-nowrap shadow-lg">
+                {item.label}
+              </div>
+            )}
           </Link>
         )
       })}
@@ -66,35 +80,79 @@ function SidebarContent({
   location,
   footerLink,
   onNavigate,
+  isCollapsed,
+  onToggleCollapse,
 }) {
   return (
-    <>
-      <VotrixLogo size="md" linkTo={homeLink} className="text-white" />
-      {moduleLabel && (
-        <p className="mt-3 text-[11px] font-medium uppercase tracking-wider text-gray-500">
-          {moduleLabel}
-        </p>
-      )}
-      {navItems?.length > 0 && (
-        <div className="mt-8">
-          <NavLinks
-            items={navItems}
-            eventId={eventId}
-            location={location}
-            onNavigate={onNavigate}
-          />
+    <div className="flex h-full flex-col">
+      {/* Top Section */}
+      <div className="flex-1">
+        <div className={`flex items-center ${isCollapsed ? 'h-[32px]' : ''}`}>
+          {!isCollapsed && <VotrixLogo size="md" linkTo={homeLink} className="text-white" />}
         </div>
-      )}
-      {footerLink && (
-        <Link
-          to={footerLink.to}
-          onClick={onNavigate}
-          className="mt-8 block text-xs text-gray-500 transition hover:text-gray-300"
-        >
-          {footerLink.label}
-        </Link>
-      )}
-    </>
+        {!isCollapsed && moduleLabel && (
+          <p className="mt-3 text-[11px] font-medium uppercase tracking-wider text-gray-500">
+            {moduleLabel}
+          </p>
+        )}
+        {navItems?.length > 0 && (
+          <div className="mt-8">
+            <NavLinks
+              items={navItems}
+              eventId={eventId}
+              location={location}
+              onNavigate={onNavigate}
+              isCollapsed={isCollapsed}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Section */}
+      <div className={`mt-auto pt-6 flex ${isCollapsed ? 'flex-col items-center space-y-4' : 'flex-col space-y-4'}`}>
+        {footerLink && (
+          <Link
+            to={footerLink.to}
+            onClick={onNavigate}
+            className={`group relative block text-xs text-gray-500 transition hover:text-gray-300 ${isCollapsed ? 'flex justify-center p-2.5 w-full' : ''}`}
+          >
+            {isCollapsed ? (
+              <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+            ) : (
+              footerLink.label
+            )}
+            {isCollapsed && (
+              <div className="absolute left-full ml-4 rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none z-[100] whitespace-nowrap shadow-lg">
+                {footerLink.label.replace('←', '').trim()}
+              </div>
+            )}
+          </Link>
+        )}
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className={`hidden lg:flex items-center rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors duration-150 ${isCollapsed ? 'p-2.5 justify-center w-full' : 'p-2.5 gap-3 w-full'}`}
+            aria-expanded={!isCollapsed}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
+            ) : (
+              <>
+                <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+                <span className="text-sm font-medium">Collapse</span>
+              </>
+            )}
+            {isCollapsed && (
+              <div className="absolute left-full ml-11 rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity duration-200 hover:opacity-100 pointer-events-none z-[100] whitespace-nowrap shadow-lg">
+                Expand
+              </div>
+            )}
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -111,6 +169,10 @@ export default function AppShell({
   children,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    const stored = localStorage.getItem('votrix.sidebar.collapsed')
+    return stored === 'true'
+  })
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const location = useLocation()
@@ -129,8 +191,33 @@ export default function AppShell({
     navigate('/')
   }
 
+  const toggleCollapse = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev
+      localStorage.setItem('votrix.sidebar.collapsed', String(next))
+      return next
+    })
+  }
+
   const displayName = user?.username ?? user?.email ?? 'User'
   const initials = displayName.slice(0, 2).toUpperCase()
+
+  // Prevent background scroll and handle ESC key when mobile drawer is open
+  useEffect(() => {
+    if (!mobileOpen) return undefined
+
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') setMobileOpen(false)
+    }
+
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.body.style.overflow = 'unset'
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [mobileOpen])
 
   useEffect(() => {
     if (!user) return undefined
@@ -167,7 +254,7 @@ export default function AppShell({
     setUnreadCount((c) => c + 1)
   })
 
-  const sidebar = (
+  const sidebar = (isDesktop) => (
     <SidebarContent
       homeLink={homeLink}
       moduleLabel={moduleLabel}
@@ -176,29 +263,34 @@ export default function AppShell({
       location={location}
       footerLink={footerLink}
       onNavigate={closeMobile}
+      isCollapsed={isDesktop ? isCollapsed : false}
+      onToggleCollapse={isDesktop ? toggleCollapse : undefined}
     />
   )
 
   return (
     <div className="flex min-h-screen bg-v-bg">
       {showSidebar && (
-        <aside className="hidden w-64 shrink-0 bg-v-sidebar p-6 md:block">
-          <div className="h-full flex flex-col">
-            {sidebar}
-          </div>
+        <aside
+          className={`hidden shrink-0 bg-v-sidebar lg:block transition-[width,padding] duration-200 ease-in-out ${
+            isCollapsed ? 'w-[72px] px-3 py-6' : 'w-64 p-6'
+          }`}
+        >
+          {sidebar(true)}
         </aside>
       )}
 
+      {/* Off-canvas sidebar for Tablet/Mobile */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
           <button
             type="button"
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-sm cursor-default"
             aria-label="Close menu"
             onClick={closeMobile}
           />
-          <aside className="relative flex h-full w-[min(100%,280px)] flex-col bg-v-sidebar p-6 shadow-xl">
-            {sidebar}
+          <aside className="relative flex h-full w-[min(100%,280px)] flex-col bg-v-sidebar p-6 shadow-xl animate-in slide-in-from-left duration-200 ease-out">
+            {sidebar(false)}
           </aside>
         </div>
       )}
@@ -208,9 +300,10 @@ export default function AppShell({
           {showSidebar && (
             <button
               type="button"
-              className="rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated md:hidden"
+              className="rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Open menu"
+              aria-expanded={mobileOpen}
             >
               <Menu className="h-5 w-5" strokeWidth={1.5} />
             </button>
