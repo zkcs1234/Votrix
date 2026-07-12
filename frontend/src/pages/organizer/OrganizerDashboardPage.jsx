@@ -148,7 +148,7 @@ export default function OrganizerDashboardPage() {
               Manage events, positions, candidates, and voters.
             </p>
 
-            <Link to="/organizer/election" className="v-module-card__btn v-press">
+            <Link to="/organizer/election" className="v-btn-primary w-full mt-4 v-press">
               <span>Manage Election</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -172,7 +172,7 @@ export default function OrganizerDashboardPage() {
               Contestants, criteria, judge scoring, and rankings.
             </p>
 
-            <Link to="/organizer/competition" className="v-module-card__btn v-press">
+            <Link to="/organizer/competition" className="v-btn-primary w-full mt-4 v-press">
               <span>Manage Competition</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -196,7 +196,7 @@ export default function OrganizerDashboardPage() {
               Build surveys, configure settings, and view analytics.
             </p>
 
-            <Link to="/organizer/polling" className="v-module-card__btn v-press">
+            <Link to="/organizer/polling" className="v-btn-primary w-full mt-4 v-press">
               <span>Create Poll</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
