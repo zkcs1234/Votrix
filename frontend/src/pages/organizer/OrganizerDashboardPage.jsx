@@ -137,7 +137,7 @@ export default function OrganizerDashboardPage() {
             <img
               src={ElectionSVG}
               alt="Election"
-              className="h-full w-full object-contain p-4"
+              className="h-full w-full object-cover"
             />
           </div>
 
@@ -165,7 +165,7 @@ export default function OrganizerDashboardPage() {
             <img
               src={CompetitionSVG}
               alt="Competition"
-              className="h-full w-full object-contain p-4"
+              className="h-full w-full object-cover"
             />
           </div>
 
@@ -193,7 +193,7 @@ export default function OrganizerDashboardPage() {
             <img
               src={PollingSVG}
               alt="Polling"
-              className="h-full w-full object-contain p-4"
+              className="h-full w-full object-cover"
             />
           </div>
 
