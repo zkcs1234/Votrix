@@ -8,6 +8,7 @@ import VotrixLogo from '@/components/brand/VotrixLogo'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import Button from '@/components/ui/Button'
 import NotificationsModal from '@/components/ui/NotificationsModal'
+import GlobalSearch from '@/components/ui/GlobalSearch'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
@@ -328,6 +329,7 @@ export default function AppShell({
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
+            <GlobalSearch />
             <div className="relative flex">
               <button
                 type="button"
