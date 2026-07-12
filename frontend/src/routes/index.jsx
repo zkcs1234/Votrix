@@ -241,7 +241,7 @@ export const routeConfig = [
     path: '/voter/events/:eventId',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
-        <DashboardLayout title="Vote" showSidebar={false} showBackButton={true} backButtonPath="/voter" />
+        <DashboardLayout title="Vote" showSidebar={false} />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <VoterEventPage /> }],
@@ -250,7 +250,7 @@ export const routeConfig = [
     path: '/voter/polling/events/:eventId',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
-        <DashboardLayout title="Poll" showSidebar={false} showBackButton={true} backButtonPath="/voter" />
+        <DashboardLayout title="Poll" showSidebar={false} />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <VoterPollPage /> }],
@@ -259,7 +259,7 @@ export const routeConfig = [
     path: '/voter/competition/events/:eventId/score',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
-        <DashboardLayout title="Judge scoring" showSidebar={false} showBackButton={true} backButtonPath="/voter" />
+        <DashboardLayout title="Judge scoring" showSidebar={false} />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <JudgeScoringPage /> }],
