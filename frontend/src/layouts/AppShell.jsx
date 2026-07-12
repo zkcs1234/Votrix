@@ -205,14 +205,16 @@ export default function AppShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow sm:px-6 sm:py-4">
-          <button
-            type="button"
-            className="rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated md:hidden"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" strokeWidth={1.5} />
-          </button>
+          {showSidebar && (
+            <button
+              type="button"
+              className="rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated md:hidden"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" strokeWidth={1.5} />
+            </button>
+          )}
 
           <div className="min-w-0 flex-1">
             {showBackButton && (

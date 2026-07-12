@@ -176,7 +176,7 @@ function RatingInput({ min, max, step, value, onChange, disabled, required }) {
 
 function LikertInput({ options, value, onChange, disabled, required }) {
   return (
-    <div className="mt-4 grid gap-2" style={{ gridTemplateColumns: `repeat(${options?.length ?? 5}, minmax(0, 1fr))` }}>
+    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
       {options?.map((o) => (
         <button
           key={o.id}
