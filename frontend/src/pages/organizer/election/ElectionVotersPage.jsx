@@ -262,7 +262,7 @@ export default function ElectionVotersPage() {
               minLength={8}
               required
             />
-            <Button type="submit" loading={inviting}>
+            <Button type="submit" loading={inviting} className="w-[160px]">
               Invite New
             </Button>
           </form>
@@ -276,7 +276,7 @@ export default function ElectionVotersPage() {
               onChange={(e) => setRegisteredEmail(e.target.value)}
               required
             />
-            <Button type="submit" variant="secondary" loading={invitingRegistered}>
+            <Button type="submit" variant="secondary" loading={invitingRegistered} className="w-[160px]">
               Invite Registered
             </Button>
           </form>

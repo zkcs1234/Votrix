@@ -103,7 +103,7 @@ export default function PollingRespondentsPage() {
               minLength={8}
               className="v-input flex-1 min-w-[200px]"
             />
-            <Button type="submit">
+            <Button type="submit" className="w-[160px]">
               Invite New
             </Button>
           </form>
@@ -117,7 +117,7 @@ export default function PollingRespondentsPage() {
               onChange={(e) => setRegisteredEmail(e.target.value)}
               className="v-input flex-1 min-w-[200px]"
             />
-            <Button type="submit" variant="secondary" loading={invitingRegistered}>
+            <Button type="submit" variant="secondary" loading={invitingRegistered} className="w-[160px]">
               Invite Registered
             </Button>
           </form>

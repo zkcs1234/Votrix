@@ -188,6 +188,7 @@ export default function NotificationsModal({ onClose }) {
                 placeholder="Search..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                className="w-full"
               />
 
               <div className="flex flex-wrap gap-1">

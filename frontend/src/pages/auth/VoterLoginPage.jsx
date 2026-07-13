@@ -27,6 +27,7 @@ export default function VoterLoginPage() {
       register={register}
       errors={errors}
       showForgot
+      showHomeLink={false}
     />
   )
 }

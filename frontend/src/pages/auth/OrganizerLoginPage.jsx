@@ -27,6 +27,7 @@ export default function OrganizerLoginPage() {
       register={register}
       errors={errors}
       showForgot
+      showHomeLink={false}
     />
   )
 }

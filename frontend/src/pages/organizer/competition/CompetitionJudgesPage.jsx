@@ -91,7 +91,7 @@ export default function CompetitionJudgesPage() {
               minLength={8}
               required
             />
-            <Button type="submit">
+            <Button type="submit" className="w-[160px]">
               Invite Judge
             </Button>
           </form>

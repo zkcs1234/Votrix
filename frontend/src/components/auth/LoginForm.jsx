@@ -16,6 +16,7 @@ export default function LoginForm({
   errors,
   usernameField = false,
   showForgot = false,
+  showHomeLink = true,
 }) {
   return (
     <div className="w-full max-w-md">
@@ -76,12 +77,14 @@ export default function LoginForm({
         </form>
       </Card>
 
-      <p className="mt-6 text-center text-sm">
-        <Link to="/" className="v-btn-tertiary inline-flex items-center gap-1.5">
-          <Home className="h-3.5 w-3.5" strokeWidth={2} />
-          Back to home
-        </Link>
-      </p>
+      {showHomeLink && (
+        <p className="mt-6 text-center text-sm">
+          <Link to="/" className="v-btn-tertiary inline-flex items-center gap-1.5">
+            <Home className="h-3.5 w-3.5" strokeWidth={2} />
+            Back to home
+          </Link>
+        </p>
+      )}
     </div>
   )
 }

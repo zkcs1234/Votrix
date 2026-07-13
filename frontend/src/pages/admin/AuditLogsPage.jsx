@@ -55,6 +55,35 @@ function formatDate(iso) {
   }
 }
 
+// ─── Utility: format summary ────────────────────────────────────────────────
+
+function formatDetailsSummary(log) {
+  if (!log) return '—'
+  const action = log.action || ''
+  const role = log.actor?.role || 'system'
+  const formattedRole = role.charAt(0).toUpperCase() + role.slice(1)
+
+  if (action.includes('LOGIN_SUCCESS')) return `${formattedRole} logged in successfully`
+  if (action.includes('LOGIN_FAILED')) return `${formattedRole} failed to log in`
+  if (action.includes('LOGOUT')) return `${formattedRole} logged out`
+  
+  const name = log.details?.title || log.details?.name || log.details?.email || log.entityId || ''
+  
+  if (action.includes('CREATE') || action.includes('INSERT')) {
+    return `Created ${log.entity || 'record'}${name ? `: ${name}` : ''}`
+  }
+  if (action.includes('UPDATE') || action.includes('PATCH') || action.includes('CHANGE')) {
+    return `Updated ${log.entity || 'record'}${name ? `: ${name}` : ''}`
+  }
+  if (action.includes('DELETE') || action.includes('REMOVE')) {
+    return `Deleted ${log.entity || 'record'}${name ? `: ${name}` : ''}`
+  }
+
+  if (log.details?.message) return log.details.message
+
+  return 'Action completed'
+}
+
 // ─── Skeleton rows ────────────────────────────────────────────────────────────
 
 function TableSkeleton({ rows = 8 }) {
@@ -121,10 +150,19 @@ function AuditDetailModal({ log, onClose }) {
     },
     {
       title: 'Details',
-      content: log.details ? (
-        <pre className="overflow-auto rounded-lg bg-v-surface-elevated p-3 text-xs text-v-text-muted leading-relaxed max-h-64">
-          {JSON.stringify(log.details, null, 2)}
-        </pre>
+      content: log.details && Object.keys(log.details).length > 0 ? (
+        <div className="space-y-2 rounded-lg bg-v-surface-elevated p-4 text-sm text-v-text">
+          {Object.entries(log.details).map(([key, value]) => (
+            <div key={key} className="flex flex-col sm:flex-row sm:gap-4 border-b border-v-border/50 pb-2 last:border-0 last:pb-0">
+              <span className="w-1/3 shrink-0 font-medium text-v-text-subtle capitalize">
+                {key.replace(/([A-Z])/g, ' $1').trim()}
+              </span>
+              <span className="min-w-0 break-all text-v-text">
+                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+              </span>
+            </div>
+          ))}
+        </div>
       ) : (
         <p className="text-sm text-v-text-subtle italic">No additional details recorded.</p>
       ),
@@ -574,9 +612,9 @@ export default function AuditLogsPage() {
                         </td>
 
                         {/* Details preview */}
-                        <td className="max-w-[240px] truncate text-xs text-v-text-muted">
+                        <td className="max-w-[240px] truncate text-xs text-v-text-muted" title={log.details ? formatDetailsSummary(log) : undefined}>
                           {log.details
-                            ? JSON.stringify(log.details)
+                            ? formatDetailsSummary(log)
                             : <span className="italic">—</span>
                           }
                         </td>
