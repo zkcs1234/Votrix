@@ -165,6 +165,7 @@ export default function AppShell({
   eventId,
   footerLink,
   showSidebar = true,
+  showSearch = true,
   showBackButton = false,
   backButtonPath = '/voter',
   children,
@@ -329,7 +330,7 @@ export default function AppShell({
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
-            <GlobalSearch />
+            {showSearch && <GlobalSearch />}
             <div className="relative flex">
               <button
                 type="button"

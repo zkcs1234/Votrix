@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
+import Button from '@/components/ui/Button'
 
 export default function PollingRespondentsPage() {
   const { eventId } = useParams()
@@ -64,59 +65,64 @@ export default function PollingRespondentsPage() {
         Invite people by email or CSV. They receive credentials to respond to this poll.
       </p>
 
-      <div className="v-card p-6">
-        <h3 className="text-sm font-medium text-v-text-muted">CSV upload</h3>
-        <p className="mt-1 text-xs text-v-text-subtle">
-          Columns: email (required), tempassword (optional).
-          <br />
-          If tempassword provided: Creates new respondent with that password.
-          <br />
-          If tempassword empty: Enrolls existing respondent only.
-        </p>
-        <input type="file" accept=".csv" className="mt-3 text-sm text-v-text-subtle" onChange={handleCsv} />
-        {importResult && (
-          <p className="mt-2 text-sm text-v-success">
-            Imported {importResult.succeeded} of {importResult.total} â€” invitation emails sent.
+      <div className="grid gap-6">
+        <div className="v-card-sm">
+          <h3 className="v-label">CSV upload</h3>
+          <p className="v-helper-text mb-3">
+            Columns: email (required), tempassword (optional).
+            <br />
+            If tempassword provided: Creates new respondent with that password.
+            <br />
+            If tempassword empty: Enrolls existing respondent only.
           </p>
-        )}
+          <input type="file" accept=".csv" className="v-caption" onChange={handleCsv} />
+          {importResult && (
+            <p className="v-caption mt-2 text-v-success">
+              Imported {importResult.succeeded} of {importResult.total} — invitation emails sent.
+            </p>
+          )}
+        </div>
+
+        <div className="v-card-sm">
+          <h3 className="v-label mb-3">Invite Manually</h3>
+          <form onSubmit={handleInvite} className="flex flex-wrap gap-3 mb-4">
+            <input
+              type="email"
+              required
+              placeholder="New respondent (email)"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="v-input flex-1 min-w-[200px]"
+            />
+            <input
+              type="password"
+              required
+              placeholder="Temp Password (min 8 chars)"
+              value={temporaryPassword}
+              onChange={(e) => setTemporaryPassword(e.target.value)}
+              minLength={8}
+              className="v-input flex-1 min-w-[200px]"
+            />
+            <Button type="submit">
+              Invite New
+            </Button>
+          </form>
+
+          <form onSubmit={handleInviteRegistered} className="flex flex-wrap gap-3 pt-4 border-t border-v-border">
+            <input
+              type="email"
+              required
+              placeholder="Registered respondent (email)"
+              value={registeredEmail}
+              onChange={(e) => setRegisteredEmail(e.target.value)}
+              className="v-input flex-1 min-w-[200px]"
+            />
+            <Button type="submit" variant="secondary" loading={invitingRegistered}>
+              Invite Registered
+            </Button>
+          </form>
+        </div>
       </div>
-
-      <form onSubmit={handleInvite} className="flex flex-wrap gap-2">
-        <input
-          type="email"
-          required
-          placeholder="respondent@email.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="flex-1 min-w-[200px] rounded-lg border border-v-border-strong bg-v-surface-elevated px-3 py-2 text-white"
-        />
-        <input
-          type="password"
-          required
-          placeholder="Temp Password (min 8 chars)"
-          value={temporaryPassword}
-          onChange={(e) => setTemporaryPassword(e.target.value)}
-          minLength={8}
-          className="flex-1 min-w-[200px] rounded-lg border border-v-border-strong bg-v-surface-elevated px-3 py-2 text-white"
-        />
-        <button type="submit" className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white">
-          Invite New
-        </button>
-      </form>
-
-      <form onSubmit={handleInviteRegistered} className="flex flex-wrap gap-2">
-        <input
-          type="email"
-          required
-          placeholder="respondent@email.com"
-          value={registeredEmail}
-          onChange={(e) => setRegisteredEmail(e.target.value)}
-          className="flex-1 min-w-[200px] rounded-lg border border-v-border-strong bg-v-surface-elevated px-3 py-2 text-white"
-        />
-        <button type="submit" disabled={invitingRegistered} className="rounded-lg bg-v-secondary px-4 py-2 text-sm text-white">
-          Invite Registered
-        </button>
-      </form>
 
       {success && <p className="text-sm text-v-success">{success}</p>}
       {error && <p className="text-sm text-v-danger">{error}</p>}

@@ -205,78 +205,83 @@ export default function ElectionVotersPage() {
     <div className="space-y-6">
       <h2 className="v-page-title">Voters</h2>
 
-      <div className="v-card-sm">
-        <h3 className="v-label">CSV upload</h3>
-        <p className="v-helper-text mb-3">
-          Columns: email (required), tempassword (optional).
-          <br />
-          If tempassword provided: Creates new voter with that password.
-          <br />
-          If tempassword empty: Enrolls existing voter only.
-        </p>
-        <input
-          type="file"
-          accept=".csv"
-          className="v-caption"
-          onChange={handleCsv}
-          disabled={importProgress !== null}
-        />
-
-        {/* Progress bar during import */}
-        {importProgress && (
-          <div className="mt-3">
-            <ProgressBarWithStats
-              value={importProgress.processed}
-              max={importProgress.total}
-              succeeded={importProgress.succeeded}
-              failed={importProgress.failed}
-            />
-          </div>
-        )}
-
-        {importResult && (
-          <p className="v-caption mt-2 text-v-success">
-            Imported {importResult.succeeded} of {importResult.total} — invitation emails sent.
+      <div className="grid gap-6">
+        <div className="v-card-sm">
+          <h3 className="v-label">CSV upload</h3>
+          <p className="v-helper-text mb-3">
+            Columns: email (required), tempassword (optional).
+            <br />
+            If tempassword provided: Creates new voter with that password.
+            <br />
+            If tempassword empty: Enrolls existing voter only.
           </p>
-        )}
+          <input
+            type="file"
+            accept=".csv"
+            className="v-caption"
+            onChange={handleCsv}
+            disabled={importProgress !== null}
+          />
+
+          {/* Progress bar during import */}
+          {importProgress && (
+            <div className="mt-3">
+              <ProgressBarWithStats
+                value={importProgress.processed}
+                max={importProgress.total}
+                succeeded={importProgress.succeeded}
+                failed={importProgress.failed}
+              />
+            </div>
+          )}
+
+          {importResult && (
+            <p className="v-caption mt-2 text-v-success">
+              Imported {importResult.succeeded} of {importResult.total} — invitation emails sent.
+            </p>
+          )}
+        </div>
+
+        <div className="v-card-sm">
+          <h3 className="v-label mb-3">Invite Manually</h3>
+          <form onSubmit={handleInvite} className="flex flex-wrap gap-3 mb-4">
+            <input
+              type="email"
+              placeholder="New voter (email)"
+              className="v-input flex-1 min-w-[200px]"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <input
+              type="password"
+              placeholder="Temp Password (min 8 chars)"
+              className="v-input flex-1 min-w-[200px]"
+              value={temporaryPassword}
+              onChange={(e) => setTemporaryPassword(e.target.value)}
+              minLength={8}
+              required
+            />
+            <Button type="submit" loading={inviting}>
+              Invite New
+            </Button>
+          </form>
+
+          <form onSubmit={handleInviteRegistered} className="flex flex-wrap gap-3 pt-4 border-t border-v-border">
+            <input
+              type="email"
+              placeholder="Registered voter (email)"
+              className="v-input flex-1 min-w-[200px]"
+              value={registeredEmail}
+              onChange={(e) => setRegisteredEmail(e.target.value)}
+              required
+            />
+            <Button type="submit" variant="secondary" loading={invitingRegistered}>
+              Invite Registered
+            </Button>
+          </form>
+        </div>
       </div>
-
-      <form onSubmit={handleInvite} className="flex flex-wrap gap-3">
-        <input
-          type="email"
-          placeholder="voter@email.com"
-          className="v-input flex-1 min-w-[200px]"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Temp Password (min 8 chars)"
-          className="v-input flex-1 min-w-[200px]"
-          value={temporaryPassword}
-          onChange={(e) => setTemporaryPassword(e.target.value)}
-          minLength={8}
-          required
-        />
-        <Button type="submit" loading={inviting}>
-          Invite New
-        </Button>
-      </form>
-
-      <form onSubmit={handleInviteRegistered} className="flex flex-wrap gap-3">
-        <input
-          type="email"
-          placeholder="voter@email.com"
-          className="v-input flex-1 min-w-[200px]"
-          value={registeredEmail}
-          onChange={(e) => setRegisteredEmail(e.target.value)}
-          required
-        />
-        <Button type="submit" loading={invitingRegistered}>
-          Invite Registered
-        </Button>
-      </form>
 
       {error && <p className="v-error-text">{error}</p>}
 

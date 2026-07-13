@@ -60,6 +60,7 @@ export default function DashboardLayout({
       homeLink={home}
       navItems={navItems}
       showSidebar={showSidebar}
+      showSearch={role !== USER_ROLES.VOTER}
       showBackButton={showBackButton}
       backButtonPath={backButtonPath}
     />
