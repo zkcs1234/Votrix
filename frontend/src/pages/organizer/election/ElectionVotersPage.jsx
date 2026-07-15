@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
-import { ProgressBarWithStats } from '@/components/ui/Skeleton'
 import SearchInput from '@/components/ui/SearchInput'
 import Button from '@/components/ui/Button'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -95,27 +94,24 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-v-surface rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto">
-        <h3 className="v-page-title mb-4">Preview CSV Import</h3>
-        <p className="v-helper-text mb-4">
-          Review the data below before registering voters. No emails will be sent until you click "Register Voters".
-        </p>
+        <h3 className="v-page-title mb-4">Review & Register</h3>
 
         {data.errors && data.errors.length > 0 && (
           <div className="mb-4 p-3 bg-v-danger/10 border border-v-danger/30 rounded-lg">
-            <p className="v-error-text font-semibold mb-2">Errors ({data.errors.length})</p>
+            <p className="v-error-text font-semibold mb-2">{data.errors.length} error(s)</p>
             <ul className="v-error-text text-sm list-disc list-inside">
               {data.errors.slice(0, 5).map((err, i) => (
                 <li key={i}>{err}</li>
               ))}
               {data.errors.length > 5 && (
-                <li>...and {data.errors.length - 5} more errors</li>
+                <li>...and {data.errors.length - 5} more</li>
               )}
             </ul>
           </div>
         )}
 
         <div className="mb-4">
-          <p className="v-label">Valid rows: {data.valid} of {data.total}</p>
+          <p className="v-label">{data.valid} of {data.total} valid</p>
         </div>
 
         <div className="v-table-wrap max-h-64 overflow-auto mb-4">
@@ -124,7 +120,6 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
               <tr>
                 <th>Row</th>
                 <th>Email</th>
-                <th>Type</th>
               </tr>
             </thead>
             <tbody>
@@ -132,11 +127,6 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
                 <tr key={i}>
                   <td>{row.rowNumber}</td>
                   <td>{row.email}</td>
-                  <td>
-                    <span className={row.type === 'new' ? 'v-badge v-badge-success' : 'v-badge'}>
-                      {row.type === 'new' ? 'New Voter' : 'Existing'}
-                    </span>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -148,7 +138,7 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
             Cancel
           </Button>
           <Button onClick={onRegister} loading={registering}>
-            Register Voters ({data.valid})
+            Register ({data.valid})
           </Button>
         </div>
       </div>
@@ -161,18 +151,13 @@ export default function ElectionVotersPage() {
   const [voters, setVoters] = useState([])
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
-  const [temporaryPassword, setTemporaryPassword] = useState('')
-  const [registeredEmail, setRegisteredEmail] = useState('')
   const [importResult, setImportResult] = useState(null)
   const [csvPreview, setCsvPreview] = useState(null)
-  const [previewFile, setPreviewFile] = useState(null)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [registering, setRegistering] = useState(false)
-  const [registeringRegistered, setRegisteringRegistered] = useState(false)
   const [sendingAll, setSendingAll] = useState(false)
   const [sendingId, setSendingId] = useState(null)
-  const [importProgress, setImportProgress] = useState(null)
 
   const { success, error: showError } = useToast()
 
@@ -198,42 +183,22 @@ export default function ElectionVotersPage() {
   // Count pending invitations
   const pendingCount = voters.filter(v => !v.invitationSent).length
 
-  // Register new voter (no email)
+  // Register new voter (auto-generates password if new)
   const handleRegister = async (e) => {
     e.preventDefault()
     setError(null)
     setRegistering(true)
 
     try {
-      await electionService.registerVoter(eventId, { email, temporaryPassword })
+      await electionService.registerVoter(eventId, { email })
       setEmail('')
-      setTemporaryPassword('')
       load()
-      success('Voter registered successfully. Send invitation later from the voter list.')
+      success('Voter registered. Send invitation when ready.')
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed')
       showError(err.response?.data?.message || 'Registration failed')
     } finally {
       setRegistering(false)
-    }
-  }
-
-  // Register existing voter (no email)
-  const handleRegisterExisting = async (e) => {
-    e.preventDefault()
-    setError(null)
-    setRegisteringRegistered(true)
-
-    try {
-      await electionService.registerExistingVoter(eventId, registeredEmail)
-      setRegisteredEmail('')
-      load()
-      success('Voter registered successfully. Send invitation later from the voter list.')
-    } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed')
-      showError(err.response?.data?.message || 'Registration failed')
-    } finally {
-      setRegisteringRegistered(false)
     }
   }
 
@@ -355,30 +320,14 @@ export default function ElectionVotersPage() {
         <div className="v-card-sm">
           <h3 className="v-label">CSV Upload</h3>
           <p className="v-helper-text mb-3">
-            Columns: email (required), tempassword (optional).
-            <br />
-            If tempassword provided: Creates new voter with that password.
-            <br />
-            If tempassword empty: Enrolls existing voter only.
+            Upload a CSV with email column. Passwords are auto-generated.
           </p>
           <input
             type="file"
             accept=".csv"
             className="v-caption"
             onChange={handleCsvPreview}
-            disabled={importProgress !== null}
           />
-
-          {importProgress && (
-            <div className="mt-3">
-              <ProgressBarWithStats
-                value={importProgress.processed}
-                max={importProgress.total}
-                succeeded={importProgress.succeeded}
-                failed={importProgress.failed}
-              />
-            </div>
-          )}
 
           {importResult && (
             <p className="v-caption mt-2 text-v-success">
@@ -389,40 +338,17 @@ export default function ElectionVotersPage() {
 
         <div className="v-card-sm">
           <h3 className="v-label mb-3">Register Manually</h3>
-          <form onSubmit={handleRegister} className="flex flex-wrap gap-3 mb-4">
+          <form onSubmit={handleRegister} className="flex flex-wrap gap-3">
             <input
               type="email"
-              placeholder="New voter (email)"
+              placeholder="Voter email"
               className="v-input flex-1 min-w-[200px]"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <input
-              type="password"
-              placeholder="Temp Password (min 8 chars)"
-              className="v-input flex-1 min-w-[200px]"
-              value={temporaryPassword}
-              onChange={(e) => setTemporaryPassword(e.target.value)}
-              minLength={8}
-              required
-            />
             <Button type="submit" loading={registering} className="w-[160px]">
-              Register Voter
-            </Button>
-          </form>
-
-          <form onSubmit={handleRegisterExisting} className="flex flex-wrap gap-3 pt-4 border-t border-v-border">
-            <input
-              type="email"
-              placeholder="Registered voter (email)"
-              className="v-input flex-1 min-w-[200px]"
-              value={registeredEmail}
-              onChange={(e) => setRegisteredEmail(e.target.value)}
-              required
-            />
-            <Button type="submit" variant="secondary" loading={registeringRegistered} className="w-[160px]">
-              Register to Event
+              Register
             </Button>
           </form>
         </div>

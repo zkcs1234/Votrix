@@ -237,9 +237,10 @@ export const registerImportJudgesCsv = asyncHandler(async (req, res) => {
 
   for (const row of data) {
     try {
+      // CSV import: always reset password for existing judges
       await pageantService.registerJudge(req.params.eventId, req.user.id, {
         email: row.email,
-        temporaryPassword: row.temporaryPassword,
+        resetPasswordForExisting: true,
       })
       results.push({ email: row.email, success: true })
       succeeded++

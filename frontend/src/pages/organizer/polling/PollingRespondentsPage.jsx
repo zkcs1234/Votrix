@@ -45,22 +45,19 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-v-surface rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto">
-        <h3 className="v-page-title mb-4">Preview CSV Import</h3>
-        <p className="v-helper-text mb-4">
-          Review the data below before registering respondents. No emails will be sent until you click "Register Respondents".
-        </p>
+        <h3 className="v-page-title mb-4">Review & Register</h3>
 
         {data.errors?.length > 0 && (
           <div className="mb-4 p-3 bg-v-danger/10 border border-v-danger/30 rounded-lg">
-            <p className="v-error-text font-semibold mb-2">Errors ({data.errors.length})</p>
+            <p className="v-error-text font-semibold mb-2">{data.errors.length} error(s)</p>
             <ul className="v-error-text text-sm list-disc list-inside">
               {data.errors.slice(0, 5).map((err, i) => <li key={i}>{err}</li>)}
-              {data.errors.length > 5 && <li>...and {data.errors.length - 5} more errors</li>}
+              {data.errors.length > 5 && <li>...and {data.errors.length - 5} more</li>}
             </ul>
           </div>
         )}
 
-        <p className="v-label mb-4">Valid rows: {data.valid} of {data.total}</p>
+        <p className="v-label mb-4">{data.valid} of {data.total} valid</p>
 
         <div className="v-table-wrap max-h-64 overflow-auto mb-4">
           <table className="v-table">
@@ -68,7 +65,6 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
               <tr>
                 <th>Row</th>
                 <th>Email</th>
-                <th>Type</th>
               </tr>
             </thead>
             <tbody>
@@ -76,11 +72,6 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
                 <tr key={i}>
                   <td>{row.rowNumber}</td>
                   <td>{row.email}</td>
-                  <td>
-                    <span className={row.type === 'new' ? 'v-badge v-badge-success' : 'v-badge'}>
-                      {row.type === 'new' ? 'New Respondent' : 'Existing'}
-                    </span>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -90,7 +81,7 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
         <div className="flex gap-3 justify-end">
           <Button variant="secondary" onClick={onClose} disabled={registering}>Cancel</Button>
           <Button onClick={onRegister} loading={registering}>
-            Register Respondents ({data.valid})
+            Register ({data.valid})
           </Button>
         </div>
       </div>
@@ -103,13 +94,10 @@ export default function PollingRespondentsPage() {
   const [voters, setVoters] = useState([])
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
-  const [temporaryPassword, setTemporaryPassword] = useState('')
-  const [registeredEmail, setRegisteredEmail] = useState('')
   const [error, setError] = useState(null)
   const [importResult, setImportResult] = useState(null)
   const [csvPreview, setCsvPreview] = useState(null)
   const [registering, setRegistering] = useState(false)
-  const [registeringRegistered, setRegisteringRegistered] = useState(false)
   const [sendingAll, setSendingAll] = useState(false)
   const [sendingId, setSendingId] = useState(null)
   const [search, setSearch] = useState('')
@@ -137,35 +125,16 @@ export default function PollingRespondentsPage() {
     setError(null)
     setRegistering(true)
     try {
-      await pollingService.registerRespondent(eventId, { email, temporaryPassword })
+      await pollingService.registerRespondent(eventId, { email })
       setEmail('')
-      setTemporaryPassword('')
       load()
-      success('Respondent registered successfully. Send invitation later from the list.')
+      success('Respondent registered. Send invitation when ready.')
     } catch (err) {
       const msg = err.response?.data?.message || 'Registration failed'
       setError(msg)
       showError(msg)
     } finally {
       setRegistering(false)
-    }
-  }
-
-  const handleRegisterExisting = async (e) => {
-    e.preventDefault()
-    setError(null)
-    setRegisteringRegistered(true)
-    try {
-      await pollingService.registerExistingRespondent(eventId, registeredEmail)
-      setRegisteredEmail('')
-      load()
-      success('Respondent registered successfully. Send invitation later from the list.')
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Registration failed'
-      setError(msg)
-      showError(msg)
-    } finally {
-      setRegisteringRegistered(false)
     }
   }
 
@@ -271,56 +240,29 @@ export default function PollingRespondentsPage() {
         <div className="v-card-sm">
           <h3 className="v-label">CSV Upload</h3>
           <p className="v-helper-text mb-3">
-            Columns: email (required), tempassword (optional).
-            <br />
-            If tempassword provided: Creates new respondent with that password.
-            <br />
-            If tempassword empty: Enrolls existing respondent only.
+            Upload a CSV with email column. Passwords are auto-generated.
           </p>
           <input type="file" accept=".csv" className="v-caption" onChange={handleCsvPreview} />
           {importResult && (
             <p className="v-caption mt-2 text-v-success">
-              Registered {importResult.succeeded} of {importResult.total} respondents. Invitation emails not sent.
+              Registered {importResult.succeeded} of {importResult.total}.
             </p>
           )}
         </div>
 
         <div className="v-card-sm">
           <h3 className="v-label mb-3">Register Manually</h3>
-          <form onSubmit={handleRegister} className="flex flex-wrap gap-3 mb-4">
+          <form onSubmit={handleRegister} className="flex flex-wrap gap-3">
             <input
               type="email"
               required
-              placeholder="New respondent (email)"
+              placeholder="Respondent email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="v-input flex-1 min-w-[200px]"
             />
-            <input
-              type="password"
-              required
-              placeholder="Temp Password (min 8 chars)"
-              value={temporaryPassword}
-              onChange={(e) => setTemporaryPassword(e.target.value)}
-              minLength={8}
-              className="v-input flex-1 min-w-[200px]"
-            />
             <Button type="submit" loading={registering} className="w-[160px]">
-              Register Respondent
-            </Button>
-          </form>
-
-          <form onSubmit={handleRegisterExisting} className="flex flex-wrap gap-3 pt-4 border-t border-v-border">
-            <input
-              type="email"
-              required
-              placeholder="Registered respondent (email)"
-              value={registeredEmail}
-              onChange={(e) => setRegisteredEmail(e.target.value)}
-              className="v-input flex-1 min-w-[200px]"
-            />
-            <Button type="submit" variant="secondary" loading={registeringRegistered} className="w-[160px]">
-              Register to Event
+              Register
             </Button>
           </form>
         </div>

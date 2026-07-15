@@ -2,7 +2,7 @@ import { Readable } from 'stream'
 import csv from 'csv-parser'
 import { ApiError } from '../utils/ApiError.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
-import { inviteJudge } from './pageant.service.js'
+import { inviteJudge, registerJudge } from './pageant.service.js'
 
 function parseCsvBuffer(buffer) {
   return new Promise((resolve, reject) => {
@@ -21,17 +21,14 @@ function parseCsvBuffer(buffer) {
 
 function normalizeRow(row, index) {
   const email = (row.email || row.e_mail || '').trim().toLowerCase()
-  const tempassword = (row.tempassword || row.temporarypassword || row.temp_password || row.temporary_password || '').trim()
 
   if (!email) return { error: `Row ${index + 2}: email is required`, row: null }
 
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRe.test(email)) return { error: `Row ${index + 2}: invalid email`, row: null }
 
-  if (!tempassword) return { error: `Row ${index + 2}: tempassword is required`, row: null }
-  if (tempassword.length < 8) return { error: `Row ${index + 2}: tempassword must be at least 8 characters`, row: null }
-
-  return { row: { email, temporaryPassword: tempassword }, error: null }
+  // Email-only - password will be auto-generated
+  return { row: { email }, error: null }
 }
 
 export async function importJudgesFromCsv(eventId, organizerId, fileBuffer) {
@@ -71,14 +68,16 @@ export async function importJudgesFromCsv(eventId, organizerId, fileBuffer) {
 
   for (const row of parsed) {
     try {
-      const invite = await inviteJudge(eventId, organizerId, {
+      // Use registerJudge (no email) with resetPasswordForExisting = true
+      const result = await registerJudge(eventId, organizerId, {
         email: row.email,
-        temporaryPassword: row.temporaryPassword,
+        resetPasswordForExisting: true,
       })
       results.push({
         email: row.email,
         success: true,
-        emailSent: invite.email?.sent,
+        isNewJudge: result.isNewJudge,
+        invitationSent: false,
       })
     } catch (err) {
       results.push({ email: row.email, success: false, error: err.message })

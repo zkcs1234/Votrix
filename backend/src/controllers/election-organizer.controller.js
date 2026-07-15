@@ -182,6 +182,8 @@ export const registerVoter = asyncHandler(async (req, res) => {
     email: payload.email,
     organizerId: req.user.id,
     temporaryPassword: payload.temporaryPassword,
+    // Don't reset password for existing voters - just enroll them
+    resetPasswordForExisting: false,
   })
   res.status(201).json({ success: true, ...result })
 })

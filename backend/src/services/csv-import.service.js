@@ -24,7 +24,6 @@ function parseCsvBuffer(buffer) {
 
 function normalizeRow(row, index) {
   const email = (row.email || row.e_mail || '').trim().toLowerCase()
-  const tempassword = (row.tempassword || row.temporarypassword || row.temp_password || row.temporary_password || '').trim()
 
   if (!email) {
     return { error: `Row ${index + 2}: email is required`, row: null }
@@ -35,20 +34,9 @@ function normalizeRow(row, index) {
     return { error: `Row ${index + 2}: invalid email`, row: null }
   }
 
-  // Auto-detect: if tempassword provided → new voter, if not → registered voter
-  if (tempassword && tempassword.length > 0) {
-    if (tempassword.length < 8) {
-      return { error: `Row ${index + 2}: tempassword must be at least 8 characters`, row: null }
-    }
-    return {
-      row: { email, type: 'new', temporaryPassword: tempassword },
-      error: null,
-    }
-  }
-
-  // No tempassword → register existing voter
+  // All rows are new voters - password will be auto-generated
   return {
-    row: { email, type: 'existing' },
+    row: { email, type: 'new' },
     error: null,
   }
 }

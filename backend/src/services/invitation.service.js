@@ -273,13 +273,55 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
 /**
  * Register a voter to an event WITHOUT sending invitation email.
  * Creates account (if new), enrolls in event, creates pending invitation record.
+ *
+ * @param {Object} params
+ * @param {string} params.eventId - The event ID
+ * @param {string} params.email - The voter email
+ * @param {string} params.organizerId - The organizer ID
+ * @param {string} [params.temporaryPassword] - Optional password (auto-generated if not provided)
+ * @param {boolean} [params.resetPasswordForExisting] - If false, won't reset password for existing voters (default: true for CSV)
  */
-export async function registerVoterToEvent({ eventId, email, organizerId, temporaryPassword }) {
+export async function registerVoterToEvent({ eventId, email, organizerId, temporaryPassword, resetPasswordForExisting = true }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
 
-  const tempPassword = temporaryPassword || generateTemporaryPassword()
-  const { user, isNew } = await ensureVoterAccount(email, tempPassword)
+  // Check if voter already exists
+  const existingVoter = await findUserByEmail(email.toLowerCase().trim())
+
+  let user
+  let isNew = false
+
+  if (existingVoter) {
+    // Existing voter - decide whether to reset password
+    if (resetPasswordForExisting) {
+      // Reset password (used for CSV import)
+      const tempPassword = temporaryPassword || generateTemporaryPassword()
+      const passwordHash = await hashPassword(tempPassword)
+
+      const { data, error } = await getClient()
+        .from(DB_TABLES.USERS)
+        .update({
+          password: passwordHash,
+          must_change_password: true,
+        })
+        .eq('id', existingVoter.id)
+        .select('*')
+        .single()
+
+      if (error) throw new ApiError(500, error.message)
+      user = sanitizeUser(data)
+    } else {
+      // Just use existing user without password change
+      user = existingVoter
+    }
+  } else {
+    // New voter - create account with password
+    isNew = true
+    const tempPassword = temporaryPassword || generateTemporaryPassword()
+    const { user: newUser, isNew: newIsNew } = await ensureVoterAccount(email, tempPassword)
+    user = newUser
+    isNew = newIsNew
+  }
 
   // Enroll voter in event — required for them to access it
   const { error: evError } = await getClient().from(DB_TABLES.EVENT_VOTERS).upsert(

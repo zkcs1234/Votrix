@@ -397,12 +397,17 @@ export async function deleteCriteria(eventId, organizerId, criteriaId) {
 
 // ——— Judges (voters with is_judge) ———
 
-async function ensureJudgeAccount(email, plainPassword) {
+async function ensureJudgeAccount(email, plainPassword, resetPasswordForExisting = true) {
   const normalizedEmail = email.toLowerCase().trim()
   const existing = await findUserByEmail(normalizedEmail)
 
   if (existing && existing.role !== USER_ROLES.VOTER) {
     throw new ApiError(409, 'This email is already used by another account type')
+  }
+
+  // If user exists and we're not resetting password, just return them
+  if (existing && !resetPasswordForExisting) {
+    return { user: existing, isNew: false }
   }
 
   const passwordHash = await hashPassword(plainPassword)
@@ -468,12 +473,20 @@ export async function inviteJudge(eventId, organizerId, { email, temporaryPasswo
 
 /**
  * Register a judge WITHOUT sending invitation email.
+ * @param {string} eventId
+ * @param {string} organizerId
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} [params.temporaryPassword]
+ * @param {string} [params.firstName]
+ * @param {string} [params.lastName]
+ * @param {boolean} [params.resetPasswordForExisting] - If false, won't reset password for existing judges (default: false for manual)
  */
-export async function registerJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName }) {
+export async function registerJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName, resetPasswordForExisting = false }) {
   await assertCompetitionEvent(eventId, organizerId)
 
   const tempPassword = temporaryPassword || generateTemporaryPassword()
-  const { user, isNew } = await ensureJudgeAccount(email, tempPassword)
+  const { user, isNew } = await ensureJudgeAccount(email, tempPassword, resetPasswordForExisting)
 
   const { error: evError } = await getClient().from(DB_TABLES.EVENT_VOTERS).upsert(
     {
