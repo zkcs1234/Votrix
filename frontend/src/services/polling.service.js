@@ -74,6 +74,45 @@ export const pollingService = {
     return api.post(`${org}/events/${eventId}/respondents/import`, form)
   },
 
+  // NEW METHODS: Registration and Invitation separated
+
+  // Register respondent (no email sent)
+  registerRespondent(eventId, payload) {
+    return api.post(`${org}/events/${eventId}/respondents/register`, payload)
+  },
+
+  // Register existing respondent (no email sent)
+  registerExistingRespondent(eventId, email) {
+    return api.post(`${org}/events/${eventId}/respondents/register-existing`, { email })
+  },
+
+  // Send invitation for specific respondent
+  sendInvitation(eventId, voterId) {
+    return api.post(`${org}/events/${eventId}/respondents/${voterId}/send-invitation`)
+  },
+
+  // Send all pending invitations
+  sendAllInvitations(eventId) {
+    return api.post(`${org}/events/${eventId}/respondents/send-all`)
+  },
+
+  // Preview CSV without registering
+  previewCsv(eventId, file) {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`${org}/events/${eventId}/respondents/import-preview`, form)
+  },
+
+  // Register respondents from previewed CSV data
+  registerCsv(eventId, data) {
+    return api.post(`${org}/events/${eventId}/respondents/import-register`, { data })
+  },
+
+  // List voters/respondents for an event (uses election endpoint for polling events too)
+  listVoters(eventId) {
+    return api.get(`${org}/events/${eventId}/voters`)
+  },
+
   // Phase 7 — Question type registry (database-driven)
   listQuestionTypes() {
     return api.get(`${org}/question-types`)

@@ -33,9 +33,14 @@ router.post(
 )
 
 router.get('/events/:eventId/voters', ctrl.listVoters)
-router.post('/events/:eventId/voters/invite', emailLimiter, ctrl.inviteVoter)
-router.post('/events/:eventId/voters/invite-existing', emailLimiter, ctrl.inviteExistingVoter)
-router.post('/events/:eventId/voters/import', csvImportLimiter, uploadSingle('file'), ctrl.importCsv)
+
+// Registration and Invitation separated
+router.post('/events/:eventId/voters/register', emailLimiter, ctrl.registerVoter)
+router.post('/events/:eventId/voters/register-existing', emailLimiter, ctrl.registerExistingVoter)
+router.post('/events/:eventId/voters/:voterId/send-invitation', emailLimiter, ctrl.sendInvitation)
+router.post('/events/:eventId/voters/send-all', emailLimiter, ctrl.sendAllInvitations)
+router.post('/events/:eventId/voters/import-preview', csvImportLimiter, uploadSingle('file'), ctrl.previewImportCsv)
+router.post('/events/:eventId/voters/import-register', csvImportLimiter, ctrl.registerImportCsv)
 
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
 

@@ -1,8 +1,9 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import * as pollingService from '../services/polling.service.js'
-import { importVotersFromCsv } from '../services/csv-import.service.js'
-import { inviteVoterToEvent, inviteRegisteredVoter } from '../services/invitation.service.js'
+import * as electionService from '../services/election.service.js'
+import { importVotersFromCsv, previewCsv, registerVotersFromCsv } from '../services/csv-import.service.js'
+import { inviteVoterToEvent, inviteRegisteredVoter, registerVoterToEvent, registerExistingVoter, sendVoterInvitation, sendAllPendingInvitations } from '../services/invitation.service.js'
 import {
   validatePollEvent,
   validateQuestion,
@@ -13,6 +14,7 @@ import { validateInviteVoter } from '../validators/email.validator.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
 import { updateOrganizationLogo } from '../services/organization.service.js'
 import { ORG_TYPES } from '../utils/constants.js'
+import { sanitizeEmail } from '../utils/sanitize.js'
 import {
   loadQuestionTypeRegistry,
   listCustomTypes,
@@ -152,6 +154,14 @@ export const importRespondentsCsv = asyncHandler(async (req, res) => {
   res.json({ success: true, ...result })
 })
 
+// List respondents (voters) for a poll event
+export const listRespondents = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page, 10) || 1
+  const limit = parseInt(req.query.limit, 10) || 50
+  const result = await electionService.listEventVoters(req.params.eventId, req.user.id, page, limit)
+  res.json({ success: true, ...result })
+})
+
 // ---------------------------------------------------------------------------
 // Phase 7 — Question type registry
 // ---------------------------------------------------------------------------
@@ -185,4 +195,91 @@ export const deleteCustomQuestionType = asyncHandler(async (req, res) => {
   const org = await getOrCreatePollingOrganization(req.user.id)
   await deleteCustomType(org.id, req.params.typeId)
   res.json({ success: true, message: 'Custom type removed' })
+})
+
+// ============================================================================
+// NEW CONTROLLER FUNCTIONS: Separate Registration from Invitation
+// ============================================================================
+
+export const registerRespondent = asyncHandler(async (req, res) => {
+  const payload = validateInviteVoter(req.body)
+  const result = await registerVoterToEvent({
+    eventId: req.params.eventId,
+    email: payload.email,
+    organizerId: req.user.id,
+    temporaryPassword: payload.temporaryPassword,
+  })
+  res.status(201).json({ success: true, ...result })
+})
+
+export const registerExistingRespondent = asyncHandler(async (req, res) => {
+  const rawEmail = req.body?.email
+  if (!rawEmail) {
+    throw new ApiError(400, 'Email is required')
+  }
+  const email = sanitizeEmail(rawEmail)
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRe.test(email)) {
+    throw new ApiError(400, 'Invalid email format')
+  }
+
+  const result = await registerExistingVoter({
+    eventId: req.params.eventId,
+    email,
+    organizerId: req.user.id,
+  })
+
+  res.json({
+    success: true,
+    message: 'Respondent registered successfully',
+    voter: result.user,
+  })
+})
+
+export const sendRespondentInvitation = asyncHandler(async (req, res) => {
+  const result = await sendVoterInvitation({
+    eventId: req.params.eventId,
+    voterId: req.params.voterId,
+    organizerId: req.user.id,
+  })
+
+  res.json({
+    success: true,
+    message: result.invitationSent ? 'Invitation sent' : 'Failed to send invitation',
+    invitationSent: result.invitationSent,
+    email: result.email,
+  })
+})
+
+export const sendAllRespondentInvitations = asyncHandler(async (req, res) => {
+  const result = await sendAllPendingInvitations({
+    eventId: req.params.eventId,
+    organizerId: req.user.id,
+  })
+
+  res.json({
+    success: true,
+    total: result.total,
+    sent: result.sent,
+    failed: result.failed,
+    results: result.results,
+  })
+})
+
+export const previewRespondentsCsv = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'CSV file required')
+
+  const result = await previewCsv(req.params.eventId, req.user.id, req.file.buffer)
+  res.json({ success: true, ...result })
+})
+
+export const registerRespondentsCsv = asyncHandler(async (req, res) => {
+  const { data } = req.body
+
+  if (!data || !Array.isArray(data)) {
+    throw new ApiError(400, 'Invalid import data')
+  }
+
+  const result = await registerVotersFromCsv(req.params.eventId, req.user.id, data)
+  res.json({ success: true, ...result })
 })

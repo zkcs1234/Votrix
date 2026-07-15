@@ -605,6 +605,20 @@ export async function submitPollResponse(eventId, voterId, answers) {
       .eq('voter_id', voterId)
   }
 
+  // A voter who has cast a vote has clearly received/accessed their
+  // invitation, so keep the invitation status consistent: a voted voter
+  // should never appear as "Pending" in the organizer list.
+  try {
+    await getClient()
+      .from(DB_TABLES.INVITATIONS)
+      .upsert(
+        { event_id: eventId, voter_id: voterId, invitation_sent: true },
+        { onConflict: 'event_id,voter_id' },
+      )
+  } catch (dbErr) {
+    console.error('[vote] failed to mark invitation_sent=true:', dbErr.message)
+  }
+
   // Fetch updated stats for real-time dashboard update
   const { count: respondedCount } = await getClient()
     .from(DB_TABLES.EVENT_VOTERS)

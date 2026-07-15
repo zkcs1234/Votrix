@@ -1,7 +1,7 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import * as electionService from '../services/election.service.js'
-import { importVotersFromCsv } from '../services/csv-import.service.js'
+import { previewCsv, registerVotersFromCsv } from '../services/csv-import.service.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
 import { updateOrganizationLogo } from '../services/organization.service.js'
 import { ORG_TYPES } from '../utils/constants.js'
@@ -13,10 +13,8 @@ import {
   validateVotingToggle,
 } from '../validators/election.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
-import { inviteVoterToEvent, inviteRegisteredVoter } from '../services/invitation.service.js'
+import { registerVoterToEvent, registerExistingVoter as registerExistingVoterService, sendVoterInvitation, sendAllPendingInvitations } from '../services/invitation.service.js'
 import { sanitizeEmail, validateUUID } from '../utils/sanitize.js'
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const data = await electionService.getOrganizerDashboard(req.user.id)
@@ -172,9 +170,14 @@ export const listVoters = asyncHandler(async (req, res) => {
   res.json({ success: true, ...result })
 })
 
-export const inviteVoter = asyncHandler(async (req, res) => {
+// ============================================================================
+// Registration and Invitation separated
+// ============================================================================
+
+export const registerVoter = asyncHandler(async (req, res) => {
+  // Validate input
   const payload = validateInviteVoter(req.body)
-  const result = await inviteVoterToEvent({
+  const result = await registerVoterToEvent({
     eventId: req.params.eventId,
     email: payload.email,
     organizerId: req.user.id,
@@ -183,10 +186,7 @@ export const inviteVoter = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, ...result })
 })
 
-export const inviteExistingVoter = asyncHandler(async (req, res) => {
-  // CWE-20: Validate email format before passing to the invitation service.
-  // The previous check only tested for presence, allowing malformed strings
-  // (e.g. "<script>", excessively long values) to reach the email layer.
+export const registerExistingVoter = asyncHandler(async (req, res) => {
   const rawEmail = req.body?.email
   if (!rawEmail) {
     throw new ApiError(400, 'Email is required')
@@ -196,7 +196,7 @@ export const inviteExistingVoter = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid email format')
   }
 
-  const result = await inviteRegisteredVoter({
+  const result = await registerExistingVoterService({
     eventId: req.params.eventId,
     email,
     organizerId: req.user.id,
@@ -204,15 +204,56 @@ export const inviteExistingVoter = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    message: 'Voter invited successfully',
+    message: 'Voter registered successfully',
     voter: result.user,
   })
 })
 
-export const importCsv = asyncHandler(async (req, res) => {
+export const sendInvitation = asyncHandler(async (req, res) => {
+  const result = await sendVoterInvitation({
+    eventId: req.params.eventId,
+    voterId: req.params.voterId,
+    organizerId: req.user.id,
+  })
+
+  res.json({
+    success: true,
+    message: result.invitationSent ? 'Invitation sent' : 'Failed to send invitation',
+    invitationSent: result.invitationSent,
+    email: result.email,
+  })
+})
+
+export const sendAllInvitations = asyncHandler(async (req, res) => {
+  const result = await sendAllPendingInvitations({
+    eventId: req.params.eventId,
+    organizerId: req.user.id,
+  })
+
+  res.json({
+    success: true,
+    total: result.total,
+    sent: result.sent,
+    failed: result.failed,
+    results: result.results,
+  })
+})
+
+export const previewImportCsv = asyncHandler(async (req, res) => {
   if (!req.file) throw new ApiError(400, 'CSV file required')
 
-  const result = await importVotersFromCsv(req.params.eventId, req.user.id, req.file.buffer)
+  const result = await previewCsv(req.params.eventId, req.user.id, req.file.buffer)
+  res.json({ success: true, ...result })
+})
+
+export const registerImportCsv = asyncHandler(async (req, res) => {
+  const { data } = req.body
+
+  if (!data || !Array.isArray(data)) {
+    throw new ApiError(400, 'Invalid import data')
+  }
+
+  const result = await registerVotersFromCsv(req.params.eventId, req.user.id, data)
   res.json({ success: true, ...result })
 })
 

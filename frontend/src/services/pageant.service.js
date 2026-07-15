@@ -96,6 +96,29 @@ export const pageantService = {
     return api.post(`${org}/events/${eventId}/judges/import`, form)
   },
 
+  // New workflow: register without email, send later
+  registerJudge(eventId, payload) {
+    return api.post(`${org}/events/${eventId}/judges/register`, payload)
+  },
+
+  sendJudgeInvitation(eventId, judgeId) {
+    return api.post(`${org}/events/${eventId}/judges/${judgeId}/send-invitation`)
+  },
+
+  sendAllJudgeInvitations(eventId) {
+    return api.post(`${org}/events/${eventId}/judges/send-all`)
+  },
+
+  previewJudgesCsv(eventId, file) {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`${org}/events/${eventId}/judges/import-preview`, form)
+  },
+
+  registerJudgesCsv(eventId, data) {
+    return api.post(`${org}/events/${eventId}/judges/import-register`, { data })
+  },
+
   getRankings(eventId) {
     return api.get(`${org}/events/${eventId}/rankings`)
   },

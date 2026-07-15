@@ -23,15 +23,22 @@ router.delete('/events/:eventId/questions/:questionId', ctrl.deleteQuestion)
 
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
 
-// Phase 7 — Question type registry (database-driven, no hardcoded list)
+// Question type registry
 router.get('/question-types', ctrl.listQuestionTypes)
 router.get('/question-types/custom', ctrl.listCustomQuestionTypes)
 router.post('/question-types/custom', ctrl.createCustomQuestionType)
 router.patch('/question-types/custom/:typeId', ctrl.updateCustomQuestionType)
 router.delete('/question-types/custom/:typeId', ctrl.deleteCustomQuestionType)
 
-router.post('/events/:eventId/respondents/invite', emailLimiter, ctrl.inviteRespondent)
-router.post('/events/:eventId/respondents/invite-existing', emailLimiter, ctrl.inviteExistingRespondent)
-router.post('/events/:eventId/respondents/import', csvImportLimiter, uploadSingle('file'), ctrl.importRespondentsCsv)
+// List respondents
+router.get('/events/:eventId/voters', ctrl.listRespondents)
+
+// Registration and Invitation separated
+router.post('/events/:eventId/respondents/register', emailLimiter, ctrl.registerRespondent)
+router.post('/events/:eventId/respondents/register-existing', emailLimiter, ctrl.registerExistingRespondent)
+router.post('/events/:eventId/respondents/:voterId/send-invitation', emailLimiter, ctrl.sendRespondentInvitation)
+router.post('/events/:eventId/respondents/send-all', emailLimiter, ctrl.sendAllRespondentInvitations)
+router.post('/events/:eventId/respondents/import-preview', csvImportLimiter, uploadSingle('file'), ctrl.previewRespondentsCsv)
+router.post('/events/:eventId/respondents/import-register', csvImportLimiter, ctrl.registerRespondentsCsv)
 
 export default router

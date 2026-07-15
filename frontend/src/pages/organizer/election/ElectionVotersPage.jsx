@@ -7,7 +7,16 @@ import Button from '@/components/ui/Button'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 
-function VoterRow({ voter }) {
+function InvitationStatusBadge({ sent }) {
+  if (sent) {
+    return <span className="v-badge v-badge-success">Sent</span>
+  }
+  return <span className="v-badge v-badge-warning">Pending</span>
+}
+
+function VoterRow({ voter, onSendInvitation, sendingId }) {
+  const isSending = sendingId === voter.voterId
+
   return (
     <tr>
       <td className="text-v-text-muted">{voter.email}</td>
@@ -15,6 +24,22 @@ function VoterRow({ voter }) {
         <span className={voter.hasVoted ? 'v-badge v-badge-success' : 'v-badge'}>
           {voter.hasVoted ? 'Voted' : 'Pending'}
         </span>
+      </td>
+      <td>
+        <InvitationStatusBadge sent={voter.invitationSent} />
+      </td>
+      <td>
+        {!voter.invitationSent && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => onSendInvitation(voter.voterId)}
+            loading={isSending}
+            disabled={isSending}
+          >
+            Send Invitation
+          </Button>
+        )}
       </td>
     </tr>
   )
@@ -35,6 +60,12 @@ function TableSkeleton() {
             <th>
               <div className="h-4 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
             </th>
+            <th>
+              <div className="h-4 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
+            </th>
+            <th>
+              <div className="h-4 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -46,10 +77,81 @@ function TableSkeleton() {
               <td>
                 <div className="h-6 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
               </td>
+              <td>
+                <div className="h-6 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
+              </td>
+              <td>
+                <div className="h-6 w-28 animate-pulse rounded-lg bg-v-surface-elevated" />
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+function CsvPreviewModal({ data, onClose, onRegister, registering }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-v-surface rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto">
+        <h3 className="v-page-title mb-4">Preview CSV Import</h3>
+        <p className="v-helper-text mb-4">
+          Review the data below before registering voters. No emails will be sent until you click "Register Voters".
+        </p>
+
+        {data.errors && data.errors.length > 0 && (
+          <div className="mb-4 p-3 bg-v-danger/10 border border-v-danger/30 rounded-lg">
+            <p className="v-error-text font-semibold mb-2">Errors ({data.errors.length})</p>
+            <ul className="v-error-text text-sm list-disc list-inside">
+              {data.errors.slice(0, 5).map((err, i) => (
+                <li key={i}>{err}</li>
+              ))}
+              {data.errors.length > 5 && (
+                <li>...and {data.errors.length - 5} more errors</li>
+              )}
+            </ul>
+          </div>
+        )}
+
+        <div className="mb-4">
+          <p className="v-label">Valid rows: {data.valid} of {data.total}</p>
+        </div>
+
+        <div className="v-table-wrap max-h-64 overflow-auto mb-4">
+          <table className="v-table">
+            <thead>
+              <tr>
+                <th>Row</th>
+                <th>Email</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.data.map((row, i) => (
+                <tr key={i}>
+                  <td>{row.rowNumber}</td>
+                  <td>{row.email}</td>
+                  <td>
+                    <span className={row.type === 'new' ? 'v-badge v-badge-success' : 'v-badge'}>
+                      {row.type === 'new' ? 'New Voter' : 'Existing'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex gap-3 justify-end">
+          <Button variant="secondary" onClick={onClose} disabled={registering}>
+            Cancel
+          </Button>
+          <Button onClick={onRegister} loading={registering}>
+            Register Voters ({data.valid})
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -62,10 +164,14 @@ export default function ElectionVotersPage() {
   const [temporaryPassword, setTemporaryPassword] = useState('')
   const [registeredEmail, setRegisteredEmail] = useState('')
   const [importResult, setImportResult] = useState(null)
+  const [csvPreview, setCsvPreview] = useState(null)
+  const [previewFile, setPreviewFile] = useState(null)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
-  const [inviting, setInviting] = useState(false)
-  const [invitingRegistered, setInvitingRegistered] = useState(false)
+  const [registering, setRegistering] = useState(false)
+  const [registeringRegistered, setRegisteringRegistered] = useState(false)
+  const [sendingAll, setSendingAll] = useState(false)
+  const [sendingId, setSendingId] = useState(null)
   const [importProgress, setImportProgress] = useState(null)
 
   const { success, error: showError } = useToast()
@@ -85,99 +191,127 @@ export default function ElectionVotersPage() {
   }, [eventId])
 
   useEffect(() => {
-    // Async fetch-on-mount pattern — see ElectionEventsPage.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // Async fetch-on-mount pattern
     load()
   }, [load])
 
-  // Optimistic UI - invite voter immediately
-  const handleInvite = async (e) => {
+  // Count pending invitations
+  const pendingCount = voters.filter(v => !v.invitationSent).length
+
+  // Register new voter (no email)
+  const handleRegister = async (e) => {
     e.preventDefault()
     setError(null)
-    setInviting(true)
-
-    // Optimistically add to list
-    const tempId = `temp-${Date.now()}`
-    const newVoter = { id: tempId, email, firstName: '', lastName: '', hasVoted: false }
-    setVoters((prev) => [...prev, newVoter])
+    setRegistering(true)
 
     try {
-      const res = await electionService.inviteVoter(eventId, { email, temporaryPassword })
-      const emailResult = res?.data?.email ?? null
-
-      if (!emailResult?.sent) {
-        const reason = emailResult?.reason || emailResult?.error || 'Email was not sent'
-        setVoters((prev) => prev.filter((v) => v.id !== tempId))
-        setError(reason)
-        showError(reason)
-        return
-      }
-
+      await electionService.registerVoter(eventId, { email, temporaryPassword })
       setEmail('')
       setTemporaryPassword('')
       load()
-      success('Voter invited successfully')
+      success('Voter registered successfully. Send invitation later from the voter list.')
     } catch (err) {
-      // Rollback
-      setVoters((prev) => prev.filter((v) => v.id !== tempId))
-      setError(err.response?.data?.message || 'Invite failed')
-      showError(err.response?.data?.message || 'Invite failed')
+      setError(err.response?.data?.message || 'Registration failed')
+      showError(err.response?.data?.message || 'Registration failed')
     } finally {
-      setInviting(false)
+      setRegistering(false)
     }
   }
 
-  // Handler for inviting already registered voters
-  const handleInviteRegistered = async (e) => {
+  // Register existing voter (no email)
+  const handleRegisterExisting = async (e) => {
     e.preventDefault()
     setError(null)
-    setInvitingRegistered(true)
+    setRegisteringRegistered(true)
 
     try {
-      await electionService.inviteExistingVoter(eventId, registeredEmail)
+      await electionService.registerExistingVoter(eventId, registeredEmail)
       setRegisteredEmail('')
       load()
-      success('Registered voter invited successfully')
+      success('Voter registered successfully. Send invitation later from the voter list.')
     } catch (err) {
-      setError(err.response?.data?.message || 'Invite failed')
-      showError(err.response?.data?.message || 'Invite failed')
+      setError(err.response?.data?.message || 'Registration failed')
+      showError(err.response?.data?.message || 'Registration failed')
     } finally {
-      setInvitingRegistered(false)
+      setRegisteringRegistered(false)
     }
   }
 
-  // CSV Import with progress tracking
-  const handleCsv = async (e) => {
+  // CSV: Preview first
+  const handleCsvPreview = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     setError(null)
-    setImportResult(null)
-    setImportProgress({ processed: 0, total: 0, succeeded: 0, failed: 0 })
+    setPreviewFile(file)
 
     try {
-      // Use XMLHttpRequest for progress tracking
-      const response = await electionService.importCsvWithProgress(
-        eventId,
-        file,
-        (progress) => {
-          setImportProgress(progress)
-        }
-      )
+      const { data } = await electionService.previewCsv(eventId, file)
+      setCsvPreview(data)
+    } catch (err) {
+      const details = err.response?.data?.details?.errors
+      const message = details?.join(', ') || err.response?.data?.message || 'Preview failed'
+      setError(message)
+      showError(message)
+    }
+    e.target.value = ''
+  }
 
+  // CSV: Register after preview
+  const handleCsvRegister = async () => {
+    if (!csvPreview?.data) return
+    setError(null)
+    setRegistering(true)
+
+    try {
+      const { data } = await electionService.registerCsv(eventId, csvPreview.data)
       setImportResult({
-        succeeded: response.data.succeeded,
-        total: response.data.total,
+        succeeded: data.succeeded,
+        total: data.total,
       })
-      success(`Imported ${response.data.succeeded} of ${response.data.total} voters`)
+      setCsvPreview(null)
+      setPreviewFile(null)
+      success(`Registered ${data.succeeded} of ${data.total} voters. Send invitations later.`)
       load()
     } catch (err) {
       const details = err.response?.data?.details?.errors
-      const message = details?.join(', ') || err.response?.data?.message || 'Import failed'
+      const message = details?.join(', ') || err.response?.data?.message || 'Registration failed'
       setError(message)
       showError(message)
     } finally {
-      setImportProgress(null)
-      e.target.value = ''
+      setRegistering(false)
+    }
+  }
+
+  // Send invitation for single voter
+  const handleSendInvitation = async (voterId) => {
+    setSendingId(voterId)
+    try {
+      const { data } = await electionService.sendInvitation(eventId, voterId)
+      if (data.invitationSent) {
+        success('Invitation sent successfully')
+      } else {
+        showError('Failed to send invitation')
+      }
+      load()
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to send invitation')
+    } finally {
+      setSendingId(null)
+    }
+  }
+
+  // Send all pending invitations
+  const handleSendAll = async () => {
+    if (pendingCount === 0) return
+    setSendingAll(true)
+    try {
+      const { data } = await electionService.sendAllInvitations(eventId)
+      success(`Sent ${data.sent} of ${data.total} invitations`)
+      load()
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to send invitations')
+    } finally {
+      setSendingAll(false)
     }
   }
 
@@ -205,9 +339,21 @@ export default function ElectionVotersPage() {
     <div className="space-y-6">
       <h2 className="v-page-title">Voters</h2>
 
+      {csvPreview && (
+        <CsvPreviewModal
+          data={csvPreview}
+          onClose={() => {
+            setCsvPreview(null)
+            setPreviewFile(null)
+          }}
+          onRegister={handleCsvRegister}
+          registering={registering}
+        />
+      )}
+
       <div className="grid gap-6">
         <div className="v-card-sm">
-          <h3 className="v-label">CSV upload</h3>
+          <h3 className="v-label">CSV Upload</h3>
           <p className="v-helper-text mb-3">
             Columns: email (required), tempassword (optional).
             <br />
@@ -219,11 +365,10 @@ export default function ElectionVotersPage() {
             type="file"
             accept=".csv"
             className="v-caption"
-            onChange={handleCsv}
+            onChange={handleCsvPreview}
             disabled={importProgress !== null}
           />
 
-          {/* Progress bar during import */}
           {importProgress && (
             <div className="mt-3">
               <ProgressBarWithStats
@@ -237,14 +382,14 @@ export default function ElectionVotersPage() {
 
           {importResult && (
             <p className="v-caption mt-2 text-v-success">
-              Imported {importResult.succeeded} of {importResult.total} — invitation emails sent.
+              Registered {importResult.succeeded} of {importResult.total} voters. Invitation emails not sent.
             </p>
           )}
         </div>
 
         <div className="v-card-sm">
-          <h3 className="v-label mb-3">Invite Manually</h3>
-          <form onSubmit={handleInvite} className="flex flex-wrap gap-3 mb-4">
+          <h3 className="v-label mb-3">Register Manually</h3>
+          <form onSubmit={handleRegister} className="flex flex-wrap gap-3 mb-4">
             <input
               type="email"
               placeholder="New voter (email)"
@@ -262,12 +407,12 @@ export default function ElectionVotersPage() {
               minLength={8}
               required
             />
-            <Button type="submit" loading={inviting} className="w-[160px]">
-              Invite New
+            <Button type="submit" loading={registering} className="w-[160px]">
+              Register Voter
             </Button>
           </form>
 
-          <form onSubmit={handleInviteRegistered} className="flex flex-wrap gap-3 pt-4 border-t border-v-border">
+          <form onSubmit={handleRegisterExisting} className="flex flex-wrap gap-3 pt-4 border-t border-v-border">
             <input
               type="email"
               placeholder="Registered voter (email)"
@@ -276,8 +421,8 @@ export default function ElectionVotersPage() {
               onChange={(e) => setRegisteredEmail(e.target.value)}
               required
             />
-            <Button type="submit" variant="secondary" loading={invitingRegistered} className="w-[160px]">
-              Invite Registered
+            <Button type="submit" variant="secondary" loading={registeringRegistered} className="w-[160px]">
+              Register to Event
             </Button>
           </form>
         </div>
@@ -286,31 +431,47 @@ export default function ElectionVotersPage() {
       {error && <p className="v-error-text">{error}</p>}
 
       <div className="v-table-wrap">
-        <div className="p-4 border-b border-v-border">
+        <div className="p-4 border-b border-v-border flex flex-wrap gap-3 justify-between items-center">
           <SearchInput
             placeholder="Search voters by email"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-xs"
           />
+          {pendingCount > 0 && (
+            <Button
+              onClick={handleSendAll}
+              loading={sendingAll}
+              disabled={sendingAll}
+            >
+              Send All Invitations ({pendingCount})
+            </Button>
+          )}
         </div>
         <table className="v-table">
           <thead>
             <tr>
               <th>Email</th>
-              <th>Status</th>
+              <th>Voted</th>
+              <th>Invitation</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredVoters.length === 0 ? (
               <tr>
-                <td colSpan={2} className="text-center v-caption py-8">
+                <td colSpan={4} className="text-center v-caption py-8">
                   {search ? 'No voters found matching your search' : 'No voters yet'}
                 </td>
               </tr>
             ) : (
               filteredVoters.map((v) => (
-                <VoterRow key={v.id} voter={v} />
+                <VoterRow
+                  key={v.id}
+                  voter={v}
+                  onSendInvitation={handleSendInvitation}
+                  sendingId={sendingId}
+                />
               ))
             )}
           </tbody>

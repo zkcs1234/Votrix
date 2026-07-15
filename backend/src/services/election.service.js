@@ -475,6 +475,9 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
   const from = (page - 1) * limit
   const to = from + limit - 1
 
+  // Fetch voters with user email. Invitation status is fetched separately
+  // below, because there is no foreign key from `invitations` to
+  // `event_voters`, so PostgREST cannot resolve the embedded resource.
   const { data, error, count } = await getClient()
     .from(DB_TABLES.EVENT_VOTERS)
     .select(
@@ -484,7 +487,8 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
       first_name,
       last_name,
       created_at,
-      users (id, email)
+      voter_id,
+      users!inner (id, email)
     `,
       { count: 'exact' }
     )
@@ -494,8 +498,27 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
 
   if (error) throw new ApiError(500, error.message)
 
+  const voterRows = data ?? []
+  const voterIds = voterRows.map((row) => row.voter_id).filter(Boolean)
+
+  // Fetch invitation statuses in a single query and index by voter_id.
+  const invitationSentByVoter = new Map()
+  if (voterIds.length) {
+    const { data: invites, error: inviteError } = await getClient()
+      .from(DB_TABLES.INVITATIONS)
+      .select('voter_id, invitation_sent')
+      .eq('event_id', eventId)
+      .in('voter_id', voterIds)
+
+    if (inviteError) throw new ApiError(500, inviteError.message)
+
+    for (const inv of invites ?? []) {
+      invitationSentByVoter.set(inv.voter_id, inv.invitation_sent)
+    }
+  }
+
   return {
-    voters: (data ?? []).map((row) => ({
+    voters: voterRows.map((row) => ({
       id: row.id,
       voterId: row.users?.id,
       email: row.users?.email,
@@ -503,6 +526,8 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
       lastName: row.last_name,
       hasVoted: row.has_voted,
       createdAt: row.created_at,
+      // Invitation status: true = sent, false = pending, no record = false
+      invitationSent: invitationSentByVoter.get(row.voter_id) ?? false,
     })),
     meta: {
       page,
@@ -699,6 +724,20 @@ export async function submitBallot(eventId, voterId, selections) {
       .eq('event_id', eventId)
       .eq('voter_id', voterId)
     throw err
+  }
+
+  // A voter who has cast a vote has clearly received/accessed their
+  // invitation, so keep the invitation status consistent: a voted voter
+  // should never appear as "Pending" in the organizer list.
+  try {
+    await getClient()
+      .from(DB_TABLES.INVITATIONS)
+      .upsert(
+        { event_id: eventId, voter_id: voterId, invitation_sent: true },
+        { onConflict: 'event_id,voter_id' },
+      )
+  } catch (dbErr) {
+    console.error('[vote] failed to mark invitation_sent=true:', dbErr.message)
   }
 
   // Fetch updated stats for real-time dashboard update

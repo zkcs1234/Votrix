@@ -35,7 +35,13 @@ router.delete('/events/:eventId/criteria/:criteriaId', ctrl.deleteCriteria)
 
 router.get('/events/:eventId/judges', ctrl.listJudges)
 router.post('/events/:eventId/judges/invite', emailLimiter, ctrl.inviteJudge)
-router.post('/events/:eventId/judges/import', csvImportLimiter, uploadSingle('file'), ctrl.importJudgesCsv)
+
+// Registration and Invitation separated
+router.post('/events/:eventId/judges/register', emailLimiter, ctrl.registerJudge)
+router.post('/events/:eventId/judges/:judgeId/send-invitation', emailLimiter, ctrl.sendJudgeInvitation)
+router.post('/events/:eventId/judges/send-all', emailLimiter, ctrl.sendAllJudgeInvitations)
+router.post('/events/:eventId/judges/import-preview', csvImportLimiter, uploadSingle('file'), ctrl.previewImportJudgesCsv)
+router.post('/events/:eventId/judges/import-register', csvImportLimiter, ctrl.registerImportJudgesCsv)
 
 router.get('/events/:eventId/rankings', ctrl.getRankings)
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)

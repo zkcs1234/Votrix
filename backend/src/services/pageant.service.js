@@ -466,6 +466,144 @@ export async function inviteJudge(eventId, organizerId, { email, temporaryPasswo
   return { user, email: emailResult }
 }
 
+/**
+ * Register a judge WITHOUT sending invitation email.
+ */
+export async function registerJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName }) {
+  await assertCompetitionEvent(eventId, organizerId)
+
+  const tempPassword = temporaryPassword || generateTemporaryPassword()
+  const { user, isNew } = await ensureJudgeAccount(email, tempPassword)
+
+  const { error: evError } = await getClient().from(DB_TABLES.EVENT_VOTERS).upsert(
+    {
+      event_id: eventId,
+      voter_id: user.id,
+      is_judge: true,
+      has_scored: false,
+      has_voted: false,
+      first_name: firstName || null,
+      last_name: lastName || null,
+    },
+    { onConflict: 'event_id,voter_id' },
+  )
+
+  if (evError) throw new ApiError(500, evError.message)
+
+  try {
+    await getClient().from(DB_TABLES.INVITATIONS).upsert(
+      { event_id: eventId, voter_id: user.id, invitation_sent: false },
+      { onConflict: 'event_id,voter_id', ignoreDuplicates: false },
+    )
+  } catch (dbErr) {
+    console.error('[registerJudge] invitations upsert failed:', dbErr.message)
+  }
+
+  return { user, isNewJudge: isNew, invitationSent: false }
+}
+
+/**
+ * Send invitation email for an already-registered judge.
+ */
+export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const event = await getEventById(eventId)
+
+  const { data: enrollment } = await getClient()
+    .from(DB_TABLES.EVENT_VOTERS)
+    .select('id, users (id, email)')
+    .eq('event_id', eventId)
+    .eq('voter_id', judgeId)
+    .eq('is_judge', true)
+    .maybeSingle()
+
+  if (!enrollment) throw new ApiError(404, 'Judge is not enrolled in this event')
+
+  const judgeEmail = enrollment.users?.email
+  const tempPassword = generateTemporaryPassword()
+  const passwordHash = await hashPassword(tempPassword)
+
+  await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', judgeId)
+
+  const emailResult = await sendJudgeInvitationEmail({
+    email: judgeEmail,
+    temporaryPassword: tempPassword,
+    eventId: event.id,
+    eventTitle: event.title,
+  })
+
+  if (emailResult.sent) {
+    try {
+      await getClient().from(DB_TABLES.INVITATIONS).update({ invitation_sent: true }).eq('event_id', eventId).eq('voter_id', judgeId)
+    } catch (dbErr) {
+      console.error('[sendJudgeInvitation] failed to mark invitation_sent=true:', dbErr.message)
+    }
+  }
+
+  return { email: emailResult, invitationSent: emailResult.sent }
+}
+
+/**
+ * Send all pending judge invitations for an event.
+ */
+export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const event = await getEventById(eventId)
+
+  const { data: pending, error } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .select('voter_id, users (id, email)')
+    .eq('event_id', eventId)
+    .eq('invitation_sent', false)
+
+  if (error) throw new ApiError(500, error.message)
+  if (!pending?.length) return { total: 0, sent: 0, failed: 0, results: [] }
+
+  // Only send to judges
+  const { data: judgeRows } = await getClient()
+    .from(DB_TABLES.EVENT_VOTERS)
+    .select('voter_id')
+    .eq('event_id', eventId)
+    .eq('is_judge', true)
+
+  const judgeIds = new Set((judgeRows ?? []).map((r) => r.voter_id))
+  const pendingJudges = pending.filter((p) => judgeIds.has(p.voter_id))
+
+  let sent = 0, failed = 0
+  const results = []
+
+  for (const p of pendingJudges) {
+    const judgeEmail = p.users?.email
+    const tempPassword = generateTemporaryPassword()
+    const passwordHash = await hashPassword(tempPassword)
+
+    try {
+      await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', p.voter_id)
+
+      const emailResult = await sendJudgeInvitationEmail({
+        email: judgeEmail,
+        temporaryPassword: tempPassword,
+        eventId: event.id,
+        eventTitle: event.title,
+      })
+
+      if (emailResult.sent) {
+        await getClient().from(DB_TABLES.INVITATIONS).update({ invitation_sent: true }).eq('event_id', eventId).eq('voter_id', p.voter_id)
+        sent++
+        results.push({ judgeId: p.voter_id, email: judgeEmail, success: true })
+      } else {
+        failed++
+        results.push({ judgeId: p.voter_id, email: judgeEmail, success: false, error: emailResult.error || 'Email delivery failed' })
+      }
+    } catch (err) {
+      failed++
+      results.push({ judgeId: p.voter_id, email: judgeEmail, success: false, error: err.message })
+    }
+  }
+
+  return { total: pendingJudges.length, sent, failed, results }
+}
+
 export async function listJudges(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
 
@@ -486,6 +624,21 @@ export async function listJudges(eventId, organizerId) {
 
   if (error) throw new ApiError(500, error.message)
 
+  const judgeIds = (data ?? []).map((r) => r.users?.id).filter(Boolean)
+  let invitationMap = {}
+
+  if (judgeIds.length) {
+    const { data: invitations } = await getClient()
+      .from(DB_TABLES.INVITATIONS)
+      .select('voter_id, invitation_sent')
+      .eq('event_id', eventId)
+      .in('voter_id', judgeIds)
+
+    for (const inv of invitations ?? []) {
+      invitationMap[inv.voter_id] = inv.invitation_sent
+    }
+  }
+
   return (data ?? []).map((row) => ({
     id: row.id,
     judgeId: row.users?.id,
@@ -493,6 +646,7 @@ export async function listJudges(eventId, organizerId) {
     firstName: row.first_name,
     lastName: row.last_name,
     hasScored: row.has_scored,
+    invitationSent: invitationMap[row.users?.id] ?? null,
   }))
 }
 

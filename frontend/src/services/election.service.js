@@ -1,5 +1,4 @@
-import api, { ensureCsrfToken } from '@/services/api'
-import { CSRF_HEADER } from '@/utils/csrf'
+import api from '@/services/api'
 
 const base = '/organizer/election'
 const voterBase = '/voter/election'
@@ -85,74 +84,36 @@ export const electionService = {
     return api.get(`${base}/events/${eventId}/voters`)
   },
 
-  inviteVoter(eventId, payload) {
-    return api.post(`${base}/events/${eventId}/voters/invite`, payload)
+  // Register voter (no email sent)
+  registerVoter(eventId, payload) {
+    return api.post(`${base}/events/${eventId}/voters/register`, payload)
   },
 
-  inviteExistingVoter(eventId, email) {
-    return api.post(`${base}/events/${eventId}/voters/invite-existing`, { email })
+  // Register existing voter (no email sent)
+  registerExistingVoter(eventId, email) {
+    return api.post(`${base}/events/${eventId}/voters/register-existing`, { email })
   },
 
-  importCsv(eventId, file) {
+  // Send invitation for specific voter
+  sendInvitation(eventId, voterId) {
+    return api.post(`${base}/events/${eventId}/voters/${voterId}/send-invitation`)
+  },
+
+  // Send all pending invitations
+  sendAllInvitations(eventId) {
+    return api.post(`${base}/events/${eventId}/voters/send-all`)
+  },
+
+  // Preview CSV without registering
+  previewCsv(eventId, file) {
     const form = new FormData()
     form.append('file', file)
-    return api.post(`${base}/events/${eventId}/voters/import`, form)
+    return api.post(`${base}/events/${eventId}/voters/import-preview`, form)
   },
 
-  /**
-   * Import CSV with progress tracking
-   * Uses XMLHttpRequest to track upload progress
-   * @param {string} eventId - Event ID
-   * @param {File} file - CSV file
-   * @param {Function} onProgress - Progress callback
-   * @returns {Promise} - Import result
-   */
-  importCsvWithProgress(eventId, file, onProgress) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      const form = new FormData()
-      form.append('file', file)
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && onProgress) {
-          const estimatedTotal = Math.max(event.total, file.size * 2)
-          onProgress({
-            processed: event.loaded,
-            total: estimatedTotal,
-            succeeded: Math.floor(event.loaded / 3),
-            failed: 0,
-          })
-        }
-      }
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve({ data: JSON.parse(xhr.responseText) })
-        } else {
-          reject({
-            response: {
-              data: JSON.parse(xhr.responseText),
-              status: xhr.status,
-            },
-          })
-        }
-      }
-
-      xhr.onerror = () => {
-        reject({
-          response: { data: { message: 'Network error during import' }, status: xhr.status },
-        })
-      }
-
-      ensureCsrfToken()
-        .then((csrf) => {
-          xhr.open('POST', `${api.defaults.baseURL}${base}/events/${eventId}/voters/import`)
-          if (csrf) xhr.setRequestHeader(CSRF_HEADER, csrf)
-          xhr.withCredentials = true
-          xhr.send(form)
-        })
-        .catch((err) => reject(err))
-    })
+  // Register voters from previewed CSV data
+  registerCsv(eventId, data) {
+    return api.post(`${base}/events/${eventId}/voters/import-register`, { data })
   },
 
   getAnalytics(eventId) {

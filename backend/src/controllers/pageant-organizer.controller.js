@@ -2,6 +2,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import * as pageantService from '../services/pageant.service.js'
 import { importJudgesFromCsv } from '../services/pageant-csv.service.js'
+import { previewCsv } from '../services/csv-import.service.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
 import { updateOrganizationLogo } from '../services/organization.service.js'
 import { ORG_TYPES } from '../utils/constants.js'
@@ -12,6 +13,7 @@ import {
   validateScoringToggle,
 } from '../validators/competition.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
+import { sanitizeEmail } from '../utils/sanitize.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const data = await pageantService.getOrganizerDashboard(req.user.id)
@@ -183,3 +185,68 @@ export const getAnalytics = asyncHandler(async (req, res) => {
   res.json({ success: true, analytics })
 })
 
+// ============================================================================
+// NEW: Separate Registration from Invitation Email (judges)
+// ============================================================================
+
+export const registerJudge = asyncHandler(async (req, res) => {
+  const payload = validateInviteVoter(req.body)
+  const result = await pageantService.registerJudge(req.params.eventId, req.user.id, {
+    email: payload.email,
+    temporaryPassword: payload.temporaryPassword,
+    firstName: req.body.firstName,
+    lastName: req.body.lastName,
+  })
+  res.status(201).json({ success: true, ...result })
+})
+
+export const sendJudgeInvitation = asyncHandler(async (req, res) => {
+  const result = await pageantService.sendJudgeInvitation(
+    req.params.eventId,
+    req.user.id,
+    req.params.judgeId,
+  )
+  res.json({
+    success: true,
+    message: result.invitationSent ? 'Invitation sent' : 'Failed to send invitation',
+    invitationSent: result.invitationSent,
+    email: result.email,
+  })
+})
+
+export const sendAllJudgeInvitations = asyncHandler(async (req, res) => {
+  const result = await pageantService.sendAllPendingJudgeInvitations(
+    req.params.eventId,
+    req.user.id,
+  )
+  res.json({ success: true, ...result })
+})
+
+export const previewImportJudgesCsv = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'CSV file required')
+  const result = await previewCsv(req.params.eventId, req.user.id, req.file.buffer)
+  res.json({ success: true, ...result })
+})
+
+export const registerImportJudgesCsv = asyncHandler(async (req, res) => {
+  const { data } = req.body
+  if (!data || !Array.isArray(data)) throw new ApiError(400, 'Invalid import data')
+
+  const results = []
+  let succeeded = 0
+
+  for (const row of data) {
+    try {
+      await pageantService.registerJudge(req.params.eventId, req.user.id, {
+        email: row.email,
+        temporaryPassword: row.temporaryPassword,
+      })
+      results.push({ email: row.email, success: true })
+      succeeded++
+    } catch (err) {
+      results.push({ email: row.email, success: false, error: err.message })
+    }
+  }
+
+  res.json({ success: true, total: data.length, succeeded, failed: data.length - succeeded, results })
+})
