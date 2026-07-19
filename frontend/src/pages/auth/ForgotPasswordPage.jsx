@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link } from 'react-router-dom'
@@ -75,13 +75,9 @@ export default function ForgotPasswordPage() {
       </form>
 
       <p className="mt-4 flex items-center justify-center gap-3 text-center text-sm text-v-text-subtle">
-        <Link to="/login/organizer" className="inline-flex items-center gap-1 text-v-text-muted hover:text-v-text">
+        <Link to="/login" className="inline-flex items-center gap-1 text-v-text-muted hover:text-v-text">
           <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
-          Organizer login
-        </Link>
-        <span>·</span>
-        <Link to="/login/voter" className="text-v-text-muted hover:text-v-text">
-          Voter login
+          Back to login
         </Link>
       </p>
     </div>

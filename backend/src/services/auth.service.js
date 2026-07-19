@@ -1,8 +1,6 @@
 import { ApiError } from '../utils/ApiError.js'
 import { comparePassword } from '../utils/password.js'
-import { USER_ROLES } from '../utils/constants.js'
 import {
-  findUserByUsername,
   findUserByEmail,
   findUserById,
   updateUserPassword,
@@ -29,48 +27,23 @@ function assertAccountActive(user) {
   throw new ApiError(403, 'Your account is not active')
 }
 
-async function loginWithCredentials({ findUser, identifier, password, invalidMessage }) {
-  const user = await findUser(identifier)
+// Unified login - works for admin, organizer, and voter by email
+export async function login({ email, password }) {
+  // Find user by email (any role)
+  const user = await findUserByEmail(email)
 
   if (!user) {
-    throw new ApiError(401, invalidMessage)
+    throw new ApiError(401, 'Invalid email or password')
   }
 
   const valid = await comparePassword(password, user.password)
   if (!valid) {
-    throw new ApiError(401, invalidMessage)
+    throw new ApiError(401, 'Invalid email or password')
   }
 
   assertAccountActive(user)
 
   return issueTokenPair(user)
-}
-
-export async function loginAdmin({ username, password }) {
-  return loginWithCredentials({
-    findUser: (u) => findUserByUsername(u.trim()),
-    identifier: username,
-    password,
-    invalidMessage: 'Invalid username or password',
-  })
-}
-
-export async function loginOrganizer({ email, password }) {
-  return loginWithCredentials({
-    findUser: (e) => findUserByEmail(e, USER_ROLES.ORGANIZER),
-    identifier: email,
-    password,
-    invalidMessage: 'Invalid email or password',
-  })
-}
-
-export async function loginVoter({ email, password }) {
-  return loginWithCredentials({
-    findUser: (e) => findUserByEmail(e, USER_ROLES.VOTER),
-    identifier: email,
-    password,
-    invalidMessage: 'Invalid email or password',
-  })
 }
 
 export async function refreshSession(userId, tokenVersion) {

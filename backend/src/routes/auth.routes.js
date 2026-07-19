@@ -12,9 +12,7 @@ import * as authController from '../controllers/auth.controller.js'
 const router = Router()
 
 router.get('/csrf', csrfLimiter, authController.getCsrfToken)
-router.post('/admin/login', authLimiter, authController.adminLogin)
-router.post('/organizer/login', authLimiter, authController.organizerLogin)
-router.post('/voter/login', authLimiter, authController.voterLogin)
+router.post('/login', authLimiter, authController.login)
 router.post('/forgot-password', passwordResetLimiter, authController.forgotPassword)
 router.post('/reset-password', passwordResetLimiter, authController.resetPassword)
 router.post('/refresh', refreshLimiter, authController.refresh)

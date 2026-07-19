@@ -5,8 +5,7 @@ import { issueCsrfToken, clearCsrfCookie } from '../utils/csrf.js'
 import { verifyAccessToken, verifyRefreshToken } from '../utils/jwt.js'
 import { env } from '../config/env.js'
 import {
-  validateAdminLogin,
-  validateEmailLogin,
+  validateLogin,
   validateChangePassword,
 } from '../validators/auth.validator.js'
 import {
@@ -52,82 +51,29 @@ export const getCsrfToken = asyncHandler(async (_req, res) => {
   res.json({ success: true, csrfToken })
 })
 
-export const adminLogin = asyncHandler(async (req, res) => {
-  const credentials = validateAdminLogin(req.body)
-  try {
-    const tokens = await authService.loginAdmin(credentials)
-    await writeAuthAudit({
-      action: 'ADMIN_LOGIN_SUCCESS',
-      userId: tokens.user?.id ?? null,
-      entityId: tokens.user?.id ?? null,
-      details: {
-        username: tokens.user?.username ?? null,
-        ip: req.ip ?? null,
-        userAgent: req.get('user-agent') ?? null,
-      },
-    })
-    return sendAuthResponse(res, tokens, { remember: credentials.remember })
-  } catch (error) {
-    await writeAuthAudit({
-      action: 'ADMIN_LOGIN_FAILED',
-      details: {
-        username: credentials.username,
-        ip: req.ip ?? null,
-        userAgent: req.get('user-agent') ?? null,
-        message: error.message,
-      },
-    })
-    throw error
-  }
-})
+// Unified login handler - works for admin, organizer, and voter
+export const login = asyncHandler(async (req, res) => {
+  const credentials = validateLogin(req.body)
 
-export const organizerLogin = asyncHandler(async (req, res) => {
-  const credentials = validateEmailLogin(req.body)
   try {
-    const tokens = await authService.loginOrganizer(credentials)
+    const tokens = await authService.login(credentials)
+
     await writeAuthAudit({
-      action: 'ORGANIZER_LOGIN_SUCCESS',
+      action: `${tokens.user.role.toUpperCase()}_LOGIN_SUCCESS`,
       userId: tokens.user?.id ?? null,
       entityId: tokens.user?.id ?? null,
       details: {
         email: tokens.user?.email ?? credentials.email,
+        role: tokens.user?.role,
         ip: req.ip ?? null,
         userAgent: req.get('user-agent') ?? null,
       },
     })
-    return sendAuthResponse(res, tokens, { remember: credentials.remember })
-  } catch (error) {
-    await writeAuthAudit({
-      action: 'ORGANIZER_LOGIN_FAILED',
-      details: {
-        email: credentials.email,
-        ip: req.ip ?? null,
-        userAgent: req.get('user-agent') ?? null,
-        message: error.message,
-      },
-    })
-    throw error
-  }
-})
 
-export const voterLogin = asyncHandler(async (req, res) => {
-  const credentials = validateEmailLogin(req.body)
-  try {
-    const tokens = await authService.loginVoter(credentials)
-    await writeAuthAudit({
-      action: 'VOTER_LOGIN_SUCCESS',
-      userId: tokens.user?.id ?? null,
-      entityId: tokens.user?.id ?? null,
-      details: {
-        email: tokens.user?.email ?? credentials.email,
-        ip: req.ip ?? null,
-        userAgent: req.get('user-agent') ?? null,
-      },
-    })
     return sendAuthResponse(res, tokens, { remember: credentials.remember })
   } catch (error) {
     await writeAuthAudit({
-      action: 'VOTER_LOGIN_FAILED',
+      action: 'LOGIN_FAILED',
       details: {
         email: credentials.email,
         ip: req.ip ?? null,

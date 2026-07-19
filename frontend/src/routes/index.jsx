@@ -1,6 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
 import { lazy } from 'react'
-import MainLayout from '@/layouts/MainLayout'
 import AuthLayout from '@/layouts/AuthLayout'
 import DashboardLayout from '@/layouts/DashboardLayout'
 import ElectionLayout from '@/layouts/ElectionLayout'
@@ -11,11 +10,8 @@ import ProtectedRoute from '@/routes/ProtectedRoute'
 import GuestRoute from '@/routes/GuestRoute'
 import { USER_ROLES } from '@/utils/constants'
 
-const HomePage = lazy(() => import('@/pages/HomePage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
-const AdminLoginPage = lazy(() => import('@/pages/auth/AdminLoginPage'))
-const OrganizerLoginPage = lazy(() => import('@/pages/auth/OrganizerLoginPage'))
-const VoterLoginPage = lazy(() => import('@/pages/auth/VoterLoginPage'))
+const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
 const ChangePasswordPage = lazy(() => import('@/pages/auth/ChangePasswordPage'))
 const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'))
 const OrganizerManagementPage = lazy(() => import('@/pages/admin/OrganizerManagementPage'))
@@ -86,14 +82,19 @@ const CompetitionReportPage = lazy(() => import('@/pages/organizer/reports/Compe
 const PollingReportPage = lazy(() => import('@/pages/organizer/reports/PollingReportPage'))
 
 export const routeConfig = [
+  // ROOT — Shows login for guests, redirects authenticated users to dashboard
   {
     path: '/',
-    element: <MainLayout />,
+    element: (
+      <GuestRoute>
+        <AuthLayout />
+      </GuestRoute>
+    ),
     children: [
-      { index: true, element: <HomePage /> },
-      { path: '*', element: <NotFoundPage /> },
+      { index: true, element: <LoginPage /> },
     ],
   },
+  // /login — alias for root (backward compatibility)
   {
     path: '/login',
     element: (
@@ -102,9 +103,7 @@ export const routeConfig = [
       </GuestRoute>
     ),
     children: [
-      { path: 'admin', element: <AdminLoginPage /> },
-      { path: 'organizer', element: <OrganizerLoginPage /> },
-      { path: 'voter', element: <VoterLoginPage /> },
+      { index: true, element: <LoginPage /> },
     ],
   },
   {
@@ -263,5 +262,10 @@ export const routeConfig = [
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <JudgeScoringPage /> }],
+  },
+  // Catch-all 404
+  {
+    path: '*',
+    element: <NotFoundPage />,
   },
 ]

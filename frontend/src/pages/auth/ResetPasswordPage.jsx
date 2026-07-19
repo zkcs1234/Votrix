@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -37,7 +37,7 @@ export default function ResetPasswordPage() {
         newPassword: values.newPassword,
         confirmPassword: values.confirmPassword,
       })
-      navigate('/login/organizer', {
+      navigate('/login', {
         replace: true,
         state: { message: 'Password reset. You can sign in now.' },
       })

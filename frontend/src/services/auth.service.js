@@ -20,16 +20,9 @@ async function ensureFreshCsrfToken() {
 }
 
 export const authService = {
-  adminLogin(credentials) {
-    return api.post('/auth/admin/login', credentials)
-  },
-
-  organizerLogin(credentials) {
-    return api.post('/auth/organizer/login', credentials)
-  },
-
-  voterLogin(credentials) {
-    return api.post('/auth/voter/login', credentials)
+  // Unified login - works for admin, organizer, and voter
+  login(credentials) {
+    return api.post('/auth/login', credentials)
   },
 
   refresh() {

@@ -1,12 +1,7 @@
 import { z } from 'zod'
 
-export const adminLoginSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
-  password: z.string().min(1, 'Password is required'),
-  remember: z.boolean().optional(),
-})
-
-export const emailLoginSchema = z.object({
+// Unified login schema for admin, organizer, and voter
+export const loginSchema = z.object({
   email: z.string().email('Enter a valid email'),
   password: z.string().min(1, 'Password is required'),
   remember: z.boolean().optional(),

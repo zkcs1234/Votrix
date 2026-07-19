@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { User, Mail, LogIn, Home } from 'lucide-react'
+import { Mail, LogIn } from 'lucide-react'
 import AuthFormField from '@/components/auth/AuthFormField'
 import Input from '@/components/ui/Input'
 import PasswordInput from '@/components/ui/PasswordInput'
@@ -14,9 +14,7 @@ export default function LoginForm({
   onSubmit,
   register,
   errors,
-  usernameField = false,
   showForgot = false,
-  showHomeLink = true,
 }) {
   return (
     <div className="w-full max-w-md">
@@ -25,21 +23,12 @@ export default function LoginForm({
 
       <Card padding="md" className="mt-6">
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
-          {usernameField ? (
-            <AuthFormField label="Username" id="username" error={errors.username?.message}>
-              <div className="relative">
-                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
-                <Input id="username" type="text" autoComplete="username" className="pl-9" {...register('username')} />
-              </div>
-            </AuthFormField>
-          ) : (
-            <AuthFormField label="Email" id="email" error={errors.email?.message}>
-              <div className="relative">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
-                <Input id="email" type="email" autoComplete="email" className="pl-9" {...register('email')} />
-              </div>
-            </AuthFormField>
-          )}
+          <AuthFormField label="Email" id="email" error={errors.email?.message}>
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
+              <Input id="email" type="email" autoComplete="email" className="pl-9" {...register('email')} />
+            </div>
+          </AuthFormField>
 
           <AuthFormField label="Password" id="password" error={errors.password?.message}>
             <PasswordInput id="password" autoComplete="current-password" {...register('password')} />
@@ -76,15 +65,6 @@ export default function LoginForm({
           </SubmitButton>
         </form>
       </Card>
-
-      {showHomeLink && (
-        <p className="mt-6 text-center text-sm">
-          <Link to="/" className="v-btn-tertiary inline-flex items-center gap-1.5">
-            <Home className="h-3.5 w-3.5" strokeWidth={2} />
-            Back to home
-          </Link>
-        </p>
-      )}
     </div>
   )
 }

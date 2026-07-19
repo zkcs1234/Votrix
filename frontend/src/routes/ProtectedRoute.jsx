@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { getRoleDashboardPath, getRoleLoginPath } from '@/utils/auth'
+import { getRoleDashboardPath } from '@/utils/auth'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 export default function ProtectedRoute({
@@ -20,8 +20,7 @@ export default function ProtectedRoute({
   }
 
   if (!isAuthenticated) {
-    const loginPath = allowedRoles?.length === 1 ? getRoleLoginPath(allowedRoles[0]) : '/'
-    return <Navigate to={loginPath} state={{ from: location }} replace />
+    return <Navigate to="/login" state={{ from: location }} replace />
   }
 
   if (!role) {

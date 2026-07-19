@@ -3,17 +3,8 @@ import { sanitizeEmail, sanitizeString } from '../utils/sanitize.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function validateAdminLogin(body) {
-  const { username, password, remember } = body ?? {}
-
-  if (!username?.trim() || !password) {
-    throw new ApiError(400, 'Username and password are required')
-  }
-
-  return { username: sanitizeString(username, 64), password, remember: Boolean(remember) }
-}
-
-export function validateEmailLogin(body) {
+// Unified login validator - handles admin, organizer, and voter
+export function validateLogin(body) {
   const { email, password, remember } = body ?? {}
 
   if (!email?.trim() || !password) {
