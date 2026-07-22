@@ -19,7 +19,7 @@ export async function getOrganizersList() {
 
   const orgsQuery = db()
     .from(DB_TABLES.ORGANIZATIONS)
-    .select('id, organization_name, status, organizer_id')
+    .select('id, organization_name, logo, status, organizer_id')
   const orgs = await wrap(await orgsQuery, { context: 'admin.getOrganizersList.orgs' })
 
   return users.map((orgUser) => {

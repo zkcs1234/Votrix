@@ -6,6 +6,7 @@ import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import PollQuestionField from '@/components/voter/polling/PollQuestionField'
+import VoterEventHeader from '@/components/voter/VoterEventHeader'
 
 export default function VoterPollPage() {
   const { eventId } = useParams()
@@ -141,18 +142,11 @@ export default function VoterPollPage() {
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-6 pb-24">
-      <div>
-        <Link to="/voter" className="text-sm text-v-text-subtle hover:text-v-text-muted">
-          ← Dashboard
-        </Link>
-        <h2 className="mt-2 text-xl font-semibold text-v-text">{poll.event.title}</h2>
-        {poll.event.description && (
-          <p className="mt-1 text-sm text-v-text-subtle">{poll.event.description}</p>
-        )}
+      <VoterEventHeader event={poll.event} eyebrow="Poll">
         {poll.event.pollAnonymous && (
-          <p className="mt-2 text-xs text-v-text-subtle/80">Your responses are anonymous.</p>
+          <p className="text-xs font-medium text-white/70">Your responses are anonymous.</p>
         )}
-      </div>
+      </VoterEventHeader>
 
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-sm">
         <span className="text-v-text-muted">

@@ -1034,9 +1034,11 @@ export async function listJudgeCompetitionEvents(judgeId) {
         id,
         title,
         description,
+        banner,
         scoring_enabled,
         status,
-        event_type
+        event_type,
+        organization_id
       )
     `,
     )

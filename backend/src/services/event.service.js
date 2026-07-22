@@ -18,6 +18,7 @@ export async function getEventById(eventId) {
         organizations (
           id,
           organization_name,
+          logo,
           organizer_id
         )
       `,

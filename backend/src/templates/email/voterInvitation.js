@@ -13,7 +13,7 @@ export function voterInvitationTemplate({
     ${infoBoxHtml([
       ['Event', eventTitle],
       ['Email', email],
-      ['Temporary password', temporaryPassword],
+      ['Temporary password', temporaryPassword, true],
     ])}
     ${buttonHtml(eventLink, 'Open event')}
     <p style="margin:8px 0 16px;font-size:13px;color:#94a3b8;">

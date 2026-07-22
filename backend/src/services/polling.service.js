@@ -26,8 +26,11 @@ import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
 
 
 function mapPollEvent(row) {
+  const org = row.organizations ?? null
+
   return {
     id: row.id,
+    organizationId: row.organization_id,
     title: row.title,
     description: row.description,
     banner: row.banner,
@@ -39,6 +42,13 @@ function mapPollEvent(row) {
     pollExpiresAt: row.poll_expires_at,
     startDate: row.start_date,
     endDate: row.end_date,
+    organization: org
+      ? {
+          id: org.id,
+          name: org.organization_name,
+          logo: org.logo ?? null,
+        }
+      : null,
   }
 }
 
@@ -677,7 +687,21 @@ export async function listVoterPollEvents(voterId) {
     .select(
       `
       has_voted,
-      events (*)
+      events (
+        id,
+        title,
+        description,
+        banner,
+        status,
+        event_type,
+        polling_enabled,
+        poll_anonymous,
+        poll_allow_multiple_submissions,
+        poll_expires_at,
+        start_date,
+        end_date,
+        organization_id
+      )
     `,
     )
     .eq('voter_id', voterId)

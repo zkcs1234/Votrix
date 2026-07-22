@@ -5,6 +5,7 @@ import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ElectionPositionSection from '@/components/voter/election/ElectionPositionSection'
 import Button from '@/components/ui/Button'
+import VoterEventHeader from '@/components/voter/VoterEventHeader'
 
 function validateSelections(positions, selections) {
   let hasAtLeastOneVote = false
@@ -243,15 +244,7 @@ export default function VoterEventPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-28">
-      <div>
-        <Link to="/voter" className="v-btn-tertiary text-sm">
-          ← Dashboard
-        </Link>
-        <h2 className="v-page-title mt-2">{ballot.event.title}</h2>
-        {ballot.event.description && (
-          <p className="v-caption mt-1">{ballot.event.description}</p>
-        )}
-      </div>
+      <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
 
       <div className="v-card-sm">
         <div className="flex justify-between text-sm">

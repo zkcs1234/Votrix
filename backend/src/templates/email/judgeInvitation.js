@@ -13,7 +13,7 @@ export function judgeInvitationTemplate({
     ${infoBoxHtml([
       ['Event', eventTitle],
       ['Email', email],
-      ['Temporary password', temporaryPassword],
+      ['Temporary password', temporaryPassword, true],
     ])}
     ${buttonHtml(eventLink, 'Open scoring')}
     <p style="margin:8px 0 0;font-size:13px;color:#94a3b8;">

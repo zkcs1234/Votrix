@@ -791,11 +791,13 @@ export async function listVoterElectionEvents(voterId) {
         id,
         title,
         description,
+        banner,
         voting_enabled,
         status,
         event_type,
         start_date,
-        end_date
+        end_date,
+        organization_id
       )
     `,
     )

@@ -5,6 +5,7 @@ import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import CompetitionScoringForm from '@/components/voter/competition/CompetitionScoringForm'
+import VoterEventHeader from '@/components/voter/VoterEventHeader'
 
 export default function JudgeScoringPage() {
   const { eventId } = useParams()
@@ -129,13 +130,9 @@ export default function JudgeScoringPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-24">
-      <div>
-        <Link to="/voter" className="text-sm text-v-text-subtle hover:text-v-text-muted">
-          ← Dashboard
-        </Link>
-        <h2 className="mt-2 text-xl font-semibold text-v-text">{sheet.event.title}</h2>
-        <p className="text-sm text-v-text-muted/90">Judge scoring — one submission only</p>
-      </div>
+      <VoterEventHeader event={sheet.event} eyebrow="Judge scoring">
+        <p className="text-sm font-medium text-white/75">One submission only</p>
+      </VoterEventHeader>
 
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-sm">
         <p className="text-v-text-muted">

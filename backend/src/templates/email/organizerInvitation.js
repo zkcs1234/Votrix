@@ -6,7 +6,7 @@ export function organizerInvitationTemplate({ email, temporaryPassword, loginUrl
     <p style="margin:0 0 16px;">An administrator created your VOTRIX organizer account. Use the credentials below to sign in. You will be asked to change your password on first login.</p>
     ${infoBoxHtml([
       ['Email', email],
-      ['Temporary password', temporaryPassword],
+      ['Temporary password', temporaryPassword, true],
     ])}
     ${buttonHtml(loginUrl, 'Sign in to VOTRIX')}
     <p style="margin:16px 0 0;font-size:13px;color:#94a3b8;">

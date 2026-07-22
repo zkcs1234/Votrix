@@ -56,8 +56,8 @@ export function buttonHtml(href, label) {
 export function infoBoxHtml(rows) {
   const items = rows
     .map(
-      ([label, value]) =>
-        `<tr><td style="padding:6px 0;color:#94a3b8;width:140px;">${escapeHtml(label)}</td><td style="padding:6px 0;color:#f1f5f9;font-weight:500;">${escapeHtml(value)}</td></tr>`,
+      ([label, value, isMonospace]) =>
+        `<tr><td style="padding:6px 0;color:#94a3b8;width:140px;">${escapeHtml(label)}</td><td style="padding:6px 0;color:#f1f5f9;font-weight:500;${isMonospace ? 'font-family:Consolas,Monaco,monospace;letter-spacing:0.5px;' : ''}">${escapeHtml(value)}</td></tr>`,
     )
     .join('')
 

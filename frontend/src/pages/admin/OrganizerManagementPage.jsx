@@ -24,6 +24,9 @@ function OrganizerTableSkeleton() {
         <thead>
           <tr>
             <th>
+              <div className="h-4 w-10 animate-pulse rounded-lg bg-v-surface-elevated" />
+            </th>
+            <th>
               <div className="h-4 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
             </th>
             <th>
@@ -43,6 +46,9 @@ function OrganizerTableSkeleton() {
         <tbody className="divide-y divide-v-border">
           {Array.from({ length: 6 }).map((_, i) => (
             <tr key={i}>
+              <td>
+                <div className="h-7 w-7 animate-pulse rounded-lg bg-v-surface-elevated" />
+              </td>
               <td>
                 <div className="h-4 w-40 animate-pulse rounded-lg bg-v-surface-elevated" />
               </td>
@@ -75,6 +81,35 @@ function getStatusTone(status) {
 
 function getStatusLabel(status) {
   return STATUS_CONFIG[status]?.label ?? status
+}
+
+function getInitials(value) {
+  const words = value?.trim?.().split(/\s+/).filter(Boolean) ?? []
+  if (words.length === 0) return 'OR'
+  return words.slice(0, 2).map((word) => word[0]).join('').toUpperCase()
+}
+
+function getPrimaryOrganization(organizer) {
+  const organizations = organizer.organizations ?? []
+  return organizations.find((organization) => organization.logo) ?? organizations[0] ?? null
+}
+
+function OrganizationLogo({ organization, fallback }) {
+  const name = organization?.organization_name || fallback
+
+  return (
+    <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-v-border bg-v-surface-elevated text-[10px] font-semibold text-v-text-muted">
+      {organization?.logo ? (
+        <img
+          src={organization.logo}
+          alt={`${name} logo`}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        getInitials(name)
+      )}
+    </div>
+  )
 }
 
 export default function OrganizerManagementPage() {
@@ -244,6 +279,7 @@ export default function OrganizerManagementPage() {
             <table className="v-table">
               <thead>
                 <tr>
+                  <th>Logo</th>
                   <th>Email</th>
                   <th>Status</th>
                   <th>Organizations</th>
@@ -256,6 +292,7 @@ export default function OrganizerManagementPage() {
                   const status = org.account_status || 'active'
                   const orgCount = org.organizationSummary?.total ?? org.organizations?.length ?? 0
                   const activeOrgs = org.organizationSummary?.active ?? 0
+                  const primaryOrganization = getPrimaryOrganization(org)
                   const isBusy = savingKey?.startsWith(org.id)
                   const nextPrimaryAction =
                     status === 'pending'
@@ -268,6 +305,9 @@ export default function OrganizerManagementPage() {
 
                   return (
                     <tr key={org.id} className="hover:bg-v-surface-elevated/50">
+                      <td>
+                        <OrganizationLogo organization={primaryOrganization} fallback={org.email} />
+                      </td>
                       <td>
                         <div className="space-y-1">
                           <p className="font-medium text-v-text">{org.email}</p>

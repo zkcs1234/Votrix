@@ -3,15 +3,15 @@ import { env } from '../config/env.js'
 const base = env.clientUrl.replace(/\/$/, '')
 
 export function organizerLoginUrl() {
-  return `${base}/login/organizer`
+  return `${base}/login`
 }
 
 export function voterLoginUrl() {
-  return `${base}/login/voter`
+  return `${base}/login`
 }
 
 export function adminLoginUrl() {
-  return `${base}/login/admin`
+  return `${base}/login`
 }
 
 export function eventUrl(eventId) {

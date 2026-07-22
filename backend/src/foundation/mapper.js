@@ -35,6 +35,10 @@ export function mapOrganization(row) {
  */
 export function mapEvent(row) {
   if (!row) return null
+
+  // Handle organization data - may come from join as nested object
+  const org = row.organizations ?? null
+
   return {
     id: row.id,
     organizationId: row.organization_id,
@@ -52,6 +56,14 @@ export function mapEvent(row) {
     resultsVisibility: row.results_visibility ?? 'public',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    // Organization data from join
+    organization: org
+      ? {
+          id: org.id,
+          name: org.organization_name,
+          logo: org.logo ?? null,
+        }
+      : null,
   }
 }
 
