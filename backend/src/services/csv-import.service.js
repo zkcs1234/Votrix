@@ -4,7 +4,7 @@ import { ApiError } from '../utils/ApiError.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
 import { inviteVoterToEvent, inviteRegisteredVoter, registerVoterToEvent, registerExistingVoter } from './invitation.service.js'
 import { db as getClient } from '../foundation/db.js'
-import { DB_TABLES } from '../utils/constants.js'
+import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
 
 function parseCsvBuffer(buffer) {
   return new Promise((resolve, reject) => {
@@ -22,7 +22,7 @@ function parseCsvBuffer(buffer) {
   })
 }
 
-function normalizeRow(row, index) {
+function validateRow(row, index) {
   const email = (row.email || row.e_mail || '').trim().toLowerCase()
 
   if (!email) {
@@ -34,9 +34,8 @@ function normalizeRow(row, index) {
     return { error: `Row ${index + 2}: invalid email`, row: null }
   }
 
-  // All rows are new voters - password will be auto-generated
   return {
-    row: { email, type: 'new' },
+    row: { email },
     error: null,
   }
 }
@@ -52,6 +51,35 @@ async function rollbackCsvEnrollments(eventId, voterIds) {
     .delete()
     .eq('event_id', eventId)
     .in('voter_id', voterIds)
+}
+
+/**
+ * Check which emails already exist in the users table.
+ * Returns a map of email -> user exists (boolean)
+ */
+async function checkExistingAccounts(emails) {
+  if (!emails || emails.length === 0) return new Map()
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.USERS)
+    .select('email, role')
+    .in('email', emails)
+    .eq('role', USER_ROLES.VOTER)
+
+  if (error) {
+    console.error('[csv-import] Error checking existing accounts:', error.message)
+    throw new ApiError(500, 'Failed to validate email addresses')
+  }
+
+  const emailMap = new Map()
+  // Initialize all as not existing
+  emails.forEach(email => emailMap.set(email, false))
+  // Mark existing voter accounts
+  if (data) {
+    data.forEach(user => emailMap.set(user.email, true))
+  }
+
+  return emailMap
 }
 
 export async function importVotersFromCsv(eventId, organizerId, fileBuffer) {
@@ -73,8 +101,9 @@ export async function importVotersFromCsv(eventId, organizerId, fileBuffer) {
   const errors = []
   const seenEmails = new Set()
 
+  // First pass: validate and collect emails
   rawRows.forEach((raw, index) => {
-    const { row, error } = normalizeRow(raw, index)
+    const { row, error } = validateRow(raw, index)
     if (error) {
       errors.push(error)
       return
@@ -91,11 +120,21 @@ export async function importVotersFromCsv(eventId, organizerId, fileBuffer) {
     throw new ApiError(400, 'CSV validation failed', { errors })
   }
 
+  // Batch check which emails already exist in DB
+  const emails = parsed.map(p => p.email)
+  const existingAccountMap = await checkExistingAccounts(emails)
+
+  // Classify each row based on DB lookup
+  const classifiedRows = parsed.map(row => ({
+    ...row,
+    type: existingAccountMap.get(row.email) ? 'existing' : 'new',
+  }))
+
   const results = []
   const enrolledVoterIds = []
 
   try {
-    for (const row of parsed) {
+    for (const row of classifiedRows) {
       let invite
 
       if (row.type === 'new') {
@@ -166,6 +205,7 @@ export async function importVotersFromCsv(eventId, organizerId, fileBuffer) {
 /**
  * Preview CSV data - parse and validate without creating any records.
  * Returns parsed data for review before registration.
+ * NOW DB-AWARE: looks up existing accounts in the database.
  */
 export async function previewCsv(eventId, organizerId, fileBuffer) {
   if (!Buffer.isBuffer(fileBuffer)) {
@@ -183,8 +223,9 @@ export async function previewCsv(eventId, organizerId, fileBuffer) {
   const errors = []
   const seenEmails = new Set()
 
+  // First pass: validate and collect emails
   rawRows.forEach((raw, index) => {
-    const { row, error } = normalizeRow(raw, index)
+    const { row, error } = validateRow(raw, index)
     if (error) {
       errors.push(error)
       return
@@ -194,19 +235,34 @@ export async function previewCsv(eventId, organizerId, fileBuffer) {
       return
     }
     seenEmails.add(row.email)
-    parsed.push({
-      email: row.email,
-      type: row.type === 'new' ? 'new' : 'existing',
-      rowNumber: index + 2,
-    })
+    parsed.push(row)
   })
+
+  // Batch check which emails already exist in DB
+  const emails = parsed.map(p => p.email)
+  const existingAccountMap = await checkExistingAccounts(emails)
+
+  // Classify each row based on DB lookup
+  const classifiedData = parsed.map(row => ({
+    email: row.email,
+    type: existingAccountMap.get(row.email) ? 'existing' : 'new',
+    rowNumber: parsed.indexOf(row) + 2, // +2 for 1-based and header row
+  }))
+
+  // Count summary
+  const newCount = classifiedData.filter(r => r.type === 'new').length
+  const existingCount = classifiedData.filter(r => r.type === 'existing').length
 
   // Return preview even if there are errors - organizer can see what would be imported
   return {
     total: rawRows.length,
     valid: parsed.length,
     errors: errors,
-    data: parsed,
+    data: classifiedData,
+    summary: {
+      newAccounts: newCount,
+      existingAccounts: existingCount,
+    },
   }
 }
 
@@ -235,6 +291,8 @@ export async function registerVotersFromCsv(eventId, organizerId, parsedData) {
           email: row.email,
           organizerId,
           temporaryPassword: row.temporaryPassword,
+          // Don't reset password for existing - this is a new account
+          resetPasswordForExisting: false,
         })
 
         enrolledVoterIds.push(result.user.id)
@@ -246,7 +304,7 @@ export async function registerVotersFromCsv(eventId, organizerId, parsedData) {
           invitationSent: false,
         })
       } else {
-        // Enroll existing voter
+        // Enroll existing voter - this is an existing account
         result = await registerExistingVoter({
           eventId,
           email: row.email,

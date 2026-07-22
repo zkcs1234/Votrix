@@ -188,7 +188,7 @@ See `docs/ai/REALTIME.md` for full details.
 - **Backend version:** 1.0.0 (package.json)
 - **API phase:** Phase 12 (reported in `/api` root response)
 - **Development status:** Production-ready, all 14 phases complete
-- **Documentation note:** Known issues are now documented as resolved or monitored only in `docs/ai/KNOWN_ISSUES.md`, with no verified unresolved blockers in the current implementation.
+- **Documentation note:** Known issues and technical debt are tracked in `docs/ai/KNOWN_ISSUES.md` and kept aligned with the current implementation.
 
 ---
 

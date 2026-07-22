@@ -20,5 +20,6 @@ router.post('/logout', authController.logout)
 
 router.get('/me', authenticate, authController.getMe)
 router.post('/change-password', authenticate, strictLimiter, authController.changePassword)
+router.post('/skip-password-change', authenticate, strictLimiter, authController.skipPasswordChange)
 
 export default router

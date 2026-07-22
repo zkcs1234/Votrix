@@ -4,15 +4,6 @@
 
 ---
 
-## [1.0.2] — 2026-07-04
-
-### Documentation
-
-- Updated the known-issues tracker to reflect the current implementation state, documenting the previously resolved auth issues and removing the stale unresolved list.
-- Adjusted the AI context summary to note that no verified unresolved blockers are currently present.
-
----
-
 ## [1.0.1] — 2026-07-04
 
 ### Documentation

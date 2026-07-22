@@ -173,3 +173,23 @@ export const changePassword = asyncHandler(async (req, res) => {
     user: tokens.user,
   })
 })
+
+/**
+ * Skip password change - allows voters to keep their temporary password.
+ */
+export const skipPasswordChange = asyncHandler(async (req, res) => {
+  const user = await authService.skipPasswordChange(req.user.id)
+
+  // Issue new session tokens since must_change_password changed
+  const tokens = await authService.issueSessionForUser(user.id)
+
+  setAuthCookies(res, tokens)
+  const csrfToken = issueCsrfToken(res)
+
+  res.json({
+    success: true,
+    message: 'You can continue with your current password',
+    csrfToken,
+    user: tokens.user,
+  })
+})

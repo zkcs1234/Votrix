@@ -1,5 +1,6 @@
 import { ApiError } from '../utils/ApiError.js'
 import { comparePassword } from '../utils/password.js'
+import { USER_ROLES } from '../utils/constants.js'
 import {
   findUserByEmail,
   findUserById,
@@ -103,4 +104,40 @@ export async function changePassword(userId, { currentPassword, newPassword }) {
   await incrementTokenVersion(userId)
   const refreshed = await findUserById(userId)
   return sanitizeUser(refreshed)
+}
+
+/**
+ * Skip password change for voters who have must_change_password = true.
+ * This allows voters to keep their temporary password if they choose.
+ * Only allowed for voters - organizers/admins must change their password.
+ */
+export async function skipPasswordChange(userId) {
+  const user = await findUserById(userId)
+  if (!user) {
+    throw new ApiError(404, 'User not found')
+  }
+
+  // Only allow voters to skip - organizers/admins must change their password
+  if (user.role !== USER_ROLES.VOTER) {
+    throw new ApiError(403, 'Password change is required for your account type')
+  }
+
+  // Check if user actually has must_change_password = true
+  if (!user.must_change_password) {
+    throw new ApiError(400, 'Password change is not required for your account')
+  }
+
+  // Clear the must_change_password flag without changing the password
+  const { data, error } = await db()
+    .from(DB_TABLES.USERS)
+    .update({ must_change_password: false })
+    .eq('id', userId)
+    .select('*')
+    .single()
+
+  if (error) {
+    throw new ApiError(500, 'Failed to update password status')
+  }
+
+  return sanitizeUser(data)
 }

@@ -45,6 +45,14 @@ export const authService = {
     )
   },
 
+  skipPasswordChange() {
+    return ensureFreshCsrfToken().then((csrfToken) =>
+      api.post('/auth/skip-password-change', {}, {
+        headers: csrfToken ? { [CSRF_HEADER]: csrfToken } : undefined,
+      }),
+    )
+  },
+
   createOrganizer(payload) {
     return api.post('/admin/organizers', payload)
   },

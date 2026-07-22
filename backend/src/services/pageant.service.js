@@ -14,7 +14,7 @@ import {
 import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
 import { findUserByEmail, sanitizeUser } from './user.service.js'
-import { sendJudgeInvitationEmail } from './mailer.service.js'
+import { sendJudgeInvitationEmail, sendJudgeInvitationEmailRegistered } from './mailer.service.js'
 import {
   computeRankings,
   resolveScoreBounds,
@@ -517,6 +517,8 @@ export async function registerJudge(eventId, organizerId, { email, temporaryPass
 
 /**
  * Send invitation email for an already-registered judge.
+ * If judge has an existing account, sends "you're invited" email without password reset.
+ * If judge is new, generates temp password and sends it.
  */
 export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
   await assertCompetitionEvent(eventId, organizerId)
@@ -533,31 +535,72 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
   if (!enrollment) throw new ApiError(404, 'Judge is not enrolled in this event')
 
   const judgeEmail = enrollment.users?.email
-  const tempPassword = generateTemporaryPassword()
-  const passwordHash = await hashPassword(tempPassword)
 
-  await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', judgeId)
+  // Check if this judge has other sent invitations (existing account)
+  const { data: otherInvitations } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .select('id, invitation_sent')
+    .eq('voter_id', judgeId)
+    .neq('event_id', eventId)
+    .limit(1)
 
-  const emailResult = await sendJudgeInvitationEmail({
-    email: judgeEmail,
-    temporaryPassword: tempPassword,
-    eventId: event.id,
-    eventTitle: event.title,
-  })
+  const isExistingAccount = otherInvitations && otherInvitations.length > 0 &&
+    otherInvitations.some(inv => inv.invitation_sent === true)
 
-  if (emailResult.sent) {
+  let tempPassword = null
+  let emailResult = null
+  let invitationType = isExistingAccount ? 'existing' : 'new'
+
+  if (isExistingAccount) {
+    // Existing account - send registered email without password reset
+    console.log(`[sendJudgeInvitation] existing account detected for ${judgeEmail}, sending registered email`)
+
+    emailResult = await sendJudgeInvitationEmailRegistered({
+      email: judgeEmail,
+      eventId: event.id,
+      eventTitle: event.title,
+    })
+  } else {
+    // New account - generate temp password
+    tempPassword = generateTemporaryPassword()
+    const passwordHash = await hashPassword(tempPassword)
+
+    await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', judgeId)
+
+    emailResult = await sendJudgeInvitationEmail({
+      email: judgeEmail,
+      temporaryPassword: tempPassword,
+      eventId: event.id,
+      eventTitle: event.title,
+    })
+  }
+
+  if (emailResult?.sent) {
     try {
-      await getClient().from(DB_TABLES.INVITATIONS).update({ invitation_sent: true }).eq('event_id', eventId).eq('voter_id', judgeId)
+      await getClient()
+        .from(DB_TABLES.INVITATIONS)
+        .update({
+          invitation_sent: true,
+          is_new_account: !isExistingAccount,
+        })
+        .eq('event_id', eventId)
+        .eq('voter_id', judgeId)
     } catch (dbErr) {
       console.error('[sendJudgeInvitation] failed to mark invitation_sent=true:', dbErr.message)
     }
   }
 
-  return { email: emailResult, invitationSent: emailResult.sent }
+  return {
+    email: emailResult,
+    invitationSent: emailResult?.sent,
+    invitationType,
+    temporaryPassword,
+  }
 }
 
 /**
  * Send all pending judge invitations for an event.
+ * Handles both new and existing accounts appropriately.
  */
 export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
@@ -582,35 +625,89 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
   const judgeIds = new Set((judgeRows ?? []).map((r) => r.voter_id))
   const pendingJudges = pending.filter((p) => judgeIds.has(p.voter_id))
 
+  // Check which judges are existing accounts
+  const allJudgeIds = pendingJudges.map(p => p.voter_id)
+  const { data: existingCheck } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .select('voter_id')
+    .in('voter_id', allJudgeIds)
+    .eq('invitation_sent', true)
+
+  const existingAccountIds = new Set()
+  if (existingCheck) {
+    existingCheck.forEach(inv => existingAccountIds.add(inv.voter_id))
+  }
+
   let sent = 0, failed = 0
   const results = []
 
   for (const p of pendingJudges) {
     const judgeEmail = p.users?.email
-    const tempPassword = generateTemporaryPassword()
-    const passwordHash = await hashPassword(tempPassword)
+    const isExistingAccount = existingAccountIds.has(p.voter_id)
+
+    let tempPassword = null
+    let emailResult = null
+    let invitationType = isExistingAccount ? 'existing' : 'new'
 
     try {
-      await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', p.voter_id)
+      if (isExistingAccount) {
+        // Existing account - send registered email without password reset
+        emailResult = await sendJudgeInvitationEmailRegistered({
+          email: judgeEmail,
+          eventId: event.id,
+          eventTitle: event.title,
+        })
+      } else {
+        // New account - generate temp password
+        tempPassword = generateTemporaryPassword()
+        const passwordHash = await hashPassword(tempPassword)
 
-      const emailResult = await sendJudgeInvitationEmail({
-        email: judgeEmail,
-        temporaryPassword: tempPassword,
-        eventId: event.id,
-        eventTitle: event.title,
-      })
+        await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', p.voter_id)
 
-      if (emailResult.sent) {
-        await getClient().from(DB_TABLES.INVITATIONS).update({ invitation_sent: true }).eq('event_id', eventId).eq('voter_id', p.voter_id)
+        emailResult = await sendJudgeInvitationEmail({
+          email: judgeEmail,
+          temporaryPassword: tempPassword,
+          eventId: event.id,
+          eventTitle: event.title,
+        })
+      }
+
+      if (emailResult?.sent) {
+        await getClient()
+          .from(DB_TABLES.INVITATIONS)
+          .update({
+            invitation_sent: true,
+            is_new_account: !isExistingAccount,
+          })
+          .eq('event_id', eventId)
+          .eq('voter_id', p.voter_id)
         sent++
-        results.push({ judgeId: p.voter_id, email: judgeEmail, success: true })
+        results.push({
+          judgeId: p.voter_id,
+          email: judgeEmail,
+          success: true,
+          invitationType,
+          temporaryPassword,
+        })
       } else {
         failed++
-        results.push({ judgeId: p.voter_id, email: judgeEmail, success: false, error: emailResult.error || 'Email delivery failed' })
+        results.push({
+          judgeId: p.voter_id,
+          email: judgeEmail,
+          success: false,
+          invitationType,
+          error: emailResult?.error || 'Email delivery failed',
+        })
       }
     } catch (err) {
       failed++
-      results.push({ judgeId: p.voter_id, email: judgeEmail, success: false, error: err.message })
+      results.push({
+        judgeId: p.voter_id,
+        email: judgeEmail,
+        success: false,
+        invitationType,
+        error: err.message,
+      })
     }
   }
 

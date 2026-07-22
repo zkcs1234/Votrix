@@ -222,25 +222,52 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
     throw new ApiError(404, 'Voter is not enrolled in this event')
   }
 
-  const tempPassword = generateTemporaryPassword()
-  const passwordHash = await hashPassword(tempPassword)
+  // Check if this is an existing account (has other sent invitations)
+  const { data: otherInvitations } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .select('id, invitation_sent')
+    .eq('voter_id', voterId)
+    .neq('event_id', eventId)
+    .limit(1)
 
-  await getClient()
-    .from(DB_TABLES.USERS)
-    .update({
-      password: passwordHash,
-      must_change_password: true,
+  const isExistingAccount = otherInvitations && otherInvitations.length > 0 &&
+    otherInvitations.some(inv => inv.invitation_sent === true)
+
+  let tempPassword = null
+  let emailResult = null
+  let invitationType = isExistingAccount ? 'existing' : 'new'
+
+  if (isExistingAccount) {
+    // Existing account - send "you're invited" email without password reset
+    console.log(`[resend-invitation] existing account detected for ${voter.email}, sending registered email`)
+
+    emailResult = await sendVoterInvitationEmailRegistered({
+      email: voter.email,
+      eventId: event.id,
+      eventTitle: event.title,
     })
-    .eq('id', voterId)
+  } else {
+    // New account - generate new temp password
+    tempPassword = generateTemporaryPassword()
+    const passwordHash = await hashPassword(tempPassword)
 
-  const emailResult = await sendVoterInvitationEmail({
-    email: voter.email,
-    temporaryPassword: tempPassword,
-    eventId: event.id,
-    eventTitle: event.title,
-  })
+    await getClient()
+      .from(DB_TABLES.USERS)
+      .update({
+        password: passwordHash,
+        must_change_password: true,
+      })
+      .eq('id', voterId)
 
-  if (emailResult.sent) {
+    emailResult = await sendVoterInvitationEmail({
+      email: voter.email,
+      temporaryPassword: tempPassword,
+      eventId: event.id,
+      eventTitle: event.title,
+    })
+  }
+
+  if (emailResult?.sent) {
     await getClient()
       .from(DB_TABLES.INVITATIONS)
       .update({ invitation_sent: true })
@@ -249,9 +276,11 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
 
     await createNotification({
       userId: voterId,
-      type: 'voter.invitation.resend',
-      title: `Invitation resent for ${event.title}`,
-      message: `A new temporary password was sent for ${event.title}.`,
+      type: isExistingAccount ? 'voter.invitation.registered' : 'voter.invitation.resend',
+      title: isExistingAccount ? `You're invited to ${event.title}` : `Invitation resent for ${event.title}`,
+      message: isExistingAccount
+        ? `You've been added to ${event.title}. Sign in with your existing password.`
+        : `A new temporary password was sent for ${event.title}.`,
       actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
         ? `/voter/competition/events/${event.id}/score`
         : event.event_type === 'polling'
@@ -263,7 +292,11 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
     })
   }
 
-  return { email: emailResult }
+  return {
+    email: emailResult,
+    invitationType,
+    temporaryPassword, // null for existing accounts
+  }
 }
 
 // ============================================================================
@@ -422,7 +455,10 @@ export async function registerExistingVoter({ eventId, email, organizerId }) {
 
 /**
  * Send invitation email for a voter who is already registered/enrolled.
- * Generates new temporary password and sends invitation email.
+ * If voter has an existing account (not new), sends "you're invited" email without password reset.
+ * If voter is new, generates temp password and sends it.
+ *
+ * Returns invitationType to help frontend show appropriate modal.
  */
 export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
@@ -446,42 +482,74 @@ export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
     throw new ApiError(404, 'Voter is not enrolled in this event')
   }
 
-  // Check current invitation status
+  // Check invitation record to determine if this is a new or existing account
+  // An existing account = was already in the users table before this invitation
+  // We determine this by checking if user has other event_enrollments or was invited before
   const { data: invitation } = await getClient()
     .from(DB_TABLES.INVITATIONS)
-    .select('invitation_sent')
+    .select('id, invitation_sent, is_new_account')
     .eq('event_id', eventId)
     .eq('voter_id', voterId)
     .maybeSingle()
 
-  // Generate new temporary password
-  const tempPassword = generateTemporaryPassword()
-  const passwordHash = await hashPassword(tempPassword)
+  // Check if user has any previous invitations (meaning they existed before)
+  const { data: otherInvitations } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .select('id, invitation_sent')
+    .eq('voter_id', voterId)
+    .neq('event_id', eventId)  // Exclude current event
+    .limit(1)
 
-  await getClient()
-    .from(DB_TABLES.USERS)
-    .update({
-      password: passwordHash,
-      must_change_password: true,
+  // If user has other invitations that were sent, they are "existing"
+  const isExistingAccount = otherInvitations && otherInvitations.length > 0 &&
+    otherInvitations.some(inv => inv.invitation_sent === true)
+
+  let tempPassword = null
+  let emailResult = null
+  let invitationType = isExistingAccount ? 'existing' : 'new'
+
+  if (isExistingAccount) {
+    // Existing account - send "you're invited" email without password reset
+    console.log(`[send-invitation] existing account detected for ${voter.email}, sending registered email`)
+
+    emailResult = await sendVoterInvitationEmailRegistered({
+      email: voter.email,
+      eventId: event.id,
+      eventTitle: event.title,
     })
-    .eq('id', voterId)
+  } else {
+    // New account - generate temp password and send it
+    tempPassword = generateTemporaryPassword()
+    const passwordHash = await hashPassword(tempPassword)
 
-  // Send the invitation email
-  const emailResult = await sendVoterInvitationEmail({
-    email: voter.email,
-    temporaryPassword: tempPassword,
-    eventId: event.id,
-    eventTitle: event.title,
-  })
+    await getClient()
+      .from(DB_TABLES.USERS)
+      .update({
+        password: passwordHash,
+        must_change_password: true,
+      })
+      .eq('id', voterId)
 
-  console.log(`[send-invitation] email to ${voter.email}: sent=${emailResult.sent}`, emailResult.error ?? '')
+    // Send the invitation email with temp password
+    emailResult = await sendVoterInvitationEmail({
+      email: voter.email,
+      temporaryPassword: tempPassword,
+      eventId: event.id,
+      eventTitle: event.title,
+    })
+  }
 
-  if (emailResult.sent) {
-    // Update invitation status to sent
+  console.log(`[send-invitation] email to ${voter.email}: sent=${emailResult?.sent}, type=${invitationType}`, emailResult?.error ?? '')
+
+  if (emailResult?.sent) {
+    // Update invitation status to sent and record account type
     try {
       await getClient()
         .from(DB_TABLES.INVITATIONS)
-        .update({ invitation_sent: true })
+        .update({
+          invitation_sent: true,
+          is_new_account: !isExistingAccount,
+        })
         .eq('event_id', eventId)
         .eq('voter_id', voterId)
     } catch (dbErr) {
@@ -492,9 +560,11 @@ export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
     try {
       await createNotification({
         userId: voterId,
-        type: 'voter.invitation',
+        type: isExistingAccount ? 'voter.invitation.registered' : 'voter.invitation',
         title: `You're invited to ${event.title}`,
-        message: `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
+        message: isExistingAccount
+          ? `You've been added to ${event.title}. Sign in with your existing password.`
+          : `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
         actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
           ? `/voter/competition/events/${event.id}/score`
           : event.event_type === 'polling'
@@ -512,13 +582,16 @@ export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
   return {
     user: voter,
     email: emailResult,
-    invitationSent: emailResult.sent,
+    invitationSent: emailResult?.sent,
+    invitationType,
+    temporaryPassword: tempPassword, // null for existing accounts
   }
 }
 
 /**
  * Send all pending invitations for an event.
  * Returns summary of sent/failed invitations.
+ * Handles both new and existing accounts appropriately.
  */
 export async function sendAllPendingInvitations({ eventId, organizerId }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
@@ -546,6 +619,22 @@ export async function sendAllPendingInvitations({ eventId, organizerId }) {
     }
   }
 
+  // Get all voter IDs to check for existing accounts in batch
+  const voterIds = pendingVoters.map(p => p.voter_id)
+
+  // Check which voters have other sent invitations (existing accounts)
+  const { data: existingCheck } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .select('voter_id')
+    .in('voter_id', voterIds)
+    .eq('invitation_sent', true)
+
+  // Build a set of voter IDs that are existing accounts
+  const existingAccountIds = new Set()
+  if (existingCheck) {
+    existingCheck.forEach(inv => existingAccountIds.add(inv.voter_id))
+  }
+
   const results = []
   let sentCount = 0
   let failedCount = 0
@@ -553,32 +642,51 @@ export async function sendAllPendingInvitations({ eventId, organizerId }) {
   // Process each pending invitation sequentially
   for (const pending of pendingVoters) {
     const voter = pending.users
-    const tempPassword = generateTemporaryPassword()
-    const passwordHash = await hashPassword(tempPassword)
+    const isExistingAccount = existingAccountIds.has(voter.id)
+
+    let tempPassword = null
+    let emailResult = null
+    let invitationType = isExistingAccount ? 'existing' : 'new'
 
     try {
-      // Update password
-      await getClient()
-        .from(DB_TABLES.USERS)
-        .update({
-          password: passwordHash,
-          must_change_password: true,
+      if (isExistingAccount) {
+        // Existing account - send registered email without password reset
+        emailResult = await sendVoterInvitationEmailRegistered({
+          email: voter.email,
+          eventId: event.id,
+          eventTitle: event.title,
         })
-        .eq('id', voter.id)
+      } else {
+        // New account - generate temp password and send it
+        tempPassword = generateTemporaryPassword()
+        const passwordHash = await hashPassword(tempPassword)
 
-      // Send invitation email
-      const emailResult = await sendVoterInvitationEmail({
-        email: voter.email,
-        temporaryPassword: tempPassword,
-        eventId: event.id,
-        eventTitle: event.title,
-      })
+        // Update password
+        await getClient()
+          .from(DB_TABLES.USERS)
+          .update({
+            password: passwordHash,
+            must_change_password: true,
+          })
+          .eq('id', voter.id)
 
-      if (emailResult.sent) {
+        // Send invitation email
+        emailResult = await sendVoterInvitationEmail({
+          email: voter.email,
+          temporaryPassword: tempPassword,
+          eventId: event.id,
+          eventTitle: event.title,
+        })
+      }
+
+      if (emailResult?.sent) {
         // Update invitation status
         await getClient()
           .from(DB_TABLES.INVITATIONS)
-          .update({ invitation_sent: true })
+          .update({
+            invitation_sent: true,
+            is_new_account: !isExistingAccount,
+          })
           .eq('event_id', eventId)
           .eq('voter_id', voter.id)
 
@@ -586,9 +694,11 @@ export async function sendAllPendingInvitations({ eventId, organizerId }) {
         try {
           await createNotification({
             userId: voter.id,
-            type: 'voter.invitation',
+            type: isExistingAccount ? 'voter.invitation.registered' : 'voter.invitation',
             title: `You're invited to ${event.title}`,
-            message: `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
+            message: isExistingAccount
+              ? `You've been added to ${event.title}. Sign in with your existing password.`
+              : `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
             actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
               ? `/voter/competition/events/${event.id}/score`
               : event.event_type === 'polling'
@@ -607,6 +717,8 @@ export async function sendAllPendingInvitations({ eventId, organizerId }) {
           voterId: voter.id,
           email: voter.email,
           success: true,
+          invitationType,
+          temporaryPassword: tempPassword,
         })
       } else {
         failedCount++
@@ -614,7 +726,8 @@ export async function sendAllPendingInvitations({ eventId, organizerId }) {
           voterId: voter.id,
           email: voter.email,
           success: false,
-          error: emailResult.error || 'Email delivery failed',
+          invitationType,
+          error: emailResult?.error || 'Email delivery failed',
         })
       }
     } catch (err) {
@@ -623,6 +736,7 @@ export async function sendAllPendingInvitations({ eventId, organizerId }) {
         voterId: voter.id,
         email: voter.email,
         success: false,
+        invitationType,
         error: err.message,
       })
     }

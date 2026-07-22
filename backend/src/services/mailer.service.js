@@ -7,6 +7,7 @@ import { voterInvitationRegisteredTemplate } from '../templates/email/voterInvit
 import { passwordResetTemplate } from '../templates/email/passwordReset.js'
 import { eventNotificationTemplate } from '../templates/email/eventNotification.js'
 import { judgeInvitationTemplate } from '../templates/email/judgeInvitation.js'
+import { judgeInvitationRegisteredTemplate } from '../templates/email/judgeInvitationRegistered.js'
 import {
   organizerLoginUrl,
   voterLoginUrl,
@@ -120,6 +121,29 @@ export async function sendJudgeInvitationEmail({
   return sendWorkflowEmail({
     to: email,
     subject: `Judge invitation: ${eventTitle}`,
+    html,
+  })
+}
+
+/**
+ * Send invitation email to an already-registered judge (no password reset).
+ */
+export async function sendJudgeInvitationEmailRegistered({
+  email,
+  eventId,
+  eventTitle,
+}) {
+  const link = competitionScoreUrl(eventId)
+  const html = judgeInvitationRegisteredTemplate({
+    email,
+    eventLink: link,
+    eventTitle,
+    loginUrl: voterLoginUrl(),
+  })
+
+  return sendWorkflowEmail({
+    to: email,
+    subject: `You've been added as a judge: ${eventTitle}`,
     html,
   })
 }
