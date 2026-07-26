@@ -11,19 +11,33 @@ import VoterEventHeader from '@/components/voter/VoterEventHeader'
 export default function VoterPollPage() {
   const { eventId } = useParams()
   const draftKey = getDraftStorageKey('pollDraft', eventId)
-  const [poll, setPoll] = useState(null)
-  const [answers, setAnswers] = useState(() => {
+
+  // Check for saved draft outside of state initializer
+  const savedDraft = (() => {
     try {
       const saved = localStorage.getItem(draftKey)
-      return saved ? JSON.parse(saved) : {}
+      return saved ? JSON.parse(saved) : null
     } catch {
-      return {}
+      return null
     }
-  })
+  })()
+
+  const [draftRestored, setDraftRestored] = useState(Boolean(savedDraft))
+  const [poll, setPoll] = useState(null)
+  const [answers, setAnswers] = useState(savedDraft ?? {})
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
-  const [done, setDone] = useState(false)
+const [done, setDone] = useState(false)
+  const [startedAt] = useState(() => new Date().toISOString())
+
+  // Auto-dismiss the draft restoration toast after 4 seconds
+  useEffect(() => {
+    if (draftRestored) {
+      const timer = setTimeout(() => setDraftRestored(false), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [draftRestored])
 
   const loadPoll = () => {
     return pollingService.getPoll(eventId).then(({ data }) => {
@@ -52,6 +66,11 @@ export default function VoterPollPage() {
     }).length
   }, [questions, answers])
 
+  const progressPercent = useMemo(() => {
+    if (!questions.length) return 0
+    return Math.round((answeredCount / questions.length) * 100)
+  }, [answeredCount, questions.length])
+
   const setAnswer = (questionId, value) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }))
   }
@@ -69,7 +88,7 @@ export default function VoterPollPage() {
     setError(null)
 
     try {
-      await pollingService.submitPoll(eventId, answers)
+      await pollingService.submitPoll(eventId, answers, { startedAt })
       localStorage.removeItem(draftKey)
       setDone(true)
     } catch (err) {
@@ -121,7 +140,20 @@ export default function VoterPollPage() {
   if (!poll?.pollOpen) {
     return (
       <div className="mx-auto max-w-lg v-card p-8 text-center">
-        <p className="text-white">This poll is closed or has expired.</p>
+        <p className="text-v-text">This poll is closed or has expired.</p>
+        {poll?.event?.startDate && poll?.event?.endDate && (
+          <p className="mt-2 text-sm text-v-text-subtle">
+            This poll was open from{' '}
+            {new Date(poll.event.startDate).toLocaleDateString()} to{' '}
+            {new Date(poll.event.endDate).toLocaleDateString()}.
+          </p>
+        )}
+        {poll?.event?.pollExpiresAt && !poll?.event?.endDate && (
+          <p className="mt-2 text-sm text-v-text-subtle">
+            This poll expired on{' '}
+            {new Date(poll.event.pollExpiresAt).toLocaleDateString()}.
+          </p>
+        )}
         <Link to="/voter" className="mt-4 inline-block text-v-text-muted">
           Back to dashboard
         </Link>
@@ -132,7 +164,7 @@ export default function VoterPollPage() {
   if (!poll?.canSubmit) {
     return (
       <div className="mx-auto max-w-lg v-card p-8 text-center">
-        <p className="text-white">You have already responded to this poll.</p>
+        <p className="text-v-text">You have already responded to this poll.</p>
         <Link to="/voter" className="mt-4 inline-block text-v-text-muted">
           Back to dashboard
         </Link>
@@ -142,16 +174,44 @@ export default function VoterPollPage() {
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-6 pb-24">
+      {/* Autosave restoration notification */}
+      {draftRestored && (
+        <div
+          className="rounded-lg border border-v-border bg-v-surface-elevated px-4 py-3 text-sm text-v-text-muted"
+          role="status"
+          aria-live="polite"
+        >
+          We restored your previous answers.
+        </div>
+      )}
+
       <VoterEventHeader event={poll.event} eyebrow="Poll">
         {poll.event.pollAnonymous && (
           <p className="text-xs font-medium text-white/70">Your responses are anonymous.</p>
         )}
       </VoterEventHeader>
 
-      <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-sm">
-        <span className="text-v-text-muted">
-          {answeredCount} of {questions.length} questions answered
-        </span>
+      {/* Progress bar */}
+      <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-v-text-muted">
+            {answeredCount} of {questions.length} questions answered
+          </span>
+          <span className="text-xs text-v-text-subtle">{progressPercent}%</span>
+        </div>
+        <div
+          className="mt-2 h-2 overflow-hidden rounded-full bg-v-border"
+          role="progressbar"
+          aria-valuenow={progressPercent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Poll progress"
+        >
+          <div
+            className="h-full rounded-full bg-v-primary transition-all duration-300"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
       </div>
 
       {questions.map((q, idx) => (

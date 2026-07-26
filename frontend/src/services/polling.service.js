@@ -56,6 +56,10 @@ export const pollingService = {
     return api.delete(`${org}/events/${eventId}/questions/${questionId}`)
   },
 
+  duplicateQuestion(eventId, questionId) {
+    return api.post(`${org}/events/${eventId}/questions/${questionId}/duplicate`)
+  },
+
   getAnalytics(eventId) {
     return api.get(`${org}/events/${eventId}/analytics`)
   },
@@ -138,8 +142,12 @@ export const pollingService = {
     return api.get(`${voter}/events/${eventId}`)
   },
 
-  submitPoll(eventId, answers) {
-    return api.post(`${voter}/events/${eventId}/submit`, { answers })
+submitPoll(eventId, answers, options = {}) {
+    const payload = { answers }
+    if (options.startedAt) {
+      payload.startedAt = options.startedAt
+    }
+    return api.post(`${voter}/events/${eventId}/submit`, payload)
   },
 }
 

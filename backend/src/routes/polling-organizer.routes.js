@@ -20,6 +20,7 @@ router.get('/events/:eventId/questions', ctrl.listQuestions)
 router.post('/events/:eventId/questions', ctrl.createQuestion)
 router.patch('/events/:eventId/questions/:questionId', ctrl.updateQuestion)
 router.delete('/events/:eventId/questions/:questionId', ctrl.deleteQuestion)
+router.post('/events/:eventId/questions/:questionId/duplicate', ctrl.duplicateQuestion)
 
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
 

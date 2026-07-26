@@ -14,10 +14,12 @@ export const getPoll = asyncHandler(async (req, res) => {
 
 export const submitPoll = asyncHandler(async (req, res) => {
   const answers = validatePollAnswers(req.body)
+  const startedAt = req.body?.startedAt || null
   const result = await pollingService.submitPollResponse(
     req.params.eventId,
     req.user.id,
     answers,
+    startedAt,
   )
   res.json(result)
 })

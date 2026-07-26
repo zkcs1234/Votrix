@@ -112,6 +112,15 @@ export const deleteQuestion = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Question deleted' })
 })
 
+export const duplicateQuestion = asyncHandler(async (req, res) => {
+  const question = await pollingService.duplicateQuestion(
+    req.params.eventId,
+    req.user.id,
+    req.params.questionId,
+  )
+  res.status(201).json({ success: true, question })
+})
+
 export const getAnalytics = asyncHandler(async (req, res) => {
   const analytics = await pollingService.getPollAnalytics(req.params.eventId, req.user.id)
   res.json({ success: true, analytics })

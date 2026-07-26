@@ -1,38 +1,76 @@
-# Competition Module Live Session Enhancement - TODO
+# Election Module Enhancement - Phase 1: Quick Wins
 
-## Phase 1: Database
+## [x] 1. Audit Logging for All Election Actions (C1)
 
-- [x] Create migration `027_competition_live_session.sql`
-  - [x] `competition_session_status` enum
-  - [x] `competition_sessions` table
-  - [x] `judge_session_scores` table
-  - [x] Indexes and triggers
-- [x] Create rollback migration
+- [x] Backend: Added `recordAudit()` calls to `election.service.js` for all mutations
+- [x] Events: create, update, voting toggle (+ enable/disable)
+- [x] Positions: create, delete
+- [x] Candidates: create, delete
 
-## Phase 2: Backend
+## [ ] 2. Candidate Search & Filter (H2)
 
-- [x] Create `competition-session.service.js` - session management logic
-- [x] Create `competition-session.controller.js` - session API handlers
-- [x] Update `competition-organizer.routes.js` - add session routes
-- [x] Update `pageant.service.js` - update judge scoring flow for session support
+- [ ] Frontend: Add search input to `ElectionCandidatesPage.jsx`
+- [ ] Frontend: Add position dropdown filter
+- [ ] Frontend: Client-side filtering logic
 
-## Phase 3: Frontend - Services & Hooks
+## [ ] 3. Voter List CSV Export (M4)
 
-- [x] Create `frontend/src/services/competition-session.service.js`
-- [x] Create `frontend/src/hooks/useCompetitionSession.js`
+- [ ] Frontend: Add "Export CSV" button to `ElectionVotersPage.jsx`
+- [ ] Frontend: CSV generation and download function
 
-## Phase 4: Frontend - Organizer Live Control Page
+## [ ] 4. CSV Template Download (L2)
 
-- [x] Create `CompetitionLiveControlPage.jsx`
-- [x] Update `PageantLayout.jsx` - add live control nav link
-- [x] Update `routes/index.jsx` - add routes
+- [ ] Frontend: Add "Download CSV template" link to `ElectionVotersPage.jsx`
 
-## Phase 5: Frontend - Judge Scoring Page Enhancement
+## [ ] 5. Dashboard Caching (M1)
 
-- [x] Update `JudgeScoringPage.jsx` - respect active session (round + contestant)
-- [x] Update `CompetitionScoringForm.jsx` - per-contestant focused scoring
+- [ ] Backend: Add in-memory cache to `getOrganizerDashboard()`
+- [ ] Backend: Cache invalidation on vote submission and event mutations
 
-## Phase 6: Realtime Broadcast Integration
+## [ ] 6. CSV Duplicate Detection (M2)
 
-- [x] Add session WebSocket events to ws-emitter
-- [x] Integrate realtime updates in frontend hook
+- [x] Backend: Already partially implemented in `previewCsv()` - verified correct
+- [ ] Frontend: Show duplicate warnings in CSV preview modal
+
+---
+
+# Polling Module Implementation - Phase 1: Quick Wins
+
+## [x] 1. Question Duplication (C1)
+
+- [x] Backend: Add duplicate endpoint to polling-organizer.routes.js
+- [x] Backend: Add duplicateQuestion method to polling.service.js
+- [x] Frontend: Add duplicate button to PollingBuilderPage.jsx
+
+## [x] 2. Progress Indicator for Respondents (H2)
+
+- [x] Frontend: Add styled progress bar to VoterPollPage.jsx
+
+## [x] 3. Completion Time Analytics (H3)
+
+- [x] Backend: Add started_at/completed_at to poll_submissions (migration 027)
+- [x] Frontend: Track started_at in VoterPollPage
+- [x] Backend: Compute avg completion time in analytics
+- [ ] Frontend: Display in PollingAnalyticsPage
+
+## [ ] 4. Accessibility Improvements (H4)
+
+- [ ] Frontend: Add fieldset/legend to PollQuestionField
+- [ ] Frontend: Add aria-pressed to rating buttons
+- [ ] Frontend: Add aria-live for ranking changes
+
+## [x] 5. Poll Status Display (M3)
+
+- [x] Frontend: Show start/end dates when poll is closed
+
+## [x] 6. Autosave Restoration Notification (M6)
+
+- [x] Frontend: Add toast when draft is restored
+
+## [ ] 7. Rating Chart Visualization (M7)
+
+- [ ] Frontend: Replace text ratings with bar charts in PollingAnalyticsPage
+
+## [ ] 8. Poll Scheduling UX (M8)
+
+- [ ] Frontend: Add start_date/end_date to PollingEventFormPage

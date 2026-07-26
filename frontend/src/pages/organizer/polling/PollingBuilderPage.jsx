@@ -159,6 +159,15 @@ export default function PollingBuilderPage() {
     load()
   }
 
+  const handleDuplicate = async (id) => {
+    try {
+      await pollingService.duplicateQuestion(eventId, id)
+      load()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to duplicate question')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -345,6 +354,13 @@ export default function PollingBuilderPage() {
                   className="text-sm text-v-text-muted"
                 >
                   Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDuplicate(q.id)}
+                  className="text-sm text-v-text-muted"
+                >
+                  Duplicate
                 </button>
                 <button
                   type="button"

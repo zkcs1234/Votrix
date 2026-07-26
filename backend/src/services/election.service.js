@@ -6,6 +6,7 @@ import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { getOrCreateElectionOrganization, mapOrganization } from './organization.service.js'
 import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
+import { recordAudit } from '../foundation/audit.js'
 
 
 function mapPosition(row) {
@@ -152,6 +153,15 @@ export async function createElectionEvent(organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.event.create',
+    entity: 'events',
+    entityId: data.id,
+    details: { title: data.title, resultsVisibility: payload.resultsVisibility },
+  })
+
   return mapEvent(data)
 }
 
@@ -183,6 +193,15 @@ export async function updateElectionEvent(eventId, organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.event.update',
+    entity: 'events',
+    entityId: eventId,
+    details: { updates: Object.keys(updates) },
+  })
+
   return mapEvent(data)
 }
 
@@ -235,6 +254,14 @@ export async function setEventVoting(eventId, organizerId, votingEnabled) {
   emitToEvent(eventId, 'election:voting-toggled', {
     eventId,
     votingEnabled: Boolean(votingEnabled),
+  })
+
+  await recordAudit({
+    userId: organizerId,
+    action: votingEnabled ? 'election.voting.enable' : 'election.voting.disable',
+    entity: 'events',
+    entityId: eventId,
+    details: { title: data.title, votingEnabled: Boolean(votingEnabled) },
   })
   
   return mapEvent(data)
@@ -302,6 +329,15 @@ export async function createPosition(eventId, organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.position.create',
+    entity: 'positions',
+    entityId: data.id,
+    details: { name: data.name, eventId },
+  })
+
   return mapPosition(data)
 }
 
@@ -344,6 +380,13 @@ export async function deletePosition(eventId, organizerId, positionId) {
     throw new ApiError(409, 'Cannot delete a position that already has votes recorded')
   }
 
+  // Fetch position name before deleting for audit trail
+  const { data: posData } = await getClient()
+    .from(DB_TABLES.POSITIONS)
+    .select('name')
+    .eq('id', positionId)
+    .single()
+
   const { error } = await getClient()
     .from(DB_TABLES.POSITIONS)
     .delete()
@@ -351,6 +394,14 @@ export async function deletePosition(eventId, organizerId, positionId) {
     .eq('event_id', eventId)
 
   if (error) throw new ApiError(500, error.message)
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.position.delete',
+    entity: 'positions',
+    entityId: positionId,
+    details: { name: posData?.name ?? 'unknown', eventId },
+  })
 }
 
 // ——— Candidates ———
@@ -404,6 +455,15 @@ export async function createCandidate(eventId, organizerId, positionId, payload)
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.candidate.create',
+    entity: 'candidates',
+    entityId: data.id,
+    details: { name: data.name, positionId, eventId },
+  })
+
   return mapCandidate(data)
 }
 
@@ -463,8 +523,23 @@ export async function deleteCandidate(eventId, organizerId, candidateId) {
     throw new ApiError(409, 'Cannot delete a candidate that already has votes recorded')
   }
 
+  // Fetch candidate name before deleting for audit trail
+  const { data: candData } = await getClient()
+    .from(DB_TABLES.CANDIDATES)
+    .select('name')
+    .eq('id', candidateId)
+    .single()
+
   const { error } = await getClient().from(DB_TABLES.CANDIDATES).delete().eq('id', candidateId)
   if (error) throw new ApiError(500, error.message)
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.candidate.delete',
+    entity: 'candidates',
+    entityId: candidateId,
+    details: { name: candData?.name ?? 'unknown', eventId },
+  })
 }
 
 // ——— Voters list ———

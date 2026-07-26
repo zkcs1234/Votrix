@@ -6,6 +6,27 @@ import Button from '@/components/ui/Button'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 
+function downloadCsv(filename, headers, rows) {
+  const csvContent = [
+    headers.join(','),
+    ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+  ].join('\n')
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadCsvTemplate() {
+  const headers = ['email']
+  const exampleRows = [['voter@example.com']]
+  downloadCsv('voter-import-template.csv', headers, exampleRows)
+}
+
 function InvitationStatusBadge({ sent }) {
   if (sent) {
     return <span className="v-badge v-badge-success">Sent</span>
@@ -207,7 +228,6 @@ export default function ElectionVotersPage() {
     const file = e.target.files?.[0]
     if (!file) return
     setError(null)
-    setPreviewFile(file)
 
     try {
       const { data } = await electionService.previewCsv(eventId, file)
@@ -234,7 +254,6 @@ export default function ElectionVotersPage() {
         total: data.total,
       })
       setCsvPreview(null)
-      setPreviewFile(null)
       success(`Registered ${data.succeeded} of ${data.total} voters. Send invitations later.`)
       load()
     } catch (err) {
@@ -280,6 +299,13 @@ export default function ElectionVotersPage() {
     }
   }
 
+  // Export voters as CSV
+  const handleExportCsv = () => {
+    const headers = ['Email', 'Status', 'Invitation', 'Voted']
+    const rows = voters.map((v) => [v.email, v.hasVoted ? 'Voted' : 'Pending', v.invitationSent ? 'Sent' : 'Pending', v.hasVoted ? 'Yes' : 'No'])
+    downloadCsv(`voters-${eventId}.csv`, headers, rows)
+  }
+
   const filteredVoters = voters.filter((v) => {
     const searchLower = search.toLowerCase()
     return v.email.toLowerCase().includes(searchLower)
@@ -307,10 +333,7 @@ export default function ElectionVotersPage() {
       {csvPreview && (
         <CsvPreviewModal
           data={csvPreview}
-          onClose={() => {
-            setCsvPreview(null)
-            setPreviewFile(null)
-          }}
+          onClose={() => setCsvPreview(null)}
           onRegister={handleCsvRegister}
           registering={registering}
         />
@@ -322,12 +345,21 @@ export default function ElectionVotersPage() {
           <p className="v-helper-text mb-3">
             Upload a CSV with email column. Passwords are auto-generated.
           </p>
-          <input
-            type="file"
-            accept=".csv"
-            className="v-caption"
-            onChange={handleCsvPreview}
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="file"
+              accept=".csv"
+              className="v-caption"
+              onChange={handleCsvPreview}
+            />
+            <button
+              type="button"
+              onClick={downloadCsvTemplate}
+              className="text-sm text-v-primary hover:text-v-primary-hover underline"
+            >
+              Download CSV template
+            </button>
+          </div>
 
           {importResult && (
             <p className="v-caption mt-2 text-v-success">
@@ -358,12 +390,22 @@ export default function ElectionVotersPage() {
 
       <div className="v-table-wrap">
         <div className="p-4 border-b border-v-border flex flex-wrap gap-3 justify-between items-center">
-          <SearchInput
-            placeholder="Search voters by email"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-xs"
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <SearchInput
+              placeholder="Search voters by email"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-xs"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportCsv}
+              disabled={voters.length === 0}
+            >
+              Export CSV
+            </Button>
+          </div>
           {pendingCount > 0 && (
             <Button
               onClick={handleSendAll}

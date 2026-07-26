@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import { SkeletonGrid } from '@/components/ui/Skeleton'
 import ImageUploadField from '@/components/upload/ImageUploadField'
+import SearchInput from '@/components/ui/SearchInput'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 
@@ -90,6 +91,8 @@ export default function ElectionCandidatesPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [photoFile, setPhotoFile] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+  const [filterPositionId, setFilterPositionId] = useState('')
   const { error: showError } = useToast()
 
   const showLoader = useDelayedLoading(loading, 300)
@@ -116,6 +119,28 @@ export default function ElectionCandidatesPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
+
+  // Client-side search & position filter
+  const filteredCandidates = useMemo(() => {
+    return candidates.filter((c) => {
+      // Position filter
+      if (filterPositionId && c.positionId !== filterPositionId) return false
+      // Search text filter
+      if (search) {
+        const q = search.toLowerCase()
+        const positionName = positions.find((p) => p.id === c.positionId)?.name ?? ''
+        const party = (c.party ?? c.partylist ?? '').toLowerCase()
+        if (
+          !c.name.toLowerCase().includes(q) &&
+          !party.includes(q) &&
+          !positionName.toLowerCase().includes(q)
+        ) {
+          return false
+        }
+      }
+      return true
+    })
+  }, [candidates, search, filterPositionId, positions])
 
   // Optimistic UI - add candidate immediately
   const handleCreate = async (e) => {
@@ -255,8 +280,34 @@ export default function ElectionCandidatesPage() {
         </button>
       </form>
 
+      {/* Search & filter bar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <SearchInput
+          placeholder="Search candidates by name, party, or position…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 min-w-[200px]"
+        />
+        <select
+          className={`${inputClass} w-auto`}
+          value={filterPositionId}
+          onChange={(e) => setFilterPositionId(e.target.value)}
+          aria-label="Filter by position"
+        >
+          <option value="">All positions</option>
+          {positions.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <span className="text-sm text-v-text-subtle whitespace-nowrap">
+          {filteredCandidates.length} of {candidates.length} candidates
+        </span>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
-        {candidates.map((c) => (
+        {filteredCandidates.map((c) => (
           <CandidateCard
             key={c.id}
             candidate={c}
@@ -266,8 +317,10 @@ export default function ElectionCandidatesPage() {
         ))}
       </div>
 
-      {!candidates.length && (
-        <p className="text-center text-v-text-subtle">No candidates yet.</p>
+      {!filteredCandidates.length && (
+        <p className="text-center text-v-text-subtle">
+          {search || filterPositionId ? 'No candidates match your filters.' : 'No candidates yet.'}
+        </p>
       )}
     </div>
   )

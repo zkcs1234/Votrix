@@ -400,6 +400,94 @@ export async function deleteQuestion(eventId, organizerId, questionId) {
   if (error) throw new ApiError(500, error.message)
 }
 
+export async function duplicateQuestion(eventId, organizerId, questionId) {
+  await assertPollingEvent(eventId, organizerId)
+  const orgId = await getPollingOrgId(organizerId)
+  const registry = await loadQuestionTypeRegistry(orgId)
+
+  // Fetch the source question
+  const { data: sourceQuestion, error: qError } = await getClient()
+    .from(DB_TABLES.POLL_QUESTIONS)
+    .select('id, event_id, question, type, sort_order, required, type_config')
+    .eq('id', questionId)
+    .eq('event_id', eventId)
+    .single()
+
+  if (qError) throw new ApiError(500, qError.message)
+  if (!sourceQuestion) throw new ApiError(404, 'Question not found')
+
+  // Determine new sort_order (place immediately after the source)
+  const newSortOrder = sourceQuestion.sort_order + 1
+
+  // Shift subsequent questions' sort_order down by 1
+  const { data: laterQuestions, error: laterErr } = await getClient()
+    .from(DB_TABLES.POLL_QUESTIONS)
+    .select('id, sort_order')
+    .eq('event_id', eventId)
+    .gte('sort_order', newSortOrder)
+    .neq('id', sourceQuestion.id)
+    .order('sort_order', { ascending: false })
+
+  if (laterErr) throw new ApiError(500, laterErr.message)
+
+  if (laterQuestions?.length) {
+    const updates = laterQuestions.map((q) => ({
+      id: q.id,
+      sort_order: q.sort_order + 1,
+    }))
+    for (const u of updates) {
+      const { error: upErr } = await getClient()
+        .from(DB_TABLES.POLL_QUESTIONS)
+        .update({ sort_order: u.sort_order })
+        .eq('id', u.id)
+      if (upErr) throw new ApiError(500, upErr.message)
+    }
+  }
+
+  // Get the source question's options
+  const optMap = await loadOptionsForQuestions([sourceQuestion.id])
+  const sourceOptions = optMap[sourceQuestion.id] ?? []
+
+  const typeDef = registry.find((r) => r.key === sourceQuestion.type) ?? null
+  const typeConfig = sourceQuestion.type_config ?? {}
+
+  // Create the duplicate question with " (copy)" suffix
+  const { data: newQuestion, error: createErr } = await getClient()
+    .from(DB_TABLES.POLL_QUESTIONS)
+    .insert({
+      event_id: eventId,
+      question: `${sourceQuestion.question} (copy)`,
+      type: sourceQuestion.type,
+      sort_order: newSortOrder,
+      required: sourceQuestion.required,
+      type_config: typeConfig,
+    })
+    .select('*')
+    .single()
+
+  if (createErr) throw new ApiError(500, createErr.message)
+
+  // Duplicate options if they exist
+  let newOptions = []
+  if (sourceOptions.length > 0) {
+    const optionRows = sourceOptions.map((o, i) => ({
+      question_id: newQuestion.id,
+      label: o.label,
+      sort_order: o.sort_order ?? i,
+    }))
+
+    const { data: opts, error: optErr } = await getClient()
+      .from(DB_TABLES.POLL_OPTIONS)
+      .insert(optionRows)
+      .select('*')
+
+    if (optErr) throw new ApiError(500, optErr.message)
+    newOptions = opts ?? []
+  }
+
+  return mapQuestion(newQuestion, newOptions, typeDef)
+}
+
 // Legacy alias used in some admin code paths. The registry is the source of
 // truth; this returns the key as-is if it is known.
 function normalizeQuestionType(type) {
@@ -512,7 +600,7 @@ async function listQuestionsPublic(eventId, registry = null) {
   })
 }
 
-export async function submitPollResponse(eventId, voterId, answers) {
+export async function submitPollResponse(eventId, voterId, answers, startedAt) {
   await assertVoterCanRespond(eventId, voterId)
   const event = await getEventById(eventId)
 
@@ -554,9 +642,18 @@ export async function submitPollResponse(eventId, voterId, answers) {
     }
   }
 
+  const submissionInsert = {
+    event_id: eventId,
+    voter_id: voterId,
+    completed_at: new Date().toISOString(),
+  }
+  if (startedAt) {
+    submissionInsert.started_at = startedAt
+  }
+
   const { data: submission, error: subErr } = await getClient()
     .from(DB_TABLES.POLL_SUBMISSIONS)
-    .insert({ event_id: eventId, voter_id: voterId })
+    .insert(submissionInsert)
     .select('*')
     .single()
 
@@ -727,10 +824,29 @@ export async function getPollAnalytics(eventId, organizerId) {
   const registry = await loadQuestionTypeRegistry(orgId)
   const questions = await listQuestions(eventId, organizerId)
 
-  const { count: totalSubmissions } = await getClient()
+const { count: totalSubmissions } = await getClient()
     .from(DB_TABLES.POLL_SUBMISSIONS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
+
+  // Compute average completion time (in seconds) for submissions that have started_at
+  const { data: completionTimes, error: ctErr } = await getClient()
+    .from(DB_TABLES.POLL_SUBMISSIONS)
+    .select('started_at, completed_at')
+    .eq('event_id', eventId)
+    .not('started_at', 'is', null)
+    .not('completed_at', 'is', null)
+
+  if (ctErr) throw new ApiError(500, ctErr.message)
+
+  let averageCompletionTimeSeconds = null
+  if (completionTimes?.length > 0) {
+    const totalSeconds = completionTimes.reduce((sum, s) => {
+      const diff = new Date(s.completed_at) - new Date(s.started_at)
+      return sum + Math.max(0, diff) / 1000
+    }, 0)
+    averageCompletionTimeSeconds = Math.round(totalSeconds / completionTimes.length)
+  }
 
   const { data: allAnswers, error } = await getClient()
     .from(DB_TABLES.POLL_ANSWERS)
@@ -766,6 +882,7 @@ export async function getPollAnalytics(eventId, organizerId) {
   return {
     totalSubmissions: totalSubmissions ?? 0,
     pollAnonymous: anonymous,
+    averageCompletionTimeSeconds,
     questions: questionAnalytics,
   }
 }
