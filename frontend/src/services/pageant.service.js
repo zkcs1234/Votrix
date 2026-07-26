@@ -12,12 +12,6 @@ export const pageantService = {
     return api.get(`${org}/dashboard`)
   },
 
-  uploadOrganizationLogo(file) {
-    const form = new FormData()
-    form.append('logo', file)
-    return api.post(`/organizer/organization/logo`, form)
-  },
-
   listEvents() {
     return api.get(`${org}/events`)
   },

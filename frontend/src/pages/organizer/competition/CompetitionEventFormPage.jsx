@@ -38,13 +38,18 @@ export default function CompetitionEventFormPage() {
 
   useEffect(() => {
     if (isNew) return
-    pageantService.getEvent(eventId).then(({ data }) => {
-      reset({
-        title: data.event.title || '',
-        description: data.event.description || '',
+    pageantService.getEvent(eventId)
+      .then(({ data }) => {
+        reset({
+          title: data.event.title || '',
+          description: data.event.description || '',
+        })
+        setBanner(data.event.banner)
       })
-      setBanner(data.event.banner)
-    }).finally(() => setLoading(false))
+      .catch((err) => {
+        setError(err.response?.data?.message || 'Failed to load event')
+      })
+      .finally(() => setLoading(false))
   }, [eventId, isNew, reset])
 
   const handleNext = async (e) => {

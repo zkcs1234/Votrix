@@ -56,6 +56,7 @@ export default function ElectionEventFormPage() {
       description: '',
       startDate: '',
       endDate: '',
+      resultsVisibility: 'public',
     },
   })
 
@@ -75,6 +76,9 @@ export default function ElectionEventFormPage() {
         })
         setBanner(ev.banner)
         setValue('resultsVisibility', ev.resultsVisibility ?? ev.results_visibility ?? 'public')
+      })
+      .catch((err) => {
+        setError(err.response?.data?.message || 'Failed to load event')
       })
       .finally(() => setLoading(false))
   }, [eventId, isNew, reset, setValue])

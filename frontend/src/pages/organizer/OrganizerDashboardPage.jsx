@@ -14,6 +14,7 @@ import { AreaChartView, PieChartView } from '@/components/charts'
 import { organizerService } from '@/services/organizer.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
+import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
 
 // SVG Illustrations
 import ElectionSVG from '@/assets/module/undraw_voting_3ygx.svg'
@@ -129,6 +130,12 @@ export default function OrganizerDashboardPage() {
         <StatCard label="Finished events" value={stats?.finishedEvents ?? 0} icon={CheckCircle2} />
         <StatCard label="Assigned voters" value={stats?.totalAssignedVoters ?? 0} icon={Users} />
       </div>
+
+      <OrganizationLogoUpload
+        organizationName={dashboard?.organization?.organizationName}
+        logoUrl={dashboard?.organization?.logo}
+        onUpload={(file) => organizerService.uploadOrganizationLogo(file)}
+      />
 
       <div className="grid gap-5 md:grid-cols-3">
         {/* Election Module Card */}

@@ -95,11 +95,26 @@ export const ASSIGNMENT_SCOPES = {
   ROUND: 'round',
 }
 
+// Event participant types (used for event-scoped roles)
+export const PARTICIPANT_TYPES = {
+  ELECTION_VOTER: 'ELECTION_VOTER',
+  COMPETITION_JUDGE: 'COMPETITION_JUDGE',
+  POLLING_RESPONDENT: 'POLLING_RESPONDENT',
+}
+
+// Labels for participant types (for frontend display)
+export const PARTICIPANT_TYPE_LABELS = {
+  [PARTICIPANT_TYPES.ELECTION_VOTER]: { label: 'Voter', color: 'indigo', icon: 'Vote' },
+  [PARTICIPANT_TYPES.COMPETITION_JUDGE]: { label: 'Judge', color: 'pink', icon: 'Trophy' },
+  [PARTICIPANT_TYPES.POLLING_RESPONDENT]: { label: 'Respondent', color: 'cyan', icon: 'BarChart2' },
+}
+
 export const DB_TABLES = {
   USERS: 'users',
   ORGANIZATIONS: 'organizations',
   EVENTS: 'events',
   EVENT_VOTERS: 'event_voters',
+  EVENT_PARTICIPANTS: 'event_participants',
   INVITATIONS: 'invitations',
   POSITIONS: 'positions',
   CANDIDATES: 'candidates',

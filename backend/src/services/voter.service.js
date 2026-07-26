@@ -1,6 +1,8 @@
 import { listVoterElectionEvents } from './election.service.js'
 import { listJudgeCompetitionEvents } from './pageant.service.js'
 import { listVoterPollEvents } from './polling.service.js'
+import { enrichEventWithParticipantType } from './participant.service.js'
+import { PARTICIPANT_TYPES } from '../utils/constants.js'
 
 function isPollOpen(event) {
   if (!event.pollingEnabled) return false
@@ -13,7 +15,7 @@ function classifyElection(event) {
   if (event.hasVoted) bucket = 'completed'
   else if (event.votingEnabled) bucket = 'active'
 
-  return {
+  return enrichEventWithParticipantType({
     id: event.id,
     title: event.title,
     description: event.description,
@@ -21,6 +23,7 @@ function classifyElection(event) {
     organization: event.organization ?? null,
     eventType: 'election',
     bucket,
+    participantType: PARTICIPANT_TYPES.ELECTION_VOTER,
     statusLabel: bucket === 'completed' ? 'Voted' : event.votingEnabled ? 'Voting open' : 'Waiting to open',
     actionPath: `/voter/events/${event.id}`,
     actionLabel:
@@ -28,7 +31,7 @@ function classifyElection(event) {
     votingEnabled: Boolean(event.votingEnabled),
     hasVoted: Boolean(event.hasVoted),
     eventStatus: event.status,
-  }
+  }, 'election')
 }
 
 function classifyCompetition(event) {
@@ -36,7 +39,7 @@ function classifyCompetition(event) {
   if (event.hasScored) bucket = 'completed'
   else if (event.scoringEnabled) bucket = 'active'
 
-  return {
+  return enrichEventWithParticipantType({
     id: event.id,
     title: event.title,
     description: event.description,
@@ -44,6 +47,7 @@ function classifyCompetition(event) {
     organization: event.organization ?? null,
     eventType: 'competition_scoring',
     bucket,
+    participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE,
     statusLabel: bucket === 'completed' ? 'Scores submitted' : event.scoringEnabled ? 'Scoring open' : 'Waiting to open',
     actionPath: `/voter/competition/events/${event.id}/score`,
     actionLabel:
@@ -51,7 +55,7 @@ function classifyCompetition(event) {
     scoringEnabled: Boolean(event.scoringEnabled),
     hasScored: Boolean(event.hasScored),
     eventStatus: event.status,
-  }
+  }, 'competition_scoring')
 }
 
 function classifyPoll(event) {
@@ -69,7 +73,7 @@ function classifyPoll(event) {
   else if (canSubmitAgain) statusLabel = 'Poll open'
   else if (event.hasResponded) statusLabel = 'Responded'
 
-  return {
+  return enrichEventWithParticipantType({
     id: event.id,
     title: event.title,
     description: event.description,
@@ -77,6 +81,7 @@ function classifyPoll(event) {
     organization: event.organization ?? null,
     eventType: 'polling',
     bucket,
+    participantType: PARTICIPANT_TYPES.POLLING_RESPONDENT,
     statusLabel,
     actionPath: `/voter/polling/events/${event.id}`,
     actionLabel:
@@ -92,7 +97,7 @@ function classifyPoll(event) {
     pollAllowMultipleSubmissions: Boolean(event.pollAllowMultipleSubmissions),
     hasResponded: Boolean(event.hasResponded),
     pollOpen: open,
-  }
+  }, 'polling')
 }
 
 export async function getVoterDashboard(voterId) {

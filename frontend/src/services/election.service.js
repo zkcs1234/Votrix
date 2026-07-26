@@ -8,12 +8,6 @@ export const electionService = {
     return api.get(`${base}/dashboard`)
   },
 
-  uploadOrganizationLogo(file) {
-    const form = new FormData()
-    form.append('logo', file)
-    return api.post(`/organizer/organization/logo`, form)
-  },
-
   listEvents() {
     return api.get(`${base}/events`)
   },

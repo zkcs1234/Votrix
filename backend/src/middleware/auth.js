@@ -80,6 +80,55 @@ export function requirePasswordChanged(req, _res, next) {
   next()
 }
 
+/**
+ * Middleware factory: Requires the authenticated user to be an event participant
+ * with one of the specified participant types.
+ *
+ * Usage: router.get('/events/:eventId/ballot', requireEventParticipant('ELECTION_VOTER'), handler)
+ * Usage: router.use(requireEventParticipant('ELECTION_VOTER', 'COMPETITION_JUDGE'))
+ *
+ * Attaches req.participant with the full event_participants row.
+ * eventId is resolved from req.params.eventId.
+ */
+import { findEventParticipant } from '../services/participant.service.js'
+
+export function requireEventParticipant(...allowedTypes) {
+  return async (req, _res, next) => {
+    try {
+      if (!req.user) {
+        return next(new ApiError(401, 'Authentication required'))
+      }
+
+      const eventId = req.params.eventId
+      if (!eventId) {
+        return next(new ApiError(400, 'Event ID is required'))
+      }
+
+      const participant = await findEventParticipant(eventId, req.user.id)
+
+      if (!participant) {
+        return next(
+          new ApiError(403, 'You are not a participant in this event'),
+        )
+      }
+
+      if (allowedTypes.length > 0 && !allowedTypes.includes(participant.participant_type)) {
+        return next(
+          new ApiError(
+            403,
+            `This action requires one of these roles: ${allowedTypes.join(', ')}`,
+          ),
+        )
+      }
+
+      req.participant = participant
+      next()
+    } catch (error) {
+      next(error)
+    }
+  }
+}
+
 export async function requireActiveAccount(req, _res, next) {
   try {
     const user = await findUserById(req.user?.id)

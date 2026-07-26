@@ -8,12 +8,6 @@ export const pollingService = {
     return api.get(`${org}/dashboard`)
   },
 
-  uploadOrganizationLogo(file) {
-    const form = new FormData()
-    form.append('logo', file)
-    return api.post(`/organizer/organization/logo`, form)
-  },
-
   uploadBanner(eventId, file) {
     const form = new FormData()
     form.append('banner', file)

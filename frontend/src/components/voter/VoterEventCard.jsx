@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { Vote, Trophy, BarChart2, ArrowRight } from 'lucide-react'
+import { Vote, Trophy, BarChart2, ArrowRight, UserCheck } from 'lucide-react'
 import VoterStatusBadge from '@/components/voter/VoterStatusBadge'
-import { EVENT_TYPE_META } from '@/services/voter.service'
+import { EVENT_TYPE_META, PARTICIPANT_TYPE_META } from '@/services/voter.service'
+import Badge from '@/components/ui/Badge'
 
 const TYPE_BORDER = {
   election: 'border-v-border hover:border-v-border-strong',
@@ -38,6 +39,10 @@ export default function VoterEventCard({ event, showAction = true }) {
   const hasBanner = event.banner && event.banner.length > 0
   const fallbackGradient = TYPE_GRADIENT[event.eventType] ?? TYPE_GRADIENT.election
 
+  // Resolve participant type label from event data
+  const participantMeta = PARTICIPANT_TYPE_META[event.participantType]
+  const roleLabel = participantMeta?.label ?? null
+
   return (
     <Link
       to={event.actionPath}
@@ -68,6 +73,13 @@ export default function VoterEventCard({ event, showAction = true }) {
               <p className={`text-xs font-medium uppercase tracking-wide ${TYPE_ACCENT[event.eventType]}`}>
                 {meta.label}
               </p>
+              {/* Participant role badge */}
+              {roleLabel && (
+                <Badge variant="outline" size="sm" className="ml-1">
+                  <UserCheck className="mr-0.5 h-3 w-3 inline" aria-hidden />
+                  {roleLabel}
+                </Badge>
+              )}
             </div>
             <h4 className="mt-1 font-medium text-v-text truncate">{event.title}</h4>
             {event.description && (

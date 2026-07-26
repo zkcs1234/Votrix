@@ -42,17 +42,22 @@ export default function PollingEventFormPage() {
 
   useEffect(() => {
     if (isNew) return
-    pollingService.getSettings(eventId).then(({ data }) => {
-      const e = data.event
-      reset({
-        title: e.title || '',
-        description: e.description || '',
-        pollAnonymous: e.pollAnonymous || false,
-        pollAllowMultipleSubmissions: e.pollAllowMultipleSubmissions || false,
-        pollExpiresAt: e.pollExpiresAt ? e.pollExpiresAt.slice(0, 16) : '',
+    pollingService.getSettings(eventId)
+      .then(({ data }) => {
+        const e = data.event
+        reset({
+          title: e.title || '',
+          description: e.description || '',
+          pollAnonymous: e.pollAnonymous || false,
+          pollAllowMultipleSubmissions: e.pollAllowMultipleSubmissions || false,
+          pollExpiresAt: e.pollExpiresAt ? e.pollExpiresAt.slice(0, 16) : '',
+        })
+        setBanner(e.banner)
       })
-      setBanner(e.banner)
-    }).finally(() => setLoading(false))
+      .catch((err) => {
+        setError(err.response?.data?.message || 'Failed to load poll settings')
+      })
+      .finally(() => setLoading(false))
   }, [eventId, isNew, reset])
 
   const handleNext = async (e) => {

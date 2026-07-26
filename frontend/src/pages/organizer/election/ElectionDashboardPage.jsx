@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Vote, Users, CheckSquare, Percent, Building2, Plus } from 'lucide-react'
+import { CalendarDays, Vote, Users, CheckSquare, Percent, Plus } from 'lucide-react'
 import { electionService } from '@/services/election.service'
 import PageLoader from '@/components/ui/PageLoader'
 import PageHeader from '@/components/ui/PageHeader'
@@ -8,7 +8,6 @@ import StatCard from '@/components/ui/StatCard'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 export default function ElectionDashboardPage() {
@@ -58,20 +57,7 @@ export default function ElectionDashboardPage() {
         <StatCard label="Votes cast" value={data?.stats?.votesCast ?? 0} icon={CheckSquare} />
         <StatCard label="Voters who voted" value={data?.stats?.votedCount ?? 0} icon={Users} />
         <StatCard label="Turnout" value={`${data?.stats?.turnoutRate ?? 0}%`} icon={Percent} />
-        <StatCard
-          label="Organization"
-          value={data?.organization?.organizationName ?? data?.organization?.organization_name ?? '—'}
-          icon={Building2}
-        />
       </div>
-
-      <OrganizationLogoUpload
-        organizationName={
-          data?.organization?.organizationName ?? data?.organization?.organization_name
-        }
-        logoUrl={data?.organization?.logo}
-        onUpload={(file) => electionService.uploadOrganizationLogo(file)}
-      />
 
       <Card padding={false}>
         <div className="border-b border-v-border px-6 py-4">

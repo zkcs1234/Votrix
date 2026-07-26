@@ -8,9 +8,7 @@ export const electionEventSchema = z.object({
   resultsVisibility: z.enum(['real_time', 'hidden', 'public']),
 })
 
-export const electionEventSchemaStep1 = electionEventSchema.omit({
-  resultsVisibility: true,
-}).refine(
+export const electionEventSchemaEdit = electionEventSchema.refine(
   (data) => {
     if (!data.startDate || !data.endDate) return true
     return new Date(data.endDate) >= new Date(data.startDate)
@@ -20,6 +18,8 @@ export const electionEventSchemaStep1 = electionEventSchema.omit({
     path: ['endDate'],
   }
 )
+
+export const electionEventSchemaStep1 = electionEventSchemaEdit
 
 export const pageantEventSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200, 'Title must be 200 characters or less'),
@@ -41,10 +41,8 @@ export const pollingEventSchema = z.object({
   pollExpiresAt: z.string().optional(),
 })
 
-export const pollingEventSchemaStep1 = pollingEventSchema.omit({
-  pollAnonymous: true,
-  pollAllowMultipleSubmissions: true,
-  pollExpiresAt: true,
-})
+export const pollingEventSchemaEdit = pollingEventSchema
+
+export const pollingEventSchemaStep1 = pollingEventSchemaEdit
 
 export const pollingEventSchemaStep3 = pollingEventSchema

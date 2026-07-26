@@ -6,7 +6,6 @@ import StatCard from '@/components/ui/StatCard'
 import Card from '@/components/ui/Card'
 import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
-import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
@@ -71,15 +70,6 @@ export default function PollingDashboardPage() {
         <StatCard label="Responded users" value={data?.stats?.respondedUsers ?? 0} icon={UserCheck} />
         <StatCard label="Participation rate" value={`${data?.stats?.participationRate ?? 0}%`} icon={Percent} />
       </div>
-
-      <OrganizationLogoUpload
-        organizationName={
-          data?.organization?.organizationName ?? data?.organization?.organization_name
-        }
-        logoUrl={data?.organization?.logo}
-        onUpload={(file) => pollingService.uploadOrganizationLogo(file)}
-        accentClass="text-v-text-muted"
-      />
 
       <Card padding={false}>
         <div className="border-b border-v-border px-6 py-4">

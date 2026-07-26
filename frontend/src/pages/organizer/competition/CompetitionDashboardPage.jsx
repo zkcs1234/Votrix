@@ -1,13 +1,11 @@
 ﻿import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Zap, Users, Star, CheckSquare, UserCheck, Percent, Building2, Plus } from 'lucide-react'
+import { CalendarDays, Zap, Users, Star, CheckSquare, UserCheck, Percent, Plus } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
-import PageLoader from '@/components/ui/PageLoader'
 import StatCard from '@/components/ui/StatCard'
 import Card from '@/components/ui/Card'
 import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
-import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
@@ -87,21 +85,7 @@ export default function CompetitionDashboardPage() {
         <StatCard label="Scores submitted" value={data?.stats?.scoresSubmitted ?? 0} icon={CheckSquare} />
         <StatCard label="Completed judges" value={data?.stats?.completedJudges ?? 0} icon={UserCheck} />
         <StatCard label="Judge completion" value={`${data?.stats?.judgeCompletionRate ?? 0}%`} icon={Percent} />
-        <StatCard
-          label="Organization"
-          value={data?.organization?.organizationName ?? data?.organization?.organization_name ?? '—'}
-          icon={Building2}
-        />
       </div>
-
-      <OrganizationLogoUpload
-        organizationName={
-          data?.organization?.organizationName ?? data?.organization?.organization_name
-        }
-        logoUrl={data?.organization?.logo}
-        onUpload={(file) => pageantService.uploadOrganizationLogo(file)}
-        accentClass="text-v-text-muted"
-      />
 
       <Card padding={false}>
         <div className="border-b border-v-border px-6 py-4">
