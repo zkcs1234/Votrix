@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import { authenticate, authorize, requireActiveAccount, requirePasswordChanged } from '../middleware/auth.js'
 import { USER_ROLES } from '../utils/constants.js'
-import { emailLimiter } from '../middleware/rateLimiter.js'
+import { emailLimiter, uploadLimiter } from '../middleware/rateLimiter.js'
+import { uploadImage } from '../middleware/upload.js'
 import * as organizerController from '../controllers/organizer.controller.js'
 import electionOrganizerRoutes from './election-organizer.routes.js'
 import pageantOrganizerRoutes from './pageant-organizer.routes.js'
@@ -21,6 +22,9 @@ router.use('/reports', reportsOrganizerRoutes)
 router.get('/overview', organizerController.getOrganizerOverview)
 router.get('/dashboard', organizerController.getDashboard)
 router.get('/analytics', organizerController.getAnalytics)
+
+// Single centralized org logo endpoint (replaces the 3 module-specific ones)
+router.post('/organization/logo', uploadLimiter, uploadImage('logo'), organizerController.uploadOrganizationLogo)
 
 router.post('/events/:eventId/voters/invite', emailLimiter, organizerController.inviteVoter)
 router.post(

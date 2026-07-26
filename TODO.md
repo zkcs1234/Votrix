@@ -1,76 +1,15 @@
-# Election Module Enhancement - Phase 1: Quick Wins
+# Organization Refactoring - Implementation TODO
 
-## [x] 1. Audit Logging for All Election Actions (C1)
-
-- [x] Backend: Added `recordAudit()` calls to `election.service.js` for all mutations
-- [x] Events: create, update, voting toggle (+ enable/disable)
-- [x] Positions: create, delete
-- [x] Candidates: create, delete
-
-## [ ] 2. Candidate Search & Filter (H2)
-
-- [ ] Frontend: Add search input to `ElectionCandidatesPage.jsx`
-- [ ] Frontend: Add position dropdown filter
-- [ ] Frontend: Client-side filtering logic
-
-## [ ] 3. Voter List CSV Export (M4)
-
-- [ ] Frontend: Add "Export CSV" button to `ElectionVotersPage.jsx`
-- [ ] Frontend: CSV generation and download function
-
-## [ ] 4. CSV Template Download (L2)
-
-- [ ] Frontend: Add "Download CSV template" link to `ElectionVotersPage.jsx`
-
-## [ ] 5. Dashboard Caching (M1)
-
-- [ ] Backend: Add in-memory cache to `getOrganizerDashboard()`
-- [ ] Backend: Cache invalidation on vote submission and event mutations
-
-## [ ] 6. CSV Duplicate Detection (M2)
-
-- [x] Backend: Already partially implemented in `previewCsv()` - verified correct
-- [ ] Frontend: Show duplicate warnings in CSV preview modal
-
----
-
-# Polling Module Implementation - Phase 1: Quick Wins
-
-## [x] 1. Question Duplication (C1)
-
-- [x] Backend: Add duplicate endpoint to polling-organizer.routes.js
-- [x] Backend: Add duplicateQuestion method to polling.service.js
-- [x] Frontend: Add duplicate button to PollingBuilderPage.jsx
-
-## [x] 2. Progress Indicator for Respondents (H2)
-
-- [x] Frontend: Add styled progress bar to VoterPollPage.jsx
-
-## [x] 3. Completion Time Analytics (H3)
-
-- [x] Backend: Add started_at/completed_at to poll_submissions (migration 027)
-- [x] Frontend: Track started_at in VoterPollPage
-- [x] Backend: Compute avg completion time in analytics
-- [ ] Frontend: Display in PollingAnalyticsPage
-
-## [ ] 4. Accessibility Improvements (H4)
-
-- [ ] Frontend: Add fieldset/legend to PollQuestionField
-- [ ] Frontend: Add aria-pressed to rating buttons
-- [ ] Frontend: Add aria-live for ranking changes
-
-## [x] 5. Poll Status Display (M3)
-
-- [x] Frontend: Show start/end dates when poll is closed
-
-## [x] 6. Autosave Restoration Notification (M6)
-
-- [x] Frontend: Add toast when draft is restored
-
-## [ ] 7. Rating Chart Visualization (M7)
-
-- [ ] Frontend: Replace text ratings with bar charts in PollingAnalyticsPage
-
-## [ ] 8. Poll Scheduling UX (M8)
-
-- [ ] Frontend: Add start_date/end_date to PollingEventFormPage
+- [x] Analysis and plan created (REFACTOR_ORGANIZATION_PLAN.md)
+- [x] **Phase 1:** Database migration SQL files (028_single_organization_per_organizer.sql + down)
+- [x] **Phase 2:** Consolidate `organization.service.js` — single getOrCreateOrganization, removed orgType param from updateOrganizationLogo, backward-compat aliases
+- [x] **Phase 3:** Update service dependencies — election.service.js, pageant.service.js, polling.service.js, event.service.js, admin.service.js all use single org model
+- [x] **Phase 4:** Remove 3 duplicated logo endpoints (election, competition, polling controllers/routes), add 1 centralized (organizer.controller.js + organizer.routes.js)
+- [x] **Phase 5:** Update `event.service.js` — removed logo from organizations query (logo now on users table)
+- [x] **Phase 6:** Update `admin.service.js` for 1:1 org model — simplified summary, single org per organizer
+- [x] **Phase 7:** Verify frontend event forms — all 3 event pages use banner upload (not org logo), no changes needed
+- [x] **Phase 8:** Update frontend services — all 3 services (election, pageant, polling) point to `/organizer/organization/logo`
+- [ ] **Phase 9:** Update documentation (BUSINESS_RULES.md, AI_CONTEXT.md)
+- [ ] **Phase 10:** Frontend: Add Organization Settings page for logo upload (shared component)
+- [ ] **Phase 11:** Frontend: Display org logo consistently (AppShell, HomePage, events)
+- [ ] **Phase 12:** Cleanup: Run migration on prod DB, remove legacy code after transition

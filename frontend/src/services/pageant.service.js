@@ -15,7 +15,7 @@ export const pageantService = {
   uploadOrganizationLogo(file) {
     const form = new FormData()
     form.append('logo', file)
-    return api.post(`${org}/organization/logo`, form)
+    return api.post(`/organizer/organization/logo`, form)
   },
 
   listEvents() {

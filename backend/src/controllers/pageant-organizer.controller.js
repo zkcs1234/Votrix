@@ -4,8 +4,6 @@ import * as pageantService from '../services/pageant.service.js'
 import { importJudgesFromCsv } from '../services/pageant-csv.service.js'
 import { previewCsv } from '../services/csv-import.service.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
-import { updateOrganizationLogo } from '../services/organization.service.js'
-import { ORG_TYPES } from '../utils/constants.js'
 import {
   validateCompetitionEvent,
   validateContestant,
@@ -50,16 +48,6 @@ export const setScoring = asyncHandler(async (req, res) => {
   const enabled = validateScoringToggle(req.body)
   const event = await pageantService.setEventScoring(req.params.eventId, req.user.id, enabled)
   res.json({ success: true, event })
-})
-
-export const uploadOrganizationLogo = asyncHandler(async (req, res) => {
-  const result = await uploadImageFile(req.file, UPLOAD_KIND.LOGO, `competition-${req.user.id}`)
-  const organization = await updateOrganizationLogo(
-    req.user.id,
-    ORG_TYPES.COMPETITION_SCORING,
-    result.secure_url,
-  )
-  res.json({ success: true, url: result.secure_url, organization })
 })
 
 export const uploadBanner = asyncHandler(async (req, res) => {

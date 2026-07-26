@@ -1,5 +1,7 @@
-// Phase 9 — refactored to use the shared `foundation/` helpers.
-// The exported surface is unchanged; behaviour is identical.
+// Phase 10 — Consolidated to single organization per organizer.
+// Organization_type is removed from the organization model; each organizer
+// has exactly one organization. Organization name and logo are stored on
+// the users table.
 
 import { db, wrap } from '../foundation/db.js'
 import { mapOrganization as mapOrganizationShared } from '../foundation/mapper.js'
@@ -14,6 +16,53 @@ export function mapOrganization(row) {
   return mapOrganizationShared(row)
 }
 
+/**
+ * Get the single organization for an organizer.
+ * If none exists, creates one (1:1 relationship).
+ */
+export async function getOrCreateOrganization(organizerId) {
+  if (!organizerId) {
+    throw new ApiError(400, 'organizerId is required')
+  }
+
+  const orgs = await listOrganizations(organizerId)
+  if (orgs.length > 0) return orgs[0]
+
+  // Create the single organization — organization_type is deprecated but
+  // kept for backward compatibility during the transition.
+  return createOrganization(organizerId, {
+    organizationName: 'My Organization',
+    organizationType: ORG_TYPES.ELECTION,
+  })
+}
+
+/**
+ * Legacy alias — no longer type-specific. Kept for backward compatibility
+ * so existing callers (election.service.js, pageant.service.js, etc.)
+ * continue to work without changes.
+ *
+ * @deprecated Use getOrCreateOrganization() instead.
+ */
+export const getOrCreateElectionOrganization = getOrCreateOrganization
+
+/**
+ * Legacy alias — kept for backward compatibility.
+ * @deprecated Use getOrCreateOrganization() instead.
+ */
+export const getOrCreatePollingOrganization = getOrCreateOrganization
+
+/**
+ * Legacy alias — kept for backward compatibility.
+ * @deprecated Use getOrCreateOrganization() instead.
+ */
+export const getOrCreateCompetitionScoringOrganization = getOrCreateOrganization
+
+/**
+ * Legacy alias — kept for backward compatibility.
+ * @deprecated Use getOrCreateOrganization() instead.
+ */
+export const getOrCreatePageantOrganization = getOrCreateOrganization
+
 export async function listOrganizations(organizerId) {
   try {
     const result = wrap(
@@ -21,7 +70,8 @@ export async function listOrganizations(organizerId) {
         .from(DB_TABLES.ORGANIZATIONS)
         .select('*')
         .eq('organizer_id', organizerId)
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .limit(1),
       { context: 'organization.listOrganizations' },
     )
     return result ?? []
@@ -48,86 +98,28 @@ export async function createOrganization(organizerId, { organizationName, organi
   )
 }
 
-export async function getOrCreateElectionOrganization(organizerId) {
-  if (!organizerId) {
-    throw new ApiError(400, 'organizerId is required')
-  }
-
-  const orgs = (await listOrganizations(organizerId)) ?? []
-  const existing = orgs.find((o) => o.organization_type === ORG_TYPES.ELECTION)
-  if (existing) return existing
-
-  return createOrganization(organizerId, {
-    organizationName: 'My Elections',
-    organizationType: ORG_TYPES.ELECTION,
-  })
-}
-
-export async function getOrCreatePollingOrganization(organizerId) {
-  if (!organizerId) {
-    throw new ApiError(400, 'organizerId is required')
-  }
-
-  const orgs = await listOrganizations(organizerId)
-  const existing = orgs.find((o) => o.organization_type === ORG_TYPES.POLLING)
-  if (existing) return existing
-
-  return createOrganization(organizerId, {
-    organizationName: 'My Polls',
-    organizationType: ORG_TYPES.POLLING,
-  })
-}
-
-export async function getOrCreatePageantOrganization(organizerId) {
-  return getOrCreateCompetitionScoringOrganization(organizerId)
-}
-
-export async function getOrCreateCompetitionScoringOrganization(organizerId) {
-  if (!organizerId) {
-    throw new ApiError(400, 'organizerId is required')
-  }
-
-  const orgs = await listOrganizations(organizerId)
-  // Prefer the new enum value but fall back to legacy 'pageant' rows so
-  // existing organizers keep a single shared organization.
-  const existing =
-    orgs.find((o) => o.organization_type === ORG_TYPES.COMPETITION_SCORING) ||
-    orgs.find((o) => o.organization_type === ORG_TYPES.PAGEANT)
-  if (existing) return existing
-
-  return createOrganization(organizerId, {
-    organizationName: 'My Competitions',
-    organizationType: ORG_TYPES.COMPETITION_SCORING,
-  })
-}
-
-async function getOrganizationForType(organizerId, organizationType) {
-  if (organizationType === ORG_TYPES.ELECTION) {
-    return getOrCreateElectionOrganization(organizerId)
-  }
-  if (organizationType === ORG_TYPES.PAGEANT || organizationType === ORG_TYPES.COMPETITION_SCORING) {
-    return getOrCreateCompetitionScoringOrganization(organizerId)
-  }
-  if (organizationType === ORG_TYPES.POLLING) {
-    return getOrCreatePollingOrganization(organizerId)
-  }
-  throw badRequest('Invalid organization type')
-}
-
-export async function updateOrganizationLogo(organizerId, organizationType, logoUrl) {
-  const org = await getOrganizationForType(organizerId, organizationType)
+/**
+ * Update the organization logo.
+ * Logo is now stored on the users table (not organizations.logo).
+ */
+export async function updateOrganizationLogo(organizerId, logoUrl) {
+  const org = await getOrCreateOrganization(organizerId)
   if (org.organizer_id !== organizerId) {
     throw forbidden('Not allowed to update this organization')
   }
 
-  const data = wrap(
-    await db()
-      .from(DB_TABLES.ORGANIZATIONS)
-      .update({ logo: logoUrl })
-      .eq('id', org.id)
-      .select('*')
-      .single(),
-    { context: 'organization.updateOrganizationLogo' },
-  )
-  return mapOrganization(data)
+  // Update logo on the users table (organization_logo column)
+  const { data: userData, error } = await db()
+    .from(DB_TABLES.USERS)
+    .update({ organization_logo: logoUrl })
+    .eq('id', organizerId)
+    .select('organization_logo')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+
+  return {
+    ...mapOrganization(org),
+    logo: userData?.organization_logo ?? null,
+  }
 }

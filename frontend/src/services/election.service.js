@@ -11,7 +11,7 @@ export const electionService = {
   uploadOrganizationLogo(file) {
     const form = new FormData()
     form.append('logo', file)
-    return api.post(`${base}/organization/logo`, form)
+    return api.post(`/organizer/organization/logo`, form)
   },
 
   listEvents() {

@@ -3,8 +3,6 @@ import { ApiError } from '../utils/ApiError.js'
 import * as electionService from '../services/election.service.js'
 import { previewCsv, registerVotersFromCsv } from '../services/csv-import.service.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
-import { updateOrganizationLogo } from '../services/organization.service.js'
-import { ORG_TYPES } from '../utils/constants.js'
 import {
   validateCreateEvent,
   validateUpdateEvent,
@@ -51,16 +49,6 @@ export const setVoting = asyncHandler(async (req, res) => {
   const enabled = validateVotingToggle(req.body)
   const event = await electionService.setEventVoting(req.params.eventId, req.user.id, enabled)
   res.json({ success: true, event })
-})
-
-export const uploadOrganizationLogo = asyncHandler(async (req, res) => {
-  const result = await uploadImageFile(req.file, UPLOAD_KIND.LOGO, `election-${req.user.id}`)
-  const organization = await updateOrganizationLogo(
-    req.user.id,
-    ORG_TYPES.ELECTION,
-    result.secure_url,
-  )
-  res.json({ success: true, url: result.secure_url, organization })
 })
 
 export const uploadBanner = asyncHandler(async (req, res) => {

@@ -9,7 +9,6 @@ const router = Router()
 router.use(validateRouteUUIDParams)
 
 router.get('/dashboard', ctrl.getDashboard)
-router.post('/organization/logo', uploadLimiter, uploadImage('logo'), ctrl.uploadOrganizationLogo)
 router.get('/events', ctrl.listEvents)
 router.post('/events', ctrl.createEvent)
 router.get('/events/:eventId', ctrl.getEvent)

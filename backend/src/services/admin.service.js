@@ -19,24 +19,25 @@ export async function getOrganizersList() {
 
   const orgsQuery = db()
     .from(DB_TABLES.ORGANIZATIONS)
-    .select('id, organization_name, logo, status, organizer_id')
+    .select('id, organization_name, status, organizer_id')
   const orgs = await wrap(await orgsQuery, { context: 'admin.getOrganizersList.orgs' })
 
   return users.map((orgUser) => {
     const userOrgs = orgs.filter((o) => o.organizer_id === orgUser.id)
-    const organizationSummary = userOrgs.reduce(
-      (acc, org) => {
-        acc.total += 1
-        acc[org.status] = (acc[org.status] ?? 0) + 1
-        return acc
-      },
-      { total: 0, draft: 0, active: 0, inactive: 0, archived: 0 },
-    )
+    // Single organization per organizer model — simplified summary
+    const org = userOrgs[0] ?? null
 
     return {
       ...orgUser,
-      organizations: userOrgs,
-      organizationSummary,
+      organizationName: org?.organization_name ?? 'My Organization',
+      organization: org,
+      organizationSummary: {
+        total: userOrgs.length > 0 ? 1 : 0,
+        draft: org?.status === 'draft' ? 1 : 0,
+        active: org?.status === 'active' ? 1 : 0,
+        inactive: org?.status === 'inactive' ? 1 : 0,
+        archived: org?.status === 'archived' ? 1 : 0,
+      },
     }
   })
 }

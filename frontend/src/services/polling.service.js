@@ -11,7 +11,7 @@ export const pollingService = {
   uploadOrganizationLogo(file) {
     const form = new FormData()
     form.append('logo', file)
-    return api.post(`${org}/organization/logo`, form)
+    return api.post(`/organizer/organization/logo`, form)
   },
 
   uploadBanner(eventId, file) {
@@ -142,7 +142,7 @@ export const pollingService = {
     return api.get(`${voter}/events/${eventId}`)
   },
 
-submitPoll(eventId, answers, options = {}) {
+  submitPoll(eventId, answers, options = {}) {
     const payload = { answers }
     if (options.startedAt) {
       payload.startedAt = options.startedAt

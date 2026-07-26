@@ -19,11 +19,11 @@
 
 ## Role Rules
 
-| Role | Created By | Login Identifier | Dashboard Path |
-|------|-----------|-----------------|----------------|
-| `admin` | Manual DB insert | `username` | `/admin` |
-| `organizer` | Admin | `email` | `/organizer` |
-| `voter` | Organizer (invite/import) | `email` | `/voter` |
+| Role        | Created By                | Login Identifier | Dashboard Path |
+| ----------- | ------------------------- | ---------------- | -------------- |
+| `admin`     | Manual DB insert          | `username`       | `/admin`       |
+| `organizer` | Admin                     | `email`          | `/organizer`   |
+| `voter`     | Organizer (invite/import) | `email`          | `/voter`       |
 
 - A user has exactly one role — no multi-role accounts.
 - Organizers and voters must have `account_status = 'active'` to use the system.
@@ -117,10 +117,11 @@ draft → scheduled → active → completed
 
 ## Organization Rules
 
-1. Each organizer has exactly one organization (1:1 relationship enforced at creation).
-2. Organization type (`election`, `pageant`, `polling`) determines which module the organizer uses.
-3. Organization status (`draft`, `active`, `inactive`, `archived`) is managed by the admin.
-4. An organizer can have multiple events under their organization.
+1. Each organizer has exactly one organization (1:1 relationship enforced at creation via `getOrCreateOrganization()`).
+2. Organization type is deprecated — the `organizations.organization_type` column is kept for backward compatibility only. The organization acts as a generic container; events carry their own `event_type`.
+3. Organization brand logo is stored on the `users` table (`organization_logo` column) — not on the `organizations` table. Uploaded via a single centralized endpoint: `POST /api/organizer/organization/logo`.
+4. Organization status (`draft`, `active`, `inactive`, `archived`) is managed by the admin.
+5. An organizer can have multiple events under their single organization, across all event types (election, competition_scoring, polling).
 
 ---
 

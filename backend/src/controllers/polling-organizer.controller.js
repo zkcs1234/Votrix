@@ -12,8 +12,6 @@ import {
 } from '../validators/polling.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
-import { updateOrganizationLogo } from '../services/organization.service.js'
-import { ORG_TYPES } from '../utils/constants.js'
 import { sanitizeEmail } from '../utils/sanitize.js'
 import {
   loadQuestionTypeRegistry,
@@ -49,16 +47,6 @@ export const updateEvent = asyncHandler(async (req, res) => {
 export const getSettings = asyncHandler(async (req, res) => {
   const event = await pollingService.getPollSettings(req.params.eventId, req.user.id)
   res.json({ success: true, event })
-})
-
-export const uploadOrganizationLogo = asyncHandler(async (req, res) => {
-  const result = await uploadImageFile(req.file, UPLOAD_KIND.LOGO, `polling-${req.user.id}`)
-  const organization = await updateOrganizationLogo(
-    req.user.id,
-    ORG_TYPES.POLLING,
-    result.secure_url,
-  )
-  res.json({ success: true, url: result.secure_url, organization })
 })
 
 export const uploadBanner = asyncHandler(async (req, res) => {

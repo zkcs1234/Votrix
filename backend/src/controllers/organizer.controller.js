@@ -6,6 +6,8 @@ import {
   getOrganizerDashboardStats,
   getOrganizerAnalytics,
 } from '../services/dashboard.service.js'
+import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
+import { updateOrganizationLogo } from '../services/organization.service.js'
 
 export const getOrganizerOverview = asyncHandler(async (_req, res) => {
   res.json({
@@ -64,4 +66,17 @@ export const sendEventNotification = asyncHandler(async (req, res) => {
     success: true,
     ...result,
   })
+})
+
+/**
+ * Centralized organization logo upload.
+ * Replaces the 3 module-specific logo endpoints (election, competition, polling).
+ */
+export const uploadOrganizationLogo = asyncHandler(async (req, res) => {
+  const result = await uploadImageFile(req.file, UPLOAD_KIND.LOGO, `org-${req.user.id}`)
+  const organization = await updateOrganizationLogo(
+    req.user.id,
+    result.secure_url,
+  )
+  res.json({ success: true, url: result.secure_url, organization })
 })
