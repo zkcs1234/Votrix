@@ -62,6 +62,9 @@ const CompetitionWorkspacePage = lazy(
 const CompetitionAnalyticsPage = lazy(
   () => import('@/pages/organizer/competition/CompetitionAnalyticsPage'),
 )
+const CompetitionLiveControlPage = lazy(
+  () => import('@/pages/organizer/competition/CompetitionLiveControlPage'),
+)
 const JudgeScoringPage = lazy(() => import('@/pages/voter/JudgeScoringPage'))
 
 const PollingDashboardPage = lazy(
@@ -193,7 +196,8 @@ export const routeConfig = [
       { path: 'events/:eventId/criteria', element: <CompetitionCriteriaPage /> },
       { path: 'events/:eventId/judges', element: <CompetitionJudgesPage /> },
       { path: 'events/:eventId/rankings', element: <CompetitionRankingsPage /> },
-      { path: 'events/:eventId/analytics', element: <CompetitionAnalyticsPage /> },
+{ path: 'events/:eventId/analytics', element: <CompetitionAnalyticsPage /> },
+      { path: 'events/:eventId/live', element: <CompetitionLiveControlPage /> },
     ],
   },
   {

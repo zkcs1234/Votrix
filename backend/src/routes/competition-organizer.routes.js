@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/competition.controller.js'
+import * as sessionCtrl from '../controllers/competition-session.controller.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
 
 // All routes are mounted under /api/organizer/competition/events/:eventId
@@ -44,5 +45,28 @@ router.delete('/judges-v2/:judgeId', ctrl.deleteJudgeV2)
 router.get('/judges-v2/:judgeId/assignments', ctrl.listJudgeAssignments)
 router.post('/judges-v2/:judgeId/assignments', ctrl.createJudgeAssignment)
 router.delete('/judges-v2/:judgeId/assignments/:assignmentId', ctrl.deleteJudgeAssignment)
+
+// ---------------------------------------------------------------------------
+// Live Competition Session (Phase 7)
+// ---------------------------------------------------------------------------
+// Session status
+router.get('/session/active', sessionCtrl.getActiveSession)
+router.get('/sessions', sessionCtrl.listSessions)
+router.get('/sessions/:sessionId', sessionCtrl.getSession)
+
+// Session controls
+router.post('/session/start', sessionCtrl.startSession)
+router.post('/session/pause', sessionCtrl.pauseSession)
+router.post('/session/resume', sessionCtrl.resumeSession)
+router.post('/session/complete', sessionCtrl.completeSession)
+
+// Contestant navigation
+router.post('/session/next-contestant', sessionCtrl.nextContestant)
+router.post('/session/prev-contestant', sessionCtrl.previousContestant)
+router.post('/session/set-contestant', sessionCtrl.setActiveContestant)
+router.post('/session/set-round', sessionCtrl.setActiveRound)
+
+// Judge progress (organizer view)
+router.get('/session/judge-progress', sessionCtrl.getJudgeProgress)
 
 export default router
