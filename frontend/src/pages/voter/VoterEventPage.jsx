@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
-import { voterService, PARTICIPANT_TYPE_META } from '@/services/voter.service'
+import { voterService } from '@/services/voter.service'
 import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ElectionPositionSection from '@/components/voter/election/ElectionPositionSection'
 import Button from '@/components/ui/Button'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
 import ParticipantInformationForm from '@/components/voter/ParticipantInformationForm'
+import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 
 function validateSelections(positions, selections) {
   let hasAtLeastOneVote = false
@@ -78,34 +79,19 @@ function BallotSubmittedScreen({ ballot, eventId }) {
       </div>
 
       {ballot?.canViewResults && (
-        <div className="v-card p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-v-text">Election results</h3>
+        <>
           {resultsLoading && <LoadingSpinner />}
           {!resultsLoading && resultsMessage && (
             <p className="text-sm text-v-text-subtle">{resultsMessage}</p>
           )}
-          {!resultsLoading && results?.positionSummaries?.map((position) => (
-            <div key={position.positionId} className="rounded-xl border border-v-border p-4">
-              <p className="font-medium text-v-text">{position.positionName}</p>
-              <ul className="mt-3 space-y-2">
-                {(position.candidates ?? []).map((candidate) => (
-                  <li
-                    key={candidate.candidateId}
-                    className="flex items-center justify-between text-sm text-v-text-muted"
-                  >
-                    <span>{candidate.candidateName}</span>
-                    <span>
-                      {candidate.votes} vote{candidate.votes === 1 ? '' : 's'}
-                      {candidate.votePercentage !== undefined
-                        ? ` (${candidate.votePercentage}%)`
-                        : ''}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
+          {!resultsLoading && !resultsMessage && (
+            <ElectionResultsCard
+              results={results}
+              electionTitle={ballot?.event?.title}
+              resultsVisibility={ballot?.resultsVisibility}
+            />
+          )}
+        </>
       )}
 
       {ballot?.resultsVisibility === 'public' && !ballot?.canViewResults && (

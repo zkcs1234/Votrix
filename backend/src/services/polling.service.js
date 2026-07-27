@@ -186,6 +186,8 @@ export async function createPollEvent(organizerId, payload) {
       organization_id: org.id,
       title: payload.title,
       description: payload.description ?? null,
+      start_date: payload.startDate ?? null,
+      end_date: payload.endDate ?? null,
       event_type: EVENT_TYPES.POLLING,
       status: 'draft',
       polling_enabled: false,
@@ -206,6 +208,8 @@ export async function updatePollEvent(eventId, organizerId, payload) {
   const updates = {}
   if (payload.title !== undefined) updates.title = payload.title
   if (payload.description !== undefined) updates.description = payload.description
+  if (payload.startDate !== undefined) updates.start_date = payload.startDate
+  if (payload.endDate !== undefined) updates.end_date = payload.endDate
   if (payload.pollAnonymous !== undefined) updates.poll_anonymous = payload.pollAnonymous
   if (payload.pollAllowMultipleSubmissions !== undefined) {
     updates.poll_allow_multiple_submissions = payload.pollAllowMultipleSubmissions

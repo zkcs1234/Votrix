@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { pageantService } from '@/services/pageant.service'
 import { pageantEventSchemaStep1 } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
+import DateTimeInput from '@/components/ui/DateTimeInput'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import ParticipantInformationFormBuilder from '@/components/organizer/ParticipantInformationFormBuilder'
@@ -30,6 +31,7 @@ export default function CompetitionEventFormPage() {
 
   const {
     register,
+    getValues,
     handleSubmit: rhfHandleSubmit,
     formState: { errors },
     trigger,
@@ -39,6 +41,8 @@ export default function CompetitionEventFormPage() {
     defaultValues: {
       title: '',
       description: '',
+      startDate: '',
+      endDate: '',
     },
   })
 
@@ -49,6 +53,8 @@ export default function CompetitionEventFormPage() {
         reset({
           title: data.event.title || '',
           description: data.event.description || '',
+          startDate: data.event.startDate ? data.event.startDate.slice(0, 16) : '',
+          endDate: data.event.endDate ? data.event.endDate.slice(0, 16) : '',
         })
         setBanner(data.event.banner)
       })
@@ -79,7 +85,7 @@ export default function CompetitionEventFormPage() {
 
   const handleNext = async (e) => {
     e.preventDefault()
-    const isValid = await trigger(['title'])
+    const isValid = await trigger(['title', 'startDate', 'endDate'])
     if (isValid) {
       setStep(2)
     }
@@ -95,6 +101,8 @@ export default function CompetitionEventFormPage() {
       const payload = {
         title: data.title,
         description: data.description,
+        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
+        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
       }
       let id = eventId
       if (isNew) {
@@ -128,6 +136,8 @@ export default function CompetitionEventFormPage() {
       const payload = {
         title: data.title,
         description: data.description,
+        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
+        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
       }
       let id = eventId
       if (isNew) {
@@ -195,6 +205,30 @@ export default function CompetitionEventFormPage() {
               />
               {errors.description && <p className="v-error-text">{errors.description.message}</p>}
               <p className={HELPER_TEXT}>Optional description for judges and contestants</p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="v-form-field">
+                <label className={LABEL_CLASS} htmlFor="startDate">
+                  Start Date
+                </label>
+                <DateTimeInput
+                  id="startDate"
+                  {...register('startDate')}
+                />
+                {errors.startDate && <p className="v-error-text">{errors.startDate.message}</p>}
+              </div>
+
+              <div className="v-form-field">
+                <label className={LABEL_CLASS} htmlFor="endDate">
+                  End Date
+                </label>
+                <DateTimeInput
+                  id="endDate"
+                  {...register('endDate')}
+                />
+                {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
+              </div>
             </div>
 
             <div className="v-form-actions">

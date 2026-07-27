@@ -31,6 +31,7 @@ export default function PollingEventFormPage() {
 
   const {
     register,
+    getValues,
     handleSubmit: rhfHandleSubmit,
     formState: { errors },
     trigger,
@@ -40,6 +41,8 @@ export default function PollingEventFormPage() {
     defaultValues: {
       title: '',
       description: '',
+      startDate: '',
+      endDate: '',
       pollAnonymous: false,
       pollAllowMultipleSubmissions: false,
       pollExpiresAt: '',
@@ -54,6 +57,8 @@ export default function PollingEventFormPage() {
         reset({
           title: e.title || '',
           description: e.description || '',
+          startDate: e.startDate ? e.startDate.slice(0, 16) : '',
+          endDate: e.endDate ? e.endDate.slice(0, 16) : '',
           pollAnonymous: e.pollAnonymous || false,
           pollAllowMultipleSubmissions: e.pollAllowMultipleSubmissions || false,
           pollExpiresAt: e.pollExpiresAt ? e.pollExpiresAt.slice(0, 16) : '',
@@ -89,7 +94,7 @@ export default function PollingEventFormPage() {
     e.preventDefault()
     let isValid = false
     if (step === 1) {
-      isValid = await trigger(['title'])
+      isValid = await trigger(['title', 'startDate', 'endDate'])
     }
     if (isValid) {
       setStep(step + 1)
@@ -106,6 +111,8 @@ export default function PollingEventFormPage() {
       const payload = {
         title: data.title,
         description: data.description,
+        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
+        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
         pollAnonymous: data.pollAnonymous || false,
         pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions || false,
         pollExpiresAt: data.pollExpiresAt ? new Date(data.pollExpiresAt).toISOString() : null,
@@ -142,6 +149,8 @@ export default function PollingEventFormPage() {
       const payload = {
         title: data.title,
         description: data.description,
+        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
+        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
         pollAnonymous: data.pollAnonymous || false,
         pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions || false,
         pollExpiresAt: data.pollExpiresAt ? new Date(data.pollExpiresAt).toISOString() : null,
@@ -184,8 +193,6 @@ export default function PollingEventFormPage() {
         <span className={step === 3 ? 'text-v-primary font-medium' : ''}>Step 3: Settings</span>
         <span>→</span>
         <span className={step === 4 ? 'text-v-primary font-medium' : ''}>Step 4: Information Form</span>
-        <span>→</span>
-        <span className={step === 3 ? 'text-v-primary font-medium' : ''}>Step 3: Settings</span>
       </div>
 
       <Card padding="md">
@@ -216,6 +223,29 @@ export default function PollingEventFormPage() {
                 {...register('description')}
               />
               {errors.description && <p className="v-error-text">{errors.description.message}</p>}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="v-form-field">
+                <label className={LABEL_CLASS} htmlFor="startDate">
+                  Start Date
+                </label>
+                <DateTimeInput
+                  id="startDate"
+                  {...register('startDate')}
+                />
+                {errors.startDate && <p className="v-error-text">{errors.startDate.message}</p>}
+              </div>
+              <div className="v-form-field">
+                <label className={LABEL_CLASS} htmlFor="endDate">
+                  End Date
+                </label>
+                <DateTimeInput
+                  id="endDate"
+                  {...register('endDate')}
+                />
+                {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
+              </div>
             </div>
 
             <div className="v-form-actions">

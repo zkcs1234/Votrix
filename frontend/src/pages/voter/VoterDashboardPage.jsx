@@ -10,6 +10,7 @@ import StatCard from '@/components/ui/StatCard'
 import VoterEventCard from '@/components/voter/VoterEventCard'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
+import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
@@ -224,6 +225,28 @@ export default function VoterDashboardPage() {
         description="You have finished your participation for these events."
         events={data?.completed}
       />
+
+      {/* Election results section */}
+      {data?.events?.filter((e) => e.eventType === 'election' && e.canViewResults && e.results).length > 0 && (
+        <section>
+          <div className="mb-3">
+            <h3 className="v-section-title">Election Results</h3>
+            <p className="v-caption">View results for elections you are enrolled in.</p>
+          </div>
+          <div className="space-y-4">
+            {data.events
+              .filter((e) => e.eventType === 'election' && e.canViewResults && e.results)
+              .map((event) => (
+                <ElectionResultsCard
+                  key={event.id}
+                  results={event.results}
+                  electionTitle={event.title}
+                  resultsVisibility={event.resultsVisibility}
+                />
+              ))}
+          </div>
+        </section>
+      )}
 
       {stats.total === 0 && (
         <Card padding="sm" className="text-center">

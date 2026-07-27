@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Vote, Trophy, BarChart2, ArrowRight, UserCheck } from 'lucide-react'
+import { Vote, Trophy, BarChart2, ArrowRight, UserCheck, Eye } from 'lucide-react'
 import VoterStatusBadge from '@/components/voter/VoterStatusBadge'
 import { EVENT_TYPE_META, PARTICIPANT_TYPE_META } from '@/services/voter.service'
 import Badge from '@/components/ui/Badge'
@@ -92,6 +92,12 @@ export default function VoterEventCard({ event, showAction = true }) {
           <p className="mt-3 flex items-center gap-1 text-sm font-medium text-v-text">
             {event.actionLabel}
             <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+          </p>
+        )}
+        {event.eventType === 'election' && event.canViewResults && event.results && (
+          <p className="mt-3 flex items-center gap-1 text-sm font-medium text-v-accent">
+            <Eye className="h-3.5 w-3.5" strokeWidth={2} />
+            Results available
           </p>
         )}
       </div>

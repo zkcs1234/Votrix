@@ -26,6 +26,13 @@ export function validateCompetitionEvent(body, isCreate = false) {
   if (isCreate && !body?.title?.trim()) {
     throw new ApiError(400, 'Event title is required')
   }
+  if (isCreate) {
+    if (!body?.startDate) throw new ApiError(400, 'Start date is required')
+    if (!body?.endDate) throw new ApiError(400, 'End date is required')
+    if (body.startDate && body.endDate && new Date(body.endDate) < new Date(body.startDate)) {
+      throw new ApiError(400, 'End date must be on or after start date')
+    }
+  }
 
   const payload = {}
   if (body.title !== undefined) payload.title = body.title.trim()

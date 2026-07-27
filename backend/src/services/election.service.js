@@ -903,6 +903,7 @@ export async function listVoterElectionEvents(voterId) {
         description,
         banner,
         voting_enabled,
+        results_visibility,
         status,
         event_type,
         start_date,

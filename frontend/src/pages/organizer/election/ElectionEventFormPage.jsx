@@ -49,6 +49,7 @@ export default function ElectionEventFormPage() {
 
   const {
     register,
+    getValues,
     handleSubmit: rhfHandleSubmit,
     formState: { errors },
     trigger,
@@ -110,7 +111,7 @@ export default function ElectionEventFormPage() {
 
   const handleNext = async (e) => {
     e.preventDefault()
-    const isValid = await trigger(['title'])
+    const isValid = await trigger(['title', 'startDate', 'endDate'])
     if (isValid) {
       setStep(2)
     }

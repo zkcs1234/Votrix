@@ -6,10 +6,19 @@ export function validatePollEvent(body, isCreate = false) {
   if (isCreate && !body?.title?.trim()) {
     throw new ApiError(400, 'Poll title is required')
   }
+  if (isCreate) {
+    if (!body?.startDate) throw new ApiError(400, 'Start date is required')
+    if (!body?.endDate) throw new ApiError(400, 'End date is required')
+    if (body.startDate && body.endDate && new Date(body.endDate) < new Date(body.startDate)) {
+      throw new ApiError(400, 'End date must be on or after start date')
+    }
+  }
 
   const payload = {}
   if (body.title !== undefined) payload.title = body.title.trim()
   if (body.description !== undefined) payload.description = body.description?.trim() || null
+  if (body.startDate !== undefined) payload.startDate = body.startDate
+  if (body.endDate !== undefined) payload.endDate = body.endDate
   if (body.pollAnonymous !== undefined) payload.pollAnonymous = Boolean(body.pollAnonymous)
   if (body.pollAllowMultipleSubmissions !== undefined) {
     payload.pollAllowMultipleSubmissions = Boolean(body.pollAllowMultipleSubmissions)

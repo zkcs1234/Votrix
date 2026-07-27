@@ -1,8 +1,9 @@
-import { listVoterElectionEvents } from './election.service.js'
+import { listVoterElectionEvents, getVoterElectionResults } from './election.service.js'
 import { listJudgeCompetitionEvents } from './pageant.service.js'
 import { listVoterPollEvents } from './polling.service.js'
 import { enrichEventWithParticipantType } from './participant.service.js'
 import { PARTICIPANT_TYPES } from '../utils/constants.js'
+import { canVoterViewElectionResults } from '../utils/eventSchedule.js'
 
 function isPollOpen(event) {
   if (!event.pollingEnabled) return false
@@ -14,6 +15,9 @@ function classifyElection(event) {
   let bucket = 'assigned'
   if (event.hasVoted) bucket = 'completed'
   else if (event.votingEnabled) bucket = 'active'
+
+  // Check if voter can view results
+  const canViewResults = canVoterViewElectionResults(event)
 
   return enrichEventWithParticipantType({
     id: event.id,
@@ -31,6 +35,8 @@ function classifyElection(event) {
     votingEnabled: Boolean(event.votingEnabled),
     hasVoted: Boolean(event.hasVoted),
     eventStatus: event.status,
+    resultsVisibility: event.resultsVisibility ?? 'public',
+    canViewResults,
   }, 'election')
 }
 
@@ -107,8 +113,25 @@ export async function getVoterDashboard(voterId) {
     listVoterPollEvents(voterId),
   ])
 
+  // Fetch results for elections where voter can view them
+  const electionResults = {}
+  for (const election of elections) {
+    if (canVoterViewElectionResults(election)) {
+      try {
+        const results = await getVoterElectionResults(election.id, voterId)
+        electionResults[election.id] = results
+      } catch (err) {
+        // Ignore errors - results might not be available
+        console.error(`Failed to fetch results for election ${election.id}:`, err.message)
+      }
+    }
+  }
+
   const events = [
-    ...elections.map(classifyElection),
+    ...elections.map((e) => ({
+      ...classifyElection(e),
+      results: electionResults[e.id] || null,
+    })),
     ...competitions.map(classifyCompetition),
     ...polls.map(classifyPoll),
   ]

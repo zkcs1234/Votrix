@@ -36,8 +36,10 @@ function assertValidDateRange(startDate, endDate) {
 
 export function validateCreateEvent(body) {
   if (!body?.title?.trim()) throw new ApiError(400, 'Event title is required')
-  const startDate = body.startDate || null
-  const endDate = body.endDate || null
+  if (!body?.startDate) throw new ApiError(400, 'Start date is required')
+  if (!body?.endDate) throw new ApiError(400, 'End date is required')
+  const startDate = body.startDate
+  const endDate = body.endDate
   assertValidDateRange(startDate, endDate)
   return {
     title: body.title.trim(),
