@@ -96,6 +96,44 @@ export default function PollingEventFormPage() {
     }
   }
 
+  const handleNextStep3 = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+
+    try {
+      const data = getValues()
+      const payload = {
+        title: data.title,
+        description: data.description,
+        pollAnonymous: data.pollAnonymous || false,
+        pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions || false,
+        pollExpiresAt: data.pollExpiresAt ? new Date(data.pollExpiresAt).toISOString() : null,
+      }
+      let id = eventId
+      if (isNew) {
+        const { data: res } = await pollingService.createEvent(payload)
+        id = res.event.id
+      } else {
+        await pollingService.updateEvent(eventId, payload)
+      }
+      if (bannerFile) {
+        await pollingService.uploadBanner(id, bannerFile)
+      }
+
+      // Go to step 4 (Information Form)
+      if (isNew) {
+        navigate(`/organizer/polling/events/${id}/form`, { replace: true })
+      } else {
+        setStep(4)
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save poll')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const onSubmit = async (data) => {
     setSaving(true)
     setError(null)
@@ -210,7 +248,7 @@ export default function PollingEventFormPage() {
         )}
 
         {step === 3 && (
-          <form className="space-y-4" onSubmit={rhfHandleSubmit(onSubmit)}>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNextStep3(e) }}>
             <div className="space-y-3 pt-2">
               <label className="flex items-center gap-3 text-sm text-v-text-muted">
                 <input
@@ -259,7 +297,7 @@ export default function PollingEventFormPage() {
                 type="submit"
                 disabled={saving}
               >
-                {saving ? 'Saving...' : isNew ? 'Create & build questions' : 'Save settings'}
+                {saving ? 'Saving...' : 'Next step'}
               </Button>
             </div>
           </form>

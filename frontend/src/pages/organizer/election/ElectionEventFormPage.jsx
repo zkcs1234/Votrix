@@ -116,6 +116,47 @@ export default function ElectionEventFormPage() {
     }
   }
 
+  const handleNextStep2 = async (e) => {
+    e.preventDefault()
+    // For new events: create event first then go to step 3
+    // For existing events: update event then go to step 3
+    setSaving(true)
+    setError(null)
+
+    try {
+      const data = getValues()
+      const payload = {
+        title: data.title,
+        description: data.description,
+        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
+        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
+        resultsVisibility: data.resultsVisibility,
+      }
+      let id = eventId
+      if (isNew) {
+        const { data: res } = await electionService.createEvent(payload)
+        id = res.event.id
+      } else {
+        await electionService.updateEvent(eventId, payload)
+      }
+
+      if (bannerFile) {
+        await electionService.uploadBanner(id, bannerFile)
+      }
+
+      // Go to step 3 (Information Form)
+      if (isNew) {
+        navigate(`/organizer/election/events/${id}/form`, { replace: true })
+      } else {
+        setStep(3)
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save event')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const onSubmit = async (data) => {
     setSaving(true)
     setError(null)
@@ -286,7 +327,7 @@ export default function ElectionEventFormPage() {
             </div>
           </div>
         ) : (
-          <form className="space-y-4" onSubmit={rhfHandleSubmit(onSubmit)}>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNextStep2(e) }}>
             <ImageUploadField
               label="Event banner"
               hint="Wide image for event headers (stored on Cloudinary)."
@@ -311,7 +352,7 @@ export default function ElectionEventFormPage() {
                 type="submit"
                 disabled={saving}
               >
-                {saving ? 'Saving...' : isNew ? 'Create event' : 'Save changes'}
+                {saving ? 'Saving...' : 'Next step'}
               </Button>
             </div>
           </form>

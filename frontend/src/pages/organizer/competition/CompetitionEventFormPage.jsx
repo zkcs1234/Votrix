@@ -85,6 +85,41 @@ export default function CompetitionEventFormPage() {
     }
   }
 
+  const handleNextStep2 = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+
+    try {
+      const data = getValues()
+      const payload = {
+        title: data.title,
+        description: data.description,
+      }
+      let id = eventId
+      if (isNew) {
+        const { data: res } = await pageantService.createEvent(payload)
+        id = res.event.id
+      } else {
+        await pageantService.updateEvent(eventId, payload)
+      }
+      if (bannerFile) {
+        await pageantService.uploadBanner(id, bannerFile)
+      }
+
+      // Go to step 3 (Information Form)
+      if (isNew) {
+        navigate(`/organizer/competition/events/${id}/form`, { replace: true })
+      } else {
+        setStep(3)
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save event')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const onSubmit = async (data) => {
     setSaving(true)
     setError(null)
@@ -200,7 +235,7 @@ export default function CompetitionEventFormPage() {
             </div>
           </div>
         ) : (
-          <form className="space-y-4" onSubmit={rhfHandleSubmit(onSubmit)}>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNextStep2(e) }}>
             <ImageUploadField
               label="Event banner"
               hint="Wide image for event headers."
@@ -225,7 +260,7 @@ export default function CompetitionEventFormPage() {
                 type="submit"
                 disabled={saving}
               >
-                {saving ? 'Saving...' : isNew ? 'Create Competition Scoring Event' : 'Save changes'}
+                {saving ? 'Saving...' : 'Next step'}
               </Button>
             </div>
           </form>
