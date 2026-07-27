@@ -3,25 +3,10 @@ import { ApiError } from '../utils/ApiError.js'
 import * as pollingService from '../services/polling.service.js'
 import * as electionService from '../services/election.service.js'
 import { importVotersFromCsv, previewCsv, registerVotersFromCsv } from '../services/csv-import.service.js'
-import { inviteVoterToEvent, inviteRegisteredVoter, registerVoterToEvent, registerExistingVoter, sendVoterInvitation, sendAllPendingInvitations } from '../services/invitation.service.js'
-import {
-  validatePollEvent,
-  validateQuestion,
-  validatePollToggle,
-  validateCustomType,
-  validateReorder,
-} from '../validators/polling.validator.js'
-import { validateInviteVoter } from '../validators/email.validator.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
-import { sanitizeEmail } from '../utils/sanitize.js'
-import {
-  loadQuestionTypeRegistry,
-  listCustomTypes,
-  createCustomType,
-  updateCustomType,
-  deleteCustomType,
-} from '../services/polling-registry.service.js'
-import { getOrCreatePollingOrganization } from '../services/organization.service.js'
+import { validatePollEvent, validatePollQuestion } from '../validators/polling.validator.js'
+import { validateInviteVoter } from '../validators/email.validator.js'
+import { getEventInformationForm, setEventInformationForm } from '../services/event.service.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const data = await pollingService.getOrganizerDashboard(req.user.id)
@@ -46,7 +31,13 @@ export const updateEvent = asyncHandler(async (req, res) => {
 })
 
 export const getSettings = asyncHandler(async (req, res) => {
-  const event = await pollingService.getPollSettings(req.params.eventId, req.user.id)
+  const settings = await pollingService.getPollSettings(req.params.eventId, req.user.id)
+  res.json({ success: true, settings })
+})
+
+export const setPollOpen = asyncHandler(async (req, res) => {
+  const { open } = req.body
+  const event = await pollingService.setPollOpen(req.params.eventId, req.user.id, open)
   res.json({ success: true, event })
 })
 
@@ -58,31 +49,38 @@ export const uploadBanner = asyncHandler(async (req, res) => {
   res.json({ success: true, url: result.secure_url, event })
 })
 
-export const setPollOpen = asyncHandler(async (req, res) => {
-  const enabled = validatePollToggle(req.body)
-  const event = await pollingService.setPollOpen(req.params.eventId, req.user.id, enabled)
-  res.json({ success: true, event })
-})
-
 export const listQuestions = asyncHandler(async (req, res) => {
   const questions = await pollingService.listQuestions(req.params.eventId, req.user.id)
   res.json({ success: true, questions })
 })
 
 export const createQuestion = asyncHandler(async (req, res) => {
-  const org = await getOrCreatePollingOrganization(req.user.id)
-  const payload = await validateQuestion(req.body, org.id)
-  const question = await pollingService.createQuestion(
-    req.params.eventId,
-    req.user.id,
-    payload,
-  )
+  const payload = validatePollQuestion(req.body)
+  const question = await pollingService.createQuestion(req.params.eventId, req.user.id, payload)
   res.status(201).json({ success: true, question })
 })
 
+export const reorderQuestions = asyncHandler(async (req, res) => {
+  const { questionIds } = req.body
+  if (!Array.isArray(questionIds)) throw new ApiError(400, 'questionIds array required')
+
+  const eventId = req.params.eventId
+  const questions = await pollingService.listQuestions(eventId, req.user.id)
+
+  for (let i = 0; i < questionIds.length; i++) {
+    const q = questions.find((qq) => qq.id === questionIds[i])
+    if (!q) throw new ApiError(400, `Question ${questionIds[i]} not found`)
+  }
+
+  for (let i = 0; i < questionIds.length; i++) {
+    await pollingService.updateQuestion(eventId, req.user.id, questionIds[i], { sortOrder: i })
+  }
+
+  res.json({ success: true, message: 'Questions reordered' })
+})
+
 export const updateQuestion = asyncHandler(async (req, res) => {
-  const org = await getOrCreatePollingOrganization(req.user.id)
-  const payload = await validateQuestion(req.body, org.id)
+  const payload = validatePollQuestion(req.body)
   const question = await pollingService.updateQuestion(
     req.params.eventId,
     req.user.id,
@@ -93,11 +91,7 @@ export const updateQuestion = asyncHandler(async (req, res) => {
 })
 
 export const deleteQuestion = asyncHandler(async (req, res) => {
-  await pollingService.deleteQuestion(
-    req.params.eventId,
-    req.user.id,
-    req.params.questionId,
-  )
+  await pollingService.deleteQuestion(req.params.eventId, req.user.id, req.params.questionId)
   res.json({ success: true, message: 'Question deleted' })
 })
 
@@ -110,130 +104,69 @@ export const duplicateQuestion = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, question })
 })
 
-export const reorderQuestions = asyncHandler(async (req, res) => {
-  const orders = validateReorder(req.body)
-  const updatedQuestions = await pollingService.reorderQuestions(
-    req.params.eventId,
-    req.user.id,
-    orders,
-  )
-  res.json({ success: true, questions: updatedQuestions })
-})
-
 export const getAnalytics = asyncHandler(async (req, res) => {
   const analytics = await pollingService.getPollAnalytics(req.params.eventId, req.user.id)
   res.json({ success: true, analytics })
 })
 
-export const inviteRespondent = asyncHandler(async (req, res) => {
-  const payload = validateInviteVoter(req.body)
-  const result = await inviteVoterToEvent({
-    eventId: req.params.eventId,
-    email: payload.email,
-    organizerId: req.user.id,
-    temporaryPassword: payload.temporaryPassword,
-  })
-  res.status(201).json({ success: true, ...result })
-})
-
-export const inviteExistingRespondent = asyncHandler(async (req, res) => {
-  const { email } = req.body
-
-  if (!email) {
-    throw new ApiError(400, 'Email is required')
-  }
-
-  const result = await inviteRegisteredVoter({
-    eventId: req.params.eventId,
-    email,
-    organizerId: req.user.id,
-  })
-
-  res.json({
-    success: true,
-    message: 'Respondent invited successfully',
-    voter: result.user,
-  })
-})
-
-export const importRespondentsCsv = asyncHandler(async (req, res) => {
-  if (!req.file) throw new ApiError(400, 'CSV file required')
-  const result = await importVotersFromCsv(req.params.eventId, req.user.id, req.file.buffer)
-  res.json({ success: true, ...result })
-})
-
-// List respondents (voters) for a poll event
-export const listRespondents = asyncHandler(async (req, res) => {
-  const page = parseInt(req.query.page, 10) || 1
-  const limit = parseInt(req.query.limit, 10) || 50
-  const result = await electionService.listEventVoters(req.params.eventId, req.user.id, page, limit)
-  res.json({ success: true, ...result })
-})
-
-// ---------------------------------------------------------------------------
-// Phase 7 — Question type registry
-// ---------------------------------------------------------------------------
 export const listQuestionTypes = asyncHandler(async (req, res) => {
-  const org = await getOrCreatePollingOrganization(req.user.id)
-  const types = await loadQuestionTypeRegistry(org.id)
+  const types = await pollingService.listQuestionTypes(req.user.id)
   res.json({ success: true, types })
 })
 
 export const listCustomQuestionTypes = asyncHandler(async (req, res) => {
-  const org = await getOrCreatePollingOrganization(req.user.id)
-  const types = await listCustomTypes(org.id)
+  const types = await pollingService.listCustomQuestionTypes(req.user.id)
   res.json({ success: true, types })
 })
 
 export const createCustomQuestionType = asyncHandler(async (req, res) => {
-  const org = await getOrCreatePollingOrganization(req.user.id)
-  const payload = validateCustomType(req.body)
-  const type = await createCustomType(org.id, payload)
+  const type = await pollingService.createCustomQuestionType(req.user.id, req.body)
   res.status(201).json({ success: true, type })
 })
 
 export const updateCustomQuestionType = asyncHandler(async (req, res) => {
-  const org = await getOrCreatePollingOrganization(req.user.id)
-  const payload = validateCustomType(req.body)
-  const type = await updateCustomType(org.id, req.params.typeId, payload)
+  const type = await pollingService.updateCustomQuestionType(
+    req.params.typeId,
+    req.user.id,
+    req.body,
+  )
   res.json({ success: true, type })
 })
 
 export const deleteCustomQuestionType = asyncHandler(async (req, res) => {
-  const org = await getOrCreatePollingOrganization(req.user.id)
-  await deleteCustomType(org.id, req.params.typeId)
-  res.json({ success: true, message: 'Custom type removed' })
+  await pollingService.deleteCustomQuestionType(req.params.typeId, req.user.id)
+  res.json({ success: true, message: 'Custom question type deleted' })
 })
 
-// ============================================================================
-// NEW CONTROLLER FUNCTIONS: Separate Registration from Invitation
-// ============================================================================
+export const listRespondents = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page, 10) || 1
+  const limit = parseInt(req.query.limit, 10) || 50
+  const result = await pollingService.listEventRespondents(
+    req.params.eventId,
+    req.user.id,
+    page,
+    limit,
+  )
+  res.json({ success: true, ...result })
+})
 
 export const registerRespondent = asyncHandler(async (req, res) => {
   const payload = validateInviteVoter(req.body)
-  const result = await registerVoterToEvent({
+  const result = await pollingService.registerRespondentToPoll({
     eventId: req.params.eventId,
     email: payload.email,
     organizerId: req.user.id,
     temporaryPassword: payload.temporaryPassword,
-    // Don't reset password for existing voters - just enroll them
     resetPasswordForExisting: false,
   })
   res.status(201).json({ success: true, ...result })
 })
 
 export const registerExistingRespondent = asyncHandler(async (req, res) => {
-  const rawEmail = req.body?.email
-  if (!rawEmail) {
-    throw new ApiError(400, 'Email is required')
-  }
-  const email = sanitizeEmail(rawEmail)
-  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRe.test(email)) {
-    throw new ApiError(400, 'Invalid email format')
-  }
+  const { email } = req.body
+  if (!email) throw new ApiError(400, 'Email is required')
 
-  const result = await registerExistingVoter({
+  const result = await pollingService.registerExistingRespondent({
     eventId: req.params.eventId,
     email,
     organizerId: req.user.id,
@@ -242,12 +175,12 @@ export const registerExistingRespondent = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: 'Respondent registered successfully',
-    voter: result.user,
+    respondent: result.user,
   })
 })
 
 export const sendRespondentInvitation = asyncHandler(async (req, res) => {
-  const result = await sendVoterInvitation({
+  const result = await pollingService.sendRespondentInvitation({
     eventId: req.params.eventId,
     voterId: req.params.voterId,
     organizerId: req.user.id,
@@ -262,7 +195,7 @@ export const sendRespondentInvitation = asyncHandler(async (req, res) => {
 })
 
 export const sendAllRespondentInvitations = asyncHandler(async (req, res) => {
-  const result = await sendAllPendingInvitations({
+  const result = await pollingService.sendAllPendingRespondentInvitations({
     eventId: req.params.eventId,
     organizerId: req.user.id,
   })
@@ -278,18 +211,28 @@ export const sendAllRespondentInvitations = asyncHandler(async (req, res) => {
 
 export const previewRespondentsCsv = asyncHandler(async (req, res) => {
   if (!req.file) throw new ApiError(400, 'CSV file required')
-
   const result = await previewCsv(req.params.eventId, req.user.id, req.file.buffer)
   res.json({ success: true, ...result })
 })
 
 export const registerRespondentsCsv = asyncHandler(async (req, res) => {
   const { data } = req.body
-
   if (!data || !Array.isArray(data)) {
     throw new ApiError(400, 'Invalid import data')
   }
 
   const result = await registerVotersFromCsv(req.params.eventId, req.user.id, data)
+  res.json({ success: true, ...result })
+})
+
+// ——— Participant Information Form ———
+
+export const getInformationForm = asyncHandler(async (req, res) => {
+  const result = await getEventInformationForm(req.params.eventId, req.user.id)
+  res.json({ success: true, ...result })
+})
+
+export const updateInformationForm = asyncHandler(async (req, res) => {
+  const result = await setEventInformationForm(req.params.eventId, req.user.id, req.body)
   res.json({ success: true, ...result })
 })

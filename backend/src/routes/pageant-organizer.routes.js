@@ -45,6 +45,10 @@ router.post('/events/:eventId/judges/import-register', csvImportLimiter, ctrl.re
 router.get('/events/:eventId/rankings', ctrl.getRankings)
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
 
+// ——— Participant Information Form ———
+router.get('/events/:eventId/information-form', ctrl.getInformationForm)
+router.patch('/events/:eventId/information-form', ctrl.updateInformationForm)
+
 // Phase 4-6 dynamic scoring engine: categories, rounds, scoring config,
 // first-class judges, and flexible assignments live under
 // `/events/:eventId/...` and share the auth middleware on the parent router.

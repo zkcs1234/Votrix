@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState, useCallback } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { pageantService } from '@/services/pageant.service'
@@ -7,20 +7,26 @@ import { pageantEventSchemaStep1 } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import ParticipantInformationFormBuilder from '@/components/organizer/ParticipantInformationFormBuilder'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
 export default function CompetitionEventFormPage() {
   const { eventId } = useParams()
+  const location = useLocation()
   const isNew = !eventId || eventId === 'new'
+  const isFormStep = location.pathname.includes('/form')
   const navigate = useNavigate()
 
-  const [step, setStep] = useState(1)
+  // If accessing /form route, start at step 3, otherwise step 1
+  const [step, setStep] = useState(isFormStep ? 3 : 1)
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!isNew)
   const [error, setError] = useState(null)
+  const [infoFormSchema, setInfoFormSchema] = useState(null)
+  const [infoFormLoading, setInfoFormLoading] = useState(false)
 
   const {
     register,
@@ -52,6 +58,25 @@ export default function CompetitionEventFormPage() {
       .finally(() => setLoading(false))
   }, [eventId, isNew, reset])
 
+  // Load information form schema
+  const loadInfoFormSchema = useCallback(async () => {
+    if (isNew) return
+    setInfoFormLoading(true)
+    try {
+      const { data } = await pageantService.getInformationForm(eventId)
+      setInfoFormSchema(data.schema || { enabled: false, fields: [] })
+    } catch (err) {
+      console.error('Failed to load information form:', err)
+      setInfoFormSchema({ enabled: false, fields: [] })
+    } finally {
+      setInfoFormLoading(false)
+    }
+  }, [eventId, isNew])
+
+  useEffect(() => {
+    loadInfoFormSchema()
+  }, [loadInfoFormSchema])
+
   const handleNext = async (e) => {
     e.preventDefault()
     const isValid = await trigger(['title'])
@@ -79,7 +104,13 @@ export default function CompetitionEventFormPage() {
       if (bannerFile) {
         await pageantService.uploadBanner(id, bannerFile)
       }
-      navigate(`/organizer/competition/events/${id}/contestants`)
+
+      // For new events, go to step 3 (Information Form)
+      if (isNew) {
+        navigate(`/organizer/competition/events/${id}/form`, { replace: true })
+      } else {
+        navigate(`/organizer/competition/events/${id}/contestants`)
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save event')
     } finally {
@@ -96,6 +127,8 @@ export default function CompetitionEventFormPage() {
         <span className={step === 1 ? 'text-v-primary font-medium' : ''}>Step 1: Details</span>
         <span>→</span>
         <span className={step === 2 ? 'text-v-primary font-medium' : ''}>Step 2: Branding</span>
+        <span>→</span>
+        <span className={step === 3 ? 'text-v-primary font-medium' : ''}>Step 3: Information Form</span>
       </div>
 
       <Card padding="md">
@@ -133,6 +166,39 @@ export default function CompetitionEventFormPage() {
               <Button type="submit">Next step</Button>
             </div>
           </form>
+        ) : step === 3 ? (
+          <div className="space-y-4">
+            {infoFormLoading ? (
+              <p className="v-caption">Loading information form...</p>
+            ) : (
+              <ParticipantInformationFormBuilder
+                initialSchema={infoFormSchema}
+                service={pageantService}
+                eventId={eventId}
+                saving={saving}
+                onSave={(schema) => {
+                  setInfoFormSchema(schema)
+                }}
+              />
+            )}
+
+            <div className="flex justify-between pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setStep(2)}
+                disabled={saving}
+              >
+                Back
+              </Button>
+              <Button
+                onClick={() => navigate(`/organizer/competition/events/${eventId}/contestants`)}
+                disabled={saving}
+              >
+                Continue to Contestants
+              </Button>
+            </div>
+          </div>
         ) : (
           <form className="space-y-4" onSubmit={rhfHandleSubmit(onSubmit)}>
             <ImageUploadField

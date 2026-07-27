@@ -27,9 +27,18 @@ function downloadCsvTemplate() {
   downloadCsv('voter-import-template.csv', headers, exampleRows)
 }
 
-function InvitationStatusBadge({ sent }) {
+function InvitationStatusBadge({ sent, status }) {
+  if (status === 'bounced') {
+    return <span className="v-badge v-badge-danger">Bounced</span>
+  }
+  if (status === 'delivered') {
+    return <span className="v-badge v-badge-success">Delivered</span>
+  }
+  if (status === 'opened') {
+    return <span className="v-badge v-badge-success">Opened</span>
+  }
   if (sent) {
-    return <span className="v-badge v-badge-success">Sent</span>
+    return <span className="v-badge v-badge-info">Sent</span>
   }
   return <span className="v-badge v-badge-warning">Pending</span>
 }
@@ -46,7 +55,7 @@ function VoterRow({ voter, onSendInvitation, sendingId }) {
         </span>
       </td>
       <td>
-        <InvitationStatusBadge sent={voter.invitationSent} />
+        <InvitationStatusBadge sent={voter.invitationSent} status={voter.emailStatus} />
       </td>
       <td>
         {!voter.invitationSent && (

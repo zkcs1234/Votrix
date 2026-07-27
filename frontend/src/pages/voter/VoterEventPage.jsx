@@ -215,10 +215,23 @@ export default function VoterEventPage() {
     setSelections((prev) => ({ ...prev, [positionId]: [] }))
   }
 
+  const [isReviewing, setIsReviewing] = useState(false)
+
+  const handleStartReview = () => {
+    const validationError = validateSelections(positions, selections)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    setError(null)
+    setIsReviewing(true)
+  }
+
   const handleSubmit = async () => {
     const validationError = validateSelections(positions, selections)
     if (validationError) {
       setError(validationError)
+      setIsReviewing(false)
       return
     }
 
@@ -226,12 +239,16 @@ export default function VoterEventPage() {
     setError(null)
 
     try {
-      await electionService.submitVote(eventId, selections)
+      await electionService.submitVote(eventId, {
+        selections,
+        votingNonce: ballot?.votingNonce,
+      })
       localStorage.removeItem(draftKey)
       localStorage.removeItem(skippedDraftKey)
       setDone(true)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit ballot')
+      setIsReviewing(false)
     } finally {
       setSubmitting(false)
     }
@@ -274,52 +291,109 @@ export default function VoterEventPage() {
         />
       )}
 
-      <div className="v-card-sm">
-        <div className="flex justify-between text-sm">
-          <span className="v-caption">Ballot progress</span>
-          <span className="v-caption">{progress}%</span>
+      {isReviewing ? (
+        <div className="v-card p-6 space-y-6">
+          <div className="border-b border-v-border pb-4">
+            <h2 className="text-xl font-semibold text-v-text">Review your ballot</h2>
+            <p className="v-caption mt-1">Please confirm your selections before submitting.</p>
+          </div>
+
+          <div className="space-y-4">
+            {positions.map((position) => {
+              const selectedCandidateIds = selections[position.id] ?? []
+              const selectedCandidates = position.candidates.filter((c) =>
+                selectedCandidateIds.includes(c.id),
+              )
+              const skipped = skippedPositions.has(position.id) || selectedCandidates.length === 0
+
+              return (
+                <div key={position.id} className="rounded-xl border border-v-border p-4 bg-v-surface-elevated">
+                  <p className="font-medium text-v-text text-sm">{position.name}</p>
+                  {skipped ? (
+                    <p className="mt-1 text-xs text-amber-400 font-medium">Skipped</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1">
+                      {selectedCandidates.map((cand) => (
+                        <li key={cand.id} className="text-xs text-v-text-muted flex items-center gap-2">
+                          <span className="text-v-primary">✓</span>
+                          <span className="font-medium text-v-text">{cand.name}</span>
+                          {(cand.party || cand.partylist) && (
+                            <span className="text-v-text-subtle">({cand.party || cand.partylist})</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {error && <p className="text-sm text-v-danger">{error}</p>}
+
+          <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-v-border">
+            <Button
+              variant="secondary"
+              onClick={() => setIsReviewing(false)}
+              disabled={submitting}
+            >
+              Back to editing
+            </Button>
+            <Button onClick={handleSubmit} loading={submitting} disabled={submitting}>
+              Confirm & Submit ballot
+            </Button>
+          </div>
         </div>
-        <div
-          className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={progress}
-          aria-label="Ballot progress"
-        >
-          <div className="h-full bg-v-primary transition-all" style={{ width: `${progress}%` }} />
-        </div>
-        <p className="v-caption mt-2">
-          {positions.length} position{positions.length !== 1 ? 's' : ''} on this ballot
-        </p>
-      </div>
+      ) : (
+        <>
+          <div className="v-card-sm">
+            <div className="flex justify-between text-sm">
+              <span className="v-caption">Ballot progress</span>
+              <span className="v-caption">{progress}%</span>
+            </div>
+            <div
+              className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              aria-label="Ballot progress"
+            >
+              <div className="h-full bg-v-primary transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="v-caption mt-2">
+              {positions.length} position{positions.length !== 1 ? 's' : ''} on this ballot
+            </p>
+          </div>
 
-      {positions.map((position) => (
-        <ElectionPositionSection
-          key={position.id}
-          position={position}
-          selectedIds={selections[position.id]}
-          isSkipped={skippedPositions.has(position.id)}
-          onToggle={toggleCandidate}
-          onSkip={skipPosition}
-          disabled={submitting}
-        />
-      ))}
+          {positions.map((position) => (
+            <ElectionPositionSection
+              key={position.id}
+              position={position}
+              selectedIds={selections[position.id]}
+              isSkipped={skippedPositions.has(position.id)}
+              onToggle={toggleCandidate}
+              onSkip={skipPosition}
+              disabled={submitting}
+            />
+          ))}
 
-      {error && <p className="text-sm text-v-danger">{error}</p>}
+          {error && <p className="text-sm text-v-danger">{error}</p>}
 
-      <div className="fixed bottom-0 left-0 right-0 border-t border-v-border bg-v-surface p-4 md:static md:border-0 md:bg-transparent md:p-0">
-        <Button
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="w-full md:w-auto"
-        >
-          {submitting ? 'Submitting...' : 'Submit ballot'}
-        </Button>
-        <p className="v-caption mt-2 text-center md:hidden">
-          Once submitted, your ballot cannot be changed
-        </p>
-      </div>
+          <div className="fixed bottom-0 left-0 right-0 border-t border-v-border bg-v-surface p-4 md:static md:border-0 md:bg-transparent md:p-0">
+            <Button
+              onClick={handleStartReview}
+              disabled={submitting}
+              className="w-full md:w-auto"
+            >
+              Review ballot
+            </Button>
+            <p className="v-caption mt-2 text-center md:hidden">
+              You can review your selections before final submission
+            </p>
+          </div>
+        </>
+      )}
     </div>
   )
 }

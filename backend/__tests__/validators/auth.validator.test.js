@@ -1,7 +1,6 @@
 import { ApiError } from '../../src/utils/ApiError.js'
 import {
-  validateAdminLogin,
-  validateEmailLogin,
+  validateLogin,
   validateChangePassword,
   validateCreateOrganizer,
 } from '../../src/validators/auth.validator.js'
@@ -15,49 +14,39 @@ const TEST_CREDENTIALS = {
 }
 
 describe('Auth Validators', () => {
-  describe('validateAdminLogin', () => {
-    test('should return sanitized credentials for valid input', () => {
-      const result = validateAdminLogin({ username: '  admin  ', password: TEST_CREDENTIALS.password })
-      expect(result).toEqual({ username: 'admin', password: TEST_CREDENTIALS.password, remember: false })
-    })
-
-    test('should throw error when username is missing', () => {
-      expect(() => validateAdminLogin({ password: TEST_CREDENTIALS.password })).toThrow(ApiError)
-    })
-
-    test('should throw error when password is missing', () => {
-      expect(() => validateAdminLogin({ username: 'admin' })).toThrow(ApiError)
-    })
-
-    test('should throw error when username is empty', () => {
-      expect(() => validateAdminLogin({ username: '   ', password: TEST_CREDENTIALS.password })).toThrow(ApiError)
-    })
-
-    test('should throw error when body is null', () => {
-      expect(() => validateAdminLogin(null)).toThrow(ApiError)
-    })
-  })
-
-  describe('validateEmailLogin', () => {
+  describe('validateLogin', () => {
     test('should return sanitized email and password for valid input', () => {
-      const result = validateEmailLogin({ email: '  TEST@Example.COM  ', password: TEST_CREDENTIALS.password })
+      const result = validateLogin({ email: '  TEST@Example.COM  ', password: TEST_CREDENTIALS.password })
       expect(result).toEqual({ email: 'test@example.com', password: TEST_CREDENTIALS.password, remember: false })
     })
 
+    test('should handle remember flag', () => {
+      const result = validateLogin({ email: 'test@example.com', password: TEST_CREDENTIALS.password, remember: true })
+      expect(result.remember).toBe(true)
+    })
+
     test('should throw error when email is missing', () => {
-      expect(() => validateEmailLogin({ password: TEST_CREDENTIALS.password })).toThrow(ApiError)
+      expect(() => validateLogin({ password: TEST_CREDENTIALS.password })).toThrow(ApiError)
     })
 
     test('should throw error when password is missing', () => {
-      expect(() => validateEmailLogin({ email: 'test@example.com' })).toThrow(ApiError)
+      expect(() => validateLogin({ email: 'test@example.com' })).toThrow(ApiError)
+    })
+
+    test('should throw error when email is empty', () => {
+      expect(() => validateLogin({ email: '   ', password: TEST_CREDENTIALS.password })).toThrow(ApiError)
+    })
+
+    test('should throw error when body is null', () => {
+      expect(() => validateLogin(null)).toThrow(ApiError)
     })
 
     test('should throw error for invalid email format', () => {
-      expect(() => validateEmailLogin({ email: 'invalid-email', password: TEST_CREDENTIALS.password })).toThrow(ApiError)
+      expect(() => validateLogin({ email: 'invalid-email', password: TEST_CREDENTIALS.password })).toThrow(ApiError)
     })
 
     test('should throw error for email without domain', () => {
-      expect(() => validateEmailLogin({ email: 'test@', password: TEST_CREDENTIALS.password })).toThrow(ApiError)
+      expect(() => validateLogin({ email: 'test@', password: TEST_CREDENTIALS.password })).toThrow(ApiError)
     })
   })
 

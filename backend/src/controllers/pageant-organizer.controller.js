@@ -12,6 +12,7 @@ import {
 } from '../validators/competition.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
 import { sanitizeEmail } from '../utils/sanitize.js'
+import { getEventInformationForm, setEventInformationForm } from '../services/event.service.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const data = await pageantService.getOrganizerDashboard(req.user.id)
@@ -238,4 +239,16 @@ export const registerImportJudgesCsv = asyncHandler(async (req, res) => {
   }
 
   res.json({ success: true, total: data.length, succeeded, failed: data.length - succeeded, results })
+})
+
+// ——— Participant Information Form ———
+
+export const getInformationForm = asyncHandler(async (req, res) => {
+  const result = await getEventInformationForm(req.params.eventId, req.user.id)
+  res.json({ success: true, ...result })
+})
+
+export const updateInformationForm = asyncHandler(async (req, res) => {
+  const result = await setEventInformationForm(req.params.eventId, req.user.id, req.body)
+  res.json({ success: true, ...result })
 })

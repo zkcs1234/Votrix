@@ -1,23 +1,36 @@
-﻿export default function CandidateVoteControl({ candidate, selected, disabled, onToggle }) {
+export default function CandidateVoteControl({ candidate, selected, disabled, onToggle, positionName = '' }) {
   // Prefer the new spec field name `party`; fall back to legacy `partylist`.
   const party = candidate.party ?? candidate.partylist
   const blurb = candidate.platform || candidate.biography || candidate.description
+  const label = selected
+    ? `Selected: ${candidate.name}${party ? `, ${party}` : ''}${positionName ? ` for ${positionName}` : ''}`
+    : `Select ${candidate.name}${party ? `, ${party}` : ''}${positionName ? ` for ${positionName}` : ''}`
 
   return (
     <button
       type="button"
+      role="checkbox"
+      aria-checked={Boolean(selected)}
+      aria-label={label}
       disabled={disabled}
       onClick={onToggle}
-      className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition disabled:opacity-50 ${
+      className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-v-primary ${
         selected
           ? 'border-v-text bg-v-surface-elevated ring-1 ring-v-border'
           : 'border-v-border-strong hover:border-v-border-strong'
       }`}
     >
       {candidate.photo ? (
-        <img src={candidate.photo} alt="" className="h-14 w-14 rounded-lg object-cover" />
+        <img
+          src={candidate.photo}
+          alt={`Photo of ${candidate.name}`}
+          className="h-14 w-14 rounded-lg object-cover"
+        />
       ) : (
-        <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-v-surface-elevated text-lg text-v-text-subtle">
+        <div
+          aria-hidden="true"
+          className="flex h-14 w-14 items-center justify-center rounded-lg bg-v-surface-elevated text-lg text-v-text-subtle font-medium"
+        >
           {candidate.name?.charAt(0)}
         </div>
       )}
@@ -29,11 +42,12 @@
         )}
       </div>
       <span
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
+        aria-hidden="true"
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
           selected ? 'border-v-primary bg-v-primary text-white' : 'border-v-border-strong'
         }`}
       >
-        {selected && 'âœ“'}
+        {selected && '✓'}
       </span>
     </button>
   )

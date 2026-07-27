@@ -242,16 +242,33 @@ export async function previewCsv(eventId, organizerId, fileBuffer) {
   const emails = parsed.map(p => p.email)
   const existingAccountMap = await checkExistingAccounts(emails)
 
+  // Also check which voters are ALREADY enrolled in this specific event
+  const { data: enrolledVoters } = await getClient()
+    .from(DB_TABLES.EVENT_VOTERS)
+    .select('voter_id, users!inner(email)')
+    .eq('event_id', eventId)
+
+  const enrolledEmailSet = new Set((enrolledVoters ?? []).map(ev => ev.users?.email?.toLowerCase()).filter(Boolean))
+
   // Classify each row based on DB lookup
   const classifiedData = parsed.map(row => ({
     email: row.email,
     type: existingAccountMap.get(row.email) ? 'existing' : 'new',
+    alreadyEnrolled: enrolledEmailSet.has(row.email),
     rowNumber: parsed.indexOf(row) + 2, // +2 for 1-based and header row
   }))
 
   // Count summary
   const newCount = classifiedData.filter(r => r.type === 'new').length
   const existingCount = classifiedData.filter(r => r.type === 'existing').length
+  const alreadyEnrolledCount = classifiedData.filter(r => r.alreadyEnrolled).length
+
+  // Add warnings for already enrolled voters
+  classifiedData.forEach((row) => {
+    if (row.alreadyEnrolled) {
+      errors.push(`Row ${row.rowNumber}: ${row.email} is already enrolled in this election`)
+    }
+  })
 
   // Return preview even if there are errors - organizer can see what would be imported
   return {
@@ -262,6 +279,7 @@ export async function previewCsv(eventId, organizerId, fileBuffer) {
     summary: {
       newAccounts: newCount,
       existingAccounts: existingCount,
+      alreadyEnrolled: alreadyEnrolledCount,
     },
   }
 }

@@ -13,6 +13,7 @@ import {
 import { validateInviteVoter } from '../validators/email.validator.js'
 import { registerVoterToEvent, registerExistingVoter as registerExistingVoterService, sendVoterInvitation, sendAllPendingInvitations } from '../services/invitation.service.js'
 import { sanitizeEmail, validateUUID } from '../utils/sanitize.js'
+import { getEventInformationForm, setEventInformationForm } from '../services/event.service.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const data = await electionService.getOrganizerDashboard(req.user.id)
@@ -253,4 +254,48 @@ export const getAnalytics = asyncHandler(async (req, res) => {
     req.user.id,
   )
   res.json({ success: true, analytics })
+})
+
+export const getVotingTimeline = asyncHandler(async (req, res) => {
+  const timeline = await electionService.getElectionVotingTimeline(
+    req.params.eventId,
+    req.user.id,
+  )
+  res.json({ success: true, timeline })
+})
+
+export const getBallotPreview = asyncHandler(async (req, res) => {
+  const preview = await electionService.getBallotPreview(
+    req.params.eventId,
+    req.user.id,
+  )
+  res.json({ success: true, preview })
+})
+
+export const duplicateEvent = asyncHandler(async (req, res) => {
+  const event = await electionService.duplicateElectionEvent(
+    req.params.eventId,
+    req.user.id,
+  )
+  res.status(201).json({ success: true, event })
+})
+
+export const finalizeEvent = asyncHandler(async (req, res) => {
+  const event = await electionService.finalizeElectionEvent(
+    req.params.eventId,
+    req.user.id,
+  )
+  res.json({ success: true, event })
+})
+
+// ——— Participant Information Form ———
+
+export const getInformationForm = asyncHandler(async (req, res) => {
+  const result = await getEventInformationForm(req.params.eventId, req.user.id)
+  res.json({ success: true, ...result })
+})
+
+export const updateInformationForm = asyncHandler(async (req, res) => {
+  const result = await setEventInformationForm(req.params.eventId, req.user.id, req.body)
+  res.json({ success: true, ...result })
 })

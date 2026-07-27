@@ -68,6 +68,53 @@ function formatDate(iso) {
   })
 }
 
+// ——— Participant Information Form Schema ———
+
+export async function getEventInformationForm(eventId, organizerId) {
+  const event = await assertOrganizerOwnsEvent(eventId, organizerId)
+  return {
+    informationFormSchema: event.information_form_schema ?? { enabled: false, fields: [] },
+  }
+}
+
+export async function setEventInformationForm(eventId, organizerId, schema) {
+  await assertOrganizerOwnsEvent(eventId, organizerId)
+
+  if (!schema || typeof schema !== 'object') {
+    throw badRequest('Information form schema must be an object')
+  }
+
+  const enabled = Boolean(schema.enabled)
+  const fields = Array.isArray(schema.fields) ? schema.fields : []
+
+  for (const field of fields) {
+    if (!field.id || !field.label || !field.type) {
+      throw badRequest('Each field must have id, label, and type')
+    }
+    if (!['text', 'dropdown', 'number'].includes(field.type)) {
+      throw badRequest(`Invalid field type: ${field.type}. Must be text, dropdown, or number`)
+    }
+    if (field.type === 'dropdown') {
+      if (!Array.isArray(field.options) || field.options.length < 1) {
+        throw badRequest(`Dropdown field "${field.label}" must have at least one option`)
+      }
+    }
+  }
+
+  const schemaData = { enabled, fields }
+
+  const { data, error } = await db()
+    .from(DB_TABLES.EVENTS)
+    .update({ information_form_schema: schemaData })
+    .eq('id', eventId)
+    .select('information_form_schema')
+    .single()
+
+  if (error) throw error
+
+  return { informationFormSchema: data.information_form_schema }
+}
+
 export async function notifyEventParticipants(eventId, organizerId, { message }) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
   const voters = await getEventVoterAccounts(eventId)

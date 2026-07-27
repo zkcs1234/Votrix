@@ -90,7 +90,6 @@ export const pageantService = {
     return api.post(`${org}/events/${eventId}/judges/import`, form)
   },
 
-  // New workflow: register without email, send later
   registerJudge(eventId, payload) {
     return api.post(`${org}/events/${eventId}/judges/register`, payload)
   },
@@ -195,6 +194,15 @@ export const pageantService = {
   },
   deleteJudgeAssignment(eventId, judgeId, assignmentId) {
     return api.delete(`${org}/events/${eventId}/judges-v2/${judgeId}/assignments/${assignmentId}`)
+  },
+
+  // ——— Participant Information Form ———
+  getInformationForm(eventId) {
+    return api.get(`${org}/events/${eventId}/information-form`)
+  },
+
+  updateInformationForm(eventId, schema) {
+    return api.patch(`${org}/events/${eventId}/information-form`, schema)
   },
 
   // Judge (voter)

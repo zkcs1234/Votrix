@@ -42,4 +42,8 @@ router.post('/events/:eventId/respondents/send-all', emailLimiter, ctrl.sendAllR
 router.post('/events/:eventId/respondents/import-preview', csvImportLimiter, uploadSingle('file'), ctrl.previewRespondentsCsv)
 router.post('/events/:eventId/respondents/import-register', csvImportLimiter, ctrl.registerRespondentsCsv)
 
+// ——— Participant Information Form ———
+router.get('/events/:eventId/information-form', ctrl.getInformationForm)
+router.patch('/events/:eventId/information-form', ctrl.updateInformationForm)
+
 export default router

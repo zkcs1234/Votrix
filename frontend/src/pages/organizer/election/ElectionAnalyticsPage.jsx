@@ -22,6 +22,7 @@ import {
 export default function ElectionAnalyticsPage() {
   const { eventId } = useParams()
   const [event, setEvent] = useState(null)
+  const [timeline, setTimeline] = useState(null)
   const { data, loading } = useModuleAnalytics({
     moduleId: 'election',
     eventId,
@@ -39,6 +40,16 @@ export default function ElectionAnalyticsPage() {
       .catch(() => {
         /* non-fatal */
       })
+
+    electionService
+      .getVotingTimeline(eventId)
+      .then(({ data: res }) => {
+        if (alive) setTimeline(res.timeline)
+      })
+      .catch(() => {
+        /* non-fatal */
+      })
+
     return () => {
       alive = false
     }
@@ -58,6 +69,11 @@ export default function ElectionAnalyticsPage() {
   const positionSummaries = buildElectionPositionSummaries(data)
   const trend = buildElectionParticipationTrend(data)
 
+  const timelineItems = (timeline?.hourly?.length ? timeline.hourly : timeline?.daily ?? []).map((t) => ({
+    label: t.period,
+    value: t.votes,
+  }))
+
   return (
     <AnalyticsLayout
       title="Election analytics"
@@ -70,6 +86,21 @@ export default function ElectionAnalyticsPage() {
       </div>
 
       <AnalyticsStatsGrid stats={stats} columns={4} />
+
+      {timelineItems.length > 0 && (
+        <AnalyticsSection
+          title="Voting activity timeline"
+          description="Vote activity breakdown over time (hourly & daily)."
+        >
+          <DistributionList
+            items={timelineItems}
+            valueKey="value"
+            labelKey="label"
+            showCount
+            emptyMessage="No timeline activity recorded yet."
+          />
+        </AnalyticsSection>
+      )}
 
       <AnalyticsSection
         title="Voting progress"

@@ -76,8 +76,6 @@ export const pollingService = {
     return api.post(`${org}/events/${eventId}/respondents/import`, form)
   },
 
-  // NEW METHODS: Registration and Invitation separated
-
   // Register respondent (no email sent)
   registerRespondent(eventId, payload) {
     return api.post(`${org}/events/${eventId}/respondents/register`, payload)
@@ -110,12 +108,12 @@ export const pollingService = {
     return api.post(`${org}/events/${eventId}/respondents/import-register`, { data })
   },
 
-  // List voters/respondents for an event (uses election endpoint for polling events too)
+  // List voters/respondents for an event
   listVoters(eventId) {
     return api.get(`${org}/events/${eventId}/voters`)
   },
 
-  // Phase 7 — Question type registry (database-driven)
+  // Phase 7 — Question type registry
   listQuestionTypes() {
     return api.get(`${org}/question-types`)
   },
@@ -130,6 +128,15 @@ export const pollingService = {
   },
   deleteCustomQuestionType(typeId) {
     return api.delete(`${org}/question-types/custom/${typeId}`)
+  },
+
+  // ——— Participant Information Form ———
+  getInformationForm(eventId) {
+    return api.get(`${org}/events/${eventId}/information-form`)
+  },
+
+  updateInformationForm(eventId, schema) {
+    return api.patch(`${org}/events/${eventId}/information-form`, schema)
   },
 
   listMyPolls() {
@@ -149,8 +156,6 @@ export const pollingService = {
   },
 }
 
-// Backward-compat export. The UI no longer relies on this list; it loads
-// types from the registry. Keep it for any existing imports.
 export const QUESTION_TYPES = [
   { value: 'multiple_choice', label: 'Multiple choice' },
   { value: 'checkbox', label: 'Checkbox' },

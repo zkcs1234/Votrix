@@ -39,12 +39,20 @@ function mapCandidate(row) {
   }
 }
 
-// ——— Dashboard ———
+// ——— Dashboard Cache (30s TTL) ———
+
+const dashboardCache = new Map()
+const DASHBOARD_CACHE_TTL = 30_000
 
 export async function getOrganizerDashboard(organizerId) {
     try {
       if (!organizerId) {
         throw new ApiError(400, 'organizerId is required')
+      }
+
+      const cached = dashboardCache.get(organizerId)
+      if (cached && Date.now() - cached.timestamp < DASHBOARD_CACHE_TTL) {
+        return cached.data
       }
 
       const org = await getOrCreateElectionOrganization(organizerId)
@@ -97,7 +105,7 @@ export async function getOrganizerDashboard(organizerId) {
     const turnoutRate =
       registeredVoters > 0 ? Math.round((votedCount / registeredVoters) * 10000) / 100 : 0
 
-    return {
+    const result = {
       organization: mapOrganization(org),
       events: (events ?? []).map(mapEvent),
       stats: {
@@ -109,6 +117,9 @@ export async function getOrganizerDashboard(organizerId) {
         turnoutRate,
       },
     }
+
+    dashboardCache.set(organizerId, { data: result, timestamp: Date.now() })
+    return result
   } catch (error) {
     console.error('[getOrganizerDashboard] Error:', error.message)
     if (error.statusCode) throw error
@@ -618,7 +629,7 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
 export async function assertVoterEnrolled(eventId, voterId) {
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_VOTERS)
-    .select('id, event_id, voter_id, has_voted, first_name, last_name')
+    .select('id, event_id, voter_id, has_voted, first_name, last_name, voting_nonce')
     .eq('event_id', eventId)
     .eq('voter_id', voterId)
     .maybeSingle()
@@ -629,11 +640,23 @@ export async function assertVoterEnrolled(eventId, voterId) {
 }
 
 export async function getVoterBallot(eventId, voterId) {
-  const enrollment = await assertVoterEnrolled(eventId, voterId)
+  let enrollment = await assertVoterEnrolled(eventId, voterId)
   const event = await getEventById(eventId)
 
   if (event.event_type !== EVENT_TYPES.ELECTION) {
     throw new ApiError(400, 'Not an election event')
+  }
+
+  // Generate voting_nonce if not present
+  if (!enrollment.voting_nonce && !enrollment.has_voted) {
+    const nonce = crypto.randomUUID()
+    const { data: updated } = await getClient()
+      .from(DB_TABLES.EVENT_VOTERS)
+      .update({ voting_nonce: nonce })
+      .eq('id', enrollment.id)
+      .select('id, event_id, voter_id, has_voted, first_name, last_name, voting_nonce')
+      .single()
+    if (updated) enrollment = updated
   }
 
   const { data: positions, error: posErr } = await getClient()
@@ -667,6 +690,7 @@ export async function getVoterBallot(eventId, voterId) {
     event: mapEvent(event),
     positions: byPosition,
     hasVoted: enrollment.has_voted,
+    votingNonce: enrollment.voting_nonce ?? null,
     votingOpen: isElectionVotingOpen(event),
     resultsVisibility: event.results_visibility ?? 'public',
     canViewResults: canVoterViewElectionResults(event),
@@ -697,10 +721,18 @@ function validateBallotSelections(positions, selections) {
   }
 }
 
-export async function submitBallot(eventId, voterId, selections) {
-  await assertVoterEnrolled(eventId, voterId)
-
+export async function submitBallot(eventId, voterId, payload) {
+  const enrollment = await assertVoterEnrolled(eventId, voterId)
   const event = await getEventById(eventId)
+
+  // Replay Protection Check
+  const submittedNonce = payload?.votingNonce || payload?._votingNonce
+  if (enrollment.voting_nonce && submittedNonce && submittedNonce !== enrollment.voting_nonce) {
+    throw new ApiError(400, 'Invalid or expired voting session token. Please refresh your ballot and try again.')
+  }
+
+  // Handle selections payload format
+  const selections = payload?.selections || payload
 
   if (!isElectionVotingOpen(event)) {
     if (!event.voting_enabled) {
@@ -732,7 +764,7 @@ export async function submitBallot(eventId, voterId, selections) {
   const positionIds = new Set(mappedPositions.map((p) => p.id))
   const voteRows = []
 
-  const allCandidateIds = Object.values(selections).flat()
+  const allCandidateIds = Object.values(selections).filter(Array.isArray).flat()
   const { data: validCandidates } = await getClient()
     .from(DB_TABLES.CANDIDATES)
     .select('id, position_id')
@@ -743,9 +775,12 @@ export async function submitBallot(eventId, voterId, selections) {
   )
 
   for (const [positionId, candidateIds] of Object.entries(selections)) {
+    if (positionId === 'votingNonce' || positionId === '_votingNonce') continue
     if (!positionIds.has(positionId)) {
       throw new ApiError(400, 'Invalid position in ballot')
     }
+    if (!Array.isArray(candidateIds)) continue
+
     const unique = [...new Set(candidateIds)]
     if (unique.length !== candidateIds.length) {
       throw new ApiError(400, 'Duplicate candidate in same position')
@@ -771,7 +806,7 @@ export async function submitBallot(eventId, voterId, selections) {
 
   const { data: locked, error: lockErr } = await getClient()
     .from(DB_TABLES.EVENT_VOTERS)
-    .update({ has_voted: true })
+    .update({ has_voted: true, voting_nonce: null })
     .eq('event_id', eventId)
     .eq('voter_id', voterId)
     .eq('has_voted', false)
@@ -985,3 +1020,163 @@ export async function getElectionAnalytics(eventId, organizerId) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   return fetchElectionResultsData(eventId)
 }
+
+// ——— Time-Series Analytics (H3) ———
+
+export async function getElectionVotingTimeline(eventId, organizerId) {
+  await assertOrganizerOwnsEvent(eventId, organizerId)
+
+  const { data: votes, error } = await getClient()
+    .from(DB_TABLES.ELECTION_VOTES)
+    .select('created_at, voter_id')
+    .eq('event_id', eventId)
+    .order('created_at', { ascending: true })
+
+  if (error) throw new ApiError(500, error.message)
+
+  const hourlyMap = new Map()
+  const dailyMap = new Map()
+
+  for (const v of votes ?? []) {
+    if (!v.created_at) continue
+    const date = new Date(v.created_at)
+    
+    // Hourly bucket: YYYY-MM-DD HH:00
+    const hourKey = `${date.toISOString().slice(0, 13)}:00`
+    hourlyMap.set(hourKey, (hourlyMap.get(hourKey) || 0) + 1)
+
+    // Daily bucket: YYYY-MM-DD
+    const dayKey = date.toISOString().slice(0, 10)
+    dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + 1)
+  }
+
+  const hourlyTimeline = Array.from(hourlyMap.entries()).map(([period, votes]) => ({ period, votes }))
+  const dailyTimeline = Array.from(dailyMap.entries()).map(([period, votes]) => ({ period, votes }))
+
+  return {
+    eventId,
+    totalVotes: votes?.length ?? 0,
+    hourly: hourlyTimeline,
+    daily: dailyTimeline,
+  }
+}
+
+// ——— Organizer Ballot Preview (M3) ———
+
+export async function getBallotPreview(eventId, organizerId) {
+  await assertOrganizerOwnsEvent(eventId, organizerId)
+  const event = await getEventById(eventId)
+
+  if (event.event_type !== EVENT_TYPES.ELECTION) {
+    throw new ApiError(400, 'Not an election event')
+  }
+
+  const positions = await listPositions(eventId, organizerId)
+  const candidates = await listCandidates(eventId, organizerId)
+
+  const byPosition = positions.map((p) => ({
+    ...p,
+    candidates: candidates.filter((c) => c.positionId === p.id),
+  }))
+
+  return {
+    event: mapEvent(event),
+    positions: byPosition,
+    isPreview: true,
+  }
+}
+
+// ——— Event Duplication (M5) ———
+
+export async function duplicateElectionEvent(eventId, organizerId) {
+  const original = await assertOrganizerOwnsEvent(eventId, organizerId)
+
+  // Create new event
+  const newTitle = `${original.title} (Copy)`
+  const newEventPayload = {
+    title: newTitle,
+    description: original.description,
+    banner: original.banner,
+    startDate: null,
+    endDate: null,
+    status: 'draft',
+    resultsVisibility: original.results_visibility ?? 'public',
+  }
+
+  const newEvent = await createElectionEvent(organizerId, newEventPayload)
+
+  // Duplicate positions
+  const originalPositions = await listPositions(eventId, organizerId)
+  const positionIdMap = new Map()
+
+  for (const pos of originalPositions) {
+    const newPos = await createPosition(newEvent.id, organizerId, {
+      name: pos.name,
+      description: pos.description,
+      minVote: pos.minVote,
+      maxVote: pos.maxVote,
+      numberOfWinners: pos.numberOfWinners,
+      displayOrder: pos.displayOrder,
+      allowSkip: pos.allowSkip,
+    })
+    positionIdMap.set(pos.id, newPos.id)
+  }
+
+  // Duplicate candidates
+  const originalCandidates = await listCandidates(eventId, organizerId)
+  for (const cand of originalCandidates) {
+    const newPosId = positionIdMap.get(cand.positionId)
+    if (newPosId) {
+      await createCandidate(newEvent.id, organizerId, newPosId, {
+        name: cand.name,
+        photo: cand.photo,
+        description: cand.description,
+        biography: cand.biography,
+        platform: cand.platform,
+        partylist: cand.party || cand.partylist,
+      })
+    }
+  }
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.event.duplicate',
+    entity: 'events',
+    entityId: newEvent.id,
+    details: { originalEventId: eventId, newTitle },
+  })
+
+  return newEvent
+}
+
+// ——— Election Finalization (L1) ———
+
+export async function finalizeElectionEvent(eventId, organizerId) {
+  await assertOrganizerOwnsEvent(eventId, organizerId)
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({
+      voting_enabled: false,
+      status: 'completed',
+      election_status: 'finalized',
+    })
+    .eq('id', eventId)
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.event.finalize',
+    entity: 'events',
+    entityId: eventId,
+    details: { title: data.title, finalizedAt: new Date().toISOString() },
+  })
+
+  emitToEvent(eventId, 'election:finalized', { eventId })
+
+  return mapEvent(data)
+}
+

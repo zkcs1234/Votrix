@@ -78,40 +78,59 @@ export const electionService = {
     return api.get(`${base}/events/${eventId}/voters`)
   },
 
-  // Register voter (no email sent)
   registerVoter(eventId, payload) {
     return api.post(`${base}/events/${eventId}/voters/register`, payload)
   },
 
-  // Register existing voter (no email sent)
   registerExistingVoter(eventId, email) {
     return api.post(`${base}/events/${eventId}/voters/register-existing`, { email })
   },
 
-  // Send invitation for specific voter
   sendInvitation(eventId, voterId) {
     return api.post(`${base}/events/${eventId}/voters/${voterId}/send-invitation`)
   },
 
-  // Send all pending invitations
   sendAllInvitations(eventId) {
     return api.post(`${base}/events/${eventId}/voters/send-all`)
   },
 
-  // Preview CSV without registering
   previewCsv(eventId, file) {
     const form = new FormData()
     form.append('file', file)
     return api.post(`${base}/events/${eventId}/voters/import-preview`, form)
   },
 
-  // Register voters from previewed CSV data
   registerCsv(eventId, data) {
     return api.post(`${base}/events/${eventId}/voters/import-register`, { data })
   },
 
   getAnalytics(eventId) {
     return api.get(`${base}/events/${eventId}/analytics`)
+  },
+
+  getVotingTimeline(eventId) {
+    return api.get(`${base}/events/${eventId}/analytics/timeline`)
+  },
+
+  getBallotPreview(eventId) {
+    return api.get(`${base}/events/${eventId}/ballot-preview`)
+  },
+
+  duplicateEvent(eventId) {
+    return api.post(`${base}/events/${eventId}/duplicate`)
+  },
+
+  finalizeEvent(eventId) {
+    return api.post(`${base}/events/${eventId}/finalize`)
+  },
+
+  // ——— Participant Information Form ———
+  getInformationForm(eventId) {
+    return api.get(`${base}/events/${eventId}/information-form`)
+  },
+
+  updateInformationForm(eventId, schema) {
+    return api.patch(`${base}/events/${eventId}/information-form`, schema)
   },
 
   // Voter
@@ -123,8 +142,9 @@ export const electionService = {
     return api.get(`${voterBase}/events/${eventId}/ballot`)
   },
 
-  submitVote(eventId, selections) {
-    return api.post(`${voterBase}/events/${eventId}/vote`, { selections })
+  submitVote(eventId, payload) {
+    const body = payload?.selections ? payload : { selections: payload }
+    return api.post(`${voterBase}/events/${eventId}/vote`, body)
   },
 
   getResults(eventId) {
