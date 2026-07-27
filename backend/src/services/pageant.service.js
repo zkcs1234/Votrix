@@ -725,6 +725,7 @@ export async function listJudges(eventId, organizerId) {
       has_scored,
       first_name,
       last_name,
+      metadata,
       users (id, email)
     `,
     )
@@ -749,15 +750,23 @@ export async function listJudges(eventId, organizerId) {
     }
   }
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    judgeId: row.users?.id,
-    email: row.users?.email,
-    firstName: row.first_name,
-    lastName: row.last_name,
-    hasScored: row.has_scored,
-    invitationSent: invitationMap[row.users?.id] ?? null,
-  }))
+  // Fetch the event's information form schema for dynamic columns
+  const event = await getEventById(eventId)
+  const informationFormSchema = event?.information_form_schema ?? { enabled: false, fields: [] }
+
+  return {
+    judges: (data ?? []).map((row) => ({
+      id: row.id,
+      judgeId: row.users?.id,
+      email: row.users?.email,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      hasScored: row.has_scored,
+      metadata: row.metadata ?? {},
+      invitationSent: invitationMap[row.users?.id] ?? null,
+    })),
+    informationFormSchema,
+  }
 }
 
 // ——— Judge scoring (voter/judge) ———

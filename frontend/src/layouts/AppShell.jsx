@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Bell, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Menu, Bell, LogOut, ChevronLeft, ChevronRight, User } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { authService } from '@/services/auth.service'
 import { notificationsService } from '@/services/notifications.service'
 import VotrixLogo from '@/components/brand/VotrixLogo'
 import ThemeToggle from '@/components/ui/ThemeToggle'
-import Button from '@/components/ui/Button'
 import NotificationsModal from '@/components/ui/NotificationsModal'
 import GlobalSearch from '@/components/ui/GlobalSearch'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
@@ -176,10 +175,12 @@ export default function AppShell({
     return stored === 'true'
   })
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const location = useLocation()
   const navigate = useNavigate()
   const { user, clearSession } = useAuth()
+  const profileDropdownRef = useRef(null)
 
   const closeMobile = () => setMobileOpen(false)
 
@@ -203,6 +204,29 @@ export default function AppShell({
 
   const displayName = user?.username ?? user?.email ?? 'User'
   const initials = displayName.slice(0, 2).toUpperCase()
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    if (!profileDropdownOpen) return undefined
+
+    const handleClickOutside = (e) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
+        setProfileDropdownOpen(false)
+      }
+    }
+
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') setProfileDropdownOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [profileDropdownOpen])
 
   // Prevent background scroll and handle ESC key when mobile drawer is open
   useEffect(() => {
@@ -353,28 +377,57 @@ export default function AppShell({
               )}
             </div>
             <ThemeToggle />
-            <div className="hidden items-center gap-2 sm:flex">
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-v-surface-elevated text-xs font-semibold text-v-text-muted"
-                aria-hidden
+            <div className="relative" ref={profileDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setProfileDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-2 rounded-lg border border-v-border px-2 py-1.5 text-sm transition hover:bg-v-surface-elevated"
+                aria-expanded={profileDropdownOpen}
+                aria-haspopup="true"
               >
-                {initials}
-              </div>
-              <span className="max-w-35 truncate text-sm text-v-text-muted">
-                {displayName}
-              </span>
+                <div
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-v-surface-elevated text-xs font-semibold text-v-text-muted"
+                  aria-hidden
+                >
+                  {initials}
+                </div>
+                <span className="hidden sm:inline max-w-35 truncate text-v-text-muted">
+                  {displayName}
+                </span>
+              </button>
+
+              {profileDropdownOpen && (
+                <div className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-v-border bg-v-surface shadow-v-shadow-lg">
+                  <div className="px-4 py-3 border-b border-v-border">
+                    <p className="text-sm font-medium text-v-text truncate">{displayName}</p>
+                    <p className="text-xs text-v-text-subtle mt-0.5">{user?.email || ''}</p>
+                  </div>
+                  <div className="py-1">
+                    {user?.role === 'organizer' && (
+                      <Link
+                        to="/organizer/profile"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-v-text hover:bg-v-surface-elevated transition-colors"
+                      >
+                        <User className="h-4 w-4" strokeWidth={1.5} />
+                        <span>Organizer Profile</span>
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileDropdownOpen(false)
+                        handleLogout()
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-v-danger hover:bg-v-surface-elevated transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" strokeWidth={1.5} />
+                      <span>Sign out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            <Button variant="secondary" size="sm" onClick={handleLogout} className="hidden sm:inline-flex">
-              Sign out
-            </Button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated sm:hidden"
-              aria-label="Sign out"
-            >
-              <LogOut className="h-5 w-5" strokeWidth={1.5} />
-            </button>
           </div>
         </header>
 

@@ -84,35 +84,6 @@ function getStatusLabel(status) {
   return STATUS_CONFIG[status]?.label ?? status
 }
 
-function getInitials(value) {
-  const words = value?.trim?.().split(/\s+/).filter(Boolean) ?? []
-  if (words.length === 0) return 'OR'
-  return words.slice(0, 2).map((word) => word[0]).join('').toUpperCase()
-}
-
-function getPrimaryOrganization(organizer) {
-  const organizations = organizer.organizations ?? []
-  return organizations.find((organization) => organization.logo) ?? organizations[0] ?? null
-}
-
-function OrganizationLogo({ organization, fallback }) {
-  const name = organization?.organization_name || fallback
-
-  return (
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-v-border bg-v-surface-elevated text-[10px] font-semibold text-v-text-muted">
-      {organization?.logo ? (
-        <img
-          src={organization.logo}
-          alt={`${name} logo`}
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        getInitials(name)
-      )}
-    </div>
-  )
-}
-
 export default function OrganizerManagementPage() {
   const [organizers, setOrganizers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -297,10 +268,10 @@ export default function OrganizerManagementPage() {
             <table className="v-table">
               <thead>
                 <tr>
-                  <th>Logo</th>
+                  <th>Organization Name</th>
+                  <th>Organizer Name</th>
                   <th>Email</th>
                   <th>Status</th>
-                  <th>Profile</th>
                   <th>Created</th>
                   <th className="text-right">Actions</th>
                 </tr>
@@ -308,9 +279,8 @@ export default function OrganizerManagementPage() {
               <tbody className="divide-y divide-v-border">
                 {filteredOrganizers.map((org) => {
                   const status = org.account_status || 'active'
-                  const primaryOrganization = getPrimaryOrganization(org)
                   const isBusy = savingKey?.startsWith(org.id)
-const profileComplete = org.profile_completed_at || org.organization_name ? true : false
+                  const profileComplete = org.profile_complete
                   const nextPrimaryAction =
                     status === 'pending'
                       ? { label: 'Approve', next: 'active', variant: 'primary' }
@@ -323,43 +293,39 @@ const profileComplete = org.profile_completed_at || org.organization_name ? true
                   return (
                     <tr key={org.id} className="hover:bg-v-surface-elevated/50">
                       <td>
-                        <OrganizationLogo organization={primaryOrganization} fallback={org.email} />
+                        <div className="space-y-1">
+                          <p className="font-medium text-v-text">{org.organization_name || '—'}</p>
+                          <p className="v-caption">{org.organization_type_display || ''}</p>
+                        </div>
                       </td>
                       <td>
                         <div className="space-y-1">
-                          <p className="font-medium text-v-text">{org.email}</p>
-                          <p className="v-caption">{org.organization_name || '—'}</p>
+                          <p className="font-medium text-v-text">{org.organizer_name || '—'}</p>
+                          <p className="v-caption">{org.position || ''}</p>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="space-y-1">
+                          <p className="text-v-text">{org.email}</p>
+                          {!profileComplete && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              loading={isBusy && savingKey.endsWith('onboarding')}
+                              onClick={() => handleSendOnboarding(org.id, org.email)}
+                            >
+                              <Mail className="h-3 w-3" strokeWidth={2} />
+                              Send Onboarding
+                            </Button>
+                          )}
                         </div>
                       </td>
                       <td>
                         <div className="space-y-1">
                           <Badge tone={getStatusTone(status)}>{getStatusLabel(status)}</Badge>
                           {profileComplete && (
-                            <p className="v-caption">Onboarded</p>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="space-y-1">
-                          {profileComplete ? (
-                            <>
-                              <span className="v-badge">Complete</span>
-                              <p className="v-caption">{org.organizer_name || '—'}</p>
-                            </>
-                          ) : (
-                            <>
-                              <span className="v-badge" style={{ opacity: 0.6 }}>Incomplete</span>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                loading={isBusy && savingKey.endsWith('onboarding')}
-                                onClick={() => handleSendOnboarding(org.id, org.email)}
-                              >
-                                <Mail className="h-3 w-3" strokeWidth={2} />
-                                Send Onboarding
-                              </Button>
-                            </>
+                            <p className="v-caption text-xs">Onboarded</p>
                           )}
                         </div>
                       </td>

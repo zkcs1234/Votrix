@@ -49,7 +49,20 @@ WHERE
     role = 'organizer';
 
 -- ---------------------------------------------------------------------------
--- 3. Refresh statistics
+-- 3. Activate existing organizer accounts
+--    Before this migration, organizers were created as 'pending' and required
+--    admin approval. Now organizers are immediately active on creation.
+--    Set all existing pending organizers to 'active' so they can log in.
+-- ---------------------------------------------------------------------------
+UPDATE users
+SET
+    account_status = 'active'
+WHERE
+    role = 'organizer'
+    AND account_status = 'pending';
+
+-- ---------------------------------------------------------------------------
+-- 4. Refresh statistics
 -- ---------------------------------------------------------------------------
 ANALYZE users;
 

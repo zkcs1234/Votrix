@@ -2,47 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import Button from '@/components/ui/Button'
-import SearchInput from '@/components/ui/SearchInput'
+import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
-
-function InvitationStatusBadge({ sent }) {
-  if (sent === null || sent === undefined) return null
-  return sent
-    ? <span className="v-badge v-badge-success">Sent</span>
-    : <span className="v-badge v-badge-warning">Pending</span>
-}
-
-function JudgeRow({ judge, onSendInvitation, sendingId }) {
-  const isSending = sendingId === judge.judgeId
-
-  return (
-    <tr>
-      <td className="text-v-text-muted">{judge.email}</td>
-      <td>
-        <span className={judge.hasScored ? 'v-badge v-badge-success' : 'v-badge'}>
-          {judge.hasScored ? 'Submitted' : 'Pending'}
-        </span>
-      </td>
-      <td>
-        <InvitationStatusBadge sent={judge.invitationSent} />
-      </td>
-      <td>
-        {judge.invitationSent === false && (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => onSendInvitation(judge.judgeId)}
-            loading={isSending}
-            disabled={isSending}
-          >
-            Send Invitation
-          </Button>
-        )}
-      </td>
-    </tr>
-  )
-}
 
 function CsvPreviewModal({ data, onClose, onRegister, registering }) {
   return (
@@ -95,6 +57,7 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
 export default function CompetitionJudgesPage() {
   const { eventId } = useParams()
   const [judges, setJudges] = useState([])
+  const [formSchema, setFormSchema] = useState(null)
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [registering, setRegistering] = useState(false)
@@ -112,6 +75,7 @@ export default function CompetitionJudgesPage() {
     try {
       const { data } = await pageantService.listJudges(eventId)
       setJudges(data.judges ?? [])
+      setFormSchema(data.informationFormSchema ?? null)
     } catch (err) {
       console.error('Failed to load judges:', err)
     } finally {
@@ -192,6 +156,34 @@ export default function CompetitionJudgesPage() {
     }
   }
 
+  // Render custom action buttons (send invitation)
+  const renderActions = (participant, type) => {
+    if (type === 'toolbar') {
+      return pendingCount > 0 ? (
+        <Button onClick={handleSendAll} loading={sendingAll} disabled={sendingAll}>
+          Send All Invitations ({pendingCount})
+        </Button>
+      ) : null
+    }
+
+    // Row-level action
+    if (participant.invitationSent === false) {
+      const isSending = sendingId === participant.judgeId
+      return (
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => handleSendInvitation(participant.judgeId)}
+          loading={isSending}
+          disabled={isSending}
+        >
+          Send Invitation
+        </Button>
+      )
+    }
+    return null
+  }
+
   const handleSendAll = async () => {
     if (pendingCount === 0) return
     setSendingAll(true)
@@ -206,39 +198,7 @@ export default function CompetitionJudgesPage() {
     }
   }
 
-  const filteredJudges = judges.filter((j) =>
-    j.email?.toLowerCase().includes(search.toLowerCase()),
-  )
-
   if (loading && !showLoader) return null
-
-  if (loading || showLoader) {
-    return (
-      <div className="space-y-6">
-        <div className="h-7 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-        <div className="v-table-wrap">
-          <table className="v-table">
-            <thead>
-              <tr>
-                {['Email', 'Score Status', 'Invitation', 'Actions'].map((h) => (
-                  <th key={h}><div className="h-4 w-20 animate-pulse rounded-lg bg-v-surface-elevated" /></th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>
-                  {Array.from({ length: 4 }).map((__, j) => (
-                    <td key={j}><div className="h-4 w-24 animate-pulse rounded-lg bg-v-surface-elevated" /></td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-6">
@@ -290,49 +250,21 @@ export default function CompetitionJudgesPage() {
 
       {error && <p className="v-error-text">{error}</p>}
 
-      <div className="v-table-wrap">
-        <div className="p-4 border-b border-v-border flex flex-wrap gap-3 justify-between items-center">
-          <SearchInput
-            placeholder="Search judges by email"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-xs"
-          />
-          {pendingCount > 0 && (
-            <Button onClick={handleSendAll} loading={sendingAll} disabled={sendingAll}>
-              Send All Invitations ({pendingCount})
-            </Button>
-          )}
-        </div>
-        <table className="v-table">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Score Status</th>
-              <th>Invitation</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredJudges.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="text-center v-caption py-8">
-                  {search ? 'No judges found matching your search' : 'No judges yet'}
-                </td>
-              </tr>
-            ) : (
-              filteredJudges.map((j) => (
-                <JudgeRow
-                  key={j.id}
-                  judge={j}
-                  onSendInvitation={handleSendInvitation}
-                  sendingId={sendingId}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DynamicParticipantTable
+        participants={judges}
+        formSchema={formSchema}
+        loading={loading}
+        search={search}
+        onSearchChange={setSearch}
+        statusKey="hasScored"
+        statusLabel={{ active: 'Pending', done: 'Submitted' }}
+        renderActions={renderActions}
+        emptyMessage={search ? 'No judges found matching your search' : 'No judges yet'}
+        searchPlaceholder="Search judges by email"
+        onExportCsv
+        exportLabel="Export CSV"
+      />
     </div>
   )
 }
+

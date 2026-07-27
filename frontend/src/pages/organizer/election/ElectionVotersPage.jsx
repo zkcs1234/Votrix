@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
-import SearchInput from '@/components/ui/SearchInput'
 import Button from '@/components/ui/Button'
+import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 
@@ -25,99 +25,6 @@ function downloadCsvTemplate() {
   const headers = ['email']
   const exampleRows = [['voter@example.com']]
   downloadCsv('voter-import-template.csv', headers, exampleRows)
-}
-
-function InvitationStatusBadge({ sent, status }) {
-  if (status === 'bounced') {
-    return <span className="v-badge v-badge-danger">Bounced</span>
-  }
-  if (status === 'delivered') {
-    return <span className="v-badge v-badge-success">Delivered</span>
-  }
-  if (status === 'opened') {
-    return <span className="v-badge v-badge-success">Opened</span>
-  }
-  if (sent) {
-    return <span className="v-badge v-badge-info">Sent</span>
-  }
-  return <span className="v-badge v-badge-warning">Pending</span>
-}
-
-function VoterRow({ voter, onSendInvitation, sendingId }) {
-  const isSending = sendingId === voter.voterId
-
-  return (
-    <tr>
-      <td className="text-v-text-muted">{voter.email}</td>
-      <td>
-        <span className={voter.hasVoted ? 'v-badge v-badge-success' : 'v-badge'}>
-          {voter.hasVoted ? 'Voted' : 'Pending'}
-        </span>
-      </td>
-      <td>
-        <InvitationStatusBadge sent={voter.invitationSent} status={voter.emailStatus} />
-      </td>
-      <td>
-        {!voter.invitationSent && (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => onSendInvitation(voter.voterId)}
-            loading={isSending}
-            disabled={isSending}
-          >
-            Send Invitation
-          </Button>
-        )}
-      </td>
-    </tr>
-  )
-}
-
-function TableSkeleton() {
-  return (
-    <div className="v-table-wrap">
-      <div className="p-4 border-b border-v-border">
-        <div className="h-10 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
-      </div>
-      <table className="v-table">
-        <thead>
-          <tr>
-            <th>
-              <div className="h-4 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
-            </th>
-            <th>
-              <div className="h-4 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
-            </th>
-            <th>
-              <div className="h-4 w-20 animate-pulse rounded-lg bg-v-surface-elevated" />
-            </th>
-            <th>
-              <div className="h-4 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <tr key={i}>
-              <td>
-                <div className="h-4 w-40 animate-pulse rounded-lg bg-v-surface-elevated" />
-              </td>
-              <td>
-                <div className="h-6 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
-              </td>
-              <td>
-                <div className="h-6 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
-              </td>
-              <td>
-                <div className="h-6 w-28 animate-pulse rounded-lg bg-v-surface-elevated" />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
 }
 
 function CsvPreviewModal({ data, onClose, onRegister, registering }) {
@@ -179,6 +86,7 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
 export default function ElectionVotersPage() {
   const { eventId } = useParams()
   const [voters, setVoters] = useState([])
+  const [formSchema, setFormSchema] = useState(null)
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [importResult, setImportResult] = useState(null)
@@ -188,27 +96,38 @@ export default function ElectionVotersPage() {
   const [registering, setRegistering] = useState(false)
   const [sendingAll, setSendingAll] = useState(false)
   const [sendingId, setSendingId] = useState(null)
-
   const { success, error: showError } = useToast()
 
   // Use delayed loading
   const showLoader = useDelayedLoading(loading, 300)
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const { data } = await electionService.listVoters(eventId)
+        if (!alive) return
+        setVoters(data.voters ?? [])
+        setFormSchema(data.informationFormSchema ?? null)
+      } catch (err) {
+        console.error('Failed to load voters:', err)
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+    return () => { alive = false }
+  }, [eventId])
+
+  // Reload voters from server
+  const reload = async () => {
     try {
       const { data } = await electionService.listVoters(eventId)
       setVoters(data.voters ?? [])
+      setFormSchema(data.informationFormSchema ?? null)
     } catch (err) {
-      console.error('Failed to load voters:', err)
-    } finally {
-      setLoading(false)
+      console.error('Failed to reload voters:', err)
     }
-  }, [eventId])
-
-  useEffect(() => {
-    // Async fetch-on-mount pattern
-    load()
-  }, [load])
+  }
 
   // Count pending invitations
   const pendingCount = voters.filter(v => !v.invitationSent).length
@@ -222,7 +141,7 @@ export default function ElectionVotersPage() {
     try {
       await electionService.registerVoter(eventId, { email })
       setEmail('')
-      load()
+      await reload()
       success('Voter registered. Send invitation when ready.')
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed')
@@ -264,7 +183,7 @@ export default function ElectionVotersPage() {
       })
       setCsvPreview(null)
       success(`Registered ${data.succeeded} of ${data.total} voters. Send invitations later.`)
-      load()
+      await reload()
     } catch (err) {
       const details = err.response?.data?.details?.errors
       const message = details?.join(', ') || err.response?.data?.message || 'Registration failed'
@@ -285,7 +204,7 @@ export default function ElectionVotersPage() {
       } else {
         showError('Failed to send invitation')
       }
-      load()
+      await reload()
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to send invitation')
     } finally {
@@ -300,7 +219,7 @@ export default function ElectionVotersPage() {
     try {
       const { data } = await electionService.sendAllInvitations(eventId)
       success(`Sent ${data.sent} of ${data.total} invitations`)
-      load()
+      await reload()
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to send invitations')
     } finally {
@@ -308,31 +227,41 @@ export default function ElectionVotersPage() {
     }
   }
 
-  // Export voters as CSV
-  const handleExportCsv = () => {
-    const headers = ['Email', 'Status', 'Invitation', 'Voted']
-    const rows = voters.map((v) => [v.email, v.hasVoted ? 'Voted' : 'Pending', v.invitationSent ? 'Sent' : 'Pending', v.hasVoted ? 'Yes' : 'No'])
-    downloadCsv(`voters-${eventId}.csv`, headers, rows)
-  }
+  // Render custom action buttons (send invitation)
+  const renderActions = (participant, type) => {
+    if (type === 'toolbar') {
+      return pendingCount > 0 ? (
+        <Button
+          onClick={handleSendAll}
+          loading={sendingAll}
+          disabled={sendingAll}
+        >
+          Send All Invitations ({pendingCount})
+        </Button>
+      ) : null
+    }
 
-  const filteredVoters = voters.filter((v) => {
-    const searchLower = search.toLowerCase()
-    return v.email.toLowerCase().includes(searchLower)
-  })
+    // Row-level action
+    if (!participant.invitationSent) {
+      const isSending = sendingId === participant.voterId
+      return (
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => handleSendInvitation(participant.voterId)}
+          loading={isSending}
+          disabled={isSending}
+        >
+          Send Invitation
+        </Button>
+      )
+    }
+    return null
+  }
 
   // Show nothing under 300ms
   if (loading && !showLoader) {
     return null
-  }
-
-  // Show skeleton after 300ms
-  if (loading || showLoader) {
-    return (
-      <div className="space-y-6">
-        <div className="h-7 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-        <TableSkeleton />
-      </div>
-    )
   }
 
   return (
@@ -397,63 +326,21 @@ export default function ElectionVotersPage() {
 
       {error && <p className="v-error-text">{error}</p>}
 
-      <div className="v-table-wrap">
-        <div className="p-4 border-b border-v-border flex flex-wrap gap-3 justify-between items-center">
-          <div className="flex flex-wrap items-center gap-3">
-            <SearchInput
-              placeholder="Search voters by email"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="max-w-xs"
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleExportCsv}
-              disabled={voters.length === 0}
-            >
-              Export CSV
-            </Button>
-          </div>
-          {pendingCount > 0 && (
-            <Button
-              onClick={handleSendAll}
-              loading={sendingAll}
-              disabled={sendingAll}
-            >
-              Send All Invitations ({pendingCount})
-            </Button>
-          )}
-        </div>
-        <table className="v-table">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Voted</th>
-              <th>Invitation</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredVoters.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="text-center v-caption py-8">
-                  {search ? 'No voters found matching your search' : 'No voters yet'}
-                </td>
-              </tr>
-            ) : (
-              filteredVoters.map((v) => (
-                <VoterRow
-                  key={v.id}
-                  voter={v}
-                  onSendInvitation={handleSendInvitation}
-                  sendingId={sendingId}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DynamicParticipantTable
+        participants={voters}
+        formSchema={formSchema}
+        loading={loading}
+        search={search}
+        onSearchChange={setSearch}
+        statusKey="hasVoted"
+        statusLabel={{ active: 'Pending', done: 'Voted' }}
+        renderActions={renderActions}
+        emptyMessage={search ? 'No voters found matching your search' : 'No voters yet'}
+        searchPlaceholder="Search voters by email"
+        onExportCsv
+        exportLabel="Export CSV"
+      />
     </div>
   )
 }
+

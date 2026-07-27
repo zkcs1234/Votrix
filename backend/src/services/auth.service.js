@@ -1,6 +1,7 @@
 import { ApiError } from '../utils/ApiError.js'
 import { comparePassword } from '../utils/password.js'
-import { USER_ROLES } from '../utils/constants.js'
+import { USER_ROLES, DB_TABLES } from '../utils/constants.js'
+import { db } from '../foundation/db.js'
 import {
   findUserByEmail,
   findUserById,

@@ -162,6 +162,15 @@ export const routeConfig = [
     ),
   },
   {
+    path: '/organizer/profile',
+    element: (
+      <ProtectedRoute allowedRoles={[USER_ROLES.ORGANIZER]}>
+        <DashboardLayout title="Organizer Profile" showSidebar={false} />
+      </ProtectedRoute>
+    ),
+    children: [{ index: true, element: <OrganizerOnboardingPage /> }],
+  },
+  {
     path: '/organizer',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.ORGANIZER]}>

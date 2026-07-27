@@ -574,6 +574,7 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
       last_name,
       created_at,
       voter_id,
+      metadata,
       users!inner (id, email)
     `,
       { count: 'exact' }
@@ -603,6 +604,10 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
     }
   }
 
+  // Fetch the event's information form schema for dynamic columns
+  const event = await getEventById(eventId)
+  const informationFormSchema = event?.information_form_schema ?? { enabled: false, fields: [] }
+
   return {
     voters: voterRows.map((row) => ({
       id: row.id,
@@ -612,9 +617,11 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
       lastName: row.last_name,
       hasVoted: row.has_voted,
       createdAt: row.created_at,
+      metadata: row.metadata ?? {},
       // Invitation status: true = sent, false = pending, no record = false
       invitationSent: invitationSentByVoter.get(row.voter_id) ?? false,
     })),
+    informationFormSchema,
     meta: {
       page,
       limit,

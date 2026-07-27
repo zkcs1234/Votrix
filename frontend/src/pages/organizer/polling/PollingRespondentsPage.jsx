@@ -2,44 +2,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import Button from '@/components/ui/Button'
-import SearchInput from '@/components/ui/SearchInput'
+import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
-
-function InvitationStatusBadge({ sent }) {
-  if (sent) return <span className="v-badge v-badge-success">Sent</span>
-  return <span className="v-badge v-badge-warning">Pending</span>
-}
-
-function RespondentRow({ voter, onSendInvitation, sendingId }) {
-  const isSending = sendingId === voter.voterId
-  return (
-    <tr>
-      <td className="text-v-text-muted">{voter.email}</td>
-      <td>
-        <span className={voter.hasVoted ? 'v-badge v-badge-success' : 'v-badge'}>
-          {voter.hasVoted ? 'Voted' : 'Pending'}
-        </span>
-      </td>
-      <td>
-        <InvitationStatusBadge sent={voter.invitationSent} />
-      </td>
-      <td>
-        {!voter.invitationSent && (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => onSendInvitation(voter.voterId)}
-            loading={isSending}
-            disabled={isSending}
-          >
-            Send Invitation
-          </Button>
-        )}
-      </td>
-    </tr>
-  )
-}
 
 function CsvPreviewModal({ data, onClose, onRegister, registering }) {
   return (
@@ -92,6 +57,7 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
 export default function PollingRespondentsPage() {
   const { eventId } = useParams()
   const [voters, setVoters] = useState([])
+  const [formSchema, setFormSchema] = useState(null)
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [error, setError] = useState(null)
@@ -109,6 +75,7 @@ export default function PollingRespondentsPage() {
     try {
       const { data } = await pollingService.listVoters(eventId)
       setVoters(data.voters ?? [])
+      setFormSchema(data.informationFormSchema ?? null)
     } catch (err) {
       console.error('Failed to load respondents:', err)
     } finally {
@@ -191,6 +158,34 @@ export default function PollingRespondentsPage() {
     }
   }
 
+  // Render custom action buttons (send invitation)
+  const renderActions = (participant, type) => {
+    if (type === 'toolbar') {
+      return pendingCount > 0 ? (
+        <Button onClick={handleSendAll} loading={sendingAll} disabled={sendingAll}>
+          Send All Invitations ({pendingCount})
+        </Button>
+      ) : null
+    }
+
+    // Row-level action
+    if (!participant.invitationSent) {
+      const isSending = sendingId === participant.voterId
+      return (
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => handleSendInvitation(participant.voterId)}
+          loading={isSending}
+          disabled={isSending}
+        >
+          Send Invitation
+        </Button>
+      )
+    }
+    return null
+  }
+
   const handleSendAll = async () => {
     if (pendingCount === 0) return
     setSendingAll(true)
@@ -205,20 +200,7 @@ export default function PollingRespondentsPage() {
     }
   }
 
-  const filteredVoters = voters.filter((v) =>
-    v.email.toLowerCase().includes(search.toLowerCase()),
-  )
-
   if (loading && !showLoader) return null
-
-  if (loading || showLoader) {
-    return (
-      <div className="space-y-8">
-        <div className="h-7 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-        <div className="animate-pulse h-32 bg-v-surface-elevated rounded-lg" />
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-8">
@@ -270,49 +252,21 @@ export default function PollingRespondentsPage() {
 
       {error && <p className="v-error-text">{error}</p>}
 
-      <div className="v-table-wrap">
-        <div className="p-4 border-b border-v-border flex flex-wrap gap-3 justify-between items-center">
-          <SearchInput
-            placeholder="Search by email"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-xs"
-          />
-          {pendingCount > 0 && (
-            <Button onClick={handleSendAll} loading={sendingAll} disabled={sendingAll}>
-              Send All Invitations ({pendingCount})
-            </Button>
-          )}
-        </div>
-        <table className="v-table">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Voted</th>
-              <th>Invitation</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredVoters.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="text-center v-caption py-8">
-                  {search ? 'No respondents found matching your search' : 'No respondents yet'}
-                </td>
-              </tr>
-            ) : (
-              filteredVoters.map((v) => (
-                <RespondentRow
-                  key={v.id}
-                  voter={v}
-                  onSendInvitation={handleSendInvitation}
-                  sendingId={sendingId}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DynamicParticipantTable
+        participants={voters}
+        formSchema={formSchema}
+        loading={loading}
+        search={search}
+        onSearchChange={setSearch}
+        statusKey="hasVoted"
+        statusLabel={{ active: 'Pending', done: 'Responded' }}
+        renderActions={renderActions}
+        emptyMessage={search ? 'No respondents found matching your search' : 'No respondents yet'}
+        searchPlaceholder="Search by email"
+        onExportCsv
+        exportLabel="Export CSV"
+      />
     </div>
   )
 }
+
