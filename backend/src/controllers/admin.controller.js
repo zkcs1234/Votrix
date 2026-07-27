@@ -11,6 +11,7 @@ import {
   getAuditLogs as fetchAuditLogs,
   createAuditLog,
   updateOrganizerAccountStatus,
+  sendOnboardingNotification,
 } from '../services/admin.service.js'
 import { createAdminAlert, createNotification } from '../services/notification.service.js'
 import { ApiError } from '../utils/ApiError.js'
@@ -68,19 +69,9 @@ export const createOrganizerAccount = asyncHandler(async (req, res) => {
     details: { email: user.email }
   })
 
-  await createAdminAlert({
-    type: 'organizer.pending',
-    title: 'New organizer pending approval',
-    message: `${user.email} was created and is waiting for approval.`,
-    actionUrl: '/admin/organizers',
-    entity: 'users',
-    entityId: user.id,
-    metadata: { email: user.email },
-  })
-
   res.status(201).json({
     success: true,
-    message: 'Organizer account created and pending approval',
+    message: 'Organizer account created and ready for use',
     user,
     email,
   })
@@ -162,6 +153,26 @@ export const updateSystemSettings = asyncHandler(async (req, res) => {
   })
 
   res.json({ success: true, setting: updatedSetting })
+})
+
+export const sendOrganizerOnboarding = asyncHandler(async (req, res) => {
+  const organizerId = validateUUID(req.params.organizerId, 'organizerId')
+
+  const result = await sendOnboardingNotification(organizerId)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'SEND_ONBOARDING_NOTIFICATION',
+    entity: 'users',
+    entityId: organizerId,
+    details: { emailNotification: result.email },
+  })
+
+  res.json({
+    success: true,
+    message: 'Onboarding notification sent',
+    ...result,
+  })
 })
 
 export const getAuditLogs = asyncHandler(async (req, res) => {

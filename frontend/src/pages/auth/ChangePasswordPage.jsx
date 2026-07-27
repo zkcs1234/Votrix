@@ -62,8 +62,8 @@ export default function ChangePasswordPage() {
     }
   }
 
-  // Show optional skip button only for voters (not organizers/admins)
-  const isVoter = role === 'voter'
+  // Show optional skip button for voters and organizers (not admins)
+  const canSkip = role === 'voter' || role === 'organizer'
 
   return (
     <div>
@@ -72,7 +72,7 @@ export default function ChangePasswordPage() {
         <h2 className="text-xl font-semibold text-v-text">Change your password</h2>
       </div>
       <p className="mt-2 text-sm text-v-text-subtle">
-        {isVoter
+        {canSkip
           ? 'Set a personal password to secure your account, or continue with your temporary password.'
           : `You must set a new password before accessing your ${role} dashboard.`}
       </p>
@@ -123,8 +123,8 @@ export default function ChangePasswordPage() {
         </SubmitButton>
       </form>
 
-      {/* Skip option for voters */}
-      {isVoter && (
+      {/* Skip option for voters and organizers */}
+      {canSkip && (
         <div className="mt-6">
           <div className="relative">
             <div className="absolute inset-0 flex items-center">

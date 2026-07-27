@@ -107,9 +107,9 @@ export async function changePassword(userId, { currentPassword, newPassword }) {
 }
 
 /**
- * Skip password change for voters who have must_change_password = true.
- * This allows voters to keep their temporary password if they choose.
- * Only allowed for voters - organizers/admins must change their password.
+ * Skip password change for users who have must_change_password = true.
+ * This allows voters and organizers to keep their temporary password.
+ * Admin accounts are excluded (admin uses username-based auth).
  */
 export async function skipPasswordChange(userId) {
   const user = await findUserById(userId)
@@ -117,8 +117,8 @@ export async function skipPasswordChange(userId) {
     throw new ApiError(404, 'User not found')
   }
 
-  // Only allow voters to skip - organizers/admins must change their password
-  if (user.role !== USER_ROLES.VOTER) {
+  // Only allow voters and organizers to skip - admins must change their password
+  if (user.role === USER_ROLES.ADMIN) {
     throw new ApiError(403, 'Password change is required for your account type')
   }
 

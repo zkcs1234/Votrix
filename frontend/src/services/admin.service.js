@@ -29,5 +29,8 @@ export const adminService = {
   },
   getAuditLogs(params = {}) {
     return api.get(`${base}/audit-logs`, { params })
+  },
+  sendOnboardingNotification(organizerId) {
+    return api.post(`${base}/organizers/${organizerId}/send-onboarding`)
   }
 }

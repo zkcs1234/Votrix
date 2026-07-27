@@ -12,7 +12,7 @@ import { DB_TABLES, USER_ROLES, ACCOUNT_STATUS } from '../utils/constants.js'
 export async function getOrganizersList() {
   const usersQuery = db()
     .from(DB_TABLES.USERS)
-    .select('id, email, created_at, updated_at, account_status')
+    .select('id, email, organization_name, organizer_name, position, organization_type_display, created_at, updated_at, account_status')
     .eq('role', USER_ROLES.ORGANIZER)
     .order('created_at', { ascending: false })
   const users = await wrap(await usersQuery, { context: 'admin.getOrganizersList' })
@@ -27,8 +27,25 @@ export async function getOrganizersList() {
     // Single organization per organizer model — simplified summary
     const org = userOrgs[0] ?? null
 
+    // Check profile completeness
+    const profileComplete = Boolean(
+      orgUser.organization_name?.trim() &&
+      orgUser.organization_type_display?.trim() &&
+      orgUser.organizer_name?.trim() &&
+      orgUser.position?.trim(),
+    )
+
     return {
-      ...orgUser,
+      id: orgUser.id,
+      email: orgUser.email,
+      account_status: orgUser.account_status,
+      organization_name: orgUser.organization_name || '',
+      organizer_name: orgUser.organizer_name || '',
+      position: orgUser.position || '',
+      organization_type_display: orgUser.organization_type_display || '',
+      profile_complete: profileComplete,
+      created_at: orgUser.created_at,
+      updated_at: orgUser.updated_at,
       organizationName: org?.organization_name ?? 'My Organization',
       organization: org,
       organizationSummary: {
@@ -40,6 +57,42 @@ export async function getOrganizersList() {
       },
     }
   })
+}
+
+/**
+ * Send an onboarding notification email to an organizer.
+ * Reminds them to complete their organization profile.
+ */
+export async function sendOnboardingNotification(organizerId) {
+  const result = await db()
+    .from(DB_TABLES.USERS)
+    .select('id, email, organization_name, organizer_name, position, organization_type_display')
+    .eq('id', organizerId)
+    .eq('role', USER_ROLES.ORGANIZER)
+    .single()
+
+  const user = await wrap(result, { context: 'admin.sendOnboardingNotification' })
+  if (!user) throw notFound('Organizer not found')
+
+  // Check if profile is already complete
+  const profileComplete = Boolean(
+    user.organization_name?.trim() &&
+    user.organization_type_display?.trim() &&
+    user.organizer_name?.trim() &&
+    user.position?.trim(),
+  )
+
+  if (profileComplete) {
+    throw badRequest('Organizer profile is already complete')
+  }
+
+  // Send onboarding email
+  const { sendOrganizerOnboardingEmail } = await import('./mailer.service.js')
+  const emailResult = await sendOrganizerOnboardingEmail({
+    email: user.email,
+  })
+
+  return { email: emailResult }
 }
 
 export async function getGlobalEvents() {

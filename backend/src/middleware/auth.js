@@ -3,6 +3,8 @@ import { ApiError } from '../utils/ApiError.js'
 import { verifyAccessToken } from '../utils/jwt.js'
 import { env } from '../config/env.js'
 import { findUserById } from '../services/user.service.js'
+import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
+import { db } from '../foundation/db.js'
 
 // CWE-208: Constant-time integer comparison for token version.
 // Converts both sides to a fixed 16-byte hex string before comparing.
@@ -78,6 +80,54 @@ export function requirePasswordChanged(req, _res, next) {
     )
   }
   next()
+}
+
+/**
+ * Block dashboard/API access until the organizer's profile is complete.
+ * An organizer must fill in organization_name, organization_type_display,
+ * organizer_name, and position before accessing the dashboard.
+ *
+ * This middleware is applied to all organizer module routes (election,
+ * competition, polling, reports) and the main dashboard/analytics routes.
+ * It does NOT block the profile endpoints themselves (those are placed
+ * before this middleware in the route config).
+ */
+export function requireProfileComplete(req, _res, next) {
+  // Only applies to organizers
+  if (req.user?.role !== USER_ROLES.ORGANIZER) {
+    return next()
+  }
+
+  // Check profile completion synchronously using a direct DB query
+  db()
+    .from(DB_TABLES.USERS)
+    .select('organization_name, organization_type_display, organizer_name, position')
+    .eq('id', req.user.id)
+    .eq('role', USER_ROLES.ORGANIZER)
+    .single()
+    .then(({ data, error }) => {
+      if (error || !data) {
+        return next(new ApiError(500, 'Failed to verify profile status'))
+      }
+
+      const complete = Boolean(
+        data.organization_name?.trim() &&
+        data.organization_type_display?.trim() &&
+        data.organizer_name?.trim() &&
+        data.position?.trim(),
+      )
+
+      if (!complete) {
+        return next(
+          new ApiError(403, 'Complete your organization profile before continuing', {
+            code: 'PROFILE_INCOMPLETE',
+          }),
+        )
+      }
+
+      next()
+    })
+    .catch(() => next(new ApiError(500, 'Failed to verify profile status')))
 }
 
 /**

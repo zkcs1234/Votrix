@@ -19,6 +19,7 @@ const GlobalEventsPage = lazy(() => import('@/pages/admin/GlobalEventsPage'))
 const SystemSettingsPage = lazy(() => import('@/pages/admin/SystemSettingsPage'))
 const AuditLogsPage = lazy(() => import('@/pages/admin/AuditLogsPage'))
 const OrganizerDashboardPage = lazy(() => import('@/pages/organizer/OrganizerDashboardPage'))
+const OrganizerOnboardingPage = lazy(() => import('@/pages/organizer/OrganizerOnboardingPage'))
 const VoterDashboardPage = lazy(() => import('@/pages/voter/VoterDashboardPage'))
 const VoterEventPage = lazy(() => import('@/pages/voter/VoterEventPage'))
 
@@ -151,6 +152,14 @@ export const routeConfig = [
       { path: 'settings', element: <SystemSettingsPage /> },
       { path: 'audit-logs', element: <AuditLogsPage /> },
     ],
+  },
+  {
+    path: '/organizer/onboarding',
+    element: (
+      <ProtectedRoute allowedRoles={[USER_ROLES.ORGANIZER]} allowOnboarding>
+        <OrganizerOnboardingPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/organizer',

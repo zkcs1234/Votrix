@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { Users, UserCheck, Clock, ShieldOff, UserPlus } from 'lucide-react'
+import { Users, UserCheck, Clock, ShieldOff, UserPlus, Mail } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import CreateOrganizerModal from '@/components/admin/CreateOrganizerModal'
 import Button from '@/components/ui/Button'
@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge'
 import SearchInput from '@/components/ui/SearchInput'
 import StatCard from '@/components/ui/StatCard'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { useToast } from '@/hooks/useToast'
 
 const STATUS_CONFIG = {
   pending: { tone: 'warning', label: 'Pending review' },
@@ -122,6 +123,7 @@ export default function OrganizerManagementPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [savingKey, setSavingKey] = useState(null)
   const showLoader = useDelayedLoading(loading, 300)
+  const { success: toastSuccess } = useToast()
 
   const fetchOrganizers = async () => {
     try {
@@ -174,6 +176,22 @@ export default function OrganizerManagementPage() {
       await fetchOrganizers()
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update organizer status')
+    } finally {
+      setSavingKey(null)
+    }
+  }
+
+  const handleSendOnboarding = async (organizerId, email) => {
+    setSavingKey(`${organizerId}:onboarding`)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      await adminService.sendOnboardingNotification(organizerId)
+      toastSuccess(`Onboarding email sent to ${email}`)
+      await fetchOrganizers()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to send onboarding notification')
     } finally {
       setSavingKey(null)
     }
@@ -282,7 +300,7 @@ export default function OrganizerManagementPage() {
                   <th>Logo</th>
                   <th>Email</th>
                   <th>Status</th>
-                  <th>Organizations</th>
+                  <th>Profile</th>
                   <th>Created</th>
                   <th className="text-right">Actions</th>
                 </tr>
@@ -290,10 +308,9 @@ export default function OrganizerManagementPage() {
               <tbody className="divide-y divide-v-border">
                 {filteredOrganizers.map((org) => {
                   const status = org.account_status || 'active'
-                  const orgCount = org.organizationSummary?.total ?? org.organizations?.length ?? 0
-                  const activeOrgs = org.organizationSummary?.active ?? 0
                   const primaryOrganization = getPrimaryOrganization(org)
                   const isBusy = savingKey?.startsWith(org.id)
+const profileComplete = org.profile_completed_at || org.organization_name ? true : false
                   const nextPrimaryAction =
                     status === 'pending'
                       ? { label: 'Approve', next: 'active', variant: 'primary' }
@@ -311,27 +328,40 @@ export default function OrganizerManagementPage() {
                       <td>
                         <div className="space-y-1">
                           <p className="font-medium text-v-text">{org.email}</p>
-                          <p className="v-caption">{orgCount} organization(s)</p>
+                          <p className="v-caption">{org.organization_name || '—'}</p>
                         </div>
                       </td>
                       <td>
                         <div className="space-y-1">
                           <Badge tone={getStatusTone(status)}>{getStatusLabel(status)}</Badge>
-                          <p className="v-caption">{activeOrgs} active module(s)</p>
+                          {profileComplete && (
+                            <p className="v-caption">Onboarded</p>
+                          )}
                         </div>
                       </td>
                       <td>
-                        {org.organizations?.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {org.organizations.map((organization) => (
-                              <span key={organization.id} className="v-badge">
-                                {organization.organization_name} · {organization.status}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="v-caption">No organizations yet</span>
-                        )}
+                        <div className="space-y-1">
+                          {profileComplete ? (
+                            <>
+                              <span className="v-badge">Complete</span>
+                              <p className="v-caption">{org.organizer_name || '—'}</p>
+                            </>
+                          ) : (
+                            <>
+                              <span className="v-badge" style={{ opacity: 0.6 }}>Incomplete</span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                loading={isBusy && savingKey.endsWith('onboarding')}
+                                onClick={() => handleSendOnboarding(org.id, org.email)}
+                              >
+                                <Mail className="h-3 w-3" strokeWidth={2} />
+                                Send Onboarding
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </td>
                       <td className="v-caption">
                         {format(new Date(org.created_at), 'MMM d, yyyy')}
