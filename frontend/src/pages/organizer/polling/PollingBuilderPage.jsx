@@ -3,6 +3,21 @@ import { useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 // Phase 7 — Question Builder is registry-driven. The list of available
 // types comes from the API; we do not hardcode type names here.
@@ -12,7 +27,8 @@ const emptyForm = () => ({
   type: 'single_choice',
   required: true,
   typeConfig: {},
-  options: [{ label: '' }, { label: '' }],
+  options: [{ label: '', imageUrl: '' }, { label: '', imageUrl: '' }],
+  imageUrl: '',
 })
 
 function needsFreeOptions(typeDef) {
@@ -53,6 +69,116 @@ function configFieldFor(typeDef) {
   }
 }
 
+// Drag handle icon
+function DragHandleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="text-v-text-subtle">
+      <circle cx="5" cy="3" r="1.5" />
+      <circle cx="11" cy="3" r="1.5" />
+      <circle cx="5" cy="8" r="1.5" />
+      <circle cx="11" cy="8" r="1.5" />
+      <circle cx="5" cy="13" r="1.5" />
+      <circle cx="11" cy="13" r="1.5" />
+    </svg>
+  )
+}
+
+function SortableQuestionCard({ question, idx, types, onEdit, onDuplicate, onDelete }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: question.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : 'auto',
+  }
+
+  const q = question
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="rounded-2xl border border-v-border bg-v-surface p-5"
+    >
+      <div className="flex justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            className="mt-1 cursor-grab touch-none rounded p-1 hover:bg-v-surface-elevated active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+            aria-label="Drag to reorder"
+          >
+            <DragHandleIcon />
+          </button>
+          <div>
+            <span className="text-xs text-v-text-subtle">Q{idx + 1}</span>
+            <p className="font-medium text-v-text">{q.question}</p>
+            {q.imageUrl && (
+              <img
+                src={q.imageUrl}
+                alt="Question image"
+                className="mt-2 h-20 w-auto rounded-lg border border-v-border object-cover"
+              />
+            )}
+            <p className="mt-1 text-xs text-v-text-muted/80">
+              {types.find((t) => t.key === q.type)?.label ?? q.type}
+              {q.required ? ' · Required' : ''}
+            </p>
+            {q.options?.length > 0 && (
+              <ul className="mt-2 text-sm text-v-text-subtle">
+                {q.options.map((o) => (
+                  <li key={o.id} className="flex items-center gap-2">
+                    <span>• {o.label}</span>
+                    {o.imageUrl && (
+                      <img
+                        src={o.imageUrl}
+                        alt={o.label}
+                        className="inline-block h-6 w-6 rounded border border-v-border object-cover"
+                      />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={() => onEdit(q)}
+            className="text-sm text-v-text-muted"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => onDuplicate(q.id)}
+            className="text-sm text-v-text-muted"
+          >
+            Duplicate
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(q.id)}
+            className="text-sm text-v-danger"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </li>
+  )
+}
+
 export default function PollingBuilderPage() {
   const { eventId } = useParams()
   const [questions, setQuestions] = useState([])
@@ -68,6 +194,11 @@ export default function PollingBuilderPage() {
     [types, form.type],
   )
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
   const load = () => {
     Promise.all([
       pollingService.listQuestions(eventId),
@@ -81,7 +212,22 @@ export default function PollingBuilderPage() {
   }
 
   useEffect(() => {
-    load()
+    let isMounted = true
+    Promise.all([
+      pollingService.listQuestions(eventId),
+      pollingService.listQuestionTypes(),
+    ])
+      .then(([qRes, tRes]) => {
+        if (!isMounted) return
+        setQuestions(qRes.data.questions ?? [])
+        setTypes(tRes.data.types ?? [])
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false)
+      })
+    return () => {
+      isMounted = false
+    }
   }, [eventId])
 
   const resetForm = () => {
@@ -99,8 +245,9 @@ export default function PollingBuilderPage() {
       typeConfig: q.typeConfig ?? {},
       options:
         q.options?.length > 0
-          ? q.options.map((o) => ({ label: o.label }))
-          : [{ label: '' }, { label: '' }],
+          ? q.options.map((o) => ({ label: o.label, imageUrl: o.imageUrl ?? '' }))
+          : [{ label: '', imageUrl: '' }, { label: '', imageUrl: '' }],
+      imageUrl: q.imageUrl ?? '',
     })
   }
 
@@ -108,7 +255,7 @@ export default function PollingBuilderPage() {
     const next = { ...form, type: typeKey, typeConfig: {} }
     const def = types.find((t) => t.key === typeKey)
     if (def && needsFreeOptions(def) && form.options.length < 2) {
-      next.options = [{ label: '' }, { label: '' }]
+      next.options = [{ label: '', imageUrl: '' }, { label: '', imageUrl: '' }]
     }
     setForm(next)
   }
@@ -123,6 +270,7 @@ export default function PollingBuilderPage() {
       type: form.type,
       required: form.required,
       typeConfig: form.typeConfig,
+      imageUrl: form.imageUrl || null,
       sortOrder: editingId
         ? questions.find((q) => q.id === editingId)?.sortOrder ?? 0
         : questions.length,
@@ -135,7 +283,10 @@ export default function PollingBuilderPage() {
         setSaving(false)
         return
       }
-      payload.options = options.map((o) => ({ label: o.label.trim() }))
+      payload.options = options.map((o) => ({
+        label: o.label.trim(),
+        imageUrl: o.imageUrl?.trim() || null,
+      }))
     }
 
     try {
@@ -165,6 +316,31 @@ export default function PollingBuilderPage() {
       load()
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to duplicate question')
+    }
+  }
+
+  const handleDragEnd = async (event) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = questions.findIndex((q) => q.id === active.id)
+    const newIndex = questions.findIndex((q) => q.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+
+    // Optimistic reorder
+    const reordered = [...questions]
+    const [moved] = reordered.splice(oldIndex, 1)
+    reordered.splice(newIndex, 0, moved)
+    setQuestions(reordered)
+
+    // Persist new sort_order
+    const orders = reordered.map((q, i) => ({ id: q.id, sortOrder: i }))
+    try {
+      await pollingService.reorderQuestions(eventId, orders)
+      load()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reorder')
+      load() // revert
     }
   }
 
@@ -216,6 +392,24 @@ export default function PollingBuilderPage() {
           )}
         </div>
 
+        {/* Question image URL */}
+        <div>
+          <label className={LABEL_CLASS}>Question image URL (optional)</label>
+          <input
+            className={INPUT_CLASS}
+            placeholder="https://example.com/image.jpg"
+            value={form.imageUrl}
+            onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+          />
+          {form.imageUrl && (
+            <img
+              src={form.imageUrl}
+              alt="Preview"
+              className="mt-2 h-20 w-auto rounded-lg border border-v-border object-cover"
+            />
+          )}
+        </div>
+
         {/* Per-type config — rendered dynamically from configSchema. */}
         {configFieldFor(currentTypeDef).map((f) => (
           <div key={f.key} className="grid grid-cols-2 gap-2">
@@ -261,37 +455,49 @@ export default function PollingBuilderPage() {
           <div className="space-y-2">
             <p className="text-xs text-v-text-subtle">Options</p>
             {form.options.map((opt, i) => (
-              <div key={i} className="flex gap-2">
+              <div key={i} className="space-y-1">
+                <div className="flex gap-2">
+                  <input
+                    className={INPUT_CLASS}
+                    placeholder={`Option ${i + 1}`}
+                    value={opt.label}
+                    onChange={(e) => {
+                      const options = [...form.options]
+                      options[i] = { ...options[i], label: e.target.value }
+                      setForm({ ...form, options })
+                    }}
+                  />
+                  {form.options.length > 2 && (
+                    <button
+                      type="button"
+                      className="text-v-danger text-sm"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          options: form.options.filter((_, idx) => idx !== i),
+                        })
+                      }
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
                 <input
-                  className={INPUT_CLASS}
-                  placeholder={`Option ${i + 1}`}
-                  value={opt.label}
+                  className={`${INPUT_CLASS} text-xs`}
+                  placeholder="Option image URL (optional)"
+                  value={opt.imageUrl ?? ''}
                   onChange={(e) => {
                     const options = [...form.options]
-                    options[i] = { label: e.target.value }
+                    options[i] = { ...options[i], imageUrl: e.target.value }
                     setForm({ ...form, options })
                   }}
                 />
-                {form.options.length > 2 && (
-                  <button
-                    type="button"
-                    className="text-v-danger text-sm"
-                    onClick={() =>
-                      setForm({
-                        ...form,
-                        options: form.options.filter((_, idx) => idx !== i),
-                      })
-                    }
-                  >
-                    Remove
-                  </button>
-                )}
               </div>
             ))}
             <button
               type="button"
               className="text-sm text-v-text-muted"
-              onClick={() => setForm({ ...form, options: [...form.options, { label: '' }] })}
+              onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageUrl: '' }] })}
             >
               + Add option
             </button>
@@ -325,58 +531,27 @@ export default function PollingBuilderPage() {
         </div>
       </form>
 
-      <ul className="space-y-3">
-        {questions.map((q, idx) => (
-          <li
-            key={q.id}
-            className="rounded-2xl border border-v-border bg-v-surface p-5"
-          >
-            <div className="flex justify-between gap-4">
-              <div>
-                <span className="text-xs text-v-text-subtle">Q{idx + 1}</span>
-                <p className="font-medium text-v-text">{q.question}</p>
-                <p className="mt-1 text-xs text-v-text-muted/80">
-                  {types.find((t) => t.key === q.type)?.label ?? q.type}
-                  {q.required ? ' · Required' : ''}
-                </p>
-                {q.options?.length > 0 && (
-                  <ul className="mt-2 text-sm text-v-text-subtle">
-                    {q.options.map((o) => (
-                      <li key={o.id}>• {o.label}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  onClick={() => startEdit(q)}
-                  className="text-sm text-v-text-muted"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDuplicate(q.id)}
-                  className="text-sm text-v-text-muted"
-                >
-                  Duplicate
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(q.id)}
-                  className="text-sm text-v-danger"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </li>
-        ))}
-        {!questions.length && (
-          <p className="text-sm text-v-text-subtle">No questions yet. Add your first question above.</p>
-        )}
-      </ul>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={questions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
+          <ul className="space-y-3">
+            {questions.map((q, idx) => (
+              <SortableQuestionCard
+                key={q.id}
+                question={q}
+                idx={idx}
+                types={types}
+                onEdit={startEdit}
+                onDuplicate={handleDuplicate}
+                onDelete={handleDelete}
+              />
+            ))}
+            {!questions.length && (
+              <p className="text-sm text-v-text-subtle">No questions yet. Add your first question above.</p>
+            )}
+          </ul>
+        </SortableContext>
+      </DndContext>
     </div>
   )
 }
+

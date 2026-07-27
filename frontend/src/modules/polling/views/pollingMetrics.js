@@ -25,7 +25,9 @@ export function pollingQuestionTypeLabel(type) {
 export function buildPollingStats(analytics) {
   const total = analytics?.totalSubmissions ?? 0
   const enrolled = analytics?.enrolledRespondents ?? 0
-  return [
+  const avgTimeSec = analytics?.averageCompletionTimeSeconds ?? null
+
+  const stats = [
     { id: 'respondents', label: 'Total respondents', value: enrolled },
     { id: 'responses', label: 'Total responses', value: total, tone: 'success' },
     {
@@ -34,13 +36,33 @@ export function buildPollingStats(analytics) {
       value: `${safePercentage(total, enrolled)}%`,
       tone: 'muted',
     },
-    {
+  ]
+
+  if (avgTimeSec !== null) {
+    stats.push({
+      id: 'avg-time',
+      label: 'Avg. completion time',
+      value: formatDuration(avgTimeSec),
+      tone: 'muted',
+    })
+  } else {
+    stats.push({
       id: 'completion',
       label: 'Poll completion rate',
       value: `${safePercentage(total, enrolled)}%`,
       tone: 'muted',
-    },
-  ]
+    })
+  }
+
+  return stats
+}
+
+function formatDuration(seconds) {
+  if (seconds == null) return '—'
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  if (m === 0) return `${s}s`
+  return `${m}m ${s}s`
 }
 
 export function buildPollingQuestionStats(analytics) {
@@ -82,6 +104,13 @@ export function buildPollingRatingDistributions(analytics) {
       meta: (q.distribution ?? [])
         .map((d) => `${d.rating}★: ${d.count} (${d.percentage}%)`)
         .join(' · '),
+      // Items for bar chart rendering
+      items: (q.distribution ?? []).map((d) => ({
+        id: `${q.questionId}-${d.rating}`,
+        label: `${d.rating}★`,
+        value: d.count ?? 0,
+        percentage: d.percentage,
+      })),
     }))
 }
 

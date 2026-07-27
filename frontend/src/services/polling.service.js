@@ -54,6 +54,10 @@ export const pollingService = {
     return api.post(`${org}/events/${eventId}/questions/${questionId}/duplicate`)
   },
 
+  reorderQuestions(eventId, orders) {
+    return api.patch(`${org}/events/${eventId}/questions/reorder`, { orders })
+  },
+
   getAnalytics(eventId) {
     return api.get(`${org}/events/${eventId}/analytics`)
   },

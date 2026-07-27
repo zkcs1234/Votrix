@@ -17,6 +17,7 @@ router.post('/events/:eventId/banner', uploadLimiter, uploadImage('banner'), ctr
 
 router.get('/events/:eventId/questions', ctrl.listQuestions)
 router.post('/events/:eventId/questions', ctrl.createQuestion)
+router.patch('/events/:eventId/questions/reorder', ctrl.reorderQuestions)
 router.patch('/events/:eventId/questions/:questionId', ctrl.updateQuestion)
 router.delete('/events/:eventId/questions/:questionId', ctrl.deleteQuestion)
 router.post('/events/:eventId/questions/:questionId/duplicate', ctrl.duplicateQuestion)

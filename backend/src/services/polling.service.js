@@ -61,10 +61,12 @@ function mapQuestion(row, options = [], typeDef = null) {
     sortOrder: row.sort_order,
     required: row.required,
     typeConfig: row.type_config ?? {},
+    imageUrl: row.image_url,
     options: options.map((o) => ({
       id: o.id,
       label: o.label,
       sortOrder: o.sort_order,
+      imageUrl: o.image_url,
     })),
   }
   if (typeDef) {
@@ -309,6 +311,7 @@ export async function createQuestion(eventId, organizerId, payload) {
       sort_order: payload.sortOrder ?? 0,
       required: payload.required !== false,
       type_config: typeConfig,
+      image_url: payload.imageUrl ?? null,
     })
     .select('*')
     .single()
@@ -341,6 +344,7 @@ export async function updateQuestion(eventId, organizerId, questionId, payload) 
   }
   if (payload.sortOrder !== undefined) updates.sort_order = payload.sortOrder
   if (payload.required !== undefined) updates.required = payload.required
+  if (payload.imageUrl !== undefined) updates.image_url = payload.imageUrl
   if (payload.typeConfig !== undefined) {
     let def = typeDef
     if (!def) {
@@ -488,6 +492,29 @@ export async function duplicateQuestion(eventId, organizerId, questionId) {
   return mapQuestion(newQuestion, newOptions, typeDef)
 }
 
+export async function reorderQuestions(eventId, organizerId, orders) {
+  await assertPollingEvent(eventId, organizerId)
+  
+  if (!orders || !Array.isArray(orders) || orders.length === 0) return []
+
+  const updates = orders.map((o) => ({
+    id: o.id,
+    sort_order: o.sortOrder,
+  }))
+
+  for (const u of updates) {
+    const { error } = await getClient()
+      .from(DB_TABLES.POLL_QUESTIONS)
+      .update({ sort_order: u.sort_order })
+      .eq('id', u.id)
+      .eq('event_id', eventId)
+      
+    if (error) throw new ApiError(500, error.message)
+  }
+
+  return listQuestions(eventId, organizerId)
+}
+
 // Legacy alias used in some admin code paths. The registry is the source of
 // truth; this returns the key as-is if it is known.
 function normalizeQuestionType(type) {
@@ -527,6 +554,7 @@ async function upsertQuestionOptions(questionId, typeDef, typeConfig, optionsInp
     question_id: questionId,
     label: typeof o === 'string' ? o : o.label,
     sort_order: typeof o === 'string' ? i : o.sortOrder ?? i,
+    image_url: typeof o === 'string' ? null : (o.imageUrl ?? null),
   }))
 
   const { data, error } = await getClient().from(DB_TABLES.POLL_OPTIONS).insert(rows).select('*')

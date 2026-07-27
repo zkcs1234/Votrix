@@ -98,7 +98,21 @@ export default function PollingAnalyticsPage() {
             <div key={rd.id}>
               <p className="text-sm font-medium text-v-text">{rd.name}</p>
               <p className="text-xs text-v-text-subtle">{rd.sublabel}</p>
-              <p className="mt-2 text-xs text-v-text-subtle">{rd.meta}</p>
+              {rd.items?.length > 0 ? (
+                <div className="mt-2">
+                  <DistributionList
+                    items={rd.items}
+                    valueKey="value"
+                    labelKey="label"
+                    chartType="bar"
+                    showCount
+                    showPercentage
+                    emptyMessage="No rating data yet."
+                  />
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-v-text-subtle">{rd.meta}</p>
+              )}
             </div>
           ))}
         </div>

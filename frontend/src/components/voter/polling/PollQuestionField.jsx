@@ -7,7 +7,11 @@ export default function PollQuestionField({ question, index, value, onChange, di
   const input = def?.ui?.input ?? 'unknown'
 
   return (
-    <section className="v-card p-6">
+    <fieldset className="v-card p-6 border-0">
+      <legend className="sr-only">
+        Question {index + 1}: {q.question}
+        {q.required ? ' (required)' : ''}
+      </legend>
       <div className="flex flex-wrap justify-between gap-2">
         <p className="font-medium text-v-text">
           {index + 1}. {q.question}
@@ -18,6 +22,15 @@ export default function PollQuestionField({ question, index, value, onChange, di
         </span>
       </div>
 
+      {q.imageUrl && (
+        <img
+          src={q.imageUrl}
+          alt={`Image for question: ${q.question}`}
+          className="mt-3 max-h-48 w-auto rounded-xl border border-v-border object-cover"
+          loading="lazy"
+        />
+      )}
+
       {input === 'textarea' && (
         <textarea
           className="mt-4 v-input disabled:opacity-50"
@@ -25,7 +38,8 @@ export default function PollQuestionField({ question, index, value, onChange, di
           disabled={disabled}
           value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
-          required={q.required}
+          aria-required={q.required}
+          aria-label={q.question}
           placeholder="Type your answer…"
         />
       )}
@@ -39,6 +53,7 @@ export default function PollQuestionField({ question, index, value, onChange, di
           onChange={onChange}
           disabled={disabled}
           required={q.required}
+          questionLabel={q.question}
         />
       )}
 
@@ -49,6 +64,7 @@ export default function PollQuestionField({ question, index, value, onChange, di
           onChange={onChange}
           disabled={disabled}
           required={q.required}
+          questionLabel={q.question}
         />
       )}
 
@@ -59,6 +75,7 @@ export default function PollQuestionField({ question, index, value, onChange, di
           onChange={onChange}
           disabled={disabled}
           required={q.required}
+          questionLabel={q.question}
         />
       )}
 
@@ -69,6 +86,7 @@ export default function PollQuestionField({ question, index, value, onChange, di
           onChange={onChange}
           disabled={disabled}
           required={q.required}
+          questionLabel={q.question}
         />
       )}
 
@@ -79,6 +97,7 @@ export default function PollQuestionField({ question, index, value, onChange, di
           onChange={onChange}
           disabled={disabled}
           required={q.required}
+          questionLabel={q.question}
         />
       )}
 
@@ -87,13 +106,13 @@ export default function PollQuestionField({ question, index, value, onChange, di
           This question uses an unsupported input type ({input}). Please contact the organizer.
         </p>
       )}
-    </section>
+    </fieldset>
   )
 }
 
-function RadioInput({ options, value, onChange, disabled, required }) {
+function RadioInput({ options, value, onChange, disabled, required, questionLabel }) {
   return (
-    <div>
+    <div role="radiogroup" aria-label={`Options for ${questionLabel}`}>
       {options?.map((o) => (
         <label
           key={o.id}
@@ -108,18 +127,26 @@ function RadioInput({ options, value, onChange, disabled, required }) {
             disabled={disabled}
             checked={value === o.id}
             onChange={() => onChange(o.id)}
-            required={required}
+            aria-required={required}
           />
           <span className="text-v-text-muted">{o.label}</span>
+          {o.imageUrl && (
+            <img
+              src={o.imageUrl}
+              alt={o.label}
+              className="ml-auto h-10 w-10 rounded-lg border border-v-border object-cover"
+              loading="lazy"
+            />
+          )}
         </label>
       ))}
     </div>
   )
 }
 
-function CheckboxInput({ options, value, onChange, disabled }) {
+function CheckboxInput({ options, value, onChange, disabled, questionLabel }) {
   return (
-    <div>
+    <div role="group" aria-label={`Options for ${questionLabel}`}>
       {options?.map((o) => (
         <label
           key={o.id}
@@ -141,25 +168,35 @@ function CheckboxInput({ options, value, onChange, disabled }) {
             }}
           />
           <span className="text-v-text-muted">{o.label}</span>
+          {o.imageUrl && (
+            <img
+              src={o.imageUrl}
+              alt={o.label}
+              className="ml-auto h-10 w-10 rounded-lg border border-v-border object-cover"
+              loading="lazy"
+            />
+          )}
         </label>
       ))}
     </div>
   )
 }
 
-function RatingInput({ min, max, step, value, onChange, disabled, required }) {
+function RatingInput({ min, max, step, value, onChange, disabled, required, questionLabel }) {
   const values = []
   for (let n = min; n <= max; n += step) {
     values.push(Number(n.toFixed(4)))
   }
   return (
-    <div className="mt-4 flex flex-wrap gap-2">
+    <div className="mt-4 flex flex-wrap gap-2" role="radiogroup" aria-label={`Rating for ${questionLabel}`}>
       {values.map((n) => (
         <button
           key={n}
           type="button"
           disabled={disabled}
           onClick={() => onChange(n)}
+          aria-pressed={Number(value) === n}
+          aria-label={`Rate ${n}`}
           className={`h-11 min-w-11 rounded-xl border px-3 text-sm font-medium transition disabled:opacity-50 ${
             Number(value) === n
               ? 'border-v-text-muted bg-v-surface-elevated text-v-text'
@@ -174,15 +211,16 @@ function RatingInput({ min, max, step, value, onChange, disabled, required }) {
   )
 }
 
-function LikertInput({ options, value, onChange, disabled, required }) {
+function LikertInput({ options, value, onChange, disabled, required, questionLabel }) {
   return (
-    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5" role="radiogroup" aria-label={`Scale for ${questionLabel}`}>
       {options?.map((o) => (
         <button
           key={o.id}
           type="button"
           disabled={disabled}
           onClick={() => onChange(o.id)}
+          aria-pressed={value === o.id}
           className={`rounded-xl border px-2 py-3 text-xs transition disabled:opacity-50 ${
             value === o.id
               ? 'border-v-text-muted bg-v-surface-elevated text-v-text'
@@ -197,7 +235,7 @@ function LikertInput({ options, value, onChange, disabled, required }) {
   )
 }
 
-function RankingInput({ options, value, onChange, disabled }) {
+function RankingInput({ options, value, onChange, disabled, questionLabel }) {
   // value shape: { [optionId]: rank }
   const sorted = [...(options ?? [])].sort((a, b) => {
     const ra = value[a.id] ?? Number.POSITIVE_INFINITY
@@ -215,7 +253,7 @@ function RankingInput({ options, value, onChange, disabled }) {
   }
 
   return (
-    <ol className="mt-4 space-y-2">
+    <ol className="mt-4 space-y-2" aria-label={`Ranking for ${questionLabel}`}>
       {sorted.map((o, i) => {
         const rank = value[o.id] ?? '—'
         return (
@@ -227,20 +265,22 @@ function RankingInput({ options, value, onChange, disabled }) {
               <span className="w-6 text-center text-v-text-muted">{i + 1}</span>
               <span className="text-v-text">{o.label}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-sm" role="group" aria-label={`Rank controls for ${o.label}`}>
               <button
                 type="button"
                 disabled={disabled}
                 onClick={() => setRank(o.id, -1)}
+                aria-label={`Move ${o.label} up`}
                 className="rounded border border-v-border-strong px-2 text-v-text-muted disabled:opacity-50"
               >
                 −
               </button>
-              <span className="w-8 text-center text-v-text-muted">#{rank}</span>
+              <span className="w-8 text-center text-v-text-muted" aria-live="polite">#{rank}</span>
               <button
                 type="button"
                 disabled={disabled}
                 onClick={() => setRank(o.id, +1)}
+                aria-label={`Move ${o.label} down`}
                 className="rounded border border-v-border-strong px-2 text-v-text-muted disabled:opacity-50"
               >
                 +
@@ -252,3 +292,4 @@ function RankingInput({ options, value, onChange, disabled }) {
     </ol>
   )
 }
+

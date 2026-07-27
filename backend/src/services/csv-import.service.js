@@ -47,10 +47,10 @@ async function rollbackCsvEnrollments(eventId, voterIds) {
   if (!client) return
 
   await client
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .delete()
     .eq('event_id', eventId)
-    .in('voter_id', voterIds)
+    .in('user_id', voterIds)
 }
 
 /**

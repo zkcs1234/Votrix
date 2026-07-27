@@ -7,6 +7,7 @@ import { findUserByEmail, findUserById, sanitizeUser } from './user.service.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './mailer.service.js'
 import { createNotification } from './notification.service.js'
+import { registerParticipant } from './participant.service.js'
 
 
 async function ensureVoterAccount(email, plainPassword) {
@@ -57,17 +58,10 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
   const { user, isNew } = await ensureVoterAccount(email, tempPassword)
 
   // Enroll voter in event — required for them to access it
-  const { error: evError } = await getClient().from(DB_TABLES.EVENT_VOTERS).upsert(
-    {
-      event_id: eventId,
-      voter_id: user.id,
-      has_voted: false,
-    },
-    { onConflict: 'event_id,voter_id' },
-  )
-
-  if (evError) {
-    console.error('[invitation] event_voters upsert failed:', evError.message)
+  try {
+    await registerParticipant(eventId, user.id)
+  } catch (evError) {
+    console.error('[invitation] event participant registration failed:', evError.message)
     throw new ApiError(500, evError.message)
   }
 
@@ -159,10 +153,10 @@ export async function inviteRegisteredVoter({ eventId, email, organizerId }) {
 
   // Check if already enrolled
   const { data: existing } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('id')
     .eq('event_id', eventId)
-    .eq('voter_id', voter.id)
+    .eq('user_id', voter.id)
     .maybeSingle()
 
   if (existing) {
@@ -170,11 +164,7 @@ export async function inviteRegisteredVoter({ eventId, email, organizerId }) {
   }
 
   // Enroll voter in event
-  await getClient().from(DB_TABLES.EVENT_VOTERS).insert({
-    event_id: eventId,
-    voter_id: voter.id,
-    has_voted: false,
-  })
+  await registerParticipant(eventId, voter.id)
 
   // Send invitation email (no password)
   const emailResult = await sendVoterInvitationEmailRegistered({
@@ -211,10 +201,10 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
   }
 
   const { data: enrollment, error: enrollmentError } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('id')
     .eq('event_id', eventId)
-    .eq('voter_id', voterId)
+    .eq('user_id', voterId)
     .maybeSingle()
 
   if (enrollmentError) throw new ApiError(500, enrollmentError.message)
@@ -357,17 +347,10 @@ export async function registerVoterToEvent({ eventId, email, organizerId, tempor
   }
 
   // Enroll voter in event — required for them to access it
-  const { error: evError } = await getClient().from(DB_TABLES.EVENT_VOTERS).upsert(
-    {
-      event_id: eventId,
-      voter_id: user.id,
-      has_voted: false,
-    },
-    { onConflict: 'event_id,voter_id' },
-  )
-
-  if (evError) {
-    console.error('[registration] event_voters upsert failed:', evError.message)
+  try {
+    await registerParticipant(eventId, user.id)
+  } catch (evError) {
+    console.error('[registration] event participant registration failed:', evError.message)
     throw new ApiError(500, evError.message)
   }
 
@@ -417,10 +400,10 @@ export async function registerExistingVoter({ eventId, email, organizerId }) {
 
   // Check if already enrolled
   const { data: existing } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('id')
     .eq('event_id', eventId)
-    .eq('voter_id', voter.id)
+    .eq('user_id', voter.id)
     .maybeSingle()
 
   if (existing) {
@@ -428,11 +411,7 @@ export async function registerExistingVoter({ eventId, email, organizerId }) {
   }
 
   // Enroll voter in event
-  await getClient().from(DB_TABLES.EVENT_VOTERS).insert({
-    event_id: eventId,
-    voter_id: voter.id,
-    has_voted: false,
-  })
+  await registerParticipant(eventId, voter.id)
 
   // Create pending invitation record (no email sent)
   try {
@@ -471,10 +450,10 @@ export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
 
   // Check if voter is enrolled
   const { data: enrollment, error: enrollmentError } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('id')
     .eq('event_id', eventId)
-    .eq('voter_id', voterId)
+    .eq('user_id', voterId)
     .maybeSingle()
 
   if (enrollmentError) throw new ApiError(500, enrollmentError.message)

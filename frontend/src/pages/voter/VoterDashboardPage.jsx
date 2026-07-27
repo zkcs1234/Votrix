@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CalendarCheck2, Zap, CheckCircle2, CalendarDays, Vote, Trophy, BarChart2 } from 'lucide-react'
-import { voterService } from '@/services/voter.service'
+import { voterService, PARTICIPANT_TYPE_META } from '@/services/voter.service'
 import { useAuth } from '@/hooks/useAuth'
 import {
   SkeletonEventCard,
@@ -9,8 +9,42 @@ import {
 import StatCard from '@/components/ui/StatCard'
 import VoterEventCard from '@/components/voter/VoterEventCard'
 import Card from '@/components/ui/Card'
+import Badge from '@/components/ui/Badge'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
+
+const ROLE_ICONS = {
+  ELECTION_VOTER: Vote,
+  COMPETITION_JUDGE: Trophy,
+  POLLING_RESPONDENT: BarChart2,
+}
+
+function RoleSummaryCard({ participantType, count, icon: Icon, label }) {
+  if (!count || count === 0) return null
+  const roleBadgeLabel =
+    participantType === 'ELECTION_VOTER'
+      ? 'Voter'
+      : participantType === 'COMPETITION_JUDGE'
+        ? 'Judge'
+        : 'Respondent'
+
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-v-border bg-v-surface p-4">
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-v-surface-elevated">
+        <Icon className="h-5 w-5 text-v-text" strokeWidth={1.5} />
+      </div>
+      <div>
+        <p className="text-sm font-medium text-v-text">{label}</p>
+        <p className="text-xs text-v-text-subtle">
+          {count} event{count !== 1 ? 's' : ''}
+        </p>
+      </div>
+      <Badge variant="outline" size="sm" className="ml-auto">
+        {roleBadgeLabel}
+      </Badge>
+    </div>
+  )
+}
 
 function EventSection({ title, description, events }) {
   if (!events?.length) return null
@@ -55,15 +89,13 @@ export default function VoterDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Use delayed loading - only show skeleton after 300ms
   const showLoader = useDelayedLoading(loading, 300)
 
   useEffect(() => {
     let alive = true
 
     const load = () => {
-      voterService
-        .getOverview()
+      voterService.getOverview()
         .then(({ data: res }) => {
           if (!alive) return
           setData(res)
@@ -95,12 +127,10 @@ export default function VoterDashboardPage() {
   useSocketEvent('poll:polling-toggled', reload)
   useSocketEvent('competition:scoring-toggled', reload)
 
-  // Show nothing under 300ms - prevents loading flicker
   if (loading && !showLoader) {
     return null
   }
 
-  // Show skeleton after 300ms
   if (loading || showLoader) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
@@ -108,14 +138,12 @@ export default function VoterDashboardPage() {
           <div className="h-8 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
           <div className="mt-2 h-4 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
         </div>
-
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SkeletonStatCard />
           <SkeletonStatCard />
           <SkeletonStatCard />
           <SkeletonStatCard />
         </div>
-
         <EventSectionSkeleton />
         <EventSectionSkeleton />
       </div>
@@ -128,6 +156,16 @@ export default function VoterDashboardPage() {
 
   const stats = data?.stats ?? { total: 0, active: 0, assigned: 0, completed: 0 }
 
+  const roleCounts = {}
+  if (data?.events) {
+    for (const event of data.events) {
+      const pt = event.participantType
+      if (pt) {
+        roleCounts[pt] = (roleCounts[pt] || 0) + 1
+      }
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="v-card-md">
@@ -139,6 +177,28 @@ export default function VoterDashboardPage() {
           Elections, competition judging, and polls assigned to you appear below.
         </p>
       </div>
+
+      {Object.keys(roleCounts).length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-v-text-subtle">Your roles</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {Object.entries(PARTICIPANT_TYPE_META).map(([type, meta]) => {
+              const count = roleCounts[type] || 0
+              if (count === 0) return null
+              const Icon = ROLE_ICONS[type] ?? Vote
+              return (
+                <RoleSummaryCard
+                  key={type}
+                  participantType={type}
+                  count={count}
+                  icon={Icon}
+                  label={meta.label}
+                />
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Assigned" value={stats.assigned} valueClassName="v-stat-accent" icon={CalendarCheck2} />

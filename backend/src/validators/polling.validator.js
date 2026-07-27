@@ -42,7 +42,20 @@ export async function validateQuestion(body, organizationId) {
     required: body.required !== false,
     typeConfig,
     options: body.options,
+    imageUrl: body.imageUrl?.trim() || null,
   }
+}
+
+export function validateReorder(body) {
+  if (!body?.orders || !Array.isArray(body.orders)) {
+    throw new ApiError(400, 'orders array is required')
+  }
+  for (const item of body.orders) {
+    if (!item.id || typeof item.sortOrder !== 'number') {
+      throw new ApiError(400, 'Each order item must have an id and a numeric sortOrder')
+    }
+  }
+  return body.orders
 }
 
 export function validatePollAnswers(body) {

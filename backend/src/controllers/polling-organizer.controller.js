@@ -9,6 +9,7 @@ import {
   validateQuestion,
   validatePollToggle,
   validateCustomType,
+  validateReorder,
 } from '../validators/polling.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
@@ -107,6 +108,16 @@ export const duplicateQuestion = asyncHandler(async (req, res) => {
     req.params.questionId,
   )
   res.status(201).json({ success: true, question })
+})
+
+export const reorderQuestions = asyncHandler(async (req, res) => {
+  const orders = validateReorder(req.body)
+  const updatedQuestions = await pollingService.reorderQuestions(
+    req.params.eventId,
+    req.user.id,
+    orders,
+  )
+  res.json({ success: true, questions: updatedQuestions })
 })
 
 export const getAnalytics = asyncHandler(async (req, res) => {
