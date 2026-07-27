@@ -317,5 +317,6 @@ export default function ParticipantInformationFormBuilder({
           {saving ? 'Saving...' : dirty ? 'Save form' : 'Saved'}
         </Button>
       </div>
+    </div>
   )
 }
