@@ -94,6 +94,26 @@ export function validatePollToggle(body) {
   return body.pollingEnabled
 }
 
+// Basic question validation for sync operations
+export function validatePollQuestion(body) {
+  if (!body?.question?.trim()) {
+    throw new ApiError(400, 'Question text is required')
+  }
+  if (!body?.type) {
+    throw new ApiError(400, 'Question type is required')
+  }
+
+  return {
+    question: body.question.trim(),
+    type: body.type,
+    sortOrder: Number(body.sortOrder ?? 0),
+    required: body.required !== false,
+    typeConfig: body.typeConfig ?? {},
+    options: body.options,
+    imageUrl: body.imageUrl?.trim() || null,
+  }
+}
+
 // Phase 7 — custom type validators
 export function validateCustomType(body) {
   if (!body?.key?.trim()) throw new ApiError(400, 'key is required')
