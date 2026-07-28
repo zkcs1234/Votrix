@@ -194,10 +194,6 @@ export async function requireActiveAccount(req, _res, next) {
       return next()
     }
 
-    if (user.account_status === 'pending') {
-      return next(new ApiError(403, 'Your account is pending approval'))
-    }
-
     if (user.account_status === 'suspended') {
       return next(new ApiError(403, 'Your account has been suspended'))
     }

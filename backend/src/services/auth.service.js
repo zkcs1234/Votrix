@@ -14,10 +14,6 @@ import { issueTokenPair } from './token.service.js'
 function assertAccountActive(user) {
   if (user?.account_status === 'active') return
 
-  if (user?.account_status === 'pending') {
-    throw new ApiError(403, 'Your account is pending approval')
-  }
-
   if (user?.account_status === 'suspended') {
     throw new ApiError(403, 'Your account has been suspended')
   }

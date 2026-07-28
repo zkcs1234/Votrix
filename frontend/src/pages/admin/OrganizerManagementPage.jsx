@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { Users, UserCheck, Clock, ShieldOff, UserPlus, Mail } from 'lucide-react'
+import { Users, UserCheck, ShieldOff, UserPlus, Mail } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import CreateOrganizerModal from '@/components/admin/CreateOrganizerModal'
 import Button from '@/components/ui/Button'
@@ -12,7 +12,6 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 
 const STATUS_CONFIG = {
-  pending: { tone: 'warning', label: 'Pending review' },
   active: { tone: 'success', label: 'Active' },
   suspended: { tone: 'danger', label: 'Suspended' },
   archived: { tone: 'default', label: 'Archived' },
@@ -115,10 +114,9 @@ export default function OrganizerManagementPage() {
 
   const summary = useMemo(() => {
     const total = organizers.length
-    const pending = organizers.filter((org) => org.account_status === 'pending').length
     const active = organizers.filter((org) => org.account_status === 'active').length
     const suspended = organizers.filter((org) => org.account_status === 'suspended').length
-    return { total, pending, active, suspended }
+    return { total, active, suspended }
   }, [organizers])
 
   const filteredOrganizers = useMemo(() => {
@@ -214,9 +212,8 @@ export default function OrganizerManagementPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard label="Total organizers" value={summary.total} icon={Users} />
-        <StatCard label="Pending review" value={summary.pending} icon={Clock} />
         <StatCard label="Active" value={summary.active} icon={UserCheck} />
         <StatCard label="Suspended" value={summary.suspended} icon={ShieldOff} />
       </div>
@@ -230,7 +227,7 @@ export default function OrganizerManagementPage() {
         />
 
         <div className="flex flex-wrap gap-2">
-          {['all', 'pending', 'active', 'suspended', 'archived'].map((status) => (
+          {['all', 'active', 'suspended', 'archived'].map((status) => (
             <Button
               key={status}
               type="button"
@@ -282,13 +279,11 @@ export default function OrganizerManagementPage() {
                   const isBusy = savingKey?.startsWith(org.id)
                   const profileComplete = org.profile_complete
                   const nextPrimaryAction =
-                    status === 'pending'
-                      ? { label: 'Approve', next: 'active', variant: 'primary' }
-                      : status === 'active'
-                        ? { label: 'Suspend', next: 'suspended', variant: 'danger' }
-                        : status === 'suspended'
-                          ? { label: 'Reinstate', next: 'active', variant: 'secondary' }
-                          : { label: 'Restore', next: 'active', variant: 'secondary' }
+                    status === 'active'
+                      ? { label: 'Suspend', next: 'suspended', variant: 'danger' }
+                      : status === 'suspended'
+                        ? { label: 'Reinstate', next: 'active', variant: 'secondary' }
+                        : { label: 'Restore', next: 'active', variant: 'secondary' }
 
                   return (
                     <tr key={org.id} className="hover:bg-v-surface-elevated/50">
