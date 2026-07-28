@@ -8,6 +8,7 @@ import VotrixLogo from '@/components/brand/VotrixLogo'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import NotificationsModal from '@/components/ui/NotificationsModal'
 import GlobalSearch from '@/components/ui/GlobalSearch'
+import ProfileCard from '@/components/organizer/ProfileCard'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
@@ -176,6 +177,7 @@ export default function AppShell({
   })
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
+  const [profileCardOpen, setProfileCardOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const location = useLocation()
   const navigate = useNavigate()
@@ -375,6 +377,10 @@ export default function AppShell({
               {notificationsOpen && (
                 <NotificationsModal onClose={() => setNotificationsOpen(false)} />
               )}
+
+              {profileCardOpen && user?.role === 'organizer' && (
+                <ProfileCard onClose={() => setProfileCardOpen(false)} />
+              )}
             </div>
             <ThemeToggle />
             <div className="relative" ref={profileDropdownRef}>
@@ -404,14 +410,17 @@ export default function AppShell({
                   </div>
                   <div className="py-1">
                     {user?.role === 'organizer' && (
-                      <Link
-                        to="/organizer/profile"
-                        onClick={() => setProfileDropdownOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-v-text hover:bg-v-surface-elevated transition-colors"
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileDropdownOpen(false)
+                          setProfileCardOpen(true)
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-v-text hover:bg-v-surface-elevated transition-colors"
                       >
                         <User className="h-4 w-4" strokeWidth={1.5} />
                         <span>Organizer Profile</span>
-                      </Link>
+                      </button>
                     )}
                     <button
                       type="button"
