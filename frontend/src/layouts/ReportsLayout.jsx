@@ -1,4 +1,4 @@
-import { BarChart3, ArrowLeft } from 'lucide-react'
+import { BarChart3 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 
 const navItems = [

@@ -36,6 +36,7 @@ function assertValidDateRange(startDate, endDate) {
 
 export function validateCreateEvent(body) {
   if (!body?.title?.trim()) throw new ApiError(400, 'Event title is required')
+  const status = normalizeEventStatus(body.status, EVENT_STATUS.DRAFT)
   if (!body?.startDate) throw new ApiError(400, 'Start date is required')
   if (!body?.endDate) throw new ApiError(400, 'End date is required')
   const startDate = body.startDate
@@ -47,7 +48,7 @@ export function validateCreateEvent(body) {
     banner: body.banner || null,
     startDate,
     endDate,
-    status: normalizeEventStatus(body.status, EVENT_STATUS.DRAFT),
+    status,
     resultsVisibility: normalizeResultsVisibility(body.resultsVisibility) ?? 'public',
   }
 }

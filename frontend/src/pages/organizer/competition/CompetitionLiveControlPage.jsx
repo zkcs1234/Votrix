@@ -116,7 +116,7 @@ export default function CompetitionLiveControlPage() {
     return (
       <div className="space-y-6">
         <PageHeader eventId={eventId} title={event?.title ?? 'Competition Live Control'} />
-        <NoSessionView eventId={eventId} onStart={() => performAction('start', 'start')} actionLoading={actionLoading} />
+        <NoSessionView onStart={() => performAction('start', 'start')} actionLoading={actionLoading} />
       </div>
     )
   }
@@ -332,7 +332,7 @@ function PageHeader({ eventId, title }) {
   )
 }
 
-function NoSessionView({ eventId, onStart, actionLoading }) {
+function NoSessionView({ onStart, actionLoading }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-v-border px-6 py-16 text-center">
       <Play className="mb-4 h-12 w-12 text-v-text-subtle" />

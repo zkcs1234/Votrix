@@ -17,8 +17,6 @@ const TurnoutReport = memo(function TurnoutReport({
   accentClass = 'text-v-success',
   barColorClass = 'bg-emerald-500',
 }) {
-  if (!stats) return null
-
   const progressColor = useMemo(() => {
     if (barColorClass.includes('emerald') || barColorClass.includes('success')) return getChartColor('success')
     if (barColorClass.includes('warning')) return getChartColor('warning')
@@ -27,9 +25,11 @@ const TurnoutReport = memo(function TurnoutReport({
   }, [barColorClass])
 
   const progressData = useMemo(
-    () => [{ name: 'Progress', value: Math.min(stats.turnoutPercentage ?? 0, 100) }],
-    [stats.turnoutPercentage],
+    () => [{ name: 'Progress', value: Math.min(stats?.turnoutPercentage ?? 0, 100) }],
+    [stats?.turnoutPercentage],
   )
+
+  if (!stats) return null
 
   return (
     <section className="v-card p-6">

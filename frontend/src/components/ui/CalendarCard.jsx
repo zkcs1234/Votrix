@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Calendar, ChevronLeft, ChevronRight, Clock, X } from 'lucide-react'
 
 const WEEK_DAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
@@ -55,6 +55,47 @@ function isOutsideRange(date, minDate, maxDate) {
   return false
 }
 
+function startOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+function addDays(d, n) {
+  const next = new Date(d)
+  next.setDate(next.getDate() + n)
+  return next
+}
+
+function addMonths(d, n) {
+  return new Date(d.getFullYear(), d.getMonth() + n, d.getDate(), d.getHours(), d.getMinutes(), 0, 0)
+}
+
+const QUICK_PICKS = [
+  { id: 'now', label: 'Now' },
+  { id: 'today', label: 'Today' },
+  { id: 'tomorrow', label: 'Tomorrow' },
+  { id: 'next-week', label: 'Next week' },
+  { id: 'next-month', label: 'Next month' },
+]
+
+function applyQuickPick(pickId, defaultHour, defaultMinute) {
+  const now = new Date()
+  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), defaultHour, defaultMinute, 0, 0)
+  switch (pickId) {
+    case 'now':
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0)
+    case 'today':
+      return base
+    case 'tomorrow':
+      return addDays(base, 1)
+    case 'next-week':
+      return addDays(base, 7)
+    case 'next-month':
+      return addMonths(base, 1)
+    default:
+      return null
+  }
+}
+
 export default function CalendarCard({
   id,
   name,
@@ -66,22 +107,27 @@ export default function CalendarCard({
   disabled = false,
   required = false,
   hasError = false,
-  placeholder = 'Select date & time',
+  placeholder = 'YYYY-MM-DD HH:MM',
+  defaultHour = 9,
+  defaultMinute = 0,
   className = '',
   ariaLabel,
 }) {
   const wrapperRef = useRef(null)
+  const popRef = useRef(null)
   const inputRef = useRef(null)
   const [open, setOpen] = useState(false)
-  const today = useMemo(() => new Date(), [])
+  const [flipUp, setFlipUp] = useState(false)
+  const today = useMemo(() => startOfDay(new Date()), [])
   const selected = useMemo(() => parseLocalInputValue(value), [value])
   const minDate = useMemo(() => (min ? parseLocalInputValue(min) : null), [min])
   const maxDate = useMemo(() => (max ? parseLocalInputValue(max) : null), [max])
 
   const initialSelected = useMemo(() => parseLocalInputValue(value), []) // eslint-disable-line react-hooks/exhaustive-deps
-  const [viewMonth, setViewMonth] = useState(() => initialSelected ? startOfMonth(initialSelected) : startOfMonth(today))
-  const [hour, setHour] = useState(() => initialSelected ? initialSelected.getHours() : 9)
-  const [minute, setMinute] = useState(() => initialSelected ? initialSelected.getMinutes() : 0)
+  const initialView = initialSelected || today
+  const [viewMonth, setViewMonth] = useState(() => startOfMonth(initialView))
+  const [hour, setHour] = useState(() => initialSelected ? initialSelected.getHours() : defaultHour)
+  const [minute, setMinute] = useState(() => initialSelected ? initialSelected.getMinutes() : defaultMinute)
 
   useEffect(() => {
     if (!open) return undefined
@@ -100,6 +146,17 @@ export default function CalendarCard({
     }
   }, [open])
 
+  useLayoutEffect(() => {
+    if (!open || !popRef.current || !wrapperRef.current) return
+    const pop = popRef.current
+    const wrapper = wrapperRef.current
+    const wrapperRect = wrapper.getBoundingClientRect()
+    const popRect = pop.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - wrapperRect.bottom
+    const spaceAbove = wrapperRect.top
+    setFlipUp(spaceBelow < popRect.height + 16 && spaceAbove > spaceBelow)
+  }, [open, viewMonth])
+
   const gridDays = useMemo(() => buildMonthGrid(viewMonth), [viewMonth])
   const displayText = selected ? formatDisplay(selected) : ''
   const wrapperClass = [
@@ -107,6 +164,7 @@ export default function CalendarCard({
     hasError ? 'v-cal-error' : '',
     disabled ? 'v-cal-disabled' : '',
     open ? 'v-cal-open' : '',
+    flipUp && open ? 'v-cal-flip' : '',
     className,
   ].filter(Boolean).join(' ')
 
@@ -123,7 +181,6 @@ export default function CalendarCard({
     const next = new Date(day)
     next.setHours(hour, minute, 0, 0)
     emitChange(next)
-    inputRef.current?.focus()
   }
 
   const handleHourChange = (raw) => {
@@ -166,12 +223,17 @@ export default function CalendarCard({
     setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))
   }
 
-  const goToday = () => {
-    const now = new Date()
-    setViewMonth(startOfMonth(now))
-    setHour(now.getHours())
-    setMinute(now.getMinutes())
+  const handleQuickPick = (pickId) => {
+    const picked = applyQuickPick(pickId, defaultHour, defaultMinute)
+    if (!picked) return
+    if (isOutsideRange(picked, minDate, maxDate)) return
+    setViewMonth(startOfMonth(picked))
+    setHour(picked.getHours())
+    setMinute(picked.getMinutes())
+    emitChange(picked)
   }
+
+  const popClass = ['v-cal-pop', flipUp ? 'v-cal-pop-up' : ''].filter(Boolean).join(' ')
 
   return (
     <div ref={wrapperRef} className={wrapperClass}>
@@ -181,12 +243,22 @@ export default function CalendarCard({
           id={id}
           name={name}
           type="text"
-          readOnly
           className="v-cal-input"
           value={displayText}
           placeholder={placeholder}
           onClick={handleToggle}
           onFocus={() => setOpen(true)}
+          onChange={(e) => {
+            const parsed = parseLocalInputValue(e.target.value)
+            if (parsed) {
+              emitChange(parsed)
+              setViewMonth(startOfMonth(parsed))
+              setHour(parsed.getHours())
+              setMinute(parsed.getMinutes())
+            } else if (!e.target.value) {
+              emitChange(null)
+            }
+          }}
           onBlur={onBlur}
           disabled={disabled}
           required={required}
@@ -195,7 +267,15 @@ export default function CalendarCard({
           aria-haspopup="dialog"
           aria-expanded={open}
         />
-        <Calendar className="v-cal-icon" strokeWidth={1.5} aria-hidden />
+        <button
+          type="button"
+          className="v-cal-icon-btn"
+          onClick={handleToggle}
+          aria-label={open ? 'Close calendar' : 'Open calendar'}
+          tabIndex={-1}
+        >
+          <Calendar className="v-cal-icon" strokeWidth={1.5} aria-hidden />
+        </button>
         {value && !disabled && (
           <button
             type="button"
@@ -210,7 +290,7 @@ export default function CalendarCard({
       </div>
 
       {open && !disabled && (
-        <div className="v-cal-pop" role="dialog" aria-label="Choose date and time">
+        <div ref={popRef} className={popClass} role="dialog" aria-label="Choose date and time">
           <div className="v-cal-header">
             <button type="button" onClick={goPrevMonth} className="v-cal-nav" aria-label="Previous month">
               <ChevronLeft className="h-4 w-4" strokeWidth={2} />
@@ -258,6 +338,20 @@ export default function CalendarCard({
             })}
           </div>
 
+          <div className="v-cal-quick">
+            {QUICK_PICKS.map((pick) => (
+              <button
+                key={pick.id}
+                type="button"
+                className="v-cal-quick-btn"
+                onClick={() => handleQuickPick(pick.id)}
+                disabled={isOutsideRange(applyQuickPick(pick.id, defaultHour, defaultMinute) || today, minDate, maxDate)}
+              >
+                {pick.label}
+              </button>
+            ))}
+          </div>
+
           <div className="v-cal-time">
             <div className="v-cal-time-label">
               <Clock className="h-3.5 w-3.5" strokeWidth={2} />
@@ -287,7 +381,6 @@ export default function CalendarCard({
                   className="v-cal-time-input"
                 />
               </label>
-              <button type="button" onClick={goToday} className="v-cal-today-btn">Now</button>
             </div>
           </div>
         </div>

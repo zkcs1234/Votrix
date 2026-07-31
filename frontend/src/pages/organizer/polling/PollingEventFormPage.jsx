@@ -249,7 +249,7 @@ export default function PollingEventFormPage() {
               {errors.description && <p className="v-error-text">{errors.description.message}</p>}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="v-date-row">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
                   Start Date <span className="text-v-danger">*</span>
@@ -257,6 +257,8 @@ export default function PollingEventFormPage() {
                 <CalendarCard
                   id="startDate"
                   required
+                  defaultHour={0}
+                  defaultMinute={0}
                   hasError={Boolean(errors.startDate)}
                   {...register('startDate')}
                 />
@@ -269,6 +271,8 @@ export default function PollingEventFormPage() {
                 <CalendarCard
                   id="endDate"
                   required
+                  defaultHour={23}
+                  defaultMinute={59}
                   hasError={Boolean(errors.endDate)}
                   min={startDateValue || undefined}
                   {...register('endDate')}
@@ -337,7 +341,7 @@ export default function PollingEventFormPage() {
               <p className="v-caption -mt-2 pl-7">Allow respondents to submit more than once</p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="v-date-row">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
                   Start Date <span className="text-v-danger">*</span>
@@ -345,6 +349,8 @@ export default function PollingEventFormPage() {
                 <CalendarCard
                   id="startDate"
                   required
+                  defaultHour={0}
+                  defaultMinute={0}
                   hasError={Boolean(errors.startDate)}
                   {...register('startDate')}
                 />
@@ -357,6 +363,8 @@ export default function PollingEventFormPage() {
                 <CalendarCard
                   id="endDate"
                   required
+                  defaultHour={23}
+                  defaultMinute={59}
                   hasError={Boolean(errors.endDate)}
                   min={startDateValue || undefined}
                   {...register('endDate')}
@@ -371,6 +379,8 @@ export default function PollingEventFormPage() {
               </label>
               <CalendarCard
                 id="pollExpiresAt"
+                defaultHour={23}
+                defaultMinute={59}
                 hasError={Boolean(errors.pollExpiresAt)}
                 min={startDateValue || undefined}
                 max={endDateValue || undefined}

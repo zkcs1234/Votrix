@@ -52,8 +52,7 @@ const BarChart = memo(function BarChart({
       layout="vertical"
       height={height}
       barSize={20}
-      valueFormatter={(value, _name) => {
-        // Show percentage inline if available in payload
+      valueFormatter={(value) => {
         return String(value)
       }}
     />

@@ -28,11 +28,6 @@ const DistributionList = memo(function DistributionList({
   emptyMessage = 'No data yet.',
   className = '',
 }) {
-  if (!items.length) {
-    return <p className="text-sm text-v-text-subtle">{emptyMessage}</p>
-  }
-
-  // Resolve semantic base color from legacy barClass prop
   const baseColor = useMemo(() => {
     if (barClass.includes('success')) return getChartColor('success')
     if (barClass.includes('warning')) return getChartColor('warning')
@@ -40,7 +35,6 @@ const DistributionList = memo(function DistributionList({
     return getChartColor('primary')
   }, [barClass])
 
-  // Normalize items for chart views
   const data = useMemo(
     () =>
       items.map((item, idx) => ({
@@ -53,6 +47,10 @@ const DistributionList = memo(function DistributionList({
       })),
     [items, valueKey, labelKey, idKey, baseColor],
   )
+
+  if (!items.length) {
+    return <p className="text-sm text-v-text-subtle">{emptyMessage}</p>
+  }
 
   return (
     <div className={className}>
@@ -97,7 +95,7 @@ const DistributionList = memo(function DistributionList({
               nameKey="name"
               height={200}
               showLegend={false}
-              valueFormatter={(value, _name) => {
+              valueFormatter={(value) => {
                 const total = data.reduce((s, d) => s + d.value, 0)
                 const pct = total > 0 ? ((value / total) * 100).toFixed(1) : 0
                 return `${value} (${pct}%)`
@@ -111,7 +109,7 @@ const DistributionList = memo(function DistributionList({
               layout="vertical"
               height={Math.max(160, data.length * 32)}
               barSize={16}
-              valueFormatter={(value, _name) => String(value)}
+              valueFormatter={(value) => String(value)}
             />
           )}
         </>

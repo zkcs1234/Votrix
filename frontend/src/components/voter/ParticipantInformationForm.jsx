@@ -21,7 +21,6 @@ export default function ParticipantInformationForm({
   onSuccess
 }) {
   const [formData, setFormData] = useState({})
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)

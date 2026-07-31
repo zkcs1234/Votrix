@@ -212,7 +212,7 @@ export default function ElectionEventFormPage() {
               <p className={HELPER_TEXT}>Optional description for voters</p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="v-date-row">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
                   Start Date <span className="text-v-danger">*</span>
@@ -220,6 +220,8 @@ export default function ElectionEventFormPage() {
                 <CalendarCard
                   id="startDate"
                   required
+                  defaultHour={0}
+                  defaultMinute={0}
                   hasError={Boolean(errors.startDate)}
                   {...register('startDate')}
                 />
@@ -233,6 +235,8 @@ export default function ElectionEventFormPage() {
                 <CalendarCard
                   id="endDate"
                   required
+                  defaultHour={23}
+                  defaultMinute={59}
                   hasError={Boolean(errors.endDate)}
                   min={startDateValue || undefined}
                   {...register('endDate')}

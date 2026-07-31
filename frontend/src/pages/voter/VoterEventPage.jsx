@@ -129,7 +129,6 @@ export default function VoterEventPage() {
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
   const [participantInfo, setParticipantInfo] = useState(null)
-  const [infoLoading, setInfoLoading] = useState(true)
 
   useEffect(() => {
     localStorage.setItem(draftKey, JSON.stringify(selections))
@@ -158,7 +157,6 @@ export default function VoterEventPage() {
       .catch(() => {
         // Not a participant or no metadata - ignore
       })
-      .finally(() => setInfoLoading(false))
   }, [eventId])
 
   const positions = useMemo(() => ballot?.positions ?? [], [ballot])

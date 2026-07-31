@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
 import {
-  LayoutDashboard, CalendarDays, Trophy, Users, BarChart3, MapPin,
+  LayoutDashboard, CalendarDays, Users, BarChart3, MapPin,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 

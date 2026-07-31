@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { RefreshCw, Download, X, ClipboardList, AlertTriangle, FileSearch, ChevronUp, ChevronDown, Copy, Check } from 'lucide-react'
+import { RefreshCw, Download, X, AlertTriangle, FileSearch, ChevronUp, ChevronDown, Copy, Check } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import { useToast } from '@/hooks/useToast'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'

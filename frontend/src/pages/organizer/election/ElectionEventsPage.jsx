@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Edit2, Copy, Eye, CheckCircle2 } from 'lucide-react'
+import { Plus, Edit2, Copy, Eye } from 'lucide-react'
 import { electionService } from '@/services/election.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'

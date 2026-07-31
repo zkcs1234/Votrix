@@ -39,7 +39,6 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  Cell,
 } from 'recharts'
 import ChartTooltip from './ChartTooltip'
 import {
