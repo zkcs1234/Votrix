@@ -3,24 +3,34 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { pollingService } from '@/services/polling.service'
-import { pollingEventSchemaStep1 } from '@/schemas/event.schemas'
+import {
+  pollingEventSchemaStep1,
+  pollingEventSchemaStep3,
+  isoToLocalInput,
+  localInputToIso,
+} from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import DateTimeInput from '@/components/ui/DateTimeInput'
-import Button from '@/components/ui/Button'
+import CalendarCard from '@/components/ui/CalendarCard'
 import Card from '@/components/ui/Card'
+import EventStepper from '@/components/ui/EventStepper'
+import StageFooter from '@/components/ui/StageFooter'
 import ParticipantInformationFormBuilder from '@/components/organizer/ParticipantInformationFormBuilder'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
+
+function inferStepFromPath(pathname) {
+  if (pathname.includes('/settings')) return 'settings'
+  if (pathname.includes('/form')) return 'information-form'
+  return 'details'
+}
 
 export default function PollingEventFormPage() {
   const { eventId } = useParams()
   const location = useLocation()
   const isNew = !eventId || eventId === 'new'
-  const isFormStep = location.pathname.includes('/form')
   const navigate = useNavigate()
 
-  // If accessing /form route, start at step 4, otherwise step 1
-  const [step, setStep] = useState(isFormStep ? 4 : 1)
+  const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -32,12 +42,14 @@ export default function PollingEventFormPage() {
   const {
     register,
     getValues,
-    handleSubmit: rhfHandleSubmit,
     formState: { errors },
     trigger,
     reset,
+    watch,
   } = useForm({
-    resolver: zodResolver(pollingEventSchemaStep1),
+    resolver: zodResolver(
+      step === 'settings' ? pollingEventSchemaStep3 : pollingEventSchemaStep1,
+    ),
     defaultValues: {
       title: '',
       description: '',
@@ -50,18 +62,23 @@ export default function PollingEventFormPage() {
   })
 
   useEffect(() => {
+    setStep(inferStepFromPath(location.pathname))
+  }, [location.pathname])
+
+  useEffect(() => {
     if (isNew) return
-    pollingService.getSettings(eventId)
+    pollingService
+      .getSettings(eventId)
       .then(({ data }) => {
         const e = data.event
         reset({
           title: e.title || '',
           description: e.description || '',
-          startDate: e.startDate ? e.startDate.slice(0, 16) : '',
-          endDate: e.endDate ? e.endDate.slice(0, 16) : '',
+          startDate: isoToLocalInput(e.startDate),
+          endDate: isoToLocalInput(e.endDate),
           pollAnonymous: e.pollAnonymous || false,
           pollAllowMultipleSubmissions: e.pollAllowMultipleSubmissions || false,
-          pollExpiresAt: e.pollExpiresAt ? e.pollExpiresAt.slice(0, 16) : '',
+          pollExpiresAt: isoToLocalInput(e.pollExpiresAt),
         })
         setBanner(e.banner)
       })
@@ -71,7 +88,6 @@ export default function PollingEventFormPage() {
       .finally(() => setLoading(false))
   }, [eventId, isNew, reset])
 
-  // Load information form schema
   const loadInfoFormSchema = useCallback(async () => {
     if (isNew) return
     setInfoFormLoading(true)
@@ -90,33 +106,19 @@ export default function PollingEventFormPage() {
     loadInfoFormSchema()
   }, [loadInfoFormSchema])
 
-  const handleNext = async (e) => {
+  const handleNextDetails = async (e) => {
     e.preventDefault()
-    let isValid = false
-    if (step === 1) {
-      isValid = await trigger(['title', 'startDate', 'endDate'])
-    }
-    if (isValid) {
-      setStep(step + 1)
-    }
+    const isValid = await trigger(['title', 'startDate', 'endDate'])
+    if (isValid) navigate(stageHref('branding'))
   }
 
-  const handleNextStep3 = async (e) => {
+  const handleNextBranding = async (e) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
-
     try {
       const data = getValues()
-      const payload = {
-        title: data.title,
-        description: data.description,
-        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
-        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
-        pollAnonymous: data.pollAnonymous || false,
-        pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions || false,
-        pollExpiresAt: data.pollExpiresAt ? new Date(data.pollExpiresAt).toISOString() : null,
-      }
+      const payload = buildPayload(data)
       let id = eventId
       if (isNew) {
         const { data: res } = await pollingService.createEvent(payload)
@@ -127,12 +129,10 @@ export default function PollingEventFormPage() {
       if (bannerFile) {
         await pollingService.uploadBanner(id, bannerFile)
       }
-
-      // Go to step 4 (Information Form)
       if (isNew) {
-        navigate(`/organizer/polling/events/${id}/form`, { replace: true })
+        navigate(`/organizer/polling/events/${id}/settings`, { replace: true })
       } else {
-        setStep(4)
+        navigate(stageHref('settings'))
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save poll')
@@ -141,66 +141,90 @@ export default function PollingEventFormPage() {
     }
   }
 
-  const onSubmit = async (data) => {
+  const handleSaveSettings = async (e) => {
+    e.preventDefault()
     setSaving(true)
     setError(null)
-
     try {
-      const payload = {
-        title: data.title,
-        description: data.description,
-        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
-        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
-        pollAnonymous: data.pollAnonymous || false,
-        pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions || false,
-        pollExpiresAt: data.pollExpiresAt ? new Date(data.pollExpiresAt).toISOString() : null,
+      const data = getValues()
+      const isValid = await trigger([
+        'pollAnonymous',
+        'pollAllowMultipleSubmissions',
+        'pollExpiresAt',
+        'startDate',
+        'endDate',
+      ])
+      if (!isValid) {
+        setSaving(false)
+        return
       }
-      let id = eventId
+      const payload = buildPayload(data)
       if (isNew) {
         const { data: res } = await pollingService.createEvent(payload)
-        id = res.event.id
-      } else {
-        await pollingService.updateEvent(eventId, payload)
-      }
-      if (bannerFile) {
-        await pollingService.uploadBanner(id, bannerFile)
-      }
-
-      // For new events, go to step 4 (Information Form)
-      if (isNew) {
+        const id = res.event.id
+        if (bannerFile) await pollingService.uploadBanner(id, bannerFile)
         navigate(`/organizer/polling/events/${id}/form`, { replace: true })
       } else {
-        navigate(`/organizer/polling/events/${id}/builder`)
+        await pollingService.updateEvent(eventId, payload)
+        navigate(`/organizer/polling/events/${eventId}/form`)
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save event')
+      setError(err.response?.data?.message || 'Failed to save poll settings')
     } finally {
       setSaving(false)
     }
   }
 
+  function buildPayload(data) {
+    return {
+      title: data.title,
+      description: data.description,
+      startDate: localInputToIso(data.startDate),
+      endDate: localInputToIso(data.endDate),
+      pollAnonymous: data.pollAnonymous || false,
+      pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions || false,
+      pollExpiresAt: localInputToIso(data.pollExpiresAt),
+    }
+  }
+
+  function stageHref(stageKey) {
+    const base = '/organizer/polling/events'
+    if (isNew) return `${base}/new`
+    const pathByKey = {
+      details: 'edit',
+      branding: 'edit',
+      settings: 'settings',
+      'information-form': 'form',
+    }
+    return `${base}/${eventId}/${pathByKey[stageKey]}`
+  }
+
   if (loading) return <p className="v-caption">Loading...</p>
 
+  const stepperEventId = isNew ? 'new' : eventId
+  const startDateValue = watch('startDate', '')
+  const endDateValue = watch('endDate', '')
+
   return (
-    <div className="mx-auto max-w-lg space-y-6">
-      <h2 className="v-page-title">{isNew ? 'Create poll' : 'Poll settings'}</h2>
-      
-      <div className="flex items-center gap-2 text-sm text-v-text-subtle">
-        <span className={step === 1 ? 'text-v-primary font-medium' : ''}>Step 1: Details</span>
-        <span>→</span>
-        <span className={step === 2 ? 'text-v-primary font-medium' : ''}>Step 2: Branding</span>
-        <span>→</span>
-        <span className={step === 3 ? 'text-v-primary font-medium' : ''}>Step 3: Settings</span>
-        <span>→</span>
-        <span className={step === 4 ? 'text-v-primary font-medium' : ''}>Step 4: Information Form</span>
-      </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <header>
+        <h2 className="v-page-title mb-2">
+          {isNew ? 'Create poll' : 'Poll settings'}
+        </h2>
+        <p className="v-helper-text">
+          Fill out the poll basics, branding, and settings. Use the stepper or sidebar
+          to jump between sections.
+        </p>
+      </header>
+
+      <EventStepper module="polling" currentKey={step} eventId={stepperEventId} />
 
       <Card padding="md">
-        {step === 1 && (
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNext(e) }}>
+        {step === 'details' && (
+          <form className="space-y-4" onSubmit={handleNextDetails}>
             <div className="v-form-field">
               <label className={LABEL_CLASS} htmlFor="title">
-                Poll title
+                Poll title <span className="text-v-danger">*</span>
               </label>
               <input
                 id="title"
@@ -228,57 +252,69 @@ export default function PollingEventFormPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
-                  Start Date
+                  Start Date <span className="text-v-danger">*</span>
                 </label>
-                <DateTimeInput
+                <CalendarCard
                   id="startDate"
+                  required
+                  hasError={Boolean(errors.startDate)}
                   {...register('startDate')}
                 />
                 {errors.startDate && <p className="v-error-text">{errors.startDate.message}</p>}
               </div>
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="endDate">
-                  End Date
+                  End Date <span className="text-v-danger">*</span>
                 </label>
-                <DateTimeInput
+                <CalendarCard
                   id="endDate"
+                  required
+                  hasError={Boolean(errors.endDate)}
+                  min={startDateValue || undefined}
                   {...register('endDate')}
                 />
                 {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
               </div>
             </div>
 
-            <div className="v-form-actions">
-              <Button type="submit">Next step</Button>
-            </div>
+            <StageFooter
+              module="polling"
+              currentKey="details"
+              eventId={stepperEventId}
+              saving={saving}
+              onNext={handleNextDetails}
+              nextLabel="Next: Branding"
+              backLabel={null}
+            />
           </form>
         )}
 
-        {step === 2 && (
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNext(e) }}>
+        {step === 'branding' && (
+          <form className="space-y-4" onSubmit={handleNextBranding}>
             <ImageUploadField
               label="Poll banner (optional)"
               hint="Wide image for poll headers."
               variant="banner"
               currentUrl={banner}
               onFileSelect={setBannerFile}
+              disabled={saving}
             />
 
-            <div className="flex justify-between pt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setStep(1)}
-              >
-                Back
-              </Button>
-              <Button type="submit">Next step</Button>
-            </div>
+            {error && <p className="v-error-text">{error}</p>}
+
+            <StageFooter
+              module="polling"
+              currentKey="branding"
+              eventId={stepperEventId}
+              saving={saving}
+              onNext={handleNextBranding}
+              nextLabel={isNew ? 'Save & continue' : 'Next: Settings'}
+            />
           </form>
         )}
 
-        {step === 3 && (
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNextStep3(e) }}>
+        {step === 'settings' && (
+          <form className="space-y-4" onSubmit={handleSaveSettings}>
             <div className="space-y-3 pt-2">
               <label className="flex items-center gap-3 text-sm text-v-text-muted">
                 <input
@@ -301,39 +337,67 @@ export default function PollingEventFormPage() {
               <p className="v-caption -mt-2 pl-7">Allow respondents to submit more than once</p>
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="v-form-field">
+                <label className={LABEL_CLASS} htmlFor="startDate">
+                  Start Date <span className="text-v-danger">*</span>
+                </label>
+                <CalendarCard
+                  id="startDate"
+                  required
+                  hasError={Boolean(errors.startDate)}
+                  {...register('startDate')}
+                />
+                {errors.startDate && <p className="v-error-text">{errors.startDate.message}</p>}
+              </div>
+              <div className="v-form-field">
+                <label className={LABEL_CLASS} htmlFor="endDate">
+                  End Date <span className="text-v-danger">*</span>
+                </label>
+                <CalendarCard
+                  id="endDate"
+                  required
+                  hasError={Boolean(errors.endDate)}
+                  min={startDateValue || undefined}
+                  {...register('endDate')}
+                />
+                {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
+              </div>
+            </div>
+
             <div className="v-form-field">
               <label className={LABEL_CLASS} htmlFor="pollExpiresAt">
                 Expiration date (optional)
               </label>
-              <DateTimeInput
+              <CalendarCard
                 id="pollExpiresAt"
+                hasError={Boolean(errors.pollExpiresAt)}
+                min={startDateValue || undefined}
+                max={endDateValue || undefined}
                 {...register('pollExpiresAt')}
               />
-              <p className={HELPER_TEXT}>Poll will close after this date</p>
+              <p className={HELPER_TEXT}>
+                Poll will close after this date. Must be within the start–end window.
+              </p>
+              {errors.pollExpiresAt && (
+                <p className="v-error-text">{errors.pollExpiresAt.message}</p>
+              )}
             </div>
 
             {error && <p className="v-error-text">{error}</p>}
 
-            <div className="flex justify-between pt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setStep(2)}
-                disabled={saving}
-              >
-                Back
-              </Button>
-              <Button
-                type="submit"
-                disabled={saving}
-              >
-                {saving ? 'Saving...' : 'Next step'}
-              </Button>
-            </div>
+            <StageFooter
+              module="polling"
+              currentKey="settings"
+              eventId={stepperEventId}
+              saving={saving}
+              onNext={handleSaveSettings}
+              nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
+            />
           </form>
         )}
 
-        {step === 4 && (
+        {step === 'information-form' && (
           <div className="space-y-4">
             {infoFormLoading ? (
               <p className="v-caption">Loading information form...</p>
@@ -349,22 +413,14 @@ export default function PollingEventFormPage() {
               />
             )}
 
-            <div className="flex justify-between pt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setStep(3)}
-                disabled={saving}
-              >
-                Back
-              </Button>
-              <Button
-                onClick={() => navigate(`/organizer/polling/events/${eventId}/builder`)}
-                disabled={saving}
-              >
-                Continue to Builder
-              </Button>
-            </div>
+            <StageFooter
+              module="polling"
+              currentKey="information-form"
+              eventId={eventId}
+              saving={saving}
+              nextLabel="Continue to Builder"
+              nextPath={`/organizer/polling/events/${eventId}/builder`}
+            />
           </div>
         )}
       </Card>

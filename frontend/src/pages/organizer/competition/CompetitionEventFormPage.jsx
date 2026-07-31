@@ -3,24 +3,28 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { pageantService } from '@/services/pageant.service'
-import { pageantEventSchemaStep1 } from '@/schemas/event.schemas'
+import { pageantEventSchemaStep1, isoToLocalInput, localInputToIso } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import DateTimeInput from '@/components/ui/DateTimeInput'
-import Button from '@/components/ui/Button'
+import CalendarCard from '@/components/ui/CalendarCard'
 import Card from '@/components/ui/Card'
+import EventStepper from '@/components/ui/EventStepper'
+import StageFooter from '@/components/ui/StageFooter'
 import ParticipantInformationFormBuilder from '@/components/organizer/ParticipantInformationFormBuilder'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
+
+function inferStepFromPath(pathname) {
+  if (pathname.includes('/form')) return 'information-form'
+  return 'details'
+}
 
 export default function CompetitionEventFormPage() {
   const { eventId } = useParams()
   const location = useLocation()
   const isNew = !eventId || eventId === 'new'
-  const isFormStep = location.pathname.includes('/form')
   const navigate = useNavigate()
 
-  // If accessing /form route, start at step 3, otherwise step 1
-  const [step, setStep] = useState(isFormStep ? 3 : 1)
+  const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -36,6 +40,7 @@ export default function CompetitionEventFormPage() {
     formState: { errors },
     trigger,
     reset,
+    watch,
   } = useForm({
     resolver: zodResolver(pageantEventSchemaStep1),
     defaultValues: {
@@ -47,14 +52,18 @@ export default function CompetitionEventFormPage() {
   })
 
   useEffect(() => {
+    setStep(inferStepFromPath(location.pathname))
+  }, [location.pathname])
+
+  useEffect(() => {
     if (isNew) return
     pageantService.getEvent(eventId)
       .then(({ data }) => {
         reset({
           title: data.event.title || '',
           description: data.event.description || '',
-          startDate: data.event.startDate ? data.event.startDate.slice(0, 16) : '',
-          endDate: data.event.endDate ? data.event.endDate.slice(0, 16) : '',
+          startDate: isoToLocalInput(data.event.startDate),
+          endDate: isoToLocalInput(data.event.endDate),
         })
         setBanner(data.event.banner)
       })
@@ -64,7 +73,6 @@ export default function CompetitionEventFormPage() {
       .finally(() => setLoading(false))
   }, [eventId, isNew, reset])
 
-  // Load information form schema
   const loadInfoFormSchema = useCallback(async () => {
     if (isNew) return
     setInfoFormLoading(true)
@@ -86,12 +94,10 @@ export default function CompetitionEventFormPage() {
   const handleNext = async (e) => {
     e.preventDefault()
     const isValid = await trigger(['title', 'startDate', 'endDate'])
-    if (isValid) {
-      setStep(2)
-    }
+    if (isValid) setStep('branding')
   }
 
-  const handleNextStep2 = async (e) => {
+  const handleNextBranding = async (e) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
@@ -101,8 +107,8 @@ export default function CompetitionEventFormPage() {
       const payload = {
         title: data.title,
         description: data.description,
-        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
-        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
+        startDate: localInputToIso(data.startDate),
+        endDate: localInputToIso(data.endDate),
       }
       let id = eventId
       if (isNew) {
@@ -115,11 +121,10 @@ export default function CompetitionEventFormPage() {
         await pageantService.uploadBanner(id, bannerFile)
       }
 
-      // Go to step 3 (Information Form)
       if (isNew) {
         navigate(`/organizer/competition/events/${id}/form`, { replace: true })
       } else {
-        setStep(3)
+        setStep('information-form')
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save event')
@@ -128,60 +133,34 @@ export default function CompetitionEventFormPage() {
     }
   }
 
-  const onSubmit = async (data) => {
-    setSaving(true)
-    setError(null)
-
-    try {
-      const payload = {
-        title: data.title,
-        description: data.description,
-        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
-        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
-      }
-      let id = eventId
-      if (isNew) {
-        const { data: res } = await pageantService.createEvent(payload)
-        id = res.event.id
-      } else {
-        await pageantService.updateEvent(eventId, payload)
-      }
-      if (bannerFile) {
-        await pageantService.uploadBanner(id, bannerFile)
-      }
-
-      // For new events, go to step 3 (Information Form)
-      if (isNew) {
-        navigate(`/organizer/competition/events/${id}/form`, { replace: true })
-      } else {
-        navigate(`/organizer/competition/events/${id}/contestants`)
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save event')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const handleSubmitDetails = rhfHandleSubmit(async () => {
+    setStep('branding')
+  })
 
   if (loading) return <p className="v-caption">Loading...</p>
 
+  const stepperEventId = isNew ? 'new' : eventId
+
   return (
-    <div className="mx-auto max-w-lg">
-      <h2 className="v-page-title mb-2">{isNew ? 'Create Competition Scoring Event' : 'Edit Competition Scoring Event'}</h2>
-      <div className="mb-6 flex items-center gap-2 text-sm text-v-text-subtle">
-        <span className={step === 1 ? 'text-v-primary font-medium' : ''}>Step 1: Details</span>
-        <span>→</span>
-        <span className={step === 2 ? 'text-v-primary font-medium' : ''}>Step 2: Branding</span>
-        <span>→</span>
-        <span className={step === 3 ? 'text-v-primary font-medium' : ''}>Step 3: Information Form</span>
-      </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <header>
+        <h2 className="v-page-title mb-2">
+          {isNew ? 'Create Competition Scoring Event' : 'Edit Competition Scoring Event'}
+        </h2>
+        <p className="v-helper-text">
+          Fill out the event basics, branding, and optional information form. Use the stepper or sidebar
+          to jump between sections.
+        </p>
+      </header>
+
+      <EventStepper module="competition" currentKey={step} eventId={stepperEventId} />
 
       <Card padding="md">
-        {step === 1 ? (
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNext(e) }}>
+        {step === 'details' && (
+          <form className="space-y-4" onSubmit={handleSubmitDetails}>
             <div className="v-form-field">
               <label className={LABEL_CLASS} htmlFor="title">
-                Title
+                Title <span className="text-v-danger">*</span>
               </label>
               <input
                 id="title"
@@ -210,10 +189,12 @@ export default function CompetitionEventFormPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
-                  Start Date
+                  Start Date <span className="text-v-danger">*</span>
                 </label>
-                <DateTimeInput
+                <CalendarCard
                   id="startDate"
+                  required
+                  hasError={Boolean(errors.startDate)}
                   {...register('startDate')}
                 />
                 {errors.startDate && <p className="v-error-text">{errors.startDate.message}</p>}
@@ -221,21 +202,55 @@ export default function CompetitionEventFormPage() {
 
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="endDate">
-                  End Date
+                  End Date <span className="text-v-danger">*</span>
                 </label>
-                <DateTimeInput
+                <CalendarCard
                   id="endDate"
+                  required
+                  hasError={Boolean(errors.endDate)}
+                  min={watch('startDate') || undefined}
                   {...register('endDate')}
                 />
                 {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
               </div>
             </div>
 
-            <div className="v-form-actions">
-              <Button type="submit">Next step</Button>
-            </div>
+            <StageFooter
+              module="competition"
+              currentKey="details"
+              eventId={stepperEventId}
+              saving={saving}
+              onNext={handleNext}
+              nextLabel="Next: Branding"
+              backLabel={null}
+            />
           </form>
-        ) : step === 3 ? (
+        )}
+
+        {step === 'branding' && (
+          <form className="space-y-4" onSubmit={handleNextBranding}>
+            <ImageUploadField
+              label="Event banner"
+              hint="Wide image for event headers."
+              variant="banner"
+              currentUrl={banner}
+              onFileSelect={setBannerFile}
+              disabled={saving}
+            />
+
+            {error && <p className="v-error-text">{error}</p>}
+
+            <StageFooter
+              module="competition"
+              currentKey="branding"
+              eventId={stepperEventId}
+              saving={saving}
+              nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
+            />
+          </form>
+        )}
+
+        {step === 'information-form' && (
           <div className="space-y-4">
             {infoFormLoading ? (
               <p className="v-caption">Loading information form...</p>
@@ -251,53 +266,14 @@ export default function CompetitionEventFormPage() {
               />
             )}
 
-            <div className="flex justify-between pt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setStep(2)}
-                disabled={saving}
-              >
-                Back
-              </Button>
-              <Button
-                onClick={() => navigate(`/organizer/competition/events/${eventId}/contestants`)}
-                disabled={saving}
-              >
-                Continue to Contestants
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleNextStep2(e) }}>
-            <ImageUploadField
-              label="Event banner"
-              hint="Wide image for event headers."
-              variant="banner"
-              currentUrl={banner}
-              onFileSelect={setBannerFile}
-              disabled={saving}
+            <StageFooter
+              module="competition"
+              currentKey="information-form"
+              eventId={eventId}
+              saving={saving}
+              nextLabel="Continue to Contestants"
             />
-
-            {error && <p className="v-error-text">{error}</p>}
-
-            <div className="flex justify-between pt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setStep(1)}
-                disabled={saving}
-              >
-                Back
-              </Button>
-              <Button
-                type="submit"
-                disabled={saving}
-              >
-                {saving ? 'Saving...' : 'Next step'}
-              </Button>
-            </div>
-          </form>
+          </div>
         )}
       </Card>
     </div>

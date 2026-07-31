@@ -244,6 +244,339 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--v-primary) 30%, transparent);
   }
 
+  .v-input-error,
+  .v-input.v-input-error {
+    border-color: var(--v-danger);
+  }
+  .v-input-error:focus,
+  .v-input.v-input-error:focus {
+    border-color: var(--v-danger);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--v-danger) 30%, transparent);
+  }
+
+  /* DateTime input wrapper — keeps calendar icon aligned with text inputs */
+  .v-datetime {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid var(--v-border-strong);
+    background-color: var(--v-surface);
+    padding: 0;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    cursor: pointer;
+  }
+  .v-datetime:hover:not(.v-datetime-disabled) {
+    border-color: var(--v-primary);
+  }
+  .v-datetime:focus-within {
+    outline: none;
+    border-color: var(--v-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--v-primary) 30%, transparent);
+  }
+  .v-datetime-error,
+  .v-datetime.v-datetime-error {
+    border-color: var(--v-danger);
+  }
+  .v-datetime-error:focus-within,
+  .v-datetime.v-datetime-error:focus-within {
+    border-color: var(--v-danger);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--v-danger) 30%, transparent);
+  }
+  .v-datetime-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .v-datetime-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    padding: 0.625rem 0.875rem;
+    padding-right: 4.5rem;
+    font-size: 0.875rem;
+    color: var(--v-text);
+    cursor: pointer;
+    outline: none;
+  }
+  .v-datetime-input::-webkit-calendar-picker-indicator {
+    opacity: 0;
+    position: absolute;
+    right: 0;
+    width: 2rem;
+    height: 100%;
+    cursor: pointer;
+  }
+  .v-datetime-input::-webkit-datetime-edit {
+    color: var(--v-text);
+  }
+  .v-datetime-icon {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 1rem;
+    width: 1rem;
+    color: var(--v-text-subtle);
+    pointer-events: none;
+  }
+  .v-datetime-clear {
+    position: absolute;
+    right: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.25rem;
+    width: 1.25rem;
+    border-radius: 9999px;
+    color: var(--v-text-subtle);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+  .v-datetime-clear:hover {
+    color: var(--v-text);
+    background-color: var(--v-surface-elevated);
+  }
+
+  /* Custom CalendarCard — replaces native datetime-local */
+  .v-cal {
+    position: relative;
+    width: 100%;
+  }
+  .v-cal-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid var(--v-border-strong);
+    background-color: var(--v-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    cursor: pointer;
+  }
+  .v-cal-input-wrap:hover:not(.v-cal-disabled *) {
+    border-color: var(--v-primary);
+  }
+  .v-cal-open .v-cal-input-wrap,
+  .v-cal-input-wrap:focus-within {
+    border-color: var(--v-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--v-primary) 30%, transparent);
+  }
+  .v-cal-error .v-cal-input-wrap {
+    border-color: var(--v-danger);
+  }
+  .v-cal-error .v-cal-input-wrap:focus-within {
+    border-color: var(--v-danger);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--v-danger) 30%, transparent);
+  }
+  .v-cal-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .v-cal-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    padding: 0.625rem 0.875rem;
+    padding-right: 4.5rem;
+    font-size: 0.875rem;
+    color: var(--v-text);
+    cursor: pointer;
+    outline: none;
+  }
+  .v-cal-input::placeholder {
+    color: var(--v-text-subtle);
+  }
+  .v-cal-icon {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 1rem;
+    width: 1rem;
+    color: var(--v-text-subtle);
+    pointer-events: none;
+  }
+  .v-cal-clear {
+    position: absolute;
+    right: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.25rem;
+    width: 1.25rem;
+    border-radius: 9999px;
+    color: var(--v-text-subtle);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+  .v-cal-clear:hover {
+    color: var(--v-text);
+    background-color: var(--v-surface-elevated);
+  }
+
+  .v-cal-pop {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    left: 0;
+    z-index: 30;
+    width: 18rem;
+    border-radius: 0.625rem;
+    border: 1px solid var(--v-border);
+    background-color: var(--v-surface);
+    box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.12), 0 4px 10px -3px rgb(0 0 0 / 0.08);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .v-cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .v-cal-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--v-text);
+  }
+  .v-cal-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.75rem;
+    width: 1.75rem;
+    border-radius: 0.375rem;
+    color: var(--v-text-muted);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+  .v-cal-nav:hover {
+    background-color: var(--v-surface-elevated);
+    color: var(--v-text);
+  }
+  .v-cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 2px;
+    font-size: 0.7rem;
+    color: var(--v-text-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .v-cal-weekday {
+    text-align: center;
+    padding: 0.25rem 0;
+  }
+  .v-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 2px;
+  }
+  .v-cal-cell {
+    height: 2rem;
+    border-radius: 0.375rem;
+    background: transparent;
+    border: 0;
+    font-size: 0.8125rem;
+    color: var(--v-text);
+    cursor: pointer;
+    transition: background-color 0.1s;
+  }
+  .v-cal-cell:hover:not(:disabled) {
+    background-color: var(--v-surface-elevated);
+  }
+  .v-cal-cell-out {
+    color: var(--v-text-subtle);
+    opacity: 0.55;
+  }
+  .v-cal-cell-today:not(.v-cal-cell-selected) {
+    border: 1px solid var(--v-primary);
+  }
+  .v-cal-cell-selected {
+    background-color: var(--v-primary);
+    color: white;
+  }
+  .v-cal-cell-selected:hover {
+    background-color: var(--v-primary-hover);
+  }
+  .v-cal-cell-disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .v-cal-time {
+    border-top: 1px solid var(--v-border);
+    padding-top: 0.5rem;
+    margin-top: 0.25rem;
+  }
+  .v-cal-time-label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--v-text-subtle);
+    font-size: 0.75rem;
+    margin-bottom: 0.35rem;
+  }
+  .v-cal-time-fields {
+    display: flex;
+    align-items: end;
+    gap: 0.4rem;
+  }
+  .v-cal-time-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  .v-cal-time-cap {
+    font-size: 0.65rem;
+    color: var(--v-text-subtle);
+    text-transform: uppercase;
+  }
+  .v-cal-time-input {
+    width: 3.25rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--v-border-strong);
+    background: var(--v-surface);
+    color: var(--v-text);
+    font-size: 0.875rem;
+    text-align: center;
+  }
+  .v-cal-time-input:focus {
+    outline: none;
+    border-color: var(--v-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--v-primary) 30%, transparent);
+  }
+  .v-cal-time-sep {
+    font-size: 1rem;
+    color: var(--v-text-subtle);
+    padding-bottom: 0.4rem;
+  }
+  .v-cal-today-btn {
+    margin-left: auto;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--v-border-strong);
+    background: var(--v-surface-elevated);
+    color: var(--v-text-muted);
+    cursor: pointer;
+  }
+  .v-cal-today-btn:hover {
+    color: var(--v-text);
+    border-color: var(--v-primary);
+  }
+
   /* Table styles */
   .v-table-wrap {
     overflow-x: auto;
