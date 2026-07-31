@@ -130,6 +130,17 @@ export default function CalendarCard({
   const [minute, setMinute] = useState(() => initialSelected ? initialSelected.getMinutes() : defaultMinute)
 
   useEffect(() => {
+    if (!selected) return
+    setHour(selected.getHours())
+    setMinute(selected.getMinutes())
+    setViewMonth((prev) =>
+      prev.getFullYear() === selected.getFullYear() && prev.getMonth() === selected.getMonth()
+        ? prev
+        : startOfMonth(selected),
+    )
+  }, [selected])
+
+  useEffect(() => {
     if (!open) return undefined
     const handleClick = (e) => {
       if (!wrapperRef.current) return

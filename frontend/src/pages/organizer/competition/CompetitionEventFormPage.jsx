@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { pageantService } from '@/services/pageant.service'
 import { pageantEventSchemaStep1, isoToLocalInput, localInputToIso } from '@/schemas/event.schemas'
@@ -35,6 +35,7 @@ export default function CompetitionEventFormPage() {
 
   const {
     register,
+    control,
     getValues,
     handleSubmit: rhfHandleSubmit,
     formState: { errors },
@@ -191,13 +192,22 @@ export default function CompetitionEventFormPage() {
                 <label className={LABEL_CLASS} htmlFor="startDate">
                   Start Date <span className="text-v-danger">*</span>
                 </label>
-                <CalendarCard
-                  id="startDate"
-                  required
-                  defaultHour={0}
-                  defaultMinute={0}
-                  hasError={Boolean(errors.startDate)}
-                  {...register('startDate')}
+                <Controller
+                  control={control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <CalendarCard
+                      id="startDate"
+                      required
+                      defaultHour={0}
+                      defaultMinute={0}
+                      hasError={Boolean(errors.startDate)}
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                    />
+                  )}
                 />
                 {errors.startDate && <p className="v-error-text">{errors.startDate.message}</p>}
               </div>
@@ -206,14 +216,23 @@ export default function CompetitionEventFormPage() {
                 <label className={LABEL_CLASS} htmlFor="endDate">
                   End Date <span className="text-v-danger">*</span>
                 </label>
-                <CalendarCard
-                  id="endDate"
-                  required
-                  defaultHour={23}
-                  defaultMinute={59}
-                  hasError={Boolean(errors.endDate)}
-                  min={watch('startDate') || undefined}
-                  {...register('endDate')}
+                <Controller
+                  control={control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <CalendarCard
+                      id="endDate"
+                      required
+                      defaultHour={23}
+                      defaultMinute={59}
+                      hasError={Boolean(errors.endDate)}
+                      min={watch('startDate') || undefined}
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                    />
+                  )}
                 />
                 {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
               </div>
