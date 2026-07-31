@@ -321,6 +321,7 @@ export default function ElectionEventFormPage() {
               currentKey="branding"
               eventId={stepperEventId}
               saving={saving}
+              onNext={handleNextBranding}
               nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
             />
           </form>

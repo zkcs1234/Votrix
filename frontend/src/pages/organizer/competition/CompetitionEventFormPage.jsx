@@ -268,6 +268,7 @@ export default function CompetitionEventFormPage() {
               currentKey="branding"
               eventId={stepperEventId}
               saving={saving}
+              onNext={handleNextBranding}
               nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
             />
           </form>

@@ -36,7 +36,7 @@ export default function StageFooter({
         )}
 
         {nextHref ? (
-          next.path === null ? null : onNext ? (
+          onNext ? (
             <Button type="button" onClick={onNext} disabled={saving}>
               {saving ? 'Saving...' : nextLabel ?? `Next: ${next.label}`}
               <ArrowRight className="h-4 w-4" strokeWidth={1.5} />

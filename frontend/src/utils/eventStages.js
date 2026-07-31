@@ -42,10 +42,14 @@ export const MODULE_BASE_PATH = {
 export function stagePath(module, stageKey, eventId) {
   const base = MODULE_BASE_PATH[module]
   if (!base) return null
-  const stage = (EVENT_STAGES[module] ?? []).find((s) => s.key === stageKey)
+  const stages = EVENT_STAGES[module] ?? []
+  const stage = stages.find((s) => s.key === stageKey)
   if (!stage) return null
   if (stage.path === null) return null
-  if (eventId === 'new') return `${base}/new`
+  if (eventId === 'new') {
+    const persisted = stages.find((s) => s.path !== null && s.path !== 'edit')
+    return `${base}/new/${persisted?.path ?? stage.path}`
+  }
   return `${base}/${eventId}/${stage.path}`
 }
 
