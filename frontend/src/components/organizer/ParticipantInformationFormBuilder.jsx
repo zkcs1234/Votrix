@@ -22,12 +22,15 @@ export default function ParticipantInformationFormBuilder({
   service,
   eventId,
 }) {
-  const [enabled, setEnabled] = useState(false)
+const [enabled, setEnabled] = useState(false)
   const [fields, setFields] = useState([])
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [error, setError] = useState(null)
+
+  // Track whether initial load has completed so we don't mark dirty on first render
+  const [initialized, setInitialized] = useState(false)
 
   useEffect(() => {
     if (initialSchema) {
@@ -38,12 +41,16 @@ export default function ParticipantInformationFormBuilder({
       }))
       setFields(loaded)
       fieldIdCounter = loaded.length
+      setInitialized(true)
     }
   }, [initialSchema])
 
+  // Only mark dirty after initial load is complete AND user actually changes something
   useEffect(() => {
-    setDirty(true)
-  }, [enabled, fields])
+    if (initialized) {
+      setDirty(true)
+    }
+  }, [enabled, fields, initialized])
 
   function addField() {
     setFields((prev) => [...prev, { ...DEFAULT_FIELD, id: generateFieldId() }])

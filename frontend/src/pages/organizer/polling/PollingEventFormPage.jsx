@@ -97,9 +97,9 @@ export default function PollingEventFormPage() {
   const loadInfoFormSchema = useCallback(async () => {
     if (isNew) return
     setInfoFormLoading(true)
-    try {
+try {
       const { data } = await pollingService.getInformationForm(eventId)
-      const schema = data.schema || { enabled: false, fields: [] }
+      const schema = data.informationFormSchema || data.schema || { enabled: false, fields: [] }
       setInfoFormSchema(schema)
       if (schema.enabled && (schema.fields || []).length > 0) {
         markComplete('information-form')
@@ -472,11 +472,10 @@ export default function PollingEventFormPage() {
             {infoFormLoading ? (
               <p className="v-caption">Loading information form...</p>
             ) : (
-              <ParticipantInformationFormBuilder
+<ParticipantInformationFormBuilder
                 initialSchema={infoFormSchema}
                 service={pollingService}
                 eventId={eventId}
-                saving={saving}
                 onSave={(schema) => {
                   setInfoFormSchema(schema)
                 }}

@@ -1,10 +1,31 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import Button from '@/components/ui/Button'
 import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
+
+function downloadCsv(filename, headers, rows) {
+  const csvContent = [
+    headers.join(','),
+    ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+  ].join('\n')
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadCsvTemplate() {
+  const headers = ['email']
+  const exampleRows = [['respondent@example.com']]
+  downloadCsv('respondent-import-template.csv', headers, exampleRows)
+}
 
 function CsvPreviewModal({ data, onClose, onRegister, registering }) {
   return (
@@ -66,7 +87,8 @@ export default function PollingRespondentsPage() {
   const [registering, setRegistering] = useState(false)
   const [sendingAll, setSendingAll] = useState(false)
   const [sendingId, setSendingId] = useState(null)
-  const [search, setSearch] = useState('')
+const [search, setSearch] = useState('')
+  const fileInputRef = useRef(null)
 
   const { success, error: showError } = useToast()
   const showLoader = useDelayedLoading(loading, 300)
@@ -105,7 +127,7 @@ export default function PollingRespondentsPage() {
     }
   }
 
-  const handleCsvPreview = async (e) => {
+const handleCsvPreview = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     setError(null)
@@ -118,7 +140,9 @@ export default function PollingRespondentsPage() {
       setError(msg)
       showError(msg)
     }
-    e.target.value = ''
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
 
   const handleCsvRegister = async () => {
@@ -218,17 +242,42 @@ export default function PollingRespondentsPage() {
         />
       )}
 
-      <div className="grid gap-6">
+<div className="grid gap-6">
         <div className="v-card-sm">
           <h3 className="v-label">CSV Upload</h3>
           <p className="v-helper-text mb-3">
             Upload a CSV with email column. Passwords are auto-generated.
           </p>
-          <input type="file" accept=".csv" className="v-caption" onChange={handleCsvPreview} />
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              className="v-caption"
+              onChange={handleCsvPreview}
+            />
+            <button
+              type="button"
+              onClick={downloadCsvTemplate}
+              className="text-sm text-v-primary hover:text-v-primary-hover underline"
+            >
+              Download CSV template
+            </button>
+          </div>
           {importResult && (
-            <p className="v-caption mt-2 text-v-success">
-              Registered {importResult.succeeded} of {importResult.total}.
-            </p>
+            <div className="mt-2 space-y-1">
+              <p className="v-caption text-v-success">
+                Registered {importResult.succeeded} of {importResult.total}.
+              </p>
+              {importResult.skipped > 0 && (
+                <p className="v-caption text-v-warning">
+                  {importResult.skipped} already enrolled, skipped.
+                </p>
+              )}
+              {importResult.failed > 0 && (
+                <p className="v-caption text-v-danger">{importResult.failed} failed.</p>
+              )}
+            </div>
           )}
         </div>
 

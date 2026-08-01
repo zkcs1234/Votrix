@@ -299,10 +299,20 @@ export default function ElectionVotersPage() {
             </button>
           </div>
 
-          {importResult && (
-            <p className="v-caption mt-2 text-v-success">
-              Registered {importResult.succeeded} of {importResult.total} voters. Invitation emails not sent.
-            </p>
+{importResult && (
+            <div className="mt-2 space-y-1">
+              <p className="v-caption text-v-success">
+                Registered {importResult.succeeded} of {importResult.total} voters. Invitation emails not sent.
+              </p>
+              {importResult.skipped > 0 && (
+                <p className="v-caption text-v-warning">
+                  {importResult.skipped} already enrolled, skipped.
+                </p>
+              )}
+              {importResult.failed > 0 && (
+                <p className="v-caption text-v-danger">{importResult.failed} failed.</p>
+              )}
+            </div>
           )}
         </div>
 

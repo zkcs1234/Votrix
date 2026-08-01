@@ -108,9 +108,9 @@ setBanner(ev.banner)
   const loadInfoFormSchema = useCallback(async () => {
     if (isNew) return
     setInfoFormLoading(true)
-    try {
+try {
       const { data } = await electionService.getInformationForm(eventId)
-      const schema = data.schema || { enabled: false, fields: [] }
+      const schema = data.informationFormSchema || data.schema || { enabled: false, fields: [] }
       setInfoFormSchema(schema)
       if (schema.enabled && (schema.fields || []).length > 0) {
         markComplete('information-form')
@@ -346,11 +346,10 @@ setBanner(ev.banner)
             {infoFormLoading ? (
               <p className="v-caption">Loading information form...</p>
             ) : (
-              <ParticipantInformationFormBuilder
+<ParticipantInformationFormBuilder
                 initialSchema={infoFormSchema}
                 service={electionService}
                 eventId={eventId}
-                saving={saving}
                 onSave={(schema) => {
                   setInfoFormSchema(schema)
                 }}

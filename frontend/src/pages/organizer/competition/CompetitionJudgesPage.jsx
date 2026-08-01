@@ -1,10 +1,31 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import Button from '@/components/ui/Button'
 import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
+
+function downloadCsv(filename, headers, rows) {
+  const csvContent = [
+    headers.join(','),
+    ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+  ].join('\n')
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadCsvTemplate() {
+  const headers = ['email']
+  const exampleRows = [['judge@example.com']]
+  downloadCsv('judge-import-template.csv', headers, exampleRows)
+}
 
 function CsvPreviewModal({ data, onClose, onRegister, registering }) {
   return (
@@ -63,10 +84,11 @@ export default function CompetitionJudgesPage() {
   const [registering, setRegistering] = useState(false)
   const [sendingAll, setSendingAll] = useState(false)
   const [sendingId, setSendingId] = useState(null)
-  const [csvPreview, setCsvPreview] = useState(null)
+const [csvPreview, setCsvPreview] = useState(null)
   const [importResult, setImportResult] = useState(null)
   const [search, setSearch] = useState('')
   const [error, setError] = useState(null)
+  const fileInputRef = useRef(null)
 
   const { success, error: showError } = useToast()
   const showLoader = useDelayedLoading(loading, 300)
@@ -85,7 +107,7 @@ export default function CompetitionJudgesPage() {
 
   useEffect(() => { load() }, [load])
 
-  const pendingCount = judges.filter((j) => j.invitationSent === false).length
+const pendingCount = judges.filter((j) => !j.invitationSent).length
 
   const handleRegister = async (e) => {
     e.preventDefault()
@@ -105,7 +127,7 @@ export default function CompetitionJudgesPage() {
     }
   }
 
-  const handleCsvPreview = async (e) => {
+const handleCsvPreview = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     setError(null)
@@ -118,7 +140,9 @@ export default function CompetitionJudgesPage() {
       setError(msg)
       showError(msg)
     }
-    e.target.value = ''
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
 
   const handleCsvRegister = async () => {
@@ -166,8 +190,8 @@ export default function CompetitionJudgesPage() {
       ) : null
     }
 
-    // Row-level action
-    if (participant.invitationSent === false) {
+// Row-level action
+    if (!participant.invitationSent) {
       const isSending = sendingId === participant.judgeId
       return (
         <Button
@@ -216,17 +240,42 @@ export default function CompetitionJudgesPage() {
         />
       )}
 
-      <div className="grid gap-6">
+<div className="grid gap-6">
         <div className="v-card-sm">
           <h3 className="v-label">CSV Upload</h3>
           <p className="v-helper-text mb-3">
             Upload a CSV with email column. Passwords are auto-generated.
           </p>
-          <input type="file" accept=".csv" className="v-caption" onChange={handleCsvPreview} />
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              className="v-caption"
+              onChange={handleCsvPreview}
+            />
+            <button
+              type="button"
+              onClick={downloadCsvTemplate}
+              className="text-sm text-v-primary hover:text-v-primary-hover underline"
+            >
+              Download CSV template
+            </button>
+          </div>
           {importResult && (
-            <p className="v-caption mt-2 text-v-success">
-              Registered {importResult.succeeded} of {importResult.total}.
-            </p>
+            <div className="mt-2 space-y-1">
+              <p className="v-caption text-v-success">
+                Registered {importResult.succeeded} of {importResult.total}.
+              </p>
+              {importResult.skipped > 0 && (
+                <p className="v-caption text-v-warning">
+                  {importResult.skipped} already enrolled, skipped.
+                </p>
+              )}
+              {importResult.failed > 0 && (
+                <p className="v-caption text-v-danger">{importResult.failed} failed.</p>
+              )}
+            </div>
           )}
         </div>
 

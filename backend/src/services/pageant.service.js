@@ -763,7 +763,7 @@ export async function listJudges(eventId, organizerId) {
       lastName: row.last_name,
       hasScored: row.has_scored,
       metadata: row.metadata ?? {},
-      invitationSent: invitationMap[row.users?.id] ?? null,
+invitationSent: invitationMap[row.users?.id] ?? false,
     })),
     informationFormSchema,
   }
