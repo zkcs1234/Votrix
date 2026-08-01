@@ -1,8 +1,9 @@
-import { useParams } from 'react-router-dom'
+import { useParams, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, CalendarDays, Users, BarChart3, MapPin,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
+import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
 
 const navItems = [
   { label: 'Dashboard', path: '/organizer/election', icon: LayoutDashboard },
@@ -54,6 +55,10 @@ export default function ElectionLayout() {
       navItems={items}
       eventId={eventId}
       footerLink={{ to: '/organizer', label: '← Organizer home' }}
-    />
+    >
+      <ModuleStageLayout module="election">
+        <Outlet />
+      </ModuleStageLayout>
+    </AppShell>
   )
 }

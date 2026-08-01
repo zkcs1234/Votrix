@@ -57,6 +57,26 @@ export function getStageIndex(module, stageKey) {
   return (EVENT_STAGES[module] ?? []).findIndex((s) => s.key === stageKey)
 }
 
+/**
+ * Derive the current stage key from a URL pathname.
+ * Matches the `path` property of each stage definition.
+ * Returns null if no stage matches.
+ */
+export function stageKeyFromPath(module, pathname) {
+  const stages = EVENT_STAGES[module] ?? []
+  for (const stage of stages) {
+    if (!stage.path) continue
+    if (pathname.includes(`/${stage.path}`)) {
+      return stage.key
+    }
+  }
+  // Fallback to checking if this is a "new" route
+  if (pathname.endsWith('/new')) {
+    return 'details'
+  }
+  return null
+}
+
 export function getNextStage(module, stageKey) {
   const stages = EVENT_STAGES[module] ?? []
   const idx = stages.findIndex((s) => s.key === stageKey)

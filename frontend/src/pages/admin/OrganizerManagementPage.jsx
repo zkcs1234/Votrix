@@ -208,7 +208,7 @@ export default function OrganizerManagementPage() {
         </div>
         <Button onClick={() => setIsModalOpen(true)}>
           <UserPlus className="h-4 w-4" strokeWidth={2} />
-          Create organizer
+          Add organizer
         </Button>
       </div>
 

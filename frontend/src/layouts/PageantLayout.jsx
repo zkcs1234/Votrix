@@ -1,8 +1,9 @@
-import { useParams } from 'react-router-dom'
+import { useParams, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, CalendarDays, Users, Star, ListChecks, Award, Play,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
+import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
 
 const navItems = [
   { label: 'Competition Scoring Dashboard', path: '/organizer/competition', icon: LayoutDashboard },
@@ -55,6 +56,10 @@ export default function PageantLayout() {
       navItems={navItems}
       eventId={eventId}
       footerLink={{ to: '/organizer', label: '← Organizer home' }}
-    />
+    >
+      <ModuleStageLayout module="competition">
+        <Outlet />
+      </ModuleStageLayout>
+    </AppShell>
   )
 }

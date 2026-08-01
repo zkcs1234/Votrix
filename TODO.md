@@ -1,75 +1,33 @@
-# TODO: Participant Information Form Feature
+# Implementation TODO
 
-## Status Overview
+## Issue 1 — Fix Participant Information Form Save (DONE ✅)
 
-| Phase     | Description                                 | Status      |
-| --------- | ------------------------------------------- | ----------- |
-| Phase 1   | Database Migration (Migration 030)          | ✅ Complete |
-| Phase 2   | Backend API (controllers, routes, services) | ✅ Complete |
-| Phase 2.5 | Frontend API service methods                | ✅ Complete |
-| Phase 3   | Shared Frontend Form Builder Component      | ✅ Complete |
-| Phase 4   | Election Module integration                 | ✅ Complete |
-| Phase 5   | Competition Module integration              | ✅ Complete |
-| Phase 6   | Polling Module integration                  | ✅ Complete |
-| Phase 7   | Verification & Testing                      | ⏳ Pending  |
+- [x] `frontend/src/components/organizer/ParticipantInformationFormBuilder.jsx` — add internal `saving` state; make Save button always clickable (only disabled while saving); reorder hooks to fix `useEffect` dependency issue.
 
----
+## Issue 2 — Stage Footer + Stepper on All Module Pages & Persistent Checks (DONE ✅)
 
-## Completed Work
+- [x] Create `frontend/src/hooks/useEventProgress.js` — new hook for per-event completion tracking (localStorage).
+- [x] Update `frontend/src/utils/eventStages.js` — add `stageKeyFromPath(module, pathname)` helper.
+- [x] Update `frontend/src/components/ui/EventStepper.jsx` — support `completedKeys` prop.
+- [x] Create `frontend/src/components/ui/ModuleStageLayout.jsx` — wrapper component.
+- [x] Update `frontend/src/layouts/ElectionLayout.jsx` — render stepper + footer for non-form pages.
+- [x] Update `frontend/src/layouts/PageantLayout.jsx` — render stepper + footer for non-form pages.
+- [x] Update `frontend/src/layouts/PollingLayout.jsx` — render stepper + footer for non-form pages.
+- [x] Event form pages — seed branding/information-form completion from loaded event data.
 
-### Phase 1: Database Migration ✅
+## Issue 3 — Admin "Create organizer" → "Add organizer" (DONE ✅)
 
-- `migrations/030_event_information_form_schema.sql` — adds `events.information_form_schema JSONB` column
-- `migrations/030_down_event_information_form_schema.sql` — rollback
+- [x] `frontend/src/pages/admin/AdminDashboardPage.jsx` — text change.
+- [x] `frontend/src/pages/admin/OrganizerManagementPage.jsx` — text change.
+- [x] `frontend/src/components/admin/CreateOrganizerModal.jsx` — heading text change.
 
-### Phase 2: Backend API ✅
+## Issue 4 — Organizer Profile Edit via Profile Card (DONE ✅)
 
-- `event.service.js` — `getEventInformationForm()` and `setEventInformationForm()` with validation
-- **Election Controller**: `getInformationForm`, `updateInformationForm`
-- **Pageant/Competition Controller**: `getInformationForm`, `updateInformationForm`
-- **Polling Controller**: `getInformationForm`, `updateInformationForm`
-- **Routes**: All 3 modules have `GET/PATCH /events/:eventId/information-form`
+- [x] `frontend/src/utils/organizerProfile.js` — new shared schema + options file.
+- [x] `frontend/src/components/organizer/ProfileCard.jsx` — inline edit mode (no navigation to onboarding).
 
-### Phase 2.5: Frontend API Services ✅
+## Follow-up
 
-- `election.service.js` — `getInformationForm(eventId)`, `updateInformationForm(eventId, schema)`
-- `pageant.service.js` — `getInformationForm(eventId)`, `updateInformationForm(eventId, schema)`
-- `polling.service.js` — `getInformationForm(eventId)`, `updateInformationForm(eventId, schema)`
-
-### Phase 3: Shared Frontend Component — Form Builder ✅
-
-- `frontend/src/components/organizer/ParticipantInformationFormBuilder.jsx` — Complete component with:
-  - Add field button (text, dropdown, number)
-  - Field definition rows with label, type selector, required toggle
-  - Dynamic options list for dropdown type
-  - Remove field button per row
-  - Preview section showing how form looks
-  - Toggle to enable/disable the form
-
-### Phase 4: Election Module ✅
-
-- `ElectionEventFormPage.jsx` — Added Information Form step (Step 3)
-- Route: `/organizer/election/events/:eventId/form`
-- Navigation from branding step → information form → positions
-
-### Phase 5: Competition Module ✅
-
-- `CompetitionEventFormPage.jsx` — Added Information Form step (Step 3)
-- Route: `/organizer/competition/events/:eventId/form`
-- Navigation from branding step → information form → contestants
-
-### Phase 6: Polling Module ✅
-
-- `PollingEventFormPage.jsx` — Added Information Form step (Step 4)
-- Route: `/organizer/polling/events/:eventId/form`
-- Navigation from settings step → information form → builder
-
----
-
-## Remaining Work
-
-### Phase 7: Verification
-
-- [ ] Test full flow across all 3 modules
-- [ ] Verify form data is saved/retrieved via API
-- [ ] Test voter/respondent side - ensure information form is displayed when accessing event
+- [ ] Run frontend lint (`cd frontend && npm run lint`).
+- [ ] Run frontend build (`cd frontend && npm run build`).
+- [ ] Manual QA of all 4 issues.

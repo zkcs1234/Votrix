@@ -10,6 +10,7 @@ import Card from '@/components/ui/Card'
 import EventStepper from '@/components/ui/EventStepper'
 import StageFooter from '@/components/ui/StageFooter'
 import ParticipantInformationFormBuilder from '@/components/organizer/ParticipantInformationFormBuilder'
+import useEventProgress from '@/hooks/useEventProgress'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
@@ -51,6 +52,8 @@ export default function ElectionEventFormPage() {
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
 
+  const { completedKeys, markComplete } = useEventProgress('election', eventId)
+
   const {
     register,
     control,
@@ -91,28 +94,34 @@ export default function ElectionEventFormPage() {
           startDate: isoToLocalInput(ev.startDate),
           endDate: isoToLocalInput(ev.endDate),
         })
-        setBanner(ev.banner)
+setBanner(ev.banner)
+        if (ev.banner) markComplete('branding')
+        markComplete('details')
         setValue('resultsVisibility', ev.resultsVisibility ?? ev.results_visibility ?? 'public')
       })
       .catch((err) => {
         setError(err.response?.data?.message || 'Failed to load event')
       })
       .finally(() => setLoading(false))
-  }, [eventId, isNew, reset, setValue])
+  }, [eventId, isNew, reset, setValue, markComplete])
 
   const loadInfoFormSchema = useCallback(async () => {
     if (isNew) return
     setInfoFormLoading(true)
     try {
       const { data } = await electionService.getInformationForm(eventId)
-      setInfoFormSchema(data.schema || { enabled: false, fields: [] })
+      const schema = data.schema || { enabled: false, fields: [] }
+      setInfoFormSchema(schema)
+      if (schema.enabled && (schema.fields || []).length > 0) {
+        markComplete('information-form')
+      }
     } catch (err) {
       console.error('Failed to load information form:', err)
       setInfoFormSchema({ enabled: false, fields: [] })
     } finally {
       setInfoFormLoading(false)
     }
-  }, [eventId, isNew])
+  }, [eventId, isNew, markComplete])
 
   useEffect(() => {
     loadInfoFormSchema()
@@ -180,7 +189,12 @@ export default function ElectionEventFormPage() {
         </p>
       </header>
 
-      <EventStepper module="election" currentKey={step} eventId={stepperEventId} />
+      <EventStepper
+        module="election"
+        currentKey={step}
+        eventId={stepperEventId}
+        completedKeys={completedKeys}
+      />
 
       <Card padding="md">
         {step === 'details' && (

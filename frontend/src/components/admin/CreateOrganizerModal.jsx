@@ -77,7 +77,7 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess }) {
 
         <div className="flex items-center gap-2">
           <UserPlus className="h-5 w-5 text-v-text-muted" strokeWidth={1.5} />
-          <h2 className="v-page-title">Create Organizer</h2>
+          <h2 className="v-page-title">Add Organizer</h2>
         </div>
         <p className="v-caption mt-1">
           New organizer accounts start in pending review, and the organizer must change this password on first login.

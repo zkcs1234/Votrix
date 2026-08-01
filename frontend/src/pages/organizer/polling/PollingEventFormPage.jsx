@@ -15,6 +15,7 @@ import Card from '@/components/ui/Card'
 import EventStepper from '@/components/ui/EventStepper'
 import StageFooter from '@/components/ui/StageFooter'
 import ParticipantInformationFormBuilder from '@/components/organizer/ParticipantInformationFormBuilder'
+import useEventProgress from '@/hooks/useEventProgress'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
@@ -38,6 +39,8 @@ export default function PollingEventFormPage() {
   const [error, setError] = useState(null)
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
+
+  const { completedKeys, markComplete } = useEventProgress('polling', eventId)
 
   const {
     register,
@@ -82,26 +85,32 @@ export default function PollingEventFormPage() {
           pollExpiresAt: isoToLocalInput(e.pollExpiresAt),
         })
         setBanner(e.banner)
+        if (e.banner) markComplete('branding')
+        markComplete('details')
       })
       .catch((err) => {
         setError(err.response?.data?.message || 'Failed to load poll settings')
       })
       .finally(() => setLoading(false))
-  }, [eventId, isNew, reset])
+  }, [eventId, isNew, reset, markComplete])
 
   const loadInfoFormSchema = useCallback(async () => {
     if (isNew) return
     setInfoFormLoading(true)
     try {
       const { data } = await pollingService.getInformationForm(eventId)
-      setInfoFormSchema(data.schema || { enabled: false, fields: [] })
+      const schema = data.schema || { enabled: false, fields: [] }
+      setInfoFormSchema(schema)
+      if (schema.enabled && (schema.fields || []).length > 0) {
+        markComplete('information-form')
+      }
     } catch (err) {
       console.error('Failed to load information form:', err)
       setInfoFormSchema({ enabled: false, fields: [] })
     } finally {
       setInfoFormLoading(false)
     }
-  }, [eventId, isNew])
+  }, [eventId, isNew, markComplete])
 
   useEffect(() => {
     loadInfoFormSchema()
@@ -218,7 +227,12 @@ export default function PollingEventFormPage() {
         </p>
       </header>
 
-      <EventStepper module="polling" currentKey={step} eventId={stepperEventId} />
+<EventStepper
+        module="polling"
+        currentKey={step}
+        eventId={stepperEventId}
+        completedKeys={completedKeys}
+      />
 
       <Card padding="md">
         {step === 'details' && (

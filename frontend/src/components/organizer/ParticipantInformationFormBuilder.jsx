@@ -19,13 +19,13 @@ function generateFieldId() {
 export default function ParticipantInformationFormBuilder({
   initialSchema,
   onSave,
-  saving = false,
   service,
   eventId,
 }) {
   const [enabled, setEnabled] = useState(false)
   const [fields, setFields] = useState([])
   const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [error, setError] = useState(null)
 
@@ -90,47 +90,50 @@ export default function ParticipantInformationFormBuilder({
 
   async function handleSave() {
     setError(null)
+    setSaving(true)
 
-    if (enabled) {
-      if (fields.length === 0) {
-        setError('Add at least one field or disable the form')
-        return
-      }
-
-      for (const field of fields) {
-        if (!field.label.trim()) {
-          setError('Every field must have a label')
+    try {
+      if (enabled) {
+        if (fields.length === 0) {
+          setError('Add at least one field or disable the form')
           return
         }
-        if (field.type === 'dropdown') {
-          const validOptions = (field.options || []).filter((o) => o.trim())
-          if (validOptions.length < 1) {
-            setError(`Dropdown "${field.label}" must have at least one option`)
+
+        for (const field of fields) {
+          if (!field.label.trim()) {
+            setError('Every field must have a label')
             return
+          }
+          if (field.type === 'dropdown') {
+            const validOptions = (field.options || []).filter((o) => o.trim())
+            if (validOptions.length < 1) {
+              setError(`Dropdown "${field.label}" must have at least one option`)
+              return
+            }
           }
         }
       }
-    }
 
-    const schema = {
-      enabled,
-      fields: enabled
-        ? fields.map((f) => ({
-            id: f.id,
-            label: f.label,
-            type: f.type,
-            required: f.required,
-            options: f.type === 'dropdown' ? (f.options || []).filter((o) => o.trim()) : undefined,
-          }))
-        : [],
-    }
+      const schema = {
+        enabled,
+        fields: enabled
+          ? fields.map((f) => ({
+              id: f.id,
+              label: f.label,
+              type: f.type,
+              required: f.required,
+              options: f.type === 'dropdown' ? (f.options || []).filter((o) => o.trim()) : undefined,
+            }))
+          : [],
+      }
 
-    try {
       await service.updateInformationForm(eventId, schema)
       setDirty(false)
       if (onSave) onSave(schema)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save form')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -313,7 +316,7 @@ export default function ParticipantInformationFormBuilder({
       {error && <p className="text-sm text-v-danger">{error}</p>}
 
       <div className="flex justify-end gap-3">
-        <Button onClick={handleSave} disabled={saving || !dirty}>
+        <Button onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : dirty ? 'Save form' : 'Saved'}
         </Button>
       </div>

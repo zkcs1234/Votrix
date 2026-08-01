@@ -132,7 +132,7 @@ export default function AdminDashboardPage() {
         description={`Signed in as ${user?.username ?? 'admin'}`}
         actions={
           <Link to="/admin/organizers">
-            <Button>Create organizer</Button>
+            <Button>Add organizer</Button>
           </Link>
         }
       />
@@ -195,7 +195,7 @@ export default function AdminDashboardPage() {
                 className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
                 <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                Create organizer account
+                Add organizer account
               </Link>
             </li>
             <li>
