@@ -4,6 +4,7 @@ import { pageantService } from '@/services/pageant.service'
 import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
+import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
 import CompetitionScoringForm from '@/components/voter/competition/CompetitionScoringForm'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
 
@@ -133,6 +134,8 @@ export default function JudgeScoringPage() {
       <VoterEventHeader event={sheet.event} eyebrow="Judge scoring">
         <p className="text-sm font-medium text-white/75">One submission only</p>
       </VoterEventHeader>
+
+      <ParticipantInformationGate eventId={eventId} />
 
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-sm">
         <p className="text-v-text-muted">

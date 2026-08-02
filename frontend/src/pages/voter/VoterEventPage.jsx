@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
-import { voterService } from '@/services/voter.service'
 import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ElectionPositionSection from '@/components/voter/election/ElectionPositionSection'
 import Button from '@/components/ui/Button'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
-import ParticipantInformationForm from '@/components/voter/ParticipantInformationForm'
+import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 
 function validateSelections(positions, selections) {
@@ -128,7 +127,6 @@ export default function VoterEventPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
-  const [participantInfo, setParticipantInfo] = useState(null)
 
   useEffect(() => {
     localStorage.setItem(draftKey, JSON.stringify(selections))
@@ -143,20 +141,6 @@ export default function VoterEventPage() {
         if (data.hasVoted) setDone(true)
       })
       .finally(() => setLoading(false))
-  }, [eventId])
-
-  // Fetch participant information
-  useEffect(() => {
-    voterService
-      .getMyEventRole(eventId)
-      .then(({ data }) => {
-        if (data.success) {
-          setParticipantInfo(data)
-        }
-      })
-      .catch(() => {
-        // Not a participant or no metadata - ignore
-      })
   }, [eventId])
 
   const positions = useMemo(() => ballot?.positions ?? [], [ballot])
@@ -266,14 +250,7 @@ export default function VoterEventPage() {
     <div className="mx-auto max-w-2xl space-y-6 pb-28">
       <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
 
-      {/* Participant Information Form - show if participant has metadata fields configured */}
-      {!done && !ballot?.hasVoted && participantInfo && (
-        <ParticipantInformationForm
-          eventId={eventId}
-          initialMetadata={participantInfo.metadata}
-          fields={participantInfo.metadata?._formFields}
-        />
-      )}
+      {!done && !ballot?.hasVoted && <ParticipantInformationGate eventId={eventId} />}
 
       {isReviewing ? (
         <div className="v-card p-6 space-y-6">

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import { validatePollAnswers } from '@/utils/pollValidation'
 import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
+import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
 import PollQuestionField from '@/components/voter/polling/PollQuestionField'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
 
@@ -39,17 +40,17 @@ const [done, setDone] = useState(false)
     }
   }, [draftRestored])
 
-  const loadPoll = () => {
+  const loadPoll = useCallback(() => {
     return pollingService.getPoll(eventId).then(({ data }) => {
       setPoll(data)
       if (!data.canSubmit && data.submissionCount > 0) setDone(true)
       return data
     })
-  }
+  }, [eventId])
 
   useEffect(() => {
     loadPoll().finally(() => setLoading(false))
-  }, [eventId])
+  }, [loadPoll])
 
   useEffect(() => {
     localStorage.setItem(draftKey, JSON.stringify(answers))
@@ -190,6 +191,8 @@ const [done, setDone] = useState(false)
           <p className="text-xs font-medium text-white/70">Your responses are anonymous.</p>
         )}
       </VoterEventHeader>
+
+      <ParticipantInformationGate eventId={eventId} />
 
       {/* Progress bar */}
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3">
