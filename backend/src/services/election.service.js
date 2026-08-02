@@ -7,6 +7,7 @@ import { getOrCreateElectionOrganization, mapOrganization } from './organization
 import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
 import { recordAudit } from '../foundation/audit.js'
+import { syncEventSchedules } from './event-schedule-sync.service.js'
 
 
 function mapPosition(row) {
@@ -165,6 +166,10 @@ export async function createElectionEvent(organizerId, payload) {
 
   if (error) throw new ApiError(500, error.message)
 
+  await syncEventSchedules().catch((err) => {
+    console.error('[election] schedule sync failed after create:', err.message)
+  })
+
   await recordAudit({
     userId: organizerId,
     action: 'election.event.create',
@@ -204,6 +209,10 @@ export async function updateElectionEvent(eventId, organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  await syncEventSchedules().catch((err) => {
+    console.error('[election] schedule sync failed after update:', err.message)
+  })
 
   await recordAudit({
     userId: organizerId,

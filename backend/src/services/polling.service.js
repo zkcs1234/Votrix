@@ -24,6 +24,7 @@ import { findUserByEmail, findUserById, sanitizeUser } from './user.service.js'
 import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './mailer.service.js'
 import { createNotification } from './notification.service.js'
 import { USER_ROLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
+import { syncEventSchedules } from './event-schedule-sync.service.js'
 
 // Phase 7 — Polling question types are now registry-driven. The legacy
 // POLL_QUESTION_TYPES constants and the `multiple_choice` alias are kept in
@@ -550,6 +551,9 @@ export async function createPollEvent(organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+  await syncEventSchedules().catch((err) => {
+    console.error('[polling] schedule sync failed after create:', err.message)
+  })
   return mapPollEvent(data)
 }
 
@@ -576,6 +580,9 @@ export async function updatePollEvent(eventId, organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+  await syncEventSchedules().catch((err) => {
+    console.error('[polling] schedule sync failed after update:', err.message)
+  })
   return mapPollEvent(data)
 }
 

@@ -9,17 +9,25 @@ export function isWithinEventSchedule(event, now = new Date()) {
 }
 
 export function isElectionVotingOpen(event, now = new Date()) {
-  return Boolean(event.voting_enabled) && isWithinEventSchedule(event, now)
+  if (!event.voting_enabled) return false
+  if (event.end_date && new Date(event.end_date) < now) return false
+  if (event.status === 'active') return true
+  return isWithinEventSchedule(event, now)
 }
 
 export function isPollOpen(event, now = new Date()) {
   if (!event.polling_enabled) return false
   if (event.poll_expires_at && new Date(event.poll_expires_at) < now) return false
+  if (event.end_date && new Date(event.end_date) < now) return false
+  if (event.status === 'active') return true
   return isWithinEventSchedule(event, now)
 }
 
 export function isCompetitionScoringOpen(event, now = new Date()) {
-  return Boolean(event.scoring_enabled) && isWithinEventSchedule(event, now)
+  if (!event.scoring_enabled) return false
+  if (event.end_date && new Date(event.end_date) < now) return false
+  if (event.status === 'active') return true
+  return isWithinEventSchedule(event, now)
 }
 
 /**

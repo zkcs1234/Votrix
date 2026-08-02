@@ -25,6 +25,7 @@ import {
 import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
 import { emitToEvent } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
+import { syncEventSchedules } from './event-schedule-sync.service.js'
 
 
 
@@ -189,6 +190,9 @@ export async function createCompetitionEvent(organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+  await syncEventSchedules().catch((err) => {
+    console.error('[competition] schedule sync failed after create:', err.message)
+  })
   return mapEvent(data)
 }
 
@@ -215,6 +219,9 @@ export async function updateCompetitionEvent(eventId, organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+  await syncEventSchedules().catch((err) => {
+    console.error('[competition] schedule sync failed after update:', err.message)
+  })
   return mapEvent(data)
 }
 
