@@ -15,6 +15,7 @@ import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
 import { findUserByEmail, sanitizeUser } from './user.service.js'
 import { sendJudgeInvitationEmail, sendJudgeInvitationEmailRegistered } from './mailer.service.js'
+import { registerParticipant } from './participant.service.js'
 import {
   computeRankings,
   resolveScoreBounds,
@@ -446,20 +447,11 @@ export async function inviteJudge(eventId, organizerId, { email, temporaryPasswo
   const tempPassword = temporaryPassword || generateTemporaryPassword()
   const { user } = await ensureJudgeAccount(email, tempPassword)
 
-  const { error: evError } = await getClient().from(DB_TABLES.EVENT_VOTERS).upsert(
-    {
-      event_id: eventId,
-      voter_id: user.id,
-      is_judge: true,
-      has_scored: false,
-      has_voted: false,
-      first_name: firstName || null,
-      last_name: lastName || null,
-    },
-    { onConflict: 'event_id,voter_id' },
-  )
-
-  if (evError) throw new ApiError(500, evError.message)
+  await registerParticipant(eventId, user.id, {
+    participantType: 'COMPETITION_JUDGE',
+    firstName: firstName || null,
+    lastName: lastName || null,
+  })
 
   const emailResult = await sendJudgeInvitationEmail({
     email: user.email,
@@ -488,20 +480,11 @@ export async function registerJudge(eventId, organizerId, { email, temporaryPass
   const tempPassword = temporaryPassword || generateTemporaryPassword()
   const { user, isNew } = await ensureJudgeAccount(email, tempPassword, resetPasswordForExisting)
 
-  const { error: evError } = await getClient().from(DB_TABLES.EVENT_VOTERS).upsert(
-    {
-      event_id: eventId,
-      voter_id: user.id,
-      is_judge: true,
-      has_scored: false,
-      has_voted: false,
-      first_name: firstName || null,
-      last_name: lastName || null,
-    },
-    { onConflict: 'event_id,voter_id' },
-  )
-
-  if (evError) throw new ApiError(500, evError.message)
+  await registerParticipant(eventId, user.id, {
+    participantType: 'COMPETITION_JUDGE',
+    firstName: firstName || null,
+    lastName: lastName || null,
+  })
 
   try {
     await getClient().from(DB_TABLES.INVITATIONS).upsert(

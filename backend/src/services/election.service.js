@@ -635,15 +635,20 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
 
 export async function assertVoterEnrolled(eventId, voterId) {
   const { data, error } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
-    .select('id, event_id, voter_id, has_voted, first_name, last_name, voting_nonce')
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id, event_id, user_id, participant_type, has_voted, first_name, last_name, voting_nonce')
     .eq('event_id', eventId)
-    .eq('voter_id', voterId)
+    .eq('user_id', voterId)
     .maybeSingle()
 
   if (error) throw new ApiError(500, error.message)
   if (!data) throw new ApiError(403, 'You are not enrolled in this event')
-  return data
+
+  return {
+    ...data,
+    voter_id: data.user_id,
+    has_voted: Boolean(data.has_voted),
+  }
 }
 
 export async function getVoterBallot(eventId, voterId) {
@@ -658,12 +663,18 @@ export async function getVoterBallot(eventId, voterId) {
   if (!enrollment.voting_nonce && !enrollment.has_voted) {
     const nonce = crypto.randomUUID()
     const { data: updated } = await getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
       .update({ voting_nonce: nonce })
       .eq('id', enrollment.id)
-      .select('id, event_id, voter_id, has_voted, first_name, last_name, voting_nonce')
+      .select('id, event_id, user_id, participant_type, has_voted, first_name, last_name, voting_nonce')
       .single()
-    if (updated) enrollment = updated
+    if (updated) {
+      enrollment = {
+        ...updated,
+        voter_id: updated.user_id,
+        has_voted: Boolean(updated.has_voted),
+      }
+    }
   }
 
   const { data: positions, error: posErr } = await getClient()
@@ -812,10 +823,10 @@ export async function submitBallot(eventId, voterId, payload) {
   }
 
   const { data: locked, error: lockErr } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .update({ has_voted: true, voting_nonce: null })
     .eq('event_id', eventId)
-    .eq('voter_id', voterId)
+    .eq('user_id', voterId)
     .eq('has_voted', false)
     .select('id')
 
@@ -836,10 +847,10 @@ export async function submitBallot(eventId, voterId, payload) {
     }
   } catch (err) {
     await getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
       .update({ has_voted: false })
       .eq('event_id', eventId)
-      .eq('voter_id', voterId)
+      .eq('user_id', voterId)
     throw err
   }
 

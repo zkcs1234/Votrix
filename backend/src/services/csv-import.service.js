@@ -242,10 +242,12 @@ export async function previewCsv(eventId, organizerId, fileBuffer) {
   const emails = parsed.map(p => p.email)
   const existingAccountMap = await checkExistingAccounts(emails)
 
-  // Also check which voters are ALREADY enrolled in this specific event
+  // Also check which users are ALREADY enrolled in this specific event.
+  // Use the canonical participant table so preview/register operations stay
+  // aligned with the actual enrollment source of truth.
   const { data: enrolledVoters } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
-    .select('voter_id, users!inner(email)')
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('user_id, users!inner(email)')
     .eq('event_id', eventId)
 
   const enrolledEmailSet = new Set((enrolledVoters ?? []).map(ev => ev.users?.email?.toLowerCase()).filter(Boolean))

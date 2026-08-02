@@ -17,6 +17,13 @@ import {
 } from '../modules/poll-question-types.js'
 import { isPollOpen as isPollOpenForEvent } from '../utils/eventSchedule.js'
 import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
+import { registerParticipant } from './participant.service.js'
+import { hashPassword } from '../utils/password.js'
+import { generateTemporaryPassword } from '../utils/crypto.js'
+import { findUserByEmail, findUserById, sanitizeUser } from './user.service.js'
+import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './mailer.service.js'
+import { createNotification } from './notification.service.js'
+import { USER_ROLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
 
 // Phase 7 — Polling question types are now registry-driven. The legacy
 // POLL_QUESTION_TYPES constants and the `multiple_choice` alias are kept in
@@ -97,6 +104,350 @@ async function getPollingOrgId(organizerId) {
 
 function isPollOpen(event) {
   return isPollOpenForEvent(event)
+}
+
+async function ensureRespondentAccount(email, plainPassword) {
+  const normalizedEmail = email.toLowerCase().trim()
+  const existing = await findUserByEmail(normalizedEmail)
+
+  if (existing && existing.role !== USER_ROLES.VOTER) {
+    throw new ApiError(409, 'This email is already used by another account type')
+  }
+
+  const passwordHash = await hashPassword(plainPassword)
+
+  if (existing) {
+    const { data, error } = await getClient()
+      .from(DB_TABLES.USERS)
+      .update({ password: passwordHash, must_change_password: true })
+      .eq('id', existing.id)
+      .select('*')
+      .single()
+
+    if (error) throw new ApiError(500, error.message)
+    return { user: sanitizeUser(data), isNew: false }
+  }
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.USERS)
+    .insert({
+      email: normalizedEmail,
+      password: passwordHash,
+      role: USER_ROLES.VOTER,
+      must_change_password: true,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+  return { user: sanitizeUser(data), isNew: true }
+}
+
+export async function listEventRespondents(eventId, organizerId, page = 1, limit = 50) {
+  await assertPollingEvent(eventId, organizerId)
+
+  const from = (page - 1) * limit
+  const to = from + limit - 1
+
+  const { data, error, count } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select(`
+      id,
+      has_responded,
+      first_name,
+      last_name,
+      created_at,
+      user_id,
+      metadata,
+      users!inner (id, email)
+    `, { count: 'exact' })
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  if (error) throw new ApiError(500, error.message)
+
+  const invitationMap = new Map()
+  const respondentIds = (data ?? []).map((row) => row.user_id).filter(Boolean)
+
+  if (respondentIds.length) {
+    const { data: invitations, error: inviteError } = await getClient()
+      .from(DB_TABLES.INVITATIONS)
+      .select('voter_id, invitation_sent')
+      .eq('event_id', eventId)
+      .in('voter_id', respondentIds)
+
+    if (inviteError) throw new ApiError(500, inviteError.message)
+
+    for (const inv of invitations ?? []) {
+      invitationMap.set(inv.voter_id, inv.invitation_sent)
+    }
+  }
+
+  const event = await getEventById(eventId)
+  const informationFormSchema = event?.information_form_schema ?? { enabled: false, fields: [] }
+
+  return {
+    voters: (data ?? []).map((row) => ({
+      id: row.id,
+      voterId: row.users?.id,
+      email: row.users?.email,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      hasResponded: row.has_responded,
+      createdAt: row.created_at,
+      metadata: row.metadata ?? {},
+      invitationSent: invitationMap.get(row.user_id) ?? false,
+    })),
+    informationFormSchema,
+    meta: {
+      page,
+      limit,
+      total: count ?? 0,
+      totalPages: Math.ceil((count ?? 0) / limit),
+    },
+  }
+}
+
+export async function registerRespondentToPoll({ eventId, email, organizerId, temporaryPassword, resetPasswordForExisting = false }) {
+  await assertPollingEvent(eventId, organizerId)
+
+  const tempPassword = temporaryPassword || generateTemporaryPassword()
+  const { user, isNew } = await ensureRespondentAccount(email, tempPassword)
+
+  await registerParticipant(eventId, user.id, {
+    participantType: PARTICIPANT_TYPES.POLLING_RESPONDENT,
+  })
+
+  try {
+    await getClient().from(DB_TABLES.INVITATIONS).upsert(
+      { event_id: eventId, voter_id: user.id, invitation_sent: false },
+      { onConflict: 'event_id,voter_id', ignoreDuplicates: false },
+    )
+  } catch (dbErr) {
+    console.error('[polling] invitations upsert failed:', dbErr.message)
+    throw new ApiError(500, 'Failed to create invitation record')
+  }
+
+  return {
+    user,
+    isNewRespondent: isNew,
+    invitationSent: false,
+    temporaryPassword: resetPasswordForExisting ? tempPassword : null,
+  }
+}
+
+export async function registerExistingRespondent({ eventId, email, organizerId }) {
+  await assertPollingEvent(eventId, organizerId)
+
+  const voter = await findUserByEmail(email.toLowerCase().trim())
+  if (!voter) {
+    throw new ApiError(404, 'Respondent not found. Use the register flow to create a new respondent account.')
+  }
+
+  if (voter.role !== USER_ROLES.VOTER) {
+    throw new ApiError(400, 'This email belongs to a different account type')
+  }
+
+  const { data: existing } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('user_id', voter.id)
+    .maybeSingle()
+
+  if (existing) {
+    throw new ApiError(409, 'Respondent is already enrolled in this event')
+  }
+
+  await registerParticipant(eventId, voter.id, { participantType: PARTICIPANT_TYPES.POLLING_RESPONDENT })
+
+  try {
+    await getClient().from(DB_TABLES.INVITATIONS).insert({
+      event_id: eventId,
+      voter_id: voter.id,
+      invitation_sent: false,
+    })
+  } catch (dbErr) {
+    console.error('[polling] invitations insert failed:', dbErr.message)
+    throw new ApiError(500, 'Failed to create invitation record')
+  }
+
+  return { user: voter, invitationSent: false }
+}
+
+export async function sendRespondentInvitation({ eventId, voterId, organizerId }) {
+  await assertPollingEvent(eventId, organizerId)
+  const event = await getEventById(eventId)
+  const voter = await findUserById(voterId)
+
+  if (!voter || voter.role !== USER_ROLES.VOTER) {
+    throw new ApiError(404, 'Respondent not found')
+  }
+
+  const { data: enrollment, error: enrollmentError } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('user_id', voterId)
+    .maybeSingle()
+
+  if (enrollmentError) throw new ApiError(500, enrollmentError.message)
+  if (!enrollment) {
+    throw new ApiError(404, 'Respondent is not enrolled in this event')
+  }
+
+  const { data: otherInvitations } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .select('id, invitation_sent')
+    .eq('voter_id', voterId)
+    .neq('event_id', eventId)
+    .limit(1)
+
+  const isExistingAccount = otherInvitations && otherInvitations.length > 0 && otherInvitations.some((inv) => inv.invitation_sent === true)
+
+  let tempPassword = null
+  let emailResult = null
+
+  if (isExistingAccount) {
+    emailResult = await sendVoterInvitationEmailRegistered({
+      email: voter.email,
+      eventId: event.id,
+      eventTitle: event.title,
+    })
+  } else {
+    tempPassword = generateTemporaryPassword()
+    const passwordHash = await hashPassword(tempPassword)
+
+    await getClient()
+      .from(DB_TABLES.USERS)
+      .update({ password: passwordHash, must_change_password: true })
+      .eq('id', voterId)
+
+    emailResult = await sendVoterInvitationEmail({
+      email: voter.email,
+      temporaryPassword: tempPassword,
+      eventId: event.id,
+      eventTitle: event.title,
+    })
+  }
+
+  if (emailResult?.sent) {
+    try {
+      await getClient()
+        .from(DB_TABLES.INVITATIONS)
+        .update({ invitation_sent: true, is_new_account: !isExistingAccount })
+        .eq('event_id', eventId)
+        .eq('voter_id', voterId)
+    } catch (dbErr) {
+      console.error('[polling] failed to mark invitation_sent=true:', dbErr.message)
+    }
+
+    try {
+      await createNotification({
+        userId: voterId,
+        type: isExistingAccount ? 'voter.invitation.registered' : 'voter.invitation',
+        title: `You're invited to ${event.title}`,
+        message: isExistingAccount
+          ? `You've been added to ${event.title}. Sign in with your existing password.`
+          : `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
+        actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
+          ? `/voter/competition/events/${event.id}/score`
+          : event.event_type === 'polling'
+            ? `/voter/polling/events/${event.id}`
+            : `/voter/events/${event.id}`,
+        entity: 'events',
+        entityId: event.id,
+        metadata: { eventType: event.event_type, organizationName: event.organizations?.organization_name },
+      })
+    } catch (notifErr) {
+      console.error('[polling] createNotification failed:', notifErr.message)
+    }
+  }
+
+  return { user: voter, email: emailResult, invitationSent: emailResult?.sent, temporaryPassword: tempPassword }
+}
+
+export async function sendAllPendingRespondentInvitations({ eventId, organizerId }) {
+  await assertPollingEvent(eventId, organizerId)
+  const event = await getEventById(eventId)
+
+  const { data: pendingRespondents, error: pendingError } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .select('id, voter_id, users (id, email)')
+    .eq('event_id', eventId)
+    .eq('invitation_sent', false)
+
+  if (pendingError) throw new ApiError(500, pendingError.message)
+
+  if (!pendingRespondents?.length) {
+    return { total: 0, sent: 0, failed: 0, results: [] }
+  }
+
+  const results = []
+  let sentCount = 0
+  let failedCount = 0
+
+  const voterIds = pendingRespondents.map((p) => p.voter_id)
+  const { data: existingCheck } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .select('voter_id')
+    .in('voter_id', voterIds)
+    .eq('invitation_sent', true)
+
+  const existingAccountIds = new Set((existingCheck ?? []).map((inv) => inv.voter_id))
+
+  for (const pending of pendingRespondents) {
+    const voter = pending.users
+    const isExistingAccount = existingAccountIds.has(voter.id)
+    let tempPassword = null
+    let emailResult = null
+
+    try {
+      if (isExistingAccount) {
+        emailResult = await sendVoterInvitationEmailRegistered({
+          email: voter.email,
+          eventId: event.id,
+          eventTitle: event.title,
+        })
+      } else {
+        tempPassword = generateTemporaryPassword()
+        const passwordHash = await hashPassword(tempPassword)
+
+        await getClient()
+          .from(DB_TABLES.USERS)
+          .update({ password: passwordHash, must_change_password: true })
+          .eq('id', voter.id)
+
+        emailResult = await sendVoterInvitationEmail({
+          email: voter.email,
+          temporaryPassword: tempPassword,
+          eventId: event.id,
+          eventTitle: event.title,
+        })
+      }
+
+      if (emailResult?.sent) {
+        await getClient()
+          .from(DB_TABLES.INVITATIONS)
+          .update({ invitation_sent: true, is_new_account: !isExistingAccount })
+          .eq('event_id', eventId)
+          .eq('voter_id', voter.id)
+
+        sentCount++
+        results.push({ voterId: voter.id, email: voter.email, success: true, temporaryPassword: tempPassword })
+      } else {
+        failedCount++
+        results.push({ voterId: voter.id, email: voter.email, success: false, error: emailResult?.error || 'Email delivery failed' })
+      }
+    } catch (err) {
+      failedCount++
+      results.push({ voterId: voter.id, email: voter.email, success: false, error: err.message })
+    }
+  }
+
+  return { total: pendingRespondents.length, sent: sentCount, failed: failedCount, results }
 }
 
 // ——— Organizer: events ———

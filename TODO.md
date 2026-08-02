@@ -1,22 +1,11 @@
-# Implementation Progress - Fix Voter/Respondent/Judge Registration & Invitation Flows
+# Implementation TODO — Voter Registration & Invitation Wrong-Table Fix
 
-## Completed
+## Plan: `docs/plans/voter-registration-invitation-table-mixup-fix.md`
 
-- [x] Fix 1: Make `temporaryPassword` optional in validator
-- [x] Fix 2: Add CSV template download to Competition and Polling pages
-- [x] Fix 3: Add CSV template download to Election voters page (already had it)
-- [x] Fix 4: Fix CSV import to properly handle preview data structure
-- [x] Fix 5: Add import result feedback to Competition, Polling and Election pages
-- [x] Fix 6: Add file input ref for multiple CSV uploads
-- [x] Fix 7: Fix Competition judges CSV import to use consistent flow
-- [x] Fix 8: Fix Polling respondents CSV import to use consistent flow
-- [x] Fix 9: Fix `invitationSent` null vs false inconsistency in Competition judges table
-- [x] Fix 10: Add skipped/failed breakdown to import result feedback on all three pages
-
-## In Progress
-
-- (none)
-
-## Remaining
-
-- (none)
+- [ ] Step 1: Migration 033 — add `voting_nonce` to `event_participants`, backfill, fix `v_event_voters` view, reconcile legacy rows.
+- [ ] Step 2: `pageant.service.js` — `inviteJudge()` / `registerJudge()` write to `event_participants` via `registerParticipant()`.
+- [ ] Step 3: `polling.service.js` — implement missing respondent functions (`listEventRespondents`, `registerRespondentToPoll`, `registerExistingRespondent`, `sendRespondentInvitation`, `sendAllPendingRespondentInvitations`).
+- [ ] Step 4: `election.service.js` — use `EVENT_PARTICIPANTS` for ballot nonce read/update.
+- [ ] Step 5: `csv-import.service.js` — `previewCsv()` uses `EVENT_PARTICIPANTS` for `alreadyEnrolled`.
+- [ ] Step 6: `event.service.js` — `getEventVoterAccounts()` (read-only) → `EVENT_PARTICIPANTS`.
+- [ ] Step 7: Verify (lint/tests).
