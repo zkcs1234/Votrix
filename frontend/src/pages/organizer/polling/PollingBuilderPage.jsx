@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
+import api from '@/services/api'
 import { pollingService } from '@/services/polling.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageUploadField from '@/components/upload/ImageUploadField'
@@ -31,6 +32,10 @@ const emptyForm = () => ({
   options: [{ label: '', imageUrl: '' }, { label: '', imageUrl: '' }],
   imageUrl: '',
 })
+
+function listQuestionTypes() {
+  return api.get('/organizer/polling/question-types')
+}
 
 function needsFreeOptions(typeDef) {
   if (!typeDef) return true
@@ -203,7 +208,7 @@ export default function PollingBuilderPage() {
   const load = () => {
     Promise.all([
       pollingService.listQuestions(eventId),
-      pollingService.listQuestionTypes(),
+      listQuestionTypes(),
     ])
       .then(([qRes, tRes]) => {
         setQuestions(qRes.data.questions ?? [])
@@ -216,7 +221,7 @@ export default function PollingBuilderPage() {
     let isMounted = true
     Promise.all([
       pollingService.listQuestions(eventId),
-      pollingService.listQuestionTypes(),
+      listQuestionTypes(),
     ])
       .then(([qRes, tRes]) => {
         if (!isMounted) return
