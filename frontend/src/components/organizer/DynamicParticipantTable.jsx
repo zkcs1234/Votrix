@@ -166,7 +166,7 @@ export default function DynamicParticipantTable({
                 </td>
                 {customFields.map((field) => (
                   <td key={field.id} className="text-sm text-v-text-muted">
-                    {getFieldValue(p, field.label)}
+                    {getFieldValue(p, field)}
                   </td>
                 ))}
                 {renderActions && (

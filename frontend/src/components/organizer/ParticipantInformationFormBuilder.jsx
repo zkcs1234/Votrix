@@ -133,9 +133,6 @@ const [enabled, setEnabled] = useState(false)
               ...(f.type === 'dropdown'
                 ? { options: (f.options || []).filter((o) => o.trim()) }
                 : {}),
-              ...(f.type === 'text_number'
-                ? { value: f.value }
-                : {}),
             }))
           : [],
       }
@@ -235,19 +232,7 @@ const [enabled, setEnabled] = useState(false)
                       Required
                     </label>
                   </div>
-                {/* Text & Number value input */}
-                {field.type === 'text_number' && (
-                  <div className="flex-1 min-w-[200px]">
-                    <label className="v-label mb-1">Value</label>
-                    <input
-                      type="text"
-                      className="v-input w-full"
-                      placeholder="e.g. 4A, BSIT2"
-                      value={field.value}
-                      onChange={(e) => updateField(field.id, { value: e.target.value })}
-                    />
-                  </div>
-                )}
+
                   <button
                     type="button"
                     onClick={() => removeField(field.id)}
@@ -327,6 +312,9 @@ const [enabled, setEnabled] = useState(false)
                   )}
                   {field.type === 'number' && (
                     <input type="number" className="v-input w-full opacity-60" placeholder="0" disabled />
+                  )}
+                  {field.type === 'text_number' && (
+                    <input type="text" className="v-input w-full opacity-60" placeholder={`Enter ${field.label.toLowerCase()}`} disabled />
                   )}
                   {field.type === 'dropdown' && (
                     <select className="v-input w-full opacity-60" disabled>

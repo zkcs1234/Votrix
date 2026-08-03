@@ -91,8 +91,9 @@ export async function setEventInformationForm(eventId, organizerId, schema) {
     if (!field.id || !field.label || !field.type) {
       throw badRequest('Each field must have id, label, and type')
     }
-    if (!['text', 'dropdown', 'number'].includes(field.type)) {
-      throw badRequest(`Invalid field type: ${field.type}. Must be text, dropdown, or number`)
+    const allowedTypes = ['text', 'dropdown', 'number', 'text_number']
+    if (!allowedTypes.includes(field.type)) {
+      throw badRequest(`Invalid field type: ${field.type}. Must be text, dropdown, number, or text_number`)
     }
     if (field.type === 'dropdown') {
       if (!Array.isArray(field.options) || field.options.length < 1) {
