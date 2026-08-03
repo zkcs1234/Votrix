@@ -119,7 +119,13 @@ try {
   const handleNextDetails = async (e) => {
     e.preventDefault()
     const isValid = await trigger(['title', 'startDate', 'endDate'])
-    if (isValid) navigate(stageHref('branding'))
+    if (isValid) {
+      if (isNew) {
+        setStep('branding')
+      } else {
+        navigate(stageHref('branding'))
+      }
+    }
   }
 
   const handleNextBranding = async (e) => {
