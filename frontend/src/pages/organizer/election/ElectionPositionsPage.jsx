@@ -35,7 +35,7 @@ export default function ElectionPositionsPage() {
     setName('')
     setDescription('')
     setNumberOfWinners(1)
-    setMinVote(1)
+    // setMinVote removed – no longer needed
     setMaxVote(1)
     setDisplayOrder('')
   }
@@ -44,9 +44,7 @@ export default function ElectionPositionsPage() {
     e.preventDefault()
 
     // No need to validate minVote vs maxVote now
-      showError('Minimum votes cannot exceed maximum votes.')
-      return
-    }
+    // Validation removed – minVote feature eliminated
 
     setSaving(true)
     try {
@@ -150,7 +148,7 @@ export default function ElectionPositionsPage() {
         </div>
 
         <div>
-          <!-- Min votes field removed -->
+          {/* Min votes field removed */}
         </div>
         <div>
           <label className="mb-1 block text-sm text-v-text-muted">Max votes</label>
