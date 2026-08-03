@@ -1,7 +1,7 @@
 export const EVENT_STAGES = {
   election: [
     { key: 'details', label: 'Details', path: 'edit' },
-    { key: 'branding', label: 'Branding', path: 'edit' },
+    { key: 'branding', label: 'Branding', path: 'branding' },
     { key: 'information-form', label: 'Information Form', path: 'form' },
     { key: 'positions', label: 'Positions', path: 'positions' },
     { key: 'candidates', label: 'Candidates', path: 'candidates' },
@@ -11,7 +11,7 @@ export const EVENT_STAGES = {
   ],
   competition: [
     { key: 'details', label: 'Details', path: 'edit' },
-    { key: 'branding', label: 'Branding', path: 'edit' },
+    { key: 'branding', label: 'Branding', path: 'branding' },
     { key: 'information-form', label: 'Information Form', path: 'form' },
     { key: 'contestants', label: 'Contestants', path: 'contestants' },
     { key: 'criteria', label: 'Criteria', path: 'criteria' },
@@ -23,7 +23,7 @@ export const EVENT_STAGES = {
   ],
   polling: [
     { key: 'details', label: 'Details', path: 'edit' },
-    { key: 'branding', label: 'Branding', path: 'edit' },
+    { key: 'branding', label: 'Branding', path: 'branding' },
     { key: 'settings', label: 'Settings', path: 'settings' },
     { key: 'information-form', label: 'Information Form', path: 'form' },
     { key: 'builder', label: 'Builder', path: 'builder' },

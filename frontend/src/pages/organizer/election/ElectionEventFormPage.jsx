@@ -33,6 +33,7 @@ const RESULTS_VISIBILITY_OPTIONS = [
 ]
 
 function inferStepFromPath(pathname) {
+  if (pathname.includes('/branding')) return 'branding'
   if (pathname.includes('/form')) return 'information-form'
   return 'details'
 }

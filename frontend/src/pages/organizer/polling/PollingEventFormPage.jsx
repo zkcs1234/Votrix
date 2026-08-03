@@ -20,6 +20,7 @@ import useEventProgress from '@/hooks/useEventProgress'
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
 function inferStepFromPath(pathname) {
+  if (pathname.includes('/branding')) return 'branding'
   if (pathname.includes('/settings')) return 'settings'
   if (pathname.includes('/form')) return 'information-form'
   return 'details'

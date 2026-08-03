@@ -119,7 +119,7 @@ export const pollingService = {
     return api.get(`${org}/events/${eventId}/voters`)
   },
 
-  // Phase 7 — Question type registry
+  // Phase 7 — Question type registry - force HMR reload
   listQuestionTypes() {
     return api.get(`${org}/question-types`)
   },
