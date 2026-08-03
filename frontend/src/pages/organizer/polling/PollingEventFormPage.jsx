@@ -205,7 +205,7 @@ try {
     if (isNew) return `${base}/new`
     const pathByKey = {
       details: 'edit',
-      branding: 'edit',
+      branding: 'branding',
       settings: 'settings',
       'information-form': 'form',
     }
