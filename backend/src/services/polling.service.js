@@ -7,6 +7,10 @@ import {
   loadQuestionTypeRegistry,
   findQuestionType,
   requireQuestionType,
+  listCustomTypes,
+  createCustomType,
+  updateCustomType,
+  deleteCustomType,
 } from './polling-registry.service.js'
 import {
   buildAutoOptions,
@@ -1273,4 +1277,32 @@ const { count: totalSubmissions } = await getClient()
     averageCompletionTimeSeconds,
     questions: questionAnalytics,
   }
+}
+
+// ——— Question-type wrappers (called by polling-organizer.controller.js) ———
+// The controller passes req.user.id but the registry functions need an orgId.
+
+export async function listQuestionTypes(userId) {
+  const org = await getOrCreatePollingOrganization(userId)
+  return loadQuestionTypeRegistry(org.id)
+}
+
+export async function listCustomQuestionTypes(userId) {
+  const org = await getOrCreatePollingOrganization(userId)
+  return listCustomTypes(org.id)
+}
+
+export async function createCustomQuestionType(userId, payload) {
+  const org = await getOrCreatePollingOrganization(userId)
+  return createCustomType(org.id, payload)
+}
+
+export async function updateCustomQuestionType(typeId, userId, payload) {
+  const org = await getOrCreatePollingOrganization(userId)
+  return updateCustomType(org.id, typeId, payload)
+}
+
+export async function deleteCustomQuestionType(typeId, userId) {
+  const org = await getOrCreatePollingOrganization(userId)
+  return deleteCustomType(org.id, typeId)
 }
