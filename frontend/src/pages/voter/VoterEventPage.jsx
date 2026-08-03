@@ -18,9 +18,8 @@ function validateSelections(positions, selections) {
 
     if (count > 0) hasAtLeastOneVote = true
 
-    if (count === 0 && position.allowSkip) continue
     if (count === 0) {
-      return `Please vote for ${position.name} or skip the position.`
+      return `Please vote for ${position.name}.`
     }
     if (count < position.minVote) {
       return `${position.name}: select at least ${position.minVote} candidate(s).`
@@ -105,7 +104,6 @@ function BallotSubmittedScreen({ ballot, eventId }) {
 export default function VoterEventPage() {
   const { eventId } = useParams()
   const draftKey = getDraftStorageKey('electionDraft', eventId)
-  const skippedDraftKey = getDraftStorageKey('electionSkipped', eventId)
   const [ballot, setBallot] = useState(null)
   const [selections, setSelections] = useState(() => {
     try {
@@ -115,14 +113,6 @@ export default function VoterEventPage() {
       return {}
     }
   })
-  const [skippedPositions, setSkippedPositions] = useState(() => {
-    try {
-      const saved = localStorage.getItem(skippedDraftKey)
-      return saved ? new Set(JSON.parse(saved)) : new Set()
-    } catch {
-      return new Set()
-    }
-  })
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -130,8 +120,7 @@ export default function VoterEventPage() {
 
   useEffect(() => {
     localStorage.setItem(draftKey, JSON.stringify(selections))
-    localStorage.setItem(skippedDraftKey, JSON.stringify(Array.from(skippedPositions)))
-  }, [draftKey, skippedDraftKey, selections, skippedPositions])
+  }, [draftKey, selections])
 
   useEffect(() => {
     electionService
@@ -148,17 +137,12 @@ export default function VoterEventPage() {
     if (!positions.length) return 0
     const filled = positions.filter((p) => {
       const sel = selections[p.id] ?? []
-      return sel.length > 0 || skippedPositions.has(p.id)
+      return sel.length > 0
     }).length
     return Math.round((filled / positions.length) * 100)
-  }, [positions, selections, skippedPositions])
+  }, [positions, selections])
 
   const toggleCandidate = (positionId, candidateId, maxVote) => {
-    setSkippedPositions((prev) => {
-      const next = new Set(prev)
-      next.delete(positionId)
-      return next
-    })
     setSelections((prev) => {
       const current = prev[positionId] ?? []
       const exists = current.includes(candidateId)
@@ -178,10 +162,7 @@ export default function VoterEventPage() {
     })
   }
 
-  const skipPosition = (positionId) => {
-    setSkippedPositions((prev) => new Set(prev).add(positionId))
-    setSelections((prev) => ({ ...prev, [positionId]: [] }))
-  }
+
 
   const [isReviewing, setIsReviewing] = useState(false)
 
@@ -212,7 +193,6 @@ export default function VoterEventPage() {
         votingNonce: ballot?.votingNonce,
       })
       localStorage.removeItem(draftKey)
-      localStorage.removeItem(skippedDraftKey)
       setDone(true)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit ballot')
@@ -265,13 +245,13 @@ export default function VoterEventPage() {
               const selectedCandidates = position.candidates.filter((c) =>
                 selectedCandidateIds.includes(c.id),
               )
-              const skipped = skippedPositions.has(position.id) || selectedCandidates.length === 0
+              const isUnanswered = selectedCandidates.length === 0
 
               return (
                 <div key={position.id} className="rounded-xl border border-v-border p-4 bg-v-surface-elevated">
                   <p className="font-medium text-v-text text-sm">{position.name}</p>
-                  {skipped ? (
-                    <p className="mt-1 text-xs text-amber-400 font-medium">Skipped</p>
+                  {isUnanswered ? (
+                    <p className="mt-1 text-xs text-v-danger font-medium">No selection</p>
                   ) : (
                     <ul className="mt-2 space-y-1">
                       {selectedCandidates.map((cand) => (
@@ -332,9 +312,7 @@ export default function VoterEventPage() {
               key={position.id}
               position={position}
               selectedIds={selections[position.id]}
-              isSkipped={skippedPositions.has(position.id)}
               onToggle={toggleCandidate}
-              onSkip={skipPosition}
               disabled={submitting}
             />
           ))}

@@ -61,7 +61,7 @@ export default function ParticipantInformationForm({
   }
 
   const isFilled = Object.keys(formData).some(key => {
-    const field = fields.find(f => f.key === key)
+    const field = fields.find(f => f.id === key)
     return field && formData[key]
   })
 
@@ -78,35 +78,35 @@ export default function ParticipantInformationForm({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {fields.map((field) => (
-          <div key={field.key}>
+          <div key={field.id}>
             <label
-              htmlFor={field.key}
+              htmlFor={field.id}
               className="mb-1.5 block text-sm font-medium text-v-text-muted"
             >
               {field.label}
               {field.required && <span className="text-v-danger ml-1">*</span>}
             </label>
 
-            {field.type === 'select' ? (
+            {field.type === 'select' || field.type === 'dropdown' ? (
               <select
-                id={field.key}
-                value={formData[field.key] || ''}
-                onChange={(e) => handleChange(field.key, e.target.value)}
+                id={field.id}
+                value={formData[field.id] || ''}
+                onChange={(e) => handleChange(field.id, e.target.value)}
                 className="w-full rounded-lg border border-v-border bg-v-surface px-3 py-2 text-sm text-v-text focus:border-v-primary focus:outline-none focus:ring-1 focus:ring-v-primary"
                 required={field.required}
               >
                 <option value="">Select {field.label}</option>
                 {field.options?.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                  <option key={opt} value={opt}>
+                    {opt}
                   </option>
                 ))}
               </select>
             ) : field.type === 'textarea' ? (
               <textarea
-                id={field.key}
-                value={formData[field.key] || ''}
-                onChange={(e) => handleChange(field.key, e.target.value)}
+                id={field.id}
+                value={formData[field.id] || ''}
+                onChange={(e) => handleChange(field.id, e.target.value)}
                 className="w-full rounded-lg border border-v-border bg-v-surface px-3 py-2 text-sm text-v-text focus:border-v-primary focus:outline-none focus:ring-1 focus:ring-v-primary"
                 rows={3}
                 required={field.required}
@@ -116,21 +116,21 @@ export default function ParticipantInformationForm({
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  id={field.key}
-                  checked={Boolean(formData[field.key])}
-                  onChange={(e) => handleChange(field.key, e.target.checked)}
+                  id={field.id}
+                  checked={Boolean(formData[field.id])}
+                  onChange={(e) => handleChange(field.id, e.target.checked)}
                   className="h-4 w-4 rounded border-v-border text-v-primary focus:ring-v-primary"
                 />
-                <label htmlFor={field.key} className="text-sm text-v-text">
+                <label htmlFor={field.id} className="text-sm text-v-text">
                   {field.checkboxLabel}
                 </label>
               </div>
             ) : (
               <input
-                type={field.type || 'text'}
-                id={field.key}
-                value={formData[field.key] || ''}
-                onChange={(e) => handleChange(field.key, e.target.value)}
+                type={field.type === 'number' ? 'number' : 'text'}
+                id={field.id}
+                value={formData[field.id] || ''}
+                onChange={(e) => handleChange(field.id, e.target.value)}
                 className="w-full rounded-lg border border-v-border bg-v-surface px-3 py-2 text-sm text-v-text focus:border-v-primary focus:outline-none focus:ring-1 focus:ring-v-primary"
                 required={field.required}
                 placeholder={field.placeholder}

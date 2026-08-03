@@ -14,10 +14,9 @@ export default function ElectionPositionsPage() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [numberOfWinners, setNumberOfWinners] = useState(1)
-  const [minVote, setMinVote] = useState(1)
+  // minVote removed – default is 1 (no minimum constraint)
   const [maxVote, setMaxVote] = useState(1)
   const [displayOrder, setDisplayOrder] = useState('')
-  const [allowSkip, setAllowSkip] = useState(false)
   const [saving, setSaving] = useState(false)
   const { error: showError } = useToast()
 
@@ -39,13 +38,12 @@ export default function ElectionPositionsPage() {
     setMinVote(1)
     setMaxVote(1)
     setDisplayOrder('')
-    setAllowSkip(false)
   }
 
   const handleCreate = async (e) => {
     e.preventDefault()
 
-    if (Number(minVote) > Number(maxVote)) {
+    // No need to validate minVote vs maxVote now
       showError('Minimum votes cannot exceed maximum votes.')
       return
     }
@@ -56,10 +54,9 @@ export default function ElectionPositionsPage() {
         name,
         description: description || null,
         numberOfWinners: Number(numberOfWinners),
-        minVote: Number(minVote),
         maxVote: Number(maxVote),
         displayOrder: displayOrder === '' ? undefined : Number(displayOrder),
-        allowSkip,
+        allowSkip: false,
       })
       resetForm()
       setLoading(true)
@@ -153,14 +150,7 @@ export default function ElectionPositionsPage() {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Min votes</label>
-          <input
-            type="number"
-            min={0}
-            className={`${inputClass} w-full`}
-            value={minVote}
-            onChange={(e) => setMinVote(e.target.value)}
-          />
+          <!-- Min votes field removed -->
         </div>
         <div>
           <label className="mb-1 block text-sm text-v-text-muted">Max votes</label>
@@ -173,10 +163,6 @@ export default function ElectionPositionsPage() {
           />
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-v-text-muted sm:col-span-2">
-          <input type="checkbox" checked={allowSkip} onChange={(e) => setAllowSkip(e.target.checked)} />
-          Allow skip (no selection)
-        </label>
         <button
           type="submit"
           disabled={saving}
@@ -201,8 +187,7 @@ export default function ElectionPositionsPage() {
                 <p className="mt-1 text-xs text-v-text-subtle">{p.description}</p>
               )}
               <p className="mt-1 text-xs text-v-text-subtle">
-                Winners: {p.numberOfWinners ?? 1} · Vote {p.minVote}–{p.maxVote}
-                {p.allowSkip ? ' · skip allowed' : ''}
+                Winners: {p.numberOfWinners ?? 1} · Vote up to {p.maxVote}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">

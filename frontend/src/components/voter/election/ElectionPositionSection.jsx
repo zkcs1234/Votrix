@@ -3,14 +3,12 @@ import CandidateVoteControl from '@/components/voter/election/CandidateVoteContr
 export default function ElectionPositionSection({
   position,
   selectedIds,
-  isSkipped,
   onToggle,
-  onSkip,
   disabled,
 }) {
   const selected = selectedIds ?? []
-  const skipped = Boolean(isSkipped)
-  const isSingleSelect = position.minVote === 1 && position.maxVote === 1
+  // Single select when maxVote is 1 (no minVote concept)
+  const isSingleSelect = position.maxVote === 1
 
   return (
     <section className="v-card p-6" aria-labelledby={`pos-heading-${position.id}`}>
@@ -21,28 +19,10 @@ export default function ElectionPositionSection({
           </h3>
           <p className="mt-1 text-xs text-v-text-subtle">
             Select{' '}
-            {position.minVote === position.maxVote
-              ? position.minVote
-              : `${position.minVote}–${position.maxVote}`}{' '}
+            {position.maxVote}{' '}
             candidate{position.maxVote !== 1 ? 's' : ''}
-            {position.allowSkip ? ' · or skip this position' : ''}
           </p>
         </div>
-        {position.allowSkip && (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onSkip(position.id)}
-            aria-pressed={skipped}
-            className={`rounded-lg border px-3 py-1 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-v-primary ${
-              skipped
-                ? 'border-amber-600 bg-amber-950/40 text-amber-300'
-                : 'border-v-border-strong text-v-text-subtle hover:border-v-border-strong'
-            }`}
-          >
-            {skipped ? 'Skipped' : 'Skip position'}
-          </button>
-        )}
       </div>
 
       <div
@@ -56,7 +36,7 @@ export default function ElectionPositionSection({
             candidate={candidate}
             positionName={position.name}
             selected={selected.includes(candidate.id)}
-            disabled={disabled || skipped}
+            disabled={disabled}
             onToggle={() => onToggle(position.id, candidate.id, position.maxVote)}
           />
         ))}

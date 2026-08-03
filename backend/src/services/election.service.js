@@ -16,7 +16,6 @@ function mapPosition(row) {
     eventId: row.event_id,
     name: row.name,
     description: row.description ?? null,
-    minVote: row.min_vote,
     maxVote: row.max_vote,
     numberOfWinners: row.number_of_winners ?? 1,
     displayOrder: row.display_order ?? 0,
@@ -302,7 +301,7 @@ export async function listPositions(eventId, organizerId) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POSITIONS)
-    .select('id, event_id, name, description, min_vote, max_vote, number_of_winners, display_order, allow_skip')
+    .select('id, event_id, name, description, max_vote, number_of_winners, display_order, allow_skip')
     .eq('event_id', eventId)
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
@@ -339,7 +338,6 @@ export async function createPosition(eventId, organizerId, payload) {
       event_id: eventId,
       name: payload.name,
       description: payload.description ?? null,
-      min_vote: payload.minVote ?? 1,
       max_vote: payload.maxVote ?? 1,
       number_of_winners: payload.numberOfWinners ?? 1,
       display_order: displayOrder,
@@ -367,7 +365,6 @@ export async function updatePosition(eventId, organizerId, positionId, payload) 
   const updates = {}
   if (payload.name !== undefined) updates.name = payload.name
   if (payload.description !== undefined) updates.description = payload.description
-  if (payload.minVote !== undefined) updates.min_vote = payload.minVote
   if (payload.maxVote !== undefined) updates.max_vote = payload.maxVote
   if (payload.numberOfWinners !== undefined) updates.number_of_winners = payload.numberOfWinners
   if (payload.displayOrder !== undefined) updates.display_order = payload.displayOrder
@@ -688,7 +685,7 @@ export async function getVoterBallot(eventId, voterId) {
 
   const { data: positions, error: posErr } = await getClient()
     .from(DB_TABLES.POSITIONS)
-    .select('id, event_id, name, description, min_vote, max_vote, number_of_winners, display_order, allow_skip')
+    .select('id, event_id, name, description, max_vote, number_of_winners, display_order, allow_skip')
     .eq('event_id', eventId)
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
@@ -733,12 +730,6 @@ function validateBallotSelections(positions, selections) {
     if (count === 0 && !position.allow_skip) {
       throw new ApiError(400, `You must vote for ${position.name} or allow skip`)
     }
-    if (count < position.min_vote) {
-      throw new ApiError(
-        400,
-        `${position.name}: select at least ${position.min_vote} candidate(s)`,
-      )
-    }
     if (count > position.max_vote) {
       throw new ApiError(
         400,
@@ -780,7 +771,7 @@ export async function submitBallot(eventId, voterId, payload) {
 
   const { data: positions, error: posErr } = await getClient()
     .from(DB_TABLES.POSITIONS)
-    .select('id, event_id, name, description, min_vote, max_vote, number_of_winners, display_order, allow_skip')
+    .select('id, event_id, name, description, max_vote, number_of_winners, display_order, allow_skip')
     .eq('event_id', eventId)
 
   if (posErr) throw new ApiError(500, posErr.message)
@@ -993,7 +984,7 @@ async function fetchElectionResultsData(eventId) {
 
   const { data: positionRows, error: posListErr } = await getClient()
     .from(DB_TABLES.POSITIONS)
-    .select('id, event_id, name, description, min_vote, max_vote, number_of_winners, display_order, allow_skip')
+    .select('id, event_id, name, description, max_vote, number_of_winners, display_order, allow_skip')
     .eq('event_id', eventId)
     .order('display_order', { ascending: true })
 
@@ -1207,4 +1198,3 @@ export async function finalizeElectionEvent(eventId, organizerId) {
 
   return mapEvent(data)
 }
-

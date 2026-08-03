@@ -71,13 +71,11 @@ export function validateUpdateEvent(body) {
 export function validatePosition(body) {
   if (!body?.name?.trim()) throw new ApiError(400, 'Position name is required')
   const allowSkip = Boolean(body.allowSkip)
-  const minVote = Number(body.minVote ?? 1)
   const maxVote = Number(body.maxVote ?? 1)
-  if (Number.isNaN(minVote) || Number.isNaN(maxVote) || minVote < 0 || maxVote < minVote) {
-    throw new ApiError(400, 'Invalid vote range')
-  }
-  if (!allowSkip && minVote < 1) {
-    throw new ApiError(400, 'minVote must be at least 1 when skipping is not allowed')
+
+  // minVote removed – default is 1. Validation now only ensures maxVote is positive.
+  if (Number.isNaN(maxVote) || maxVote < 1) {
+    throw new ApiError(400, 'Invalid maxVote value')
   }
 
   const numberOfWinners = Number(body.numberOfWinners ?? 1)
@@ -96,7 +94,6 @@ export function validatePosition(body) {
   return {
     name: body.name.trim(),
     description: body.description?.trim() || null,
-    minVote,
     maxVote,
     numberOfWinners,
     displayOrder,

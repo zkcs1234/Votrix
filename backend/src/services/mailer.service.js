@@ -2,6 +2,7 @@ import { getResend } from '../config/resend.js'
 import { env } from '../config/env.js'
 import { sendEmail } from './email.service.js'
 import { organizerInvitationTemplate } from '../templates/email/organizerInvitation.js'
+import { organizerOnboardingTemplate } from '../templates/email/organizerOnboarding.js'
 import { voterInvitationTemplate } from '../templates/email/voterInvitation.js'
 import { voterInvitationRegisteredTemplate } from '../templates/email/voterInvitationRegistered.js'
 import { passwordResetTemplate } from '../templates/email/passwordReset.js'
@@ -46,6 +47,17 @@ export async function sendOrganizerInvitationEmail({ email, temporaryPassword })
   return sendWorkflowEmail({
     to: email,
     subject: 'Your VOTRIX organizer account',
+    html,
+  })
+}
+
+export async function sendOrganizerOnboardingEmail({ email }) {
+  const loginUrl = organizerLoginUrl()
+  const html = organizerOnboardingTemplate({ email, loginUrl })
+
+  return sendWorkflowEmail({
+    to: email,
+    subject: 'Complete your VOTRIX organization profile',
     html,
   })
 }
