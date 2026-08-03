@@ -14,6 +14,12 @@ export const pollingService = {
     return api.post(`${org}/events/${eventId}/banner`, form)
   },
 
+  uploadGenericImage(eventId, file) {
+    const form = new FormData()
+    form.append('image', file)
+    return api.post(`${org}/events/${eventId}/image`, form)
+  },
+
   listEvents() {
     return api.get(`${org}/events`)
   },

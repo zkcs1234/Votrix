@@ -23,9 +23,7 @@ export function validatePollEvent(body, isCreate = false) {
   if (body.pollAllowMultipleSubmissions !== undefined) {
     payload.pollAllowMultipleSubmissions = Boolean(body.pollAllowMultipleSubmissions)
   }
-  if (body.pollExpiresAt !== undefined) {
-    payload.pollExpiresAt = body.pollExpiresAt || null
-  }
+
 
   return payload
 }

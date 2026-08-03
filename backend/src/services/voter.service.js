@@ -7,7 +7,6 @@ import { canVoterViewElectionResults } from '../utils/eventSchedule.js'
 
 function isPollOpen(event) {
   if (!event.pollingEnabled) return false
-  if (event.pollExpiresAt && new Date(event.pollExpiresAt) < new Date()) return false
   return true
 }
 
@@ -99,7 +98,6 @@ function classifyPoll(event) {
           ? 'View responses'
           : 'View poll',
     pollingEnabled: Boolean(event.pollingEnabled),
-    pollExpiresAt: event.pollExpiresAt,
     pollAllowMultipleSubmissions: Boolean(event.pollAllowMultipleSubmissions),
     hasResponded: Boolean(event.hasResponded),
     pollOpen: open,

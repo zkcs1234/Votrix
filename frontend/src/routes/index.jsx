@@ -222,6 +222,7 @@ export const routeConfig = [
       { index: true, element: <PollingDashboardPage /> },
       { path: 'events', element: <PollingEventsPage /> },
       { path: 'events/new', element: <PollingEventFormPage /> },
+      { path: 'events/:eventId/edit', element: <PollingEventFormPage /> },
       { path: 'events/:eventId/settings', element: <PollingEventFormPage /> },
       { path: 'events/:eventId/form', element: <PollingEventFormPage /> },
       { path: 'events/:eventId/builder', element: <PollingBuilderPage /> },

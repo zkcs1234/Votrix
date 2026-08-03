@@ -49,6 +49,11 @@ export const uploadBanner = asyncHandler(async (req, res) => {
   res.json({ success: true, url: result.secure_url, event })
 })
 
+export const uploadGenericImage = asyncHandler(async (req, res) => {
+  const result = await uploadImageFile(req.file, UPLOAD_KIND.PHOTO, `poll-${req.params.eventId}-img`)
+  res.json({ success: true, url: result.secure_url })
+})
+
 export const listQuestions = asyncHandler(async (req, res) => {
   const questions = await pollingService.listQuestions(req.params.eventId, req.user.id)
   res.json({ success: true, questions })

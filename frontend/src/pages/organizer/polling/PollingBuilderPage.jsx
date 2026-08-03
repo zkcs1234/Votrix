@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import ImageUploadField from '@/components/upload/ImageUploadField'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 import {
   DndContext,
@@ -260,6 +261,31 @@ export default function PollingBuilderPage() {
     setForm(next)
   }
 
+  const handleImageSelect = async (file, isOption = false, optionIndex = null) => {
+    if (!file) {
+      if (isOption) {
+        const options = [...form.options]
+        options[optionIndex] = { ...options[optionIndex], imageUrl: '' }
+        setForm({ ...form, options })
+      } else {
+        setForm({ ...form, imageUrl: '' })
+      }
+      return
+    }
+    try {
+      const { data } = await pollingService.uploadGenericImage(eventId, file)
+      if (isOption) {
+        const options = [...form.options]
+        options[optionIndex] = { ...options[optionIndex], imageUrl: data.url }
+        setForm({ ...form, options })
+      } else {
+        setForm({ ...form, imageUrl: data.url })
+      }
+    } catch (err) {
+      setError('Failed to upload image')
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
@@ -392,22 +418,15 @@ export default function PollingBuilderPage() {
           )}
         </div>
 
-        {/* Question image URL */}
+        {/* Question image */}
         <div>
-          <label className={LABEL_CLASS}>Question image URL (optional)</label>
-          <input
-            className={INPUT_CLASS}
-            placeholder="https://example.com/image.jpg"
-            value={form.imageUrl}
-            onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+          <ImageUploadField
+            label="Question image (optional)"
+            variant="photo"
+            currentUrl={form.imageUrl}
+            onFileSelect={(file) => handleImageSelect(file, false)}
+            disabled={saving}
           />
-          {form.imageUrl && (
-            <img
-              src={form.imageUrl}
-              alt="Preview"
-              className="mt-2 h-20 w-auto rounded-lg border border-v-border object-cover"
-            />
-          )}
         </div>
 
         {/* Per-type config — rendered dynamically from configSchema. */}
@@ -482,16 +501,15 @@ export default function PollingBuilderPage() {
                     </button>
                   )}
                 </div>
-                <input
-                  className={`${INPUT_CLASS} text-xs`}
-                  placeholder="Option image URL (optional)"
-                  value={opt.imageUrl ?? ''}
-                  onChange={(e) => {
-                    const options = [...form.options]
-                    options[i] = { ...options[i], imageUrl: e.target.value }
-                    setForm({ ...form, options })
-                  }}
-                />
+                <div className="mt-2 w-48">
+                  <ImageUploadField
+                    hint="Option image (optional)"
+                    variant="photo"
+                    currentUrl={opt.imageUrl}
+                    onFileSelect={(file) => handleImageSelect(file, true, i)}
+                    disabled={saving}
+                  />
+                </div>
               </div>
             ))}
             <button

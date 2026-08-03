@@ -149,12 +149,7 @@ const [done, setDone] = useState(false)
             {new Date(poll.event.endDate).toLocaleDateString()}.
           </p>
         )}
-        {poll?.event?.pollExpiresAt && !poll?.event?.endDate && (
-          <p className="mt-2 text-sm text-v-text-subtle">
-            This poll expired on{' '}
-            {new Date(poll.event.pollExpiresAt).toLocaleDateString()}.
-          </p>
-        )}
+
         <Link to="/voter" className="mt-4 inline-block text-v-text-muted">
           Back to dashboard
         </Link>

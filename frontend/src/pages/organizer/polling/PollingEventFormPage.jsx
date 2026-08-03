@@ -61,7 +61,6 @@ export default function PollingEventFormPage() {
       endDate: '',
       pollAnonymous: false,
       pollAllowMultipleSubmissions: false,
-      pollExpiresAt: '',
     },
   })
 
@@ -74,7 +73,7 @@ export default function PollingEventFormPage() {
     pollingService
       .getSettings(eventId)
       .then(({ data }) => {
-        const e = data.event
+        const e = data.settings || data.event
         reset({
           title: e.title || '',
           description: e.description || '',
@@ -82,7 +81,6 @@ export default function PollingEventFormPage() {
           endDate: isoToLocalInput(e.endDate),
           pollAnonymous: e.pollAnonymous || false,
           pollAllowMultipleSubmissions: e.pollAllowMultipleSubmissions || false,
-          pollExpiresAt: isoToLocalInput(e.pollExpiresAt),
         })
         setBanner(e.banner)
         if (e.banner) markComplete('branding')
@@ -166,7 +164,6 @@ try {
       const isValid = await trigger([
         'pollAnonymous',
         'pollAllowMultipleSubmissions',
-        'pollExpiresAt',
         'startDate',
         'endDate',
       ])
@@ -199,7 +196,6 @@ try {
       endDate: localInputToIso(data.endDate),
       pollAnonymous: data.pollAnonymous || false,
       pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions || false,
-      pollExpiresAt: localInputToIso(data.pollExpiresAt),
     }
   }
 
@@ -430,35 +426,7 @@ try {
               </div>
             </div>
 
-            <div className="v-form-field">
-              <label className={LABEL_CLASS} htmlFor="pollExpiresAt">
-                Expiration date (optional)
-              </label>
-              <Controller
-                control={control}
-                name="pollExpiresAt"
-                render={({ field }) => (
-                  <CalendarCard
-                    id="pollExpiresAt"
-                    defaultHour={23}
-                    defaultMinute={59}
-                    hasError={Boolean(errors.pollExpiresAt)}
-                    min={startDateValue || undefined}
-                    max={endDateValue || undefined}
-                    value={field.value ?? ''}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                    name={field.name}
-                  />
-                )}
-              />
-              <p className={HELPER_TEXT}>
-                Poll will close after this date. Must be within the start–end window.
-              </p>
-              {errors.pollExpiresAt && (
-                <p className="v-error-text">{errors.pollExpiresAt.message}</p>
-              )}
-            </div>
+
 
             {error && <p className="v-error-text">{error}</p>}
 

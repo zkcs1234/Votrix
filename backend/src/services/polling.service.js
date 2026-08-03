@@ -545,7 +545,6 @@ export async function createPollEvent(organizerId, payload) {
       polling_enabled: false,
       poll_anonymous: Boolean(payload.pollAnonymous),
       poll_allow_multiple_submissions: Boolean(payload.pollAllowMultipleSubmissions),
-      poll_expires_at: payload.pollExpiresAt ?? null,
     })
     .select('*')
     .single()
@@ -569,7 +568,6 @@ export async function updatePollEvent(eventId, organizerId, payload) {
   if (payload.pollAllowMultipleSubmissions !== undefined) {
     updates.poll_allow_multiple_submissions = payload.pollAllowMultipleSubmissions
   }
-  if (payload.pollExpiresAt !== undefined) updates.poll_expires_at = payload.pollExpiresAt
   if (payload.banner !== undefined) updates.banner = payload.banner
 
   const { data, error } = await getClient()

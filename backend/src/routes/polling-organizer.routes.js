@@ -14,6 +14,7 @@ router.patch('/events/:eventId', ctrl.updateEvent)
 router.get('/events/:eventId/settings', ctrl.getSettings)
 router.patch('/events/:eventId/open', ctrl.setPollOpen)
 router.post('/events/:eventId/banner', uploadLimiter, uploadImage('banner'), ctrl.uploadBanner)
+router.post('/events/:eventId/image', uploadLimiter, uploadImage('image'), ctrl.uploadGenericImage)
 
 router.get('/events/:eventId/questions', ctrl.listQuestions)
 router.post('/events/:eventId/questions', ctrl.createQuestion)

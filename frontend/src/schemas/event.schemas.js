@@ -64,30 +64,18 @@ export const pollingEventSchema = z.object({
   endDate: z.string().min(1, 'End date is required').refine(isValidDateString, 'Invalid end date'),
   pollAnonymous: z.boolean().optional(),
   pollAllowMultipleSubmissions: z.boolean().optional(),
-  pollExpiresAt: z.string().optional().refine(
-    (val) => !val || isValidDateString(val),
-    'Invalid expiration date',
-  ),
 })
 
-function assertPollDateWindow(data) {
-  if (!data.startDate || !data.endDate) return true
-  if (new Date(data.endDate) < new Date(data.startDate)) return false
-  if (data.pollExpiresAt) {
-    const exp = new Date(data.pollExpiresAt)
-    if (exp < new Date(data.startDate) || exp > new Date(data.endDate)) return false
+export const pollingEventSchemaEdit = pollingEventSchema.refine(
+  (data) => {
+    if (!data.startDate || !data.endDate) return true
+    return new Date(data.endDate) >= new Date(data.startDate)
+  },
+  {
+    message: 'End date must be on or after start date',
+    path: ['endDate'],
   }
-  return true
-}
-
-export const pollingEventSchemaEdit = pollingEventSchema.refine(assertPollDateWindow, {
-  message: 'Expiration date must be between start and end dates',
-  path: ['pollExpiresAt'],
-})
+)
 
 export const pollingEventSchemaStep1 = pollingEventSchemaEdit
-
-export const pollingEventSchemaStep3 = pollingEventSchema.refine(assertPollDateWindow, {
-  message: 'Expiration date must be between start and end dates',
-  path: ['pollExpiresAt'],
-})
+export const pollingEventSchemaStep3 = pollingEventSchemaEdit
