@@ -7,9 +7,10 @@ const FIELD_TYPES = [
   { value: 'text', label: 'Text input' },
   { value: 'dropdown', label: 'Dropdown select' },
   { value: 'number', label: 'Number' },
+  { value: 'text_number', label: 'Text & Number (Free‑form)' },
 ]
 
-const DEFAULT_FIELD = { id: null, label: '', type: 'text', required: true, options: [] }
+const DEFAULT_FIELD = { id: null, label: '', type: 'text', required: true, options: [], value: '' }
 
 let fieldIdCounter = 0
 function generateFieldId() {
@@ -129,7 +130,12 @@ const [enabled, setEnabled] = useState(false)
               label: f.label,
               type: f.type,
               required: f.required,
-              options: f.type === 'dropdown' ? (f.options || []).filter((o) => o.trim()) : undefined,
+              ...(f.type === 'dropdown'
+                ? { options: (f.options || []).filter((o) => o.trim()) }
+                : {}),
+              ...(f.type === 'text_number'
+                ? { value: f.value }
+                : {}),
             }))
           : [],
       }
@@ -194,12 +200,16 @@ const [enabled, setEnabled] = useState(false)
                       onChange={(e) =>
                         updateField(field.id, {
                           type: e.target.value,
-                          options:
-                            e.target.value === 'dropdown'
-                              ? field.options?.length
-                                ? field.options
-                                : ['']
-                              : undefined,
+                          // Reset type‑specific properties
+                          ...(e.target.value === 'dropdown'
+                            ? {
+                                options: field.options?.length ? field.options : [''],
+                                value: undefined,
+                              }
+                            : e.target.value === 'text_number'
+                            ? { value: '', options: undefined }
+                            : { options: undefined, value: undefined }
+                          ),
                         })
                       }
                     >
@@ -225,6 +235,19 @@ const [enabled, setEnabled] = useState(false)
                       Required
                     </label>
                   </div>
+                {/* Text & Number value input */}
+                {field.type === 'text_number' && (
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="v-label mb-1">Value</label>
+                    <input
+                      type="text"
+                      className="v-input w-full"
+                      placeholder="e.g. 4A, BSIT2"
+                      value={field.value}
+                      onChange={(e) => updateField(field.id, { value: e.target.value })}
+                    />
+                  </div>
+                )}
                   <button
                     type="button"
                     onClick={() => removeField(field.id)}

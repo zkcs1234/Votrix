@@ -87,9 +87,10 @@ export default function DynamicParticipantTable({
   }
 
   // ─── Get dynamic field value ─────────────────────────────────────────────
-  function getFieldValue(participant, fieldLabel) {
+  function getFieldValue(participant, field) {
     const meta = participant.metadata || {}
-    return meta[fieldLabel] || '-'
+    // Try by label (legacy) then by field id (current schema)
+    return meta[field.label] ?? meta[field.id] ?? '-'
   }
 
   // ─── Export CSV ──────────────────────────────────────────────────────────
@@ -97,7 +98,7 @@ export default function DynamicParticipantTable({
     const headers = ['Email', 'Status', ...customFields.map((f) => f.label)]
     const rows = filtered.map((p) => {
       const statusVal = p[statusKey] ? statusLabel.done : statusLabel.active
-      const customVals = customFields.map((f) => getFieldValue(p, f.label))
+      const customVals = customFields.map((f) => getFieldValue(p, f))
       return [p.email, statusVal, ...customVals]
     })
     downloadCsv(`participants.csv`, headers, rows)
