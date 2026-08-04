@@ -96,7 +96,8 @@ const [csvPreview, setCsvPreview] = useState(null)
   const load = useCallback(async () => {
     try {
       const { data } = await pageantService.listJudges(eventId)
-      setJudges(data.judges ?? [])
+      const judgeList = data.judges
+      setJudges(Array.isArray(judgeList) ? judgeList : [])
       setFormSchema(data.informationFormSchema ?? null)
     } catch (err) {
       console.error('Failed to load judges:', err)

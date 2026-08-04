@@ -96,7 +96,8 @@ const [search, setSearch] = useState('')
   const load = useCallback(async () => {
     try {
       const { data } = await pollingService.listVoters(eventId)
-      setVoters(data.voters ?? [])
+      const voterList = data.voters
+      setVoters(Array.isArray(voterList) ? voterList : [])
       setFormSchema(data.informationFormSchema ?? null)
     } catch (err) {
       console.error('Failed to load respondents:', err)

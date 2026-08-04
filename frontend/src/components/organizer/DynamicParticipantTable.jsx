@@ -42,7 +42,7 @@ export default function DynamicParticipantTable({
   const [showSkeleton, setShowSkeleton] = useState(false)
 
   // Derive dynamic columns from the form schema
-  const customFields = formSchema?.enabled ? (formSchema.fields || []) : []
+  const customFields = formSchema?.enabled ? (Array.isArray(formSchema.fields) ? formSchema.fields : []) : []
 
   // Filter by search
   const filtered = participants.filter((p) =>

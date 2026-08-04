@@ -107,7 +107,8 @@ export default function ElectionVotersPage() {
       try {
         const { data } = await electionService.listVoters(eventId)
         if (!alive) return
-        setVoters(data.voters ?? [])
+        const voterList = data.voters
+        setVoters(Array.isArray(voterList) ? voterList : [])
         setFormSchema(data.informationFormSchema ?? null)
       } catch (err) {
         console.error('Failed to load voters:', err)
@@ -122,7 +123,8 @@ export default function ElectionVotersPage() {
   const reload = async () => {
     try {
       const { data } = await electionService.listVoters(eventId)
-      setVoters(data.voters ?? [])
+      const voterList = data.voters
+      setVoters(Array.isArray(voterList) ? voterList : [])
       setFormSchema(data.informationFormSchema ?? null)
     } catch (err) {
       console.error('Failed to reload voters:', err)
