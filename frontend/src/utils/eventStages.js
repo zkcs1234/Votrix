@@ -16,6 +16,7 @@ export const EVENT_STAGES = {
     { key: 'contestants', label: 'Contestants', path: 'contestants' },
     { key: 'criteria', label: 'Criteria', path: 'criteria' },
     { key: 'judges', label: 'Judges', path: 'judges' },
+    { key: 'workspace', label: 'Workspace', path: 'workspace' },
     { key: 'rankings', label: 'Rankings', path: 'rankings' },
     { key: 'live', label: 'Live Control', path: 'live' },
     { key: 'analytics', label: 'Analytics', path: 'analytics' },

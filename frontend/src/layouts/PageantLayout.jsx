@@ -1,6 +1,6 @@
 import { useParams, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, CalendarDays, Users, Star, ListChecks, Award, Play,
+  LayoutDashboard, CalendarDays, Users, Star, ListChecks, Award, Play, Settings2,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
@@ -26,6 +26,13 @@ const navItems = [
     label: 'Judges',
     path: 'judges',
     icon: Star,
+    scoped: true,
+    basePath: '/organizer/competition/events',
+  },
+  {
+    label: 'Workspace',
+    path: 'workspace',
+    icon: Settings2,
     scoped: true,
     basePath: '/organizer/competition/events',
   },
