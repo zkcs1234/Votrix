@@ -276,6 +276,7 @@ function RoundsTab({ foundation, reload }) {
   const [weight, setWeight] = useState(0)
   const [categoryId, setCategoryId] = useState('')
   const [saving, setSaving] = useState(false)
+  const [expandedRoundId, setExpandedRoundId] = useState(null)
 
   const totalWeight = useMemo(
     () => (foundation?.rounds ?? []).reduce((s, r) => s + Number(r.weight), 0),
@@ -367,44 +368,64 @@ function RoundsTab({ foundation, reload }) {
         Round weight total: {totalWeight.toFixed(2)}% (must equal 100%)
       </p>
 
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {(foundation?.rounds ?? []).map((round) => (
           <li
             key={round.id}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-v-border px-4 py-3"
+            className="rounded-xl border border-v-border bg-v-surface"
           >
-            <div>
-              <p className="font-medium text-v-text">{round.name}</p>
-              <p className="text-xs text-v-text-subtle">
-                {round.weight}% · {round.contestantIds?.length ?? 0} contestants ·{' '}
-                {round.criteriaIds?.length ?? 0} criteria ·{' '}
-                {round.categoryId
-                  ? foundation?.categories?.find((c) => c.id === round.categoryId)?.name ??
-                    'Category'
-                  : 'Event-wide'}
-              </p>
+            {/* Round header row */}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+              <div>
+                <p className="font-medium text-v-text">{round.name}</p>
+                <p className="text-xs text-v-text-subtle">
+                  {round.weight}% · {round.contestantIds?.length ?? 0} contestants ·{' '}
+                  {round.criteriaIds?.length ?? 0} criteria ·{' '}
+                  {round.categoryId
+                    ? foundation?.categories?.find((c) => c.id === round.categoryId)?.name ?? 'Category'
+                    : 'Event-wide'}
+                </p>
+              </div>
+              <div className="flex gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={() => setExpandedRoundId(expandedRoundId === round.id ? null : round.id)}
+                  className="rounded-lg border border-v-border px-3 py-1 text-xs text-v-text-muted hover:bg-v-surface-elevated"
+                >
+                  {expandedRoundId === round.id ? 'Hide assignments' : 'Assign contestants & criteria'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleOpen(round)}
+                  className={round.isOpen ? 'text-v-success' : 'text-v-text-muted'}
+                >
+                  {round.isOpen ? 'Open' : 'Closed'}
+                </button>
+                <button
+                  type="button"
+                  className="text-v-danger"
+                  onClick={async () => {
+                    if (confirm('Delete this round?')) {
+                      await pageantService.deleteRound(eventId, round.id)
+                      reload()
+                    }
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2 text-sm">
-              <button
-                type="button"
-                onClick={() => toggleOpen(round)}
-                className={round.isOpen ? 'text-v-success' : 'text-v-text-muted'}
-              >
-                {round.isOpen ? 'Open' : 'Closed'}
-              </button>
-              <button
-                type="button"
-                className="text-v-danger"
-                onClick={async () => {
-                  if (confirm('Delete this round?')) {
-                    await pageantService.deleteRound(eventId, round.id)
-                    reload()
-                  }
-                }}
-              >
-                Delete
-              </button>
-            </div>
+
+            {/* Expanded assignment panel */}
+            {expandedRoundId === round.id && (
+              <RoundAssignmentPanel
+                eventId={eventId}
+                round={round}
+                allContestants={foundation?.contestants ?? []}
+                allCriteria={foundation?.criteria ?? []}
+                reload={reload}
+              />
+            )}
           </li>
         ))}
         {!foundation?.rounds?.length && (
@@ -413,6 +434,126 @@ function RoundsTab({ foundation, reload }) {
           </li>
         )}
       </ul>
+    </div>
+  )
+}
+
+function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, reload }) {
+  const assignedContestantIds = new Set(round.contestantIds ?? [])
+  const assignedCriteriaIds = new Set(round.criteriaIds ?? [])
+  const [busy, setBusy] = useState(null) // tracks which id is loading
+
+  const toggleContestant = async (contestantId) => {
+    setBusy(`c-${contestantId}`)
+    try {
+      if (assignedContestantIds.has(contestantId)) {
+        await pageantService.removeRoundContestant(eventId, round.id, contestantId)
+      } else {
+        await pageantService.addRoundContestant(eventId, round.id, contestantId)
+      }
+      reload()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update contestant')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const toggleCriteria = async (criteriaId) => {
+    setBusy(`cr-${criteriaId}`)
+    try {
+      if (assignedCriteriaIds.has(criteriaId)) {
+        await pageantService.removeRoundCriteria(eventId, round.id, criteriaId)
+      } else {
+        await pageantService.addRoundCriteria(eventId, round.id, criteriaId)
+      }
+      reload()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update criteria')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="border-t border-v-border px-4 pb-4 pt-3 grid gap-4 sm:grid-cols-2">
+      {/* Contestants */}
+      <div>
+        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-v-text-muted">
+          Contestants in this round
+        </p>
+        {allContestants.length === 0 ? (
+          <p className="text-xs text-v-text-subtle">No contestants added to the event yet.</p>
+        ) : (
+          <ul className="space-y-1">
+            {allContestants.map((c) => {
+              const id = c.id
+              const assigned = assignedContestantIds.has(id)
+              const loading = busy === `c-${id}`
+              // foundation returns raw DB rows (snake_case) or mapped camelCase depending on path
+              const number = c.contestantNumber ?? c.contestant_number
+              return (
+                <li key={id} className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2 text-sm">
+                  <span className="text-v-text">
+                    #{number} {c.name}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => toggleContestant(id)}
+                    className={`rounded px-2 py-0.5 text-xs font-medium transition disabled:opacity-50 ${
+                      assigned
+                        ? 'bg-v-success/10 text-v-success hover:bg-v-danger/10 hover:text-v-danger'
+                        : 'bg-v-surface-elevated text-v-text-muted hover:bg-v-primary/10 hover:text-v-primary'
+                    }`}
+                  >
+                    {loading ? '...' : assigned ? 'Remove' : 'Add'}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* Criteria */}
+      <div>
+        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-v-text-muted">
+          Criteria in this round
+        </p>
+        {allCriteria.length === 0 ? (
+          <p className="text-xs text-v-text-subtle">No criteria added to the event yet.</p>
+        ) : (
+          <ul className="space-y-1">
+            {allCriteria.map((cr) => {
+              const id = cr.id
+              const assigned = assignedCriteriaIds.has(id)
+              const loading = busy === `cr-${id}`
+              const pct = cr.percentage ?? cr.percentage
+              return (
+                <li key={id} className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2 text-sm">
+                  <span className="text-v-text">
+                    {cr.name}{' '}
+                    <span className="text-xs text-v-text-subtle">{Number(pct).toFixed(1)}%</span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => toggleCriteria(id)}
+                    className={`rounded px-2 py-0.5 text-xs font-medium transition disabled:opacity-50 ${
+                      assigned
+                        ? 'bg-v-success/10 text-v-success hover:bg-v-danger/10 hover:text-v-danger'
+                        : 'bg-v-surface-elevated text-v-text-muted hover:bg-v-primary/10 hover:text-v-primary'
+                    }`}
+                  >
+                    {loading ? '...' : assigned ? 'Remove' : 'Add'}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
