@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
@@ -418,50 +419,8 @@ function RoundsTab({ foundation, reload }) {
 
 function JudgesTab({ foundation, reload }) {
   const { eventId } = useParams()
-  const [email, setEmail] = useState('')
-  const [temporaryPassword, setTemporaryPassword] = useState('')
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [role, setRole] = useState('judge')
   const [scope, setScope] = useState('event')
   const [scopeId, setScopeId] = useState('')
-  const [error, setError] = useState(null)
-  const [saving, setSaving] = useState(false)
-
-  const invite = async (e) => {
-    e.preventDefault()
-    setError(null)
-    setSaving(true)
-    try {
-      await pageantService.inviteJudgeV2(eventId, {
-        email,
-        firstName,
-        lastName,
-        role,
-        temporaryPassword,
-      })
-      setEmail('')
-      setTemporaryPassword('')
-      setFirstName('')
-      setLastName('')
-      reload()
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to invite judge')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const updateRole = async (judge, nextRole) => {
-    await pageantService.updateJudgeV2(eventId, judge.id, { role: nextRole })
-    reload()
-  }
-
-  const remove = async (judge) => {
-    if (!confirm('Remove this judge from the event?')) return
-    await pageantService.deleteJudgeV2(eventId, judge.id)
-    reload()
-  }
 
   const addAssignment = async (judge) => {
     if (!scopeId) {
@@ -500,70 +459,16 @@ function JudgesTab({ foundation, reload }) {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={invite} className="grid gap-4 v-card p-6 sm:grid-cols-2">
-        <div>
-          <label className={LABEL_CLASS}>Email</label>
-          <input
-            type="email"
-            className={INPUT_CLASS}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label className={LABEL_CLASS}>Temp Password</label>
-          <input
-            type="password"
-            className={INPUT_CLASS}
-            value={temporaryPassword}
-            onChange={(e) => setTemporaryPassword(e.target.value)}
-            minLength={8}
-            placeholder="Min 8 characters"
-            required
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className={LABEL_CLASS}>First name</label>
-            <input
-              className={INPUT_CLASS}
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className={LABEL_CLASS}>Last name</label>
-            <input
-              className={INPUT_CLASS}
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-            />
-          </div>
-        </div>
-        <div>
-          <label className={LABEL_CLASS}>Role</label>
-          <select
-            className={INPUT_CLASS}
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-          >
-            <option value="judge">Judge</option>
-            <option value="head_judge">Head Judge</option>
-            <option value="score_reviewer">Score Reviewer</option>
-          </select>
-        </div>
-        <div className="flex items-end">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-60"
-          >
-            Invite judge
-          </button>
-        </div>
-        {error && <p className="text-sm text-v-danger sm:col-span-2">{error}</p>}
-      </form>
+      <div className="rounded-lg border border-v-border/50 bg-v-surface-elevated px-4 py-3 text-sm text-v-text-muted">
+        To register or invite judges, go to the{' '}
+        <Link
+          to={`/organizer/competition/events/${eventId}/judges`}
+          className="text-v-primary underline hover:text-v-primary-hover"
+        >
+          Judges page
+        </Link>
+        . This tab is only for scoping existing judges to specific rounds or categories.
+      </div>
 
       <ul className="space-y-2">
         {(foundation?.judges ?? []).map((judge) => {
@@ -581,24 +486,6 @@ function JudgesTab({ foundation, reload }) {
                   <p className="text-xs text-v-text-subtle">
                     {judge.email} · {judge.role}
                   </p>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <select
-                    className={INPUT_CLASS}
-                    value={judge.role}
-                    onChange={(e) => updateRole(judge, e.target.value)}
-                  >
-                    <option value="judge">Judge</option>
-                    <option value="head_judge">Head Judge</option>
-                    <option value="score_reviewer">Score Reviewer</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => remove(judge)}
-                    className="text-v-danger"
-                  >
-                    Remove
-                  </button>
                 </div>
               </div>
 
@@ -674,7 +561,14 @@ function JudgesTab({ foundation, reload }) {
         })}
         {!foundation?.judges?.length && (
           <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
-            No judges invited yet.
+            No judges registered yet. Go to the{' '}
+            <Link
+              to={`/organizer/competition/events/${eventId}/judges`}
+              className="text-v-primary underline"
+            >
+              Judges page
+            </Link>{' '}
+            to add judges first.
           </li>
         )}
       </ul>
