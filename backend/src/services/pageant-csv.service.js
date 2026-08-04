@@ -71,7 +71,7 @@ export async function importJudgesFromCsv(eventId, organizerId, fileBuffer) {
       // Use registerJudge (no email) with resetPasswordForExisting = true
       const result = await registerJudge(eventId, organizerId, {
         email: row.email,
-        resetPasswordForExisting: true,
+        resetPasswordForExisting: false,
       })
       results.push({
         email: row.email,

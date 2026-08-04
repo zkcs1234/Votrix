@@ -415,7 +415,7 @@ async function ensureJudgeAccount(email, plainPassword, resetPasswordForExisting
 
   // If user exists and we're not resetting password, just return them
   if (existing && !resetPasswordForExisting) {
-    return { user: existing, isNew: false }
+    return { user: sanitizeUser(existing), isNew: false }
   }
 
   const passwordHash = await hashPassword(plainPassword)
@@ -452,7 +452,8 @@ export async function inviteJudge(eventId, organizerId, { email, temporaryPasswo
   const event = await getEventById(eventId)
 
   const tempPassword = temporaryPassword || generateTemporaryPassword()
-  const { user } = await ensureJudgeAccount(email, tempPassword)
+  // Existing judges keep their own password — never reset. isNew decides which email to send.
+  const { user, isNew } = await ensureJudgeAccount(email, tempPassword, false)
 
   await registerParticipant(eventId, user.id, {
     participantType: 'COMPETITION_JUDGE',
@@ -460,14 +461,20 @@ export async function inviteJudge(eventId, organizerId, { email, temporaryPasswo
     lastName: lastName || null,
   })
 
-  const emailResult = await sendJudgeInvitationEmail({
-    email: user.email,
-    temporaryPassword: tempPassword,
-    eventId: event.id,
-    eventTitle: event.title,
-  })
+  const emailResult = isNew
+    ? await sendJudgeInvitationEmail({
+        email: user.email,
+        temporaryPassword: tempPassword,
+        eventId: event.id,
+        eventTitle: event.title,
+      })
+    : await sendJudgeInvitationEmailRegistered({
+        email: user.email,
+        eventId: event.id,
+        eventTitle: event.title,
+      })
 
-  return { user, email: emailResult }
+  return { user: sanitizeUser(user), isNewJudge: isNew, email: emailResult }
 }
 
 /**
@@ -516,7 +523,7 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
 
   const { data: enrollment } = await getClient()
     .from(DB_TABLES.EVENT_VOTERS)
-    .select('id, users (id, email)')
+    .select('id, users (id, email, must_change_password)')
     .eq('event_id', eventId)
     .eq('voter_id', judgeId)
     .eq('is_judge', true)
@@ -525,17 +532,8 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
   if (!enrollment) throw new ApiError(404, 'Judge is not enrolled in this event')
 
   const judgeEmail = enrollment.users?.email
-
-  // Check if this judge has other sent invitations (existing account)
-  const { data: otherInvitations } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .select('id, invitation_sent')
-    .eq('voter_id', judgeId)
-    .neq('event_id', eventId)
-    .limit(1)
-
-  const isExistingAccount = otherInvitations && otherInvitations.length > 0 &&
-    otherInvitations.some(inv => inv.invitation_sent === true)
+  // A judge who has already set their own password is an existing account.
+  const isExistingAccount = !enrollment.users?.must_change_password
 
   let tempPassword = null
   let emailResult = null
@@ -598,7 +596,7 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
 
   const { data: pending, error } = await getClient()
     .from(DB_TABLES.INVITATIONS)
-    .select('voter_id, users (id, email)')
+    .select('voter_id, users (id, email, must_change_password)')
     .eq('event_id', eventId)
     .eq('invitation_sent', false)
 
@@ -615,25 +613,13 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
   const judgeIds = new Set((judgeRows ?? []).map((r) => r.voter_id))
   const pendingJudges = pending.filter((p) => judgeIds.has(p.voter_id))
 
-  // Check which judges are existing accounts
-  const allJudgeIds = pendingJudges.map(p => p.voter_id)
-  const { data: existingCheck } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .select('voter_id')
-    .in('voter_id', allJudgeIds)
-    .eq('invitation_sent', true)
-
-  const existingAccountIds = new Set()
-  if (existingCheck) {
-    existingCheck.forEach(inv => existingAccountIds.add(inv.voter_id))
-  }
-
   let sent = 0, failed = 0
   const results = []
 
   for (const p of pendingJudges) {
     const judgeEmail = p.users?.email
-    const isExistingAccount = existingAccountIds.has(p.voter_id)
+    // A judge who has already set their own password is an existing account.
+    const isExistingAccount = !p.users?.must_change_password
 
     let tempPassword = null
     let emailResult = null

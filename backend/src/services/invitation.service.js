@@ -10,12 +10,17 @@ import { createNotification } from './notification.service.js'
 import { registerParticipant } from './participant.service.js'
 
 
-async function ensureVoterAccount(email, plainPassword) {
+async function ensureVoterAccount(email, plainPassword, resetPasswordForExisting = true) {
   const normalizedEmail = email.toLowerCase().trim()
   const existing = await findUserByEmail(normalizedEmail)
 
   if (existing && existing.role !== USER_ROLES.VOTER) {
     throw new ApiError(409, 'This email is already used by another account type')
+  }
+
+  // Existing account that already has its own password — never reset it
+  if (existing && !resetPasswordForExisting) {
+    return { user: sanitizeUser(existing), isNew: false }
   }
 
   const passwordHash = await hashPassword(plainPassword)
@@ -55,7 +60,8 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
   const event = await getEventById(eventId)
 
   const tempPassword = temporaryPassword || generateTemporaryPassword()
-  const { user, isNew } = await ensureVoterAccount(email, tempPassword)
+  // Existing voters keep their own password — never reset. isNew decides which email to send.
+  const { user, isNew } = await ensureVoterAccount(email, tempPassword, false)
 
   // Enroll voter in event — required for them to access it
   try {
@@ -81,13 +87,19 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
     console.error('[invitation] invitations upsert failed (non-fatal):', dbErr.message)
   }
 
-  // Send the invitation email — this is the critical step
-  const emailResult = await sendVoterInvitationEmail({
-    email: user.email,
-    temporaryPassword: tempPassword,
-    eventId: event.id,
-    eventTitle: event.title,
-  })
+  // Send the invitation email — existing accounts get the registered email (no temp password)
+  const emailResult = isNew
+    ? await sendVoterInvitationEmail({
+        email: user.email,
+        temporaryPassword: tempPassword,
+        eventId: event.id,
+        eventTitle: event.title,
+      })
+    : await sendVoterInvitationEmailRegistered({
+        email: user.email,
+        eventId: event.id,
+        eventTitle: event.title,
+      })
 
   console.log(`[invitation] email to ${user.email}: sent=${emailResult.sent}`, emailResult.error ?? '')
 
@@ -106,9 +118,11 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
     try {
       await createNotification({
         userId: user.id,
-        type: 'voter.invitation',
+        type: isNew ? 'voter.invitation' : 'voter.invitation.registered',
         title: `You're invited to ${event.title}`,
-        message: `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
+        message: isNew
+          ? `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`
+          : `You've been added to ${event.title}. Sign in with your existing password.`,
         actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
           ? `/voter/competition/events/${event.id}/score`
           : event.event_type === 'polling'
@@ -212,16 +226,8 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
     throw new ApiError(404, 'Voter is not enrolled in this event')
   }
 
-  // Check if this is an existing account (has other sent invitations)
-  const { data: otherInvitations } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .select('id, invitation_sent')
-    .eq('voter_id', voterId)
-    .neq('event_id', eventId)
-    .limit(1)
-
-  const isExistingAccount = otherInvitations && otherInvitations.length > 0 &&
-    otherInvitations.some(inv => inv.invitation_sent === true)
+  // A voter who has already set their own password is an existing account.
+  const isExistingAccount = !voter.must_change_password
 
   let tempPassword = null
   let emailResult = null
@@ -302,9 +308,9 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
  * @param {string} params.email - The voter email
  * @param {string} params.organizerId - The organizer ID
  * @param {string} [params.temporaryPassword] - Optional password (auto-generated if not provided)
- * @param {boolean} [params.resetPasswordForExisting] - If false, won't reset password for existing voters (default: true for CSV)
+ * @param {boolean} [params.resetPasswordForExisting] - If false, won't reset password for existing voters (default: false — existing voters keep their password)
  */
-export async function registerVoterToEvent({ eventId, email, organizerId, temporaryPassword, resetPasswordForExisting = true }) {
+export async function registerVoterToEvent({ eventId, email, organizerId, temporaryPassword, resetPasswordForExisting = false }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
 
@@ -334,8 +340,7 @@ export async function registerVoterToEvent({ eventId, email, organizerId, tempor
       if (error) throw new ApiError(500, error.message)
       user = sanitizeUser(data)
     } else {
-      // Just use existing user without password change
-      user = existingVoter
+      user = sanitizeUser(existingVoter)
     }
   } else {
     // New voter - create account with password
@@ -426,7 +431,7 @@ export async function registerExistingVoter({ eventId, email, organizerId }) {
   }
 
   return {
-    user: voter,
+    user: sanitizeUser(voter),
     event: { id: event.id, title: event.title },
     invitationSent: false,
   }
@@ -461,27 +466,8 @@ export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
     throw new ApiError(404, 'Voter is not enrolled in this event')
   }
 
-  // Check invitation record to determine if this is a new or existing account
-  // An existing account = was already in the users table before this invitation
-  // We determine this by checking if user has other event_enrollments or was invited before
-  const { data: invitation } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .select('id, invitation_sent, is_new_account')
-    .eq('event_id', eventId)
-    .eq('voter_id', voterId)
-    .maybeSingle()
-
-  // Check if user has any previous invitations (meaning they existed before)
-  const { data: otherInvitations } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .select('id, invitation_sent')
-    .eq('voter_id', voterId)
-    .neq('event_id', eventId)  // Exclude current event
-    .limit(1)
-
-  // If user has other invitations that were sent, they are "existing"
-  const isExistingAccount = otherInvitations && otherInvitations.length > 0 &&
-    otherInvitations.some(inv => inv.invitation_sent === true)
+  // A voter who has already set their own password is an existing account.
+  const isExistingAccount = !voter.must_change_password
 
   let tempPassword = null
   let emailResult = null
@@ -579,49 +565,23 @@ export async function sendAllPendingInvitations({ eventId, organizerId }) {
   // Get all voters with pending invitations (enrolled but invitation_sent = false)
   const { data: pendingVoters, error: pendingError } = await getClient()
     .from(DB_TABLES.INVITATIONS)
-    .select(`
-      id,
-      voter_id,
-      users (id, email)
-    `)
+    .select('id, voter_id, users (id, email, must_change_password)')
     .eq('event_id', eventId)
     .eq('invitation_sent', false)
 
   if (pendingError) throw new ApiError(500, pendingError.message)
 
   if (!pendingVoters || pendingVoters.length === 0) {
-    return {
-      total: 0,
-      sent: 0,
-      failed: 0,
-      results: [],
-    }
-  }
-
-  // Get all voter IDs to check for existing accounts in batch
-  const voterIds = pendingVoters.map(p => p.voter_id)
-
-  // Check which voters have other sent invitations (existing accounts)
-  const { data: existingCheck } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .select('voter_id')
-    .in('voter_id', voterIds)
-    .eq('invitation_sent', true)
-
-  // Build a set of voter IDs that are existing accounts
-  const existingAccountIds = new Set()
-  if (existingCheck) {
-    existingCheck.forEach(inv => existingAccountIds.add(inv.voter_id))
+    return { total: 0, sent: 0, failed: 0, results: [] }
   }
 
   const results = []
   let sentCount = 0
   let failedCount = 0
 
-  // Process each pending invitation sequentially
   for (const pending of pendingVoters) {
     const voter = pending.users
-    const isExistingAccount = existingAccountIds.has(voter.id)
+    const isExistingAccount = !voter.must_change_password
 
     let tempPassword = null
     let emailResult = null

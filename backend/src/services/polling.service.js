@@ -111,12 +111,17 @@ function isPollOpen(event) {
   return isPollOpenForEvent(event)
 }
 
-async function ensureRespondentAccount(email, plainPassword) {
+async function ensureRespondentAccount(email, plainPassword, resetPasswordForExisting = true) {
   const normalizedEmail = email.toLowerCase().trim()
   const existing = await findUserByEmail(normalizedEmail)
 
   if (existing && existing.role !== USER_ROLES.VOTER) {
     throw new ApiError(409, 'This email is already used by another account type')
+  }
+
+  // Existing account that already has its own password — never reset it
+  if (existing && !resetPasswordForExisting) {
+    return { user: sanitizeUser(existing), isNew: false }
   }
 
   const passwordHash = await hashPassword(plainPassword)
@@ -219,7 +224,7 @@ export async function registerRespondentToPoll({ eventId, email, organizerId, te
   await assertPollingEvent(eventId, organizerId)
 
   const tempPassword = temporaryPassword || generateTemporaryPassword()
-  const { user, isNew } = await ensureRespondentAccount(email, tempPassword)
+  const { user, isNew } = await ensureRespondentAccount(email, tempPassword, resetPasswordForExisting)
 
   await registerParticipant(eventId, user.id, {
     participantType: PARTICIPANT_TYPES.POLLING_RESPONDENT,
@@ -236,7 +241,7 @@ export async function registerRespondentToPoll({ eventId, email, organizerId, te
   }
 
   return {
-    user,
+    user: sanitizeUser(user),
     isNewRespondent: isNew,
     invitationSent: false,
     temporaryPassword: resetPasswordForExisting ? tempPassword : null,
@@ -279,7 +284,7 @@ export async function registerExistingRespondent({ eventId, email, organizerId }
     throw new ApiError(500, 'Failed to create invitation record')
   }
 
-  return { user: voter, invitationSent: false }
+  return { user: sanitizeUser(voter), invitationSent: false }
 }
 
 export async function sendRespondentInvitation({ eventId, voterId, organizerId }) {
@@ -303,14 +308,9 @@ export async function sendRespondentInvitation({ eventId, voterId, organizerId }
     throw new ApiError(404, 'Respondent is not enrolled in this event')
   }
 
-  const { data: otherInvitations } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .select('id, invitation_sent')
-    .eq('voter_id', voterId)
-    .neq('event_id', eventId)
-    .limit(1)
-
-  const isExistingAccount = otherInvitations && otherInvitations.length > 0 && otherInvitations.some((inv) => inv.invitation_sent === true)
+  // A voter who has already set their own password (must_change_password = false)
+  // is an existing account — send the registered email and never reset their password.
+  const isExistingAccount = !voter.must_change_password
 
   let tempPassword = null
   let emailResult = null
@@ -380,7 +380,7 @@ export async function sendAllPendingRespondentInvitations({ eventId, organizerId
 
   const { data: pendingRespondents, error: pendingError } = await getClient()
     .from(DB_TABLES.INVITATIONS)
-    .select('id, voter_id, users (id, email)')
+    .select('id, voter_id, users (id, email, must_change_password)')
     .eq('event_id', eventId)
     .eq('invitation_sent', false)
 
@@ -394,18 +394,10 @@ export async function sendAllPendingRespondentInvitations({ eventId, organizerId
   let sentCount = 0
   let failedCount = 0
 
-  const voterIds = pendingRespondents.map((p) => p.voter_id)
-  const { data: existingCheck } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .select('voter_id')
-    .in('voter_id', voterIds)
-    .eq('invitation_sent', true)
-
-  const existingAccountIds = new Set((existingCheck ?? []).map((inv) => inv.voter_id))
-
   for (const pending of pendingRespondents) {
     const voter = pending.users
-    const isExistingAccount = existingAccountIds.has(voter.id)
+    // A voter who has already set their own password is an existing account.
+    const isExistingAccount = !voter.must_change_password
     let tempPassword = null
     let emailResult = null
 
