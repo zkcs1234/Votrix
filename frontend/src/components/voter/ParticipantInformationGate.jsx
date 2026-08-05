@@ -32,21 +32,25 @@ export default function ParticipantInformationGate({ eventId }) {
   }, [eventId])
 
   const schema = participantInfo?.informationFormSchema
-  const fields = schema?.fields ?? []
+  // Stabilise the fields array reference with useMemo so the completeness
+  // useEffect below doesn't re-run on every render due to a new [] reference.
+  const fields = useMemo(() => schema?.fields ?? [], [schema])
   const showDebugInfo = import.meta.env.DEV
 
-  // Check if form is already completely filled based on required fields
+  // Check if form is already completely filled based on required fields.
+  // Runs whenever participantInfo (metadata) or the field definitions change.
   useEffect(() => {
-    if (participantInfo && fields.length > 0) {
-      const meta = participantInfo?.metadata ?? {}
-      const isComplete = fields.every((f) => {
-        if (!f.required) return true
-        const val = meta[f.id]
-        // treat false (checkbox) and 0 (number) as filled; only undefined/null/''/missing is incomplete
-        return val !== undefined && val !== null && val !== ''
-      })
-      setIsOpen(!isComplete)
-    }
+    if (!participantInfo) return
+    if (fields.length === 0) return
+
+    const meta = participantInfo.metadata ?? {}
+    const isComplete = fields.every((f) => {
+      if (!f.required) return true
+      const val = meta[f.id]
+      // treat false (checkbox) and 0 (number) as filled; only undefined/null/'' is incomplete
+      return val !== undefined && val !== null && val !== ''
+    })
+    setIsOpen(!isComplete)
   }, [participantInfo, fields])
 
   if (loading) {
