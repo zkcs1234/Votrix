@@ -615,7 +615,7 @@ async function loadOptionsForQuestions(questionIds) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POLL_OPTIONS)
-    .select('id, question_id, label, sort_order')
+    .select('id, question_id, label, sort_order, image_url')
     .in('question_id', questionIds)
     .order('sort_order', { ascending: true })
 
@@ -636,7 +636,7 @@ export async function listQuestions(eventId, organizerId) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
-    .select('id, event_id, question, type, sort_order, required, type_config')
+    .select('id, event_id, question, type, sort_order, required, type_config, image_url')
     .eq('event_id', eventId)
     .order('sort_order', { ascending: true })
 
@@ -768,7 +768,7 @@ export async function duplicateQuestion(eventId, organizerId, questionId) {
   // Fetch the source question
   const { data: sourceQuestion, error: qError } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
-    .select('id, event_id, question, type, sort_order, required, type_config')
+    .select('id, event_id, question, type, sort_order, required, type_config, image_url')
     .eq('id', questionId)
     .eq('event_id', eventId)
     .single()
@@ -821,6 +821,7 @@ export async function duplicateQuestion(eventId, organizerId, questionId) {
       sort_order: newSortOrder,
       required: sourceQuestion.required,
       type_config: typeConfig,
+      image_url: sourceQuestion.image_url ?? null,
     })
     .select('*')
     .single()
@@ -834,6 +835,7 @@ export async function duplicateQuestion(eventId, organizerId, questionId) {
       question_id: newQuestion.id,
       label: o.label,
       sort_order: o.sort_order ?? i,
+      image_url: o.image_url ?? null,
     }))
 
     const { data: opts, error: optErr } = await getClient()
@@ -970,7 +972,7 @@ async function listQuestionsPublic(eventId, registry = null) {
   registry = registry ?? (await loadQuestionTypeRegistry())
   const { data, error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
-    .select('id, event_id, question, type, sort_order, required, type_config')
+    .select('id, event_id, question, type, sort_order, required, type_config, image_url')
     .eq('event_id', eventId)
     .order('sort_order', { ascending: true })
 

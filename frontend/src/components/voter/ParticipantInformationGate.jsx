@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ParticipantInformationForm from '@/components/voter/ParticipantInformationForm'
 import { voterService } from '@/services/voter.service'
@@ -54,13 +55,14 @@ export default function ParticipantInformationGate({ eventId }) {
   }, [participantInfo, fields])
 
   if (loading) {
-    return (
+    return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
         <div className="w-full max-w-sm rounded-xl bg-v-surface p-6 shadow-2xl text-center">
           <LoadingSpinner />
           <p className="v-caption mt-3">Loading participant information...</p>
         </div>
-      </div>
+      </div>,
+      document.body,
     )
   }
 
@@ -85,7 +87,7 @@ export default function ParticipantInformationGate({ eventId }) {
     return null
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl bg-v-surface shadow-2xl">
         <ParticipantInformationForm
@@ -114,6 +116,7 @@ export default function ParticipantInformationGate({ eventId }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
