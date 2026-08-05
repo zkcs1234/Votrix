@@ -60,9 +60,12 @@ export default function ParticipantInformationForm({
     return null
   }
 
-  const isFilled = Object.keys(formData).some(key => {
-    const field = fields.find(f => f.id === key)
-    return field && formData[key]
+  // Consider the form "filled enough" to submit if every required field
+  // has a non-empty value. false (checkbox) and 0 (number) count as filled.
+  const isFilled = fields.every((f) => {
+    if (!f.required) return true
+    const val = formData[f.id]
+    return val !== undefined && val !== null && val !== ''
   })
 
   return (

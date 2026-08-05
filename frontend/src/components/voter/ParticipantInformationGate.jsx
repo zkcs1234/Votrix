@@ -38,7 +38,13 @@ export default function ParticipantInformationGate({ eventId }) {
   // Check if form is already completely filled based on required fields
   useEffect(() => {
     if (participantInfo && fields.length > 0) {
-      const isComplete = fields.every((f) => !f.required || !!participantInfo?.metadata?.[f.id])
+      const meta = participantInfo?.metadata ?? {}
+      const isComplete = fields.every((f) => {
+        if (!f.required) return true
+        const val = meta[f.id]
+        // treat false (checkbox) and 0 (number) as filled; only undefined/null/''/missing is incomplete
+        return val !== undefined && val !== null && val !== ''
+      })
       setIsOpen(!isComplete)
     }
   }, [participantInfo, fields])
@@ -82,7 +88,15 @@ export default function ParticipantInformationGate({ eventId }) {
           eventId={eventId}
           initialMetadata={participantInfo?.metadata}
           fields={fields}
-          onSuccess={() => setIsOpen(false)}
+          onSuccess={(savedMetadata) => {
+            // Update participantInfo with the saved metadata so the
+            // isComplete useEffect evaluates the fresh data and keeps
+            // the form closed instead of re-opening it.
+            setParticipantInfo((prev) => ({
+              ...prev,
+              metadata: savedMetadata,
+            }))
+          }}
         />
         {showDebugInfo && (
           <div className="p-4 border-t border-v-border">
