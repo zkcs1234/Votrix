@@ -44,10 +44,12 @@ export default function ParticipantInformationForm({
     setSuccess(false)
 
     try {
-      await voterService.updateParticipantInformation(eventId, formData)
+      const { data } = await voterService.updateParticipantInformation(eventId, formData)
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
-      onSuccess?.(formData)
+      // Pass the server-confirmed metadata (not local formData) so the Gate
+      // evaluates completeness against what was actually stored in the DB.
+      onSuccess?.(data.metadata ?? formData)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save information')
     } finally {

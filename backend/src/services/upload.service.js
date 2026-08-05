@@ -7,6 +7,7 @@ export const UPLOAD_KIND = {
   BANNER: 'banner',
   CANDIDATE_PHOTO: 'candidate_photo',
   CONTESTANT_PHOTO: 'contestant_photo',
+  PHOTO: 'photo',
 }
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
@@ -27,6 +28,10 @@ const UPLOAD_CONFIG = {
   [UPLOAD_KIND.CONTESTANT_PHOTO]: {
     folder: 'votrix/contestants',
     transformation: [{ width: 500, height: 500, crop: 'fill', gravity: 'auto', quality: 'auto' }],
+  },
+  [UPLOAD_KIND.PHOTO]: {
+    folder: 'votrix/photos',
+    transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto' }],
   },
 }
 

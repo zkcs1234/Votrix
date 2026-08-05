@@ -66,19 +66,33 @@ export const createQuestion = asyncHandler(async (req, res) => {
 })
 
 export const reorderQuestions = asyncHandler(async (req, res) => {
-  const { questionIds } = req.body
-  if (!Array.isArray(questionIds)) throw new ApiError(400, 'questionIds array required')
+  // Accept either:
+  //   { orders: [{ id, sortOrder }] }   (sent by the builder page)
+  //   { questionIds: ['id1', 'id2'] }   (legacy format)
+  const { questionIds, orders } = req.body
 
   const eventId = req.params.eventId
   const questions = await pollingService.listQuestions(eventId, req.user.id)
 
-  for (let i = 0; i < questionIds.length; i++) {
-    const q = questions.find((qq) => qq.id === questionIds[i])
-    if (!q) throw new ApiError(400, `Question ${questionIds[i]} not found`)
-  }
-
-  for (let i = 0; i < questionIds.length; i++) {
-    await pollingService.updateQuestion(eventId, req.user.id, questionIds[i], { sortOrder: i })
+  if (Array.isArray(orders)) {
+    // New format: explicit { id, sortOrder } pairs
+    for (const entry of orders) {
+      if (!entry.id) throw new ApiError(400, 'Each order entry must have an id')
+      const q = questions.find((qq) => qq.id === entry.id)
+      if (!q) throw new ApiError(400, `Question ${entry.id} not found`)
+      await pollingService.updateQuestion(eventId, req.user.id, entry.id, {
+        sortOrder: entry.sortOrder,
+      })
+    }
+  } else if (Array.isArray(questionIds)) {
+    // Legacy format: ordered array of IDs
+    for (let i = 0; i < questionIds.length; i++) {
+      const q = questions.find((qq) => qq.id === questionIds[i])
+      if (!q) throw new ApiError(400, `Question ${questionIds[i]} not found`)
+      await pollingService.updateQuestion(eventId, req.user.id, questionIds[i], { sortOrder: i })
+    }
+  } else {
+    throw new ApiError(400, 'orders array or questionIds array required')
   }
 
   res.json({ success: true, message: 'Questions reordered' })
