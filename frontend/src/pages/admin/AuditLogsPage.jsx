@@ -394,6 +394,28 @@ export default function AuditLogsPage() {
     toastSuccess('CSV exported')
   }
 
+  const [serverExporting, setServerExporting] = useState(false)
+  const exportServerCSV = async () => {
+    setServerExporting(true)
+    try {
+      const { data } = await adminService.exportAuditLogs({
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      })
+      const url = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `audit-logs-full-${Date.now()}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toastSuccess('Full audit log exported')
+    } catch {
+      toastError('Export failed')
+    } finally {
+      setServerExporting(false)
+    }
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────
 
   const isInitialLoad = loading && !showLoader && logs.length === 0
@@ -423,7 +445,11 @@ export default function AuditLogsPage() {
           </Button>
           <Button size="sm" variant="secondary" onClick={exportCSV} disabled={logs.length === 0}>
             <Download className="h-4 w-4" strokeWidth={1.5} />
-            Export CSV
+            Export page
+          </Button>
+          <Button size="sm" variant="secondary" onClick={exportServerCSV} loading={serverExporting}>
+            <Download className="h-4 w-4" strokeWidth={1.5} />
+            Export full
           </Button>
         </div>
       </div>

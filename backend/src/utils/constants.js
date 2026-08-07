@@ -143,6 +143,7 @@ export const DB_TABLES = {
   AUDIT_LOGS: 'audit_logs',
   NOTIFICATIONS: 'notifications',
   EVENT_DRAFTS: 'event_drafts',
+  USER_SESSIONS: 'user_sessions',
 }
 
 // Modules that support persistent Create-session drafts. Values match the

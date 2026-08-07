@@ -16,6 +16,7 @@ router.get('/analytics', adminController.getAnalytics)
 
 router.get('/organizers', adminController.getOrganizers)
 router.post('/organizers', adminActionLimiter, adminController.createOrganizerAccount)
+router.get('/organizers/:organizerId/activity', adminController.getOrganizerActivity)
 router.patch('/organizers/:organizerId/status', adminActionLimiter, adminController.updateOrganizerStatus)
 router.post('/organizers/:organizerId/send-onboarding', adminActionLimiter, adminController.sendOrganizerOnboarding)
 
@@ -25,5 +26,24 @@ router.get('/settings', adminController.getSystemSettings)
 router.put('/settings', adminController.updateSystemSettings)
 
 router.get('/audit-logs', adminController.getAuditLogs)
+
+router.get('/health', adminController.getSystemHealth)
+
+router.get('/alerts/config', adminController.getAlertConfig)
+router.put('/alerts/config', adminActionLimiter, adminController.updateAlertConfig)
+
+router.get('/export/organizers', adminActionLimiter, adminController.exportOrganizersData)
+router.get('/export/events', adminActionLimiter, adminController.exportEventsData)
+router.get('/export/audit-logs', adminActionLimiter, adminController.exportAuditLogsData)
+
+router.get('/sessions', adminController.listSessions)
+router.delete('/sessions/:sessionId', adminActionLimiter, adminController.revokeOneSession)
+router.delete('/users/:userId/sessions', adminActionLimiter, adminController.revokeAllForUser)
+
+router.get('/search', adminController.platformSearchHandler)
+
+router.get('/policies/archival', adminController.getArchivalPolicy)
+router.put('/policies/archival', adminActionLimiter, adminController.updateArchivalPolicy)
+router.post('/policies/archival/run-now', adminActionLimiter, adminController.runArchivalNow)
 
 export default router

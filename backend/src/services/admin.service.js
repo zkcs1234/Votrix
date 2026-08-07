@@ -178,6 +178,17 @@ export async function createAuditLog({ userId, action, entity, entityId, details
   return recordAudit({ userId, action, entity, entityId, details })
 }
 
+export async function getOrganizerActivity(organizerId, { limit = 50, offset = 0, action, entity } = {}) {
+  const { rows, total } = await listAuditTrail({
+    userId: organizerId,
+    action: action || undefined,
+    entity: entity || undefined,
+    limit,
+    offset,
+  })
+  return { logs: (rows ?? []).map(mapAuditLog), total }
+}
+
 export async function updateOrganizerAccountStatus(organizerId, accountStatus) {
   if (!Object.values(ACCOUNT_STATUS).includes(accountStatus)) {
     throw badRequest('Invalid account status')

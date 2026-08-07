@@ -18,6 +18,11 @@ const OrganizerManagementPage = lazy(() => import('@/pages/admin/OrganizerManage
 const GlobalEventsPage = lazy(() => import('@/pages/admin/GlobalEventsPage'))
 const SystemSettingsPage = lazy(() => import('@/pages/admin/SystemSettingsPage'))
 const AuditLogsPage = lazy(() => import('@/pages/admin/AuditLogsPage'))
+const OrganizerDetailPage = lazy(() => import('@/pages/admin/OrganizerDetailPage'))
+const HealthDashboardPage = lazy(() => import('@/pages/admin/HealthDashboardPage'))
+const AlertConfigPage = lazy(() => import('@/pages/admin/AlertConfigPage'))
+const SessionManagementPage = lazy(() => import('@/pages/admin/SessionManagementPage'))
+const ArchivalPolicyPage = lazy(() => import('@/pages/admin/ArchivalPolicyPage'))
 const OrganizerDashboardPage = lazy(() => import('@/pages/organizer/OrganizerDashboardPage'))
 const OrganizerOnboardingPage = lazy(() => import('@/pages/organizer/OrganizerOnboardingPage'))
 const VoterDashboardPage = lazy(() => import('@/pages/voter/VoterDashboardPage'))
@@ -148,9 +153,14 @@ export const routeConfig = [
     children: [
       { index: true, element: <AdminDashboardPage /> },
       { path: 'organizers', element: <OrganizerManagementPage /> },
+      { path: 'organizers/:id', element: <OrganizerDetailPage /> },
       { path: 'events', element: <GlobalEventsPage /> },
       { path: 'settings', element: <SystemSettingsPage /> },
       { path: 'audit-logs', element: <AuditLogsPage /> },
+      { path: 'health', element: <HealthDashboardPage /> },
+      { path: 'alerts', element: <AlertConfigPage /> },
+      { path: 'sessions', element: <SessionManagementPage /> },
+      { path: 'archival', element: <ArchivalPolicyPage /> },
     ],
   },
   {

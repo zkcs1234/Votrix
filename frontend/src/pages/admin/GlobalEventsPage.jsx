@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Zap, Clock, CheckCircle2, Vote, Trophy, BarChart2 } from 'lucide-react'
+import { CalendarDays, Zap, Clock, CheckCircle2, Vote, Trophy, BarChart2, Download } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Card from '@/components/ui/Card'
 import { format } from 'date-fns'
@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import StatCard from '@/components/ui/StatCard'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { useToast } from '@/hooks/useToast'
 
 export default function GlobalEventsPage() {
   const [events, setEvents] = useState([])
@@ -16,7 +17,27 @@ export default function GlobalEventsPage() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [exporting, setExporting] = useState(false)
   const showLoader = useDelayedLoading(loading, 300)
+  const { success: toastSuccess, error: toastError } = useToast()
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const { data } = await adminService.exportEvents(statusFilter !== 'all' ? { status: statusFilter } : {})
+      const url = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'events.csv'
+      a.click()
+      URL.revokeObjectURL(url)
+      toastSuccess('Events exported')
+    } catch {
+      toastError('Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -95,11 +116,17 @@ export default function GlobalEventsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="v-page-title">Global events</h1>
-        <p className="v-caption">
-          Monitor all elections, competitions, and polls across the platform.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="v-page-title">Global events</h1>
+          <p className="v-caption">
+            Monitor all elections, competitions, and polls across the platform.
+          </p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={handleExport} loading={exporting}>
+          <Download className="h-4 w-4" strokeWidth={1.5} />
+          Export CSV
+        </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

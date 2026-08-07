@@ -12,8 +12,24 @@ import {
   createAuditLog,
   updateOrganizerAccountStatus,
   sendOnboardingNotification,
+  getOrganizerActivity as fetchOrganizerActivity,
 } from '../services/admin.service.js'
 import { createAdminAlert, createNotification } from '../services/notification.service.js'
+import { exportOrganizersCSV, exportEventsCSV, exportAuditLogsCSV } from '../services/export.service.js'
+import { checkSystemHealth } from '../services/health.service.js'
+import { getAlertConfig as fetchAlertConfig, updateAlertConfig as saveAlertConfig } from '../services/alert.service.js'
+import {
+  listAdminSessions,
+  listSessionsForUser,
+  revokeSession,
+  revokeAllSessionsForUser,
+} from '../services/session.service.js'
+import { platformSearch } from '../services/search.service.js'
+import {
+  getArchivalPolicy as fetchArchivalPolicy,
+  updateArchivalPolicy as saveArchivalPolicy,
+  runArchivalNow as triggerArchival,
+} from '../services/archival.service.js'
 import { ApiError } from '../utils/ApiError.js'
 import { validateUUID } from '../utils/sanitize.js'
 
@@ -212,6 +228,61 @@ export const getAuditLogs = asyncHandler(async (req, res) => {
   })
 })
 
+export const getOrganizerActivity = asyncHandler(async (req, res) => {
+  const { organizerId } = req.params
+  const { limit = '50', page = '1', action, entity } = req.query
+  const safeLimit = Math.min(Math.max(1, parseInt(limit, 10) || 50), 200)
+  const safePage = Math.max(1, parseInt(page, 10) || 1)
+  const offset = (safePage - 1) * safeLimit
+  const { logs, total } = await fetchOrganizerActivity(organizerId, {
+    limit: safeLimit,
+    offset,
+    action: action || undefined,
+    entity: entity || undefined,
+  })
+  res.json({
+    success: true,
+    logs,
+    pagination: { total, page: safePage, limit: safeLimit, totalPages: Math.ceil(total / safeLimit) },
+  })
+})
+
+export const exportOrganizersData = asyncHandler(async (_req, res) => {
+  const csv = await exportOrganizersCSV()
+  res.setHeader('Content-Type', 'text/csv')
+  res.setHeader('Content-Disposition', 'attachment; filename="organizers.csv"')
+  res.send(csv)
+})
+
+export const exportEventsData = asyncHandler(async (req, res) => {
+  const csv = await exportEventsCSV({ status: req.query.status })
+  res.setHeader('Content-Type', 'text/csv')
+  res.setHeader('Content-Disposition', 'attachment; filename="events.csv"')
+  res.send(csv)
+})
+
+export const exportAuditLogsData = asyncHandler(async (req, res) => {
+  const csv = await exportAuditLogsCSV({ startDate: req.query.startDate, endDate: req.query.endDate })
+  res.setHeader('Content-Type', 'text/csv')
+  res.setHeader('Content-Disposition', 'attachment; filename="audit-logs.csv"')
+  res.send(csv)
+})
+
+export const getSystemHealth = asyncHandler(async (_req, res) => {
+  const health = await checkSystemHealth()
+  res.json({ success: true, ...health })
+})
+
+export const getAlertConfig = asyncHandler(async (_req, res) => {
+  const config = await fetchAlertConfig()
+  res.json({ success: true, config })
+})
+
+export const updateAlertConfig = asyncHandler(async (req, res) => {
+  const config = await saveAlertConfig(req.body)
+  res.json({ success: true, config })
+})
+
 export const getAdminOverview = asyncHandler(async (_req, res) => {
   res.json({
     success: true,
@@ -227,4 +298,78 @@ export const getDashboard = asyncHandler(async (_req, res) => {
 export const getAnalytics = asyncHandler(async (_req, res) => {
   const analytics = await getAdminAnalytics()
   res.json({ success: true, ...analytics })
+})
+
+export const listSessions = asyncHandler(async (req, res) => {
+  const { userId, limit } = req.query ?? {}
+  const safeLimit = Math.min(Math.max(1, parseInt(limit, 10) || 100), 500)
+  const sessions = userId
+    ? await listSessionsForUser(userId, { limit: safeLimit })
+    : await listAdminSessions({ limit: safeLimit })
+  res.json({ success: true, sessions })
+})
+
+export const revokeOneSession = asyncHandler(async (req, res) => {
+  const sessionId = validateUUID(req.params.sessionId, 'sessionId')
+  const result = await revokeSession(sessionId)
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'REVOKE_SESSION',
+    entity: 'user_sessions',
+    entityId: result?.id,
+    details: { revokedUserId: result?.user_id },
+  })
+  res.json({ success: true, message: 'Session revoked' })
+})
+
+export const revokeAllForUser = asyncHandler(async (req, res) => {
+  const userId = validateUUID(req.params.userId, 'userId')
+  const exceptSessionId = req.query?.exceptSessionId || null
+  const { revokedCount } = await revokeAllSessionsForUser(userId, { exceptSessionId })
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'REVOKE_ALL_SESSIONS',
+    entity: 'users',
+    entityId: userId,
+    details: { revokedCount, exceptSessionId },
+  })
+  res.json({ success: true, revokedCount })
+})
+
+export const platformSearchHandler = asyncHandler(async (req, res) => {
+  const { q = '', type = 'all', limit } = req.query ?? {}
+  const query = String(q).trim()
+  if (!query) {
+    return res.json({ success: true, results: { organizers: [], events: [] } })
+  }
+  const safeLimit = Math.min(Math.max(1, parseInt(limit, 10) || 20), 50)
+  const results = await platformSearch(query, { type, limit: safeLimit })
+  res.json({ success: true, results })
+})
+
+export const getArchivalPolicy = asyncHandler(async (_req, res) => {
+  const policy = await fetchArchivalPolicy()
+  res.json({ success: true, policy })
+})
+
+export const updateArchivalPolicy = asyncHandler(async (req, res) => {
+  const policy = await saveArchivalPolicy(req.body)
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'UPDATE_ARCHIVAL_POLICY',
+    entity: 'system_settings',
+    details: { policy },
+  })
+  res.json({ success: true, policy })
+})
+
+export const runArchivalNow = asyncHandler(async (req, res) => {
+  const result = await triggerArchival()
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'RUN_EVENT_ARCHIVAL',
+    entity: 'events',
+    details: result,
+  })
+  res.json({ success: true, ...result })
 })

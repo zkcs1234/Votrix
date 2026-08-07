@@ -77,6 +77,7 @@ export async function recordAudit({ userId, action, entity, entityId, details } 
 export async function listAuditTrail({
   entity,
   entityId,
+  userId,
   action,
   search,
   startDate,
@@ -109,6 +110,7 @@ export async function listAuditTrail({
 
   if (entity) query = query.eq('entity', entity)
   if (entityId) query = query.eq('entity_id', entityId)
+  if (userId) query = query.eq('user_id', userId)
   if (action) query = query.eq('action', action)
   if (startDate) query = query.gte('created_at', startDate)
   if (endDate) {

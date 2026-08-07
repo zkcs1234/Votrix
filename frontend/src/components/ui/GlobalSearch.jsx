@@ -1,17 +1,75 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Search, X, Command } from 'lucide-react'
+import { Search, X, Command, Users, CalendarDays, Database } from 'lucide-react'
 import { searchIndex } from '@/config/searchIndex'
 import { useAuth } from '@/hooks/useAuth'
+import { USER_ROLES } from '@/utils/constants'
+import { adminService } from '@/services/admin.service'
+
+const RESULT_TYPES = {
+  STATIC: 'static',
+  ORGANIZER: 'organizer',
+  EVENT: 'event',
+}
+
+function renderResultRow(item, index, selectedIndex, setSelectedIndex, onClick) {
+  const Icon = item.icon
+  const isSelected = index === selectedIndex
+  return (
+    <button
+      key={item.id}
+      type="button"
+      className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-colors ${
+        isSelected
+          ? 'bg-v-primary/10 text-v-primary border border-v-primary/20'
+          : 'hover:bg-v-surface-elevated text-v-text border border-transparent'
+      }`}
+      onClick={() => onClick(item)}
+      onMouseEnter={() => setSelectedIndex(index)}
+      role="option"
+      aria-selected={isSelected}
+    >
+      {Icon && (
+        <div
+          className={`p-2 rounded-md ${
+            isSelected ? 'bg-v-primary/20 text-v-primary' : 'bg-v-surface-elevated text-v-text-subtle'
+          }`}
+        >
+          <Icon className="h-4 w-4" strokeWidth={1.5} />
+        </div>
+      )}
+      <div className="flex-1 flex flex-col min-w-0">
+        <span className="text-sm font-medium truncate">{item.title}</span>
+        {item.__type === RESULT_TYPES.STATIC ? (
+          <span className="text-[11px] opacity-70 truncate uppercase tracking-wider font-semibold mt-0.5">
+            {item.category}
+          </span>
+        ) : (
+          <span className="text-[11px] opacity-70 truncate mt-0.5">
+            {item.subtitle || item.__type}
+          </span>
+        )}
+      </div>
+      {item.scoped && (
+        <span className="text-[10px] bg-v-surface-elevated px-2 py-1 rounded text-v-text-subtle uppercase border border-v-border shrink-0 font-medium tracking-wide">
+          Requires Event
+        </span>
+      )}
+    </button>
+  )
+}
 
 export default function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [liveResults, setLiveResults] = useState({ organizers: [], events: [] })
+  const [liveLoading, setLiveLoading] = useState(false)
   const inputRef = useRef(null)
   const { role } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const isAdmin = role === USER_ROLES.ADMIN
 
   // Extract eventId if present in the current URL path
   const eventIdMatch = location.pathname.match(/\/events\/([a-zA-Z0-9_-]+)/)
@@ -55,7 +113,71 @@ export default function GlobalSearch() {
           item.category.toLowerCase().includes(q)
         )
       })
+      .map((item) => ({ ...item, __type: RESULT_TYPES.STATIC }))
   }, [query, role])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setLiveResults({ organizers: [], events: [] })
+      return
+    }
+    if (!query || query.trim().length < 2) {
+      setLiveResults({ organizers: [], events: [] })
+      return
+    }
+    let cancelled = false
+    setLiveLoading(true)
+    const handle = setTimeout(async () => {
+      try {
+        const { data } = await adminService.platformSearch({ q: query.trim(), limit: 5 })
+        if (!cancelled) {
+          setLiveResults(data.results ?? { organizers: [], events: [] })
+        }
+      } catch {
+        if (!cancelled) {
+          setLiveResults({ organizers: [], events: [] })
+        }
+      } finally {
+        if (!cancelled) setLiveLoading(false)
+      }
+    }, 250)
+    return () => {
+      cancelled = true
+      clearTimeout(handle)
+    }
+  }, [query, isAdmin])
+
+  const liveResultsList = useMemo(() => {
+    if (!isAdmin) return []
+    const list = []
+    for (const o of liveResults.organizers ?? []) {
+      list.push({
+        id: `org:${o.id}`,
+        __type: RESULT_TYPES.ORGANIZER,
+        title: o.organization_name || o.organizer_name || o.email,
+        subtitle: o.email,
+        icon: Users,
+        path: `/admin/organizers/${o.id}`,
+      })
+    }
+    for (const e of liveResults.events ?? []) {
+      list.push({
+        id: `event:${e.id}`,
+        __type: RESULT_TYPES.EVENT,
+        title: e.title,
+        subtitle: [e.event_type, e.status, e.organizations?.organization_name].filter(Boolean).join(' · '),
+        icon: CalendarDays,
+        path: `/admin/events`,
+        eventId: e.id,
+      })
+    }
+    return list
+  }, [liveResults, isAdmin])
+
+  const combinedResults = useMemo(
+    () => [...filteredResults, ...liveResultsList],
+    [filteredResults, liveResultsList],
+  )
 
   // Reset selected index when query changes
   useEffect(() => {
@@ -83,18 +205,18 @@ export default function GlobalSearch() {
       setIsOpen(false)
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
-      if (filteredResults.length > 0) {
-        setSelectedIndex((prev) => (prev + 1) % filteredResults.length)
+      if (combinedResults.length > 0) {
+        setSelectedIndex((prev) => (prev + 1) % combinedResults.length)
       }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      if (filteredResults.length > 0) {
-        setSelectedIndex((prev) => (prev - 1 + filteredResults.length) % filteredResults.length)
+      if (combinedResults.length > 0) {
+        setSelectedIndex((prev) => (prev - 1 + combinedResults.length) % combinedResults.length)
       }
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      if (filteredResults[selectedIndex]) {
-        handleResultClick(filteredResults[selectedIndex])
+      if (combinedResults[selectedIndex]) {
+        handleResultClick(combinedResults[selectedIndex])
       }
     }
   }
@@ -163,7 +285,7 @@ export default function GlobalSearch() {
               </button>
             </div>
 
-            {query && filteredResults.length === 0 && (
+            {query && combinedResults.length === 0 && !liveLoading && (
               <div className="px-6 py-12 text-center text-v-text-subtle">
                 <p className="text-sm">No results found for "{query}"</p>
               </div>
@@ -175,49 +297,32 @@ export default function GlobalSearch() {
               </div>
             )}
 
-            {filteredResults.length > 0 && (
-              <div id="search-results" className="flex-1 overflow-y-auto p-2 space-y-1" role="listbox">
-                {filteredResults.map((item, index) => {
-                  const Icon = item.icon
-                  const isSelected = index === selectedIndex
+            {combinedResults.length > 0 && (
+              <div id="search-results" className="flex-1 overflow-y-auto p-2 space-y-2" role="listbox">
+                {filteredResults.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="px-3 pt-1 text-[10px] font-semibold uppercase tracking-wider text-v-text-subtle">
+                      Pages
+                    </p>
+                    {filteredResults.map((item) => {
+                      const globalIndex = combinedResults.indexOf(item)
+                      return renderResultRow(item, globalIndex, selectedIndex, setSelectedIndex, handleResultClick)
+                    })}
+                  </div>
+                )}
 
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-colors ${
-                        isSelected
-                          ? 'bg-v-primary/10 text-v-primary border border-v-primary/20'
-                          : 'hover:bg-v-surface-elevated text-v-text border border-transparent'
-                      }`}
-                      onClick={() => handleResultClick(item)}
-                      onMouseEnter={() => setSelectedIndex(index)}
-                      role="option"
-                      aria-selected={isSelected}
-                    >
-                      {Icon && (
-                        <div
-                          className={`p-2 rounded-md ${
-                            isSelected ? 'bg-v-primary/20 text-v-primary' : 'bg-v-surface-elevated text-v-text-subtle'
-                          }`}
-                        >
-                          <Icon className="h-4 w-4" strokeWidth={1.5} />
-                        </div>
-                      )}
-                      <div className="flex-1 flex flex-col min-w-0">
-                        <span className="text-sm font-medium truncate">{item.title}</span>
-                        <span className="text-[11px] opacity-70 truncate uppercase tracking-wider font-semibold mt-0.5">
-                          {item.category}
-                        </span>
-                      </div>
-                      {item.scoped && (
-                        <span className="text-[10px] bg-v-surface-elevated px-2 py-1 rounded text-v-text-subtle uppercase border border-v-border shrink-0 font-medium tracking-wide">
-                          Requires Event
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
+                {liveResultsList.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-wider text-v-text-subtle flex items-center gap-1.5">
+                      <Database className="h-3 w-3" strokeWidth={2} />
+                      Platform
+                    </p>
+                    {liveResultsList.map((item) => {
+                      const globalIndex = combinedResults.indexOf(item)
+                      return renderResultRow(item, globalIndex, selectedIndex, setSelectedIndex, handleResultClick)
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

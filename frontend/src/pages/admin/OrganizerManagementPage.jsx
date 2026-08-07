@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Users, UserCheck, ShieldOff, UserPlus, Mail } from 'lucide-react'
+import { Users, UserCheck, ShieldOff, UserPlus, Mail, Download } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import CreateOrganizerModal from '@/components/admin/CreateOrganizerModal'
 import Button from '@/components/ui/Button'
@@ -84,6 +85,7 @@ function getStatusLabel(status) {
 }
 
 export default function OrganizerManagementPage() {
+  const navigate = useNavigate()
   const [organizers, setOrganizers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -93,7 +95,26 @@ export default function OrganizerManagementPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [savingKey, setSavingKey] = useState(null)
   const showLoader = useDelayedLoading(loading, 300)
-  const { success: toastSuccess } = useToast()
+  const { success: toastSuccess, error: toastError } = useToast()
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const { data } = await adminService.exportOrganizers()
+      const url = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'organizers.csv'
+      a.click()
+      URL.revokeObjectURL(url)
+      toastSuccess('Organizers exported')
+    } catch {
+      toastError('Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const fetchOrganizers = async () => {
     try {
@@ -206,10 +227,16 @@ export default function OrganizerManagementPage() {
             Review organizer accounts, approve new access, and suspend accounts when needed.
           </p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <UserPlus className="h-4 w-4" strokeWidth={2} />
-          Add organizer
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={handleExport} loading={exporting}>
+            <Download className="h-4 w-4" strokeWidth={1.5} />
+            Export CSV
+          </Button>
+          <Button onClick={() => setIsModalOpen(true)}>
+            <UserPlus className="h-4 w-4" strokeWidth={2} />
+            Add organizer
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -286,7 +313,7 @@ export default function OrganizerManagementPage() {
                         : { label: 'Restore', next: 'active', variant: 'secondary' }
 
                   return (
-                    <tr key={org.id} className="hover:bg-v-surface-elevated/50">
+                    <tr key={org.id} className="hover:bg-v-surface-elevated/50 cursor-pointer" onClick={() => navigate(`/admin/organizers/${org.id}`)}>
                       <td>
                         <div className="space-y-1">
                           <p className="font-medium text-v-text">{org.organization_name || '—'}</p>
@@ -308,7 +335,7 @@ export default function OrganizerManagementPage() {
                               size="sm"
                               variant="secondary"
                               loading={isBusy && savingKey.endsWith('onboarding')}
-                              onClick={() => handleSendOnboarding(org.id, org.email)}
+                              onClick={(e) => { e.stopPropagation(); handleSendOnboarding(org.id, org.email) }}
                             >
                               <Mail className="h-3 w-3" strokeWidth={2} />
                               Send Onboarding
@@ -334,7 +361,7 @@ export default function OrganizerManagementPage() {
                             size="sm"
                             variant={nextPrimaryAction.variant}
                             loading={isBusy && savingKey.endsWith(nextPrimaryAction.next)}
-                            onClick={() => handleStatusChange(org.id, nextPrimaryAction.next)}
+                            onClick={(e) => { e.stopPropagation(); handleStatusChange(org.id, nextPrimaryAction.next) }}
                           >
                             {nextPrimaryAction.label}
                           </Button>
@@ -345,7 +372,7 @@ export default function OrganizerManagementPage() {
                               size="sm"
                               variant="secondary"
                               loading={isBusy && savingKey.endsWith('archived')}
-                              onClick={() => handleStatusChange(org.id, 'archived')}
+                              onClick={(e) => { e.stopPropagation(); handleStatusChange(org.id, 'archived') }}
                             >
                               Archive
                             </Button>
