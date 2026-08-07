@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { uploadSingle, uploadImage } from '../middleware/upload.js'
 import { uploadLimiter, csvImportLimiter, emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/pageant-organizer.controller.js'
+import * as draftCtrl from '../controllers/draft.controller.js'
 import competitionRoutes from './competition-organizer.routes.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
 
@@ -53,5 +54,11 @@ router.patch('/events/:eventId/information-form', ctrl.updateInformationForm)
 // first-class judges, and flexible assignments live under
 // `/events/:eventId/...` and share the auth middleware on the parent router.
 router.use('/events/:eventId', competitionRoutes)
+
+// ——— Persistent Create Draft (one per organizer + module) ———
+router.get('/drafts', draftCtrl.getDraft('competition'))
+router.put('/drafts', draftCtrl.saveDraft('competition'))
+router.delete('/drafts', draftCtrl.deleteDraft('competition'))
+router.post('/drafts/publish', draftCtrl.publishDraft('competition'))
 
 export default router

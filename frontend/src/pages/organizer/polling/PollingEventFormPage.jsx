@@ -29,6 +29,11 @@ function inferStepFromPath(pathname) {
   return 'details'
 }
 
+function normalizeDraftStep(step) {
+  if (step === 'branding' || step === 'settings' || step === 'information-form') return step
+  return 'details'
+}
+
 export default function PollingEventFormPage() {
 const { eventId } = useParams()
   const location = useLocation()
@@ -43,6 +48,8 @@ const { eventId } = useParams()
   const [error, setError] = useState(null)
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
+  const [draftRestored, setDraftRestored] = useState(false)
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false)
 
   const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'polling',
@@ -83,7 +90,7 @@ const { eventId } = useParams()
     dirty: isDirty || Boolean(bannerFile),
   })
 
-  const { saveDraft, deleteDraft } = useDraft('polling')
+  const { saveDraft, deleteDraft, draft } = useDraft('polling')
 
 useEffect(() => {
     setStep(inferStepFromPath(location.pathname))
@@ -96,6 +103,8 @@ useEffect(() => {
     setBannerFile(null)
     setInfoFormSchema(null)
     setError(null)
+    setDraftRestored(false)
+    setShowDraftPrompt(false)
 reset({
       title: '',
       description: '',
@@ -108,6 +117,36 @@ reset({
     // sessionKey intentionally gates re-runs; resets run on every new session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey])
+
+  useEffect(() => {
+    if (!isNew || !draft || draftRestored || showDraftPrompt) return
+    setShowDraftPrompt(true)
+  }, [draft, draftRestored, isNew, showDraftPrompt])
+
+  const restoreDraft = useCallback(() => {
+    if (!draft) return
+
+    const payload = draft.payload || {}
+    const nextStep = normalizeDraftStep(draft.step)
+    setDraftRestored(true)
+    setShowDraftPrompt(false)
+    setStep(nextStep)
+    reset({
+      title: payload.title ?? draft.title ?? '',
+      description: payload.description ?? '',
+      startDate: payload.startDate ?? '',
+      endDate: payload.endDate ?? '',
+      pollAnonymous: payload.pollAnonymous ?? false,
+      pollAllowMultipleSubmissions: payload.pollAllowMultipleSubmissions ?? false,
+    })
+    setBanner(draft.banner ?? null)
+    if (draft.banner) {
+      markComplete('branding')
+    }
+    if (nextStep === 'information-form' || nextStep === 'settings' || nextStep === 'branding') {
+      markComplete('details')
+    }
+  }, [draft, reset, markComplete])
 
   useEffect(() => {
     if (isNew) return
@@ -178,6 +217,7 @@ try {
       if (isNew) {
         const { data: res } = await pollingService.createEvent(payload)
         id = res.event.id
+        await deleteDraft()
       } else {
         await pollingService.updateEvent(eventId, payload)
       }
@@ -264,6 +304,14 @@ function stageHref(stageKey) {
       pollAnonymous: data.pollAnonymous,
       pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
       banner,
+      payload: {
+        ...data,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        pollAnonymous: data.pollAnonymous,
+        pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
+        infoFormSchema,
+      },
     })
     confirmLeave?.proceed?.()
   }
@@ -272,6 +320,24 @@ function stageHref(stageKey) {
   const handleDiscard = () => {
     deleteDraft()
     confirmLeave?.proceed?.()
+  }
+
+  const startNewDraftSession = async () => {
+    await deleteDraft()
+    setDraftRestored(true)
+    setShowDraftPrompt(false)
+    setBanner(null)
+    setBannerFile(null)
+    setInfoFormSchema(null)
+    reset({
+      title: '',
+      description: '',
+      startDate: '',
+      endDate: '',
+      pollAnonymous: false,
+      pollAllowMultipleSubmissions: false,
+    })
+    resetProgress()
   }
 
   // Cancel navigation: stay on the form.
@@ -536,6 +602,36 @@ const stepperEventId = isNew ? 'new' : eventId
           </div>
         )}
       </Card>
+
+      {showDraftPrompt && (
+        <UnsavedChangesDialog
+          variant="resume"
+          title="Resume your draft?"
+          message="You already have a saved draft for this poll. Resume it, delete it, or start a fresh event."
+          onPrimary={restoreDraft}
+          onSecondary={async () => {
+            await deleteDraft()
+            setShowDraftPrompt(false)
+            setDraftRestored(true)
+            setBanner(null)
+            setBannerFile(null)
+            setInfoFormSchema(null)
+            reset({
+              title: '',
+              description: '',
+              startDate: '',
+              endDate: '',
+              pollAnonymous: false,
+              pollAllowMultipleSubmissions: false,
+            })
+            resetProgress()
+          }}
+          onCancel={startNewDraftSession}
+          primaryLabel="Resume Draft"
+          secondaryLabel="Delete Draft"
+          cancelLabel="Start New Event"
+        />
+      )}
 
       {blocked && (
         <UnsavedChangesDialog

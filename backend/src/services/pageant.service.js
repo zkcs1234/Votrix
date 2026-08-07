@@ -26,6 +26,7 @@ import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
 import { emitToEvent } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
+import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
 
 
 
@@ -201,7 +202,9 @@ export async function updatePageantEvent(eventId, organizerId, payload) {
 }
 
 export async function updateCompetitionEvent(eventId, organizerId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  const event = await assertCompetitionEvent(eventId, organizerId)
+
+  assertEventUpdateAllowed(event, payload)
 
   const updates = {}
   if (payload.title !== undefined) updates.title = payload.title

@@ -8,7 +8,7 @@ import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
 import { recordAudit } from '../foundation/audit.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
-
+import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
 
 function mapPosition(row) {
   return {
@@ -188,6 +188,8 @@ export async function updateElectionEvent(eventId, organizerId, payload) {
   if (nextStart && nextEnd && new Date(nextEnd) < new Date(nextStart)) {
     throw new ApiError(400, 'End date must be on or after start date')
   }
+
+  assertEventUpdateAllowed(event, payload)
 
   const updates = {}
   if (payload.title !== undefined) updates.title = payload.title

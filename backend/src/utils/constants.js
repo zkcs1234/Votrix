@@ -34,6 +34,7 @@ export const EVENT_STATUS = {
   ACTIVE: 'active',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
+  ARCHIVED: 'archived',
 }
 
 // Event types. 'pageant' is kept for backward compatibility.
@@ -141,4 +142,9 @@ export const DB_TABLES = {
   SYSTEM_SETTINGS: 'system_settings',
   AUDIT_LOGS: 'audit_logs',
   NOTIFICATIONS: 'notifications',
+  EVENT_DRAFTS: 'event_drafts',
 }
+
+// Modules that support persistent Create-session drafts. Values match the
+// frontend module strings and the /organizer/{module} route prefixes exactly.
+export const DRAFT_MODULES = ['election', 'competition', 'polling']

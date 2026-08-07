@@ -1,6 +1,32 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { draftService } from '@/services/draft.service'
 
-const DRAFT_PREFIX = 'votrix.event-draft'
+const CACHE_PREFIX = 'votrix.event-draft.cache'
+
+function readCachedDraft(module) {
+  try {
+    const raw = localStorage.getItem(`${CACHE_PREFIX}.${module}`)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function writeCachedDraft(module, value) {
+  try {
+    localStorage.setItem(`${CACHE_PREFIX}.${module}`, JSON.stringify(value))
+  } catch {
+    // Ignore storage failures and keep the in-memory state.
+  }
+}
+
+function removeCachedDraft(module) {
+  try {
+    localStorage.removeItem(`${CACHE_PREFIX}.${module}`)
+  } catch {
+    // Ignore storage failures.
+  }
+}
 
 /**
  * Draft persistence for unfinished Create sessions.
@@ -11,59 +37,87 @@ const DRAFT_PREFIX = 'votrix.event-draft'
  * @returns {{
  *   hasDraft: boolean,
  *   draft: object|null,
- *   saveDraft: (data: object) => void,
+ *   saveDraft: (data: object) => Promise<object|null>,
  *   resumeDraft: () => object|null,
- *   deleteDraft: () => void,
- *   refreshDraft: () => void,
+ *   deleteDraft: () => Promise<void>,
+ *   refreshDraft: () => Promise<object|null>,
+ *   loading: boolean,
  * }}
  */
 export default function useDraft(module) {
-  const key = `${DRAFT_PREFIX}.${module}`
+  const [draft, setDraft] = useState(() => readCachedDraft(module))
+  const [loading, setLoading] = useState(false)
 
-  const readDraft = useCallback(() => {
+  const refreshDraft = useCallback(async () => {
+    setLoading(true)
     try {
-      const raw = localStorage.getItem(key)
-      return raw ? JSON.parse(raw) : null
-    } catch {
-      return null
+      const { data } = await draftService.getDraft(module)
+      const nextDraft = data?.draft ? { ...data.draft, module } : null
+      if (nextDraft) {
+        writeCachedDraft(module, nextDraft)
+      } else {
+        removeCachedDraft(module)
+      }
+      setDraft(nextDraft)
+      return nextDraft
+    } catch (error) {
+      console.error(`[draft] failed to refresh draft for ${module}:`, error)
+      const cachedDraft = readCachedDraft(module)
+      setDraft(cachedDraft)
+      return cachedDraft
+    } finally {
+      setLoading(false)
     }
-  }, [key])
+  }, [module])
 
-  const [draft, setDraft] = useState(() => readDraft())
+  useEffect(() => {
+    void refreshDraft()
+  }, [refreshDraft])
 
-  const refreshDraft = useCallback(() => {
-    setDraft(readDraft())
-  }, [readDraft])
+  const saveDraft = useCallback(async (data) => {
+    const payload = {
+      step: data?.step ?? 'details',
+      title: data?.title ?? null,
+      banner: data?.banner ?? null,
+      payload: data?.payload ?? data ?? {},
+    }
 
-  const saveDraft = useCallback(
-    (data) => {
-      const payload = {
-        ...data,
-        module,
-        updatedAt: new Date().toISOString(),
-      }
-      try {
-        localStorage.setItem(key, JSON.stringify(payload))
-        setDraft(payload)
-      } catch {
-        /* localStorage may be full or unavailable */
-      }
-    },
-    [key, module],
-  )
+    const optimisticDraft = {
+      module,
+      step: payload.step,
+      title: payload.title,
+      banner: payload.banner,
+      payload: payload.payload,
+      updatedAt: new Date().toISOString(),
+    }
 
-  const resumeDraft = useCallback(() => {
-    return readDraft()
-  }, [readDraft])
+    writeCachedDraft(module, optimisticDraft)
+    setDraft(optimisticDraft)
 
-  const deleteDraft = useCallback(() => {
     try {
-      localStorage.removeItem(key)
-    } catch {
-      /* ignore */
+      const { data: result } = await draftService.saveDraft(module, payload)
+      const serverDraft = result?.draft ? { ...result.draft, module } : optimisticDraft
+      writeCachedDraft(module, serverDraft)
+      setDraft(serverDraft)
+      return serverDraft
+    } catch (error) {
+      console.error(`[draft] failed to save draft for ${module}:`, error)
+      throw error
     }
+  }, [module])
+
+  const resumeDraft = useCallback(() => draft, [draft])
+
+  const deleteDraft = useCallback(async () => {
+    removeCachedDraft(module)
     setDraft(null)
-  }, [key])
+
+    try {
+      await draftService.deleteDraft(module)
+    } catch (error) {
+      console.error(`[draft] failed to delete draft for ${module}:`, error)
+    }
+  }, [module])
 
   return {
     hasDraft: Boolean(draft),
@@ -72,5 +126,6 @@ export default function useDraft(module) {
     resumeDraft,
     deleteDraft,
     refreshDraft,
+    loading,
   }
 }

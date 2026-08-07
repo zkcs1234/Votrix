@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { uploadSingle, uploadImage } from '../middleware/upload.js'
 import { uploadLimiter, csvImportLimiter, emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/election-organizer.controller.js'
+import * as draftCtrl from '../controllers/draft.controller.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
 
 const router = Router()
@@ -51,5 +52,11 @@ router.get('/events/:eventId/analytics/timeline', ctrl.getVotingTimeline)
 // ——— Participant Information Form ———
 router.get('/events/:eventId/information-form', ctrl.getInformationForm)
 router.patch('/events/:eventId/information-form', ctrl.updateInformationForm)
+
+// ——— Persistent Create Draft (one per organizer + module) ———
+router.get('/drafts', draftCtrl.getDraft('election'))
+router.put('/drafts', draftCtrl.saveDraft('election'))
+router.delete('/drafts', draftCtrl.deleteDraft('election'))
+router.post('/drafts/publish', draftCtrl.publishDraft('election'))
 
 export default router

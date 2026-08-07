@@ -41,6 +41,11 @@ function inferStepFromPath(pathname) {
   return 'details'
 }
 
+function normalizeDraftStep(step) {
+  if (step === 'branding' || step === 'information-form') return step
+  return 'details'
+}
+
 export default function ElectionEventFormPage() {
 const { eventId } = useParams()
   const location = useLocation()
@@ -55,6 +60,8 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [error, setError] = useState(null)
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
+  const [draftRestored, setDraftRestored] = useState(false)
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false)
 
   const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'election',
@@ -94,7 +101,7 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
     dirty: isDirty || Boolean(bannerFile),
   })
 
-  const { saveDraft, deleteDraft } = useDraft('election')
+  const { saveDraft, deleteDraft, draft } = useDraft('election')
 
   const resultsVisibility = watch('resultsVisibility', 'public')
   const startDateValue = watch('startDate', '')
@@ -112,6 +119,8 @@ useEffect(() => {
     setBannerFile(null)
     setInfoFormSchema(null)
     setError(null)
+    setDraftRestored(false)
+    setShowDraftPrompt(false)
     reset({
       title: '',
       description: '',
@@ -123,6 +132,38 @@ resetProgress()
     // sessionKey intentionally gates re-runs; resets run on every new session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey])
+
+  useEffect(() => {
+    if (!isNew || !draft || draftRestored || showDraftPrompt) return
+    setShowDraftPrompt(true)
+  }, [draft, draftRestored, isNew, showDraftPrompt])
+
+  const restoreDraft = useCallback(() => {
+    if (!draft) return
+
+    const payload = draft.payload || {}
+    const nextStep = normalizeDraftStep(draft.step)
+    setDraftRestored(true)
+    setShowDraftPrompt(false)
+    setStep(nextStep)
+    reset({
+      title: payload.title ?? draft.title ?? '',
+      description: payload.description ?? '',
+      startDate: payload.startDate ?? '',
+      endDate: payload.endDate ?? '',
+      resultsVisibility: payload.resultsVisibility ?? 'public',
+    })
+    setBanner(draft.banner ?? null)
+    if (payload.infoFormSchema) {
+      setInfoFormSchema(payload.infoFormSchema)
+    }
+    if (draft.banner) {
+      markComplete('branding')
+    }
+    if (nextStep === 'information-form' || nextStep === 'branding') {
+      markComplete('details')
+    }
+  }, [draft, reset, markComplete])
 
   useEffect(() => {
     if (isNew) return
@@ -193,6 +234,7 @@ try {
       if (isNew) {
         const { data: res } = await electionService.createEvent(payload)
         id = res.event.id
+        await deleteDraft()
       } else {
         await electionService.updateEvent(eventId, payload)
       }
@@ -228,6 +270,13 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
       endDate: data.endDate,
       resultsVisibility: data.resultsVisibility,
       banner,
+      payload: {
+        ...data,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        resultsVisibility: data.resultsVisibility,
+        infoFormSchema,
+      },
     })
     confirmLeave?.proceed?.()
   }
@@ -236,6 +285,23 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
   const handleDiscard = () => {
     deleteDraft()
     confirmLeave?.proceed?.()
+  }
+
+  const startNewDraftSession = async () => {
+    await deleteDraft()
+    setDraftRestored(true)
+    setShowDraftPrompt(false)
+    setBanner(null)
+    setBannerFile(null)
+    setInfoFormSchema(null)
+    reset({
+      title: '',
+      description: '',
+      startDate: '',
+      endDate: '',
+      resultsVisibility: 'public',
+    })
+    resetProgress()
   }
 
   // Cancel navigation: stay on the form.
@@ -436,6 +502,35 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
           </div>
         )}
       </Card>
+
+      {showDraftPrompt && (
+        <UnsavedChangesDialog
+          variant="resume"
+          title="Resume your draft?"
+          message="You already have a saved draft for this election. Resume it, delete it, or start a fresh event."
+          onPrimary={restoreDraft}
+          onSecondary={async () => {
+            await deleteDraft()
+            setShowDraftPrompt(false)
+            setDraftRestored(true)
+            setBanner(null)
+            setBannerFile(null)
+            setInfoFormSchema(null)
+            reset({
+              title: '',
+              description: '',
+              startDate: '',
+              endDate: '',
+              resultsVisibility: 'public',
+            })
+            resetProgress()
+          }}
+          onCancel={startNewDraftSession}
+          primaryLabel="Resume Draft"
+          secondaryLabel="Delete Draft"
+          cancelLabel="Start New Event"
+        />
+      )}
 
       {blocked && (
         <UnsavedChangesDialog

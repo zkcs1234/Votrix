@@ -29,6 +29,7 @@ import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './
 import { createNotification } from './notification.service.js'
 import { USER_ROLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
+import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
 
 // Phase 7 — Polling question types are now registry-driven. The legacy
 // POLL_QUESTION_TYPES constants and the `multiple_choice` alias are kept in
@@ -553,7 +554,8 @@ export async function createPollEvent(organizerId, payload) {
 }
 
 export async function updatePollEvent(eventId, organizerId, payload) {
-  await assertPollingEvent(eventId, organizerId)
+  const event = await assertPollingEvent(eventId, organizerId)
+  assertEventUpdateAllowed(event, payload)
 
   const updates = {}
   if (payload.title !== undefined) updates.title = payload.title
