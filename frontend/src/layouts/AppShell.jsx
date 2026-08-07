@@ -75,7 +75,6 @@ function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
 
 function SidebarContent({
   homeLink,
-  moduleLabel,
   navItems,
   eventId,
   location,
@@ -101,17 +100,12 @@ function SidebarContent({
             ) : (
               <VotrixLogo size="md" linkTo={homeLink} className="text-white" />
             )}
-            {!isCollapsed && moduleLabel && (
-              <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-                {moduleLabel}
-              </p>
-            )}
           </div>
           {onToggleCollapse && (
             <button
               type="button"
               onClick={onToggleCollapse}
-              className={`hidden lg:inline-flex items-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition-colors duration-150 ${isCollapsed ? 'p-2.5 justify-center' : 'p-2.5 gap-3'}`}
+              className={`hidden lg:inline-flex items-center ${isCollapsed ? 'rounded-full border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15' : 'rounded-lg text-gray-400 hover:bg-white/10 hover:text-white'} transition-colors duration-150 ${isCollapsed ? 'p-2.5 justify-center' : 'p-2.5 gap-3'}`}
               aria-expanded={!isCollapsed}
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
@@ -323,12 +317,12 @@ export default function AppShell({
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow sm:px-6 sm:py-4">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow sm:px-6 sm:py-4">
           {showSidebar && (
             <button
               type="button"
-              className="rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated lg:hidden"
+              className="flex-shrink-0 rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Open menu"
               aria-expanded={mobileOpen}
@@ -438,7 +432,7 @@ export default function AppShell({
           </div>
         </header>
 
-        <main className="v-page-enter flex-1 p-4 md:p-8">{children ?? <Outlet />}</main>
+        <main className="v-page-enter flex-1 overflow-auto p-4 md:p-8">{children ?? <Outlet />}</main>
       </div>
     </div>
   )
