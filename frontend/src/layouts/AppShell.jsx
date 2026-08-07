@@ -294,7 +294,7 @@ export default function AppShell({
     <div className="flex min-h-screen bg-v-bg">
       {showSidebar && (
         <aside
-          className={`hidden shrink-0 bg-v-sidebar lg:block transition-[width,padding] duration-200 ease-in-out ${
+          className={`hidden shrink-0 bg-v-sidebar lg:block sticky top-0 self-start h-screen min-h-screen overflow-y-auto transition-[width,padding] duration-200 ease-in-out ${
             isCollapsed ? 'w-18 px-3 py-6' : 'w-64 p-6'
           }`}
         >

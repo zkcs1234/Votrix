@@ -331,13 +331,20 @@ export async function getOrganizerDashboardStats(organizerId) {
   const events = await getEventRowsByOrganizer(organizerId)
   const { electionEventIds, competitionEventIds, pollingEventIds } = collectEventIdsByType(events)
 
-  // Fetch the single organization for this organizer
-  const { data: orgData } = await getClient()
-    .from(DB_TABLES.ORGANIZATIONS)
-    .select('id, organization_name, logo')
-    .eq('organizer_id', organizerId)
-    .limit(1)
-    .maybeSingle()
+  // Fetch the single organization for this organizer and the organizer's profile logo.
+  const [{ data: orgData }, { data: userData }] = await Promise.all([
+    getClient()
+      .from(DB_TABLES.ORGANIZATIONS)
+      .select('id, organization_name')
+      .eq('organizer_id', organizerId)
+      .limit(1)
+      .maybeSingle(),
+    getClient()
+      .from(DB_TABLES.USERS)
+      .select('organization_logo')
+      .eq('id', organizerId)
+      .single(),
+  ])
 
   const [
     totalAssigned,
@@ -414,7 +421,7 @@ return {
       ? {
           id: orgData.id,
           organizationName: orgData.organization_name,
-          logo: orgData.logo,
+          logo: userData?.organization_logo ?? null,
         }
       : null,
     stats: {
