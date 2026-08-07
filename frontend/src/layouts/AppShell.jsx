@@ -39,7 +39,7 @@ function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
               {Icon && <Icon className={`shrink-0 opacity-40 ${isCollapsed ? 'h-5 w-5' : 'h-4 w-4'}`} strokeWidth={1.5} aria-hidden />}
               {!isCollapsed && <span className="truncate">{item.label}</span>}
               {isCollapsed && (
-                <div className="absolute left-full ml-4 rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none z-[100] whitespace-nowrap shadow-lg">
+                <div className="absolute left-full ml-4 rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none z-100 whitespace-nowrap shadow-lg">
                   {item.label} (Select event first)
                 </div>
               )}
@@ -62,7 +62,7 @@ function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
             {Icon && <Icon className={`shrink-0 ${isCollapsed ? 'h-5 w-5' : 'h-4 w-4'}`} strokeWidth={1.5} aria-hidden />}
             {!isCollapsed && <span className="truncate">{item.label}</span>}
             {isCollapsed && (
-              <div className="absolute left-full ml-4 rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none z-[100] whitespace-nowrap shadow-lg">
+              <div className="absolute left-full ml-4 rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none z-100 whitespace-nowrap shadow-lg">
                 {item.label}
               </div>
             )}
@@ -88,16 +88,46 @@ function SidebarContent({
     <div className="flex h-full flex-col">
       {/* Top Section */}
       <div className="flex-1">
-        <div className={`flex items-center ${isCollapsed ? 'h-[32px]' : ''}`}>
-          {!isCollapsed && <VotrixLogo size="md" linkTo={homeLink} className="text-white" />}
+        <div className={`flex items-center ${isCollapsed ? 'justify-between h-14' : 'justify-between'}`}>
+          <div className="flex items-center gap-3">
+            {isCollapsed ? (
+              <Link
+                to={homeLink}
+                className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15"
+                aria-label="Votrix home"
+              >
+                <VotrixLogo size="sm" variant="mark" className="text-white" />
+              </Link>
+            ) : (
+              <VotrixLogo size="md" linkTo={homeLink} className="text-white" />
+            )}
+            {!isCollapsed && moduleLabel && (
+              <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                {moduleLabel}
+              </p>
+            )}
+          </div>
+          {onToggleCollapse && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className={`hidden lg:inline-flex items-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition-colors duration-150 ${isCollapsed ? 'p-2.5 justify-center' : 'p-2.5 gap-3'}`}
+              aria-expanded={!isCollapsed}
+              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
+              ) : (
+                <>
+                  <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+                  <span className="text-sm font-medium">Collapse</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
-        {!isCollapsed && moduleLabel && (
-          <p className="mt-3 text-[11px] font-medium uppercase tracking-wider text-gray-500">
-            {moduleLabel}
-          </p>
-        )}
         {navItems?.length > 0 && (
-          <div className="mt-8">
+          <div className={`mt-8 ${isCollapsed ? 'space-y-1' : ''}`}>
             <NavLinks
               items={navItems}
               eventId={eventId}
@@ -110,47 +140,17 @@ function SidebarContent({
       </div>
 
       {/* Bottom Section */}
-      <div className={`mt-auto pt-6 flex ${isCollapsed ? 'flex-col items-center space-y-4' : 'flex-col space-y-4'}`}>
+      <div className={`mt-auto pt-6 flex ${isCollapsed ? 'flex-col items-center space-y-3' : 'flex-col space-y-4'}`}>
         {footerLink && (
           <Link
             to={footerLink.to}
             onClick={onNavigate}
-            className={`group relative block text-xs text-gray-500 transition hover:text-gray-300 ${isCollapsed ? 'flex justify-center p-2.5 w-full' : ''}`}
+            title={footerLink.label.replace(/^←\s*/, '')}
+            className={`group inline-flex items-center justify-center gap-2 rounded-2xl border border-v-border px-3 py-2 text-sm font-medium text-gray-300 transition hover:border-v-primary hover:bg-white/10 hover:text-white ${isCollapsed ? 'w-full justify-center' : 'w-full'}`}
           >
-            {isCollapsed ? (
-              <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
-            ) : (
-              footerLink.label
-            )}
-            {isCollapsed && (
-              <div className="absolute left-full ml-4 rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none z-[100] whitespace-nowrap shadow-lg">
-                {footerLink.label.replace('←', '').trim()}
-              </div>
-            )}
+            <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
+            {!isCollapsed && <span>{footerLink.label.replace(/^←\s*/, '')}</span>}
           </Link>
-        )}
-        {onToggleCollapse && (
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            className={`hidden lg:flex items-center rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors duration-150 ${isCollapsed ? 'p-2.5 justify-center w-full' : 'p-2.5 gap-3 w-full'}`}
-            aria-expanded={!isCollapsed}
-            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {isCollapsed ? (
-              <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
-            ) : (
-              <>
-                <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
-                <span className="text-sm font-medium">Collapse</span>
-              </>
-            )}
-            {isCollapsed && (
-              <div className="absolute left-full ml-11 rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity duration-200 hover:opacity-100 pointer-events-none z-[100] whitespace-nowrap shadow-lg">
-                Expand
-              </div>
-            )}
-          </button>
         )}
       </div>
     </div>
@@ -301,7 +301,7 @@ export default function AppShell({
       {showSidebar && (
         <aside
           className={`hidden shrink-0 bg-v-sidebar lg:block transition-[width,padding] duration-200 ease-in-out ${
-            isCollapsed ? 'w-[72px] px-3 py-6' : 'w-64 p-6'
+            isCollapsed ? 'w-18 px-3 py-6' : 'w-64 p-6'
           }`}
         >
           {sidebar(true)}
@@ -390,6 +390,7 @@ export default function AppShell({
                 className="flex items-center gap-2 rounded-lg border border-v-border px-2 py-1.5 text-sm transition hover:bg-v-surface-elevated"
                 aria-expanded={profileDropdownOpen}
                 aria-haspopup="true"
+                aria-label="Open profile menu"
               >
                 <div
                   className="flex h-7 w-7 items-center justify-center rounded-full bg-v-surface-elevated text-xs font-semibold text-v-text-muted"
@@ -397,9 +398,6 @@ export default function AppShell({
                 >
                   {initials}
                 </div>
-                <span className="hidden sm:inline max-w-35 truncate text-v-text-muted">
-                  {displayName}
-                </span>
               </button>
 
               {profileDropdownOpen && (

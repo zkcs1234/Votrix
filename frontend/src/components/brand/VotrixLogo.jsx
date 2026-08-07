@@ -19,7 +19,7 @@ export default function VotrixLogo({
   const toneClass = className || 'text-v-text'
 
   const logo = (
-    <div className={`inline-flex flex-col items-center ${showTagline ? 'gap-2' : ''}`}>
+    <div className={`inline-flex ${variant === 'mark' ? 'items-center' : 'flex-col items-center'} ${showTagline ? 'gap-2' : ''}`}>
       <div className={`inline-flex items-center ${config.gap}`} style={toneClass.includes('text-white') ? { color: 'white' } : {}}>
         <VotrixMark className={`${config.mark} shrink-0`} style={toneClass.includes('text-white') ? { color: 'white' } : {}} title="" />
         {variant === 'full' && (
@@ -33,7 +33,7 @@ export default function VotrixLogo({
           </span>
         )}
       </div>
-      {showTagline && (
+      {showTagline && variant !== 'mark' && (
         <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-v-text-subtle">
           Every Vote Counts
         </p>
