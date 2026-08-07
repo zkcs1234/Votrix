@@ -401,7 +401,7 @@ const stepperEventId = isNew ? 'new' : eventId
               {errors.description && <p className="v-error-text">{errors.description.message}</p>}
             </div>
 
-            <div className="v-date-row">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
                   Start Date <span className="text-v-danger">*</span>
@@ -511,7 +511,7 @@ const stepperEventId = isNew ? 'new' : eventId
               <p className="v-caption -mt-2 pl-7">Allow respondents to submit more than once</p>
             </div>
 
-            <div className="v-date-row">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
                   Start Date <span className="text-v-danger">*</span>

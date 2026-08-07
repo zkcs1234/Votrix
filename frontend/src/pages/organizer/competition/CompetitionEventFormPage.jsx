@@ -327,7 +327,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               <p className={HELPER_TEXT}>Optional description for judges and contestants</p>
             </div>
 
-            <div className="v-date-row">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
                   Start Date <span className="text-v-danger">*</span>
