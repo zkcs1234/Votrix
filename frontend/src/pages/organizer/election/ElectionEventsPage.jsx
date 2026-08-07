@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/useToast'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import useDraft from '@/hooks/useDraft'
+import DraftBanner from '@/components/organizer/DraftBanner'
 
 function BallotPreviewModal({ eventId, onClose }) {
   const [preview, setPreview] = useState(null)
@@ -194,6 +196,7 @@ export default function ElectionEventsPage() {
   const [loading, setLoading] = useState(true)
   const [previewEventId, setPreviewEventId] = useState(null)
   const { success, error: showError } = useToast()
+  const { hasDraft, draft, deleteDraft } = useDraft('election')
 
   // Use delayed loading
   const showLoader = useDelayedLoading(loading, 300)
@@ -293,6 +296,15 @@ export default function ElectionEventsPage() {
           New event
         </Link>
       </div>
+
+      {hasDraft && (
+        <DraftBanner
+          module="election"
+          draft={draft}
+          onDelete={deleteDraft}
+          newEventPath="/organizer/election/events/new"
+        />
+      )}
 
       <div className="space-y-3">
         {events.map((event) => (

@@ -50,8 +50,8 @@ export default function PollingLayout() {
       eventId={eventId}
       footerLink={{ to: '/organizer', label: '← Organizer home' }}
     >
-      <ModuleStageLayout module="polling">
-        <Outlet />
+<ModuleStageLayout module="polling">
+        <Outlet key={eventId || 'new'} />
       </ModuleStageLayout>
     </AppShell>
   )

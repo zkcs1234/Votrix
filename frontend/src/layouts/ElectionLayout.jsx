@@ -56,8 +56,8 @@ export default function ElectionLayout() {
       eventId={eventId}
       footerLink={{ to: '/organizer', label: '← Organizer home' }}
     >
-      <ModuleStageLayout module="election">
-        <Outlet />
+<ModuleStageLayout module="election">
+        <Outlet key={eventId || 'new'} />
       </ModuleStageLayout>
     </AppShell>
   )

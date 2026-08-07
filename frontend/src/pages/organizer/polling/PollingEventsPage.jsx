@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Settings2 } from 'lucide-react'
+import { Plus, Edit2 } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
+import useDraft from '@/hooks/useDraft'
+import DraftBanner from '@/components/organizer/DraftBanner'
 
 export default function PollingEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const { hasDraft, draft, deleteDraft } = useDraft('polling')
 
   const load = () => {
     pollingService
@@ -58,6 +61,15 @@ export default function PollingEventsPage() {
         </Link>
       </div>
 
+      {hasDraft && (
+        <DraftBanner
+          module="polling"
+          draft={draft}
+          onDelete={deleteDraft}
+          newEventPath="/organizer/polling/events/new"
+        />
+      )}
+
       {events.map((event) => (
         <div
           key={event.id}
@@ -78,11 +90,11 @@ export default function PollingEventsPage() {
               {event.pollingEnabled ? 'Close poll' : 'Open poll'}
             </button>
             <Link
-              to={`/organizer/polling/events/${event.id}/settings`}
+              to={`/organizer/polling/events/${event.id}/edit`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
             >
-              <Settings2 className="h-3.5 w-3.5" strokeWidth={2} />
-              Settings
+              <Edit2 className="h-3.5 w-3.5" strokeWidth={2} />
+              Edit
             </Link>
           </div>
         </div>

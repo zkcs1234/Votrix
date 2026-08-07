@@ -54,7 +54,7 @@ export default function useEventProgress(module, eventId) {
     [],
   )
 
-  const seed = useCallback(
+const seed = useCallback(
     (keys) => {
       setCompletedKeys((prev) => {
         const merged = [...prev]
@@ -67,5 +67,16 @@ export default function useEventProgress(module, eventId) {
     [],
   )
 
-  return { completedKeys, markComplete, seed }
+  // Clear completed progress for the current event (used on session end).
+  const reset = useCallback(() => {
+    setCompletedKeys([])
+    try {
+      const key = `${STORAGE_PREFIX}.${module}:${eventId}`
+      localStorage.removeItem(key)
+    } catch {
+      /* ignore */
+    }
+  }, [module, eventId])
+
+  return { completedKeys, markComplete, seed, reset }
 }

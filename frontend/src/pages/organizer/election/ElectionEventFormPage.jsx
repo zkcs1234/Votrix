@@ -11,6 +11,9 @@ import EventStepper from '@/components/ui/EventStepper'
 import StageFooter from '@/components/ui/StageFooter'
 import ParticipantInformationFormBuilder from '@/components/organizer/ParticipantInformationFormBuilder'
 import useEventProgress from '@/hooks/useEventProgress'
+import useFormSession from '@/hooks/useFormSession'
+import useDraft from '@/hooks/useDraft'
+import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
@@ -39,12 +42,12 @@ function inferStepFromPath(pathname) {
 }
 
 export default function ElectionEventFormPage() {
-  const { eventId } = useParams()
+const { eventId } = useParams()
   const location = useLocation()
   const isNew = !eventId || eventId === 'new'
   const navigate = useNavigate()
 
-  const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
+const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [loading, setLoading] = useState(!isNew)
@@ -53,14 +56,17 @@ export default function ElectionEventFormPage() {
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
 
-  const { completedKeys, markComplete } = useEventProgress('election', eventId)
+  const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
+    'election',
+    eventId,
+  )
 
   const {
     register,
     control,
     getValues,
     handleSubmit: rhfHandleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     trigger,
     setValue,
     watch,
@@ -76,12 +82,47 @@ export default function ElectionEventFormPage() {
     },
   })
 
+  // Session lifecycle: guarantees only one active session, and gives us a
+  // stable session identity keyed by mode + eventId. Also blocks leaving a
+  // dirty Create session so we can offer Save as Draft / Discard / Cancel.
+  const {
+    sessionKey,
+    confirmLeave,
+  } = useFormSession({
+    module: 'election',
+    eventId,
+    dirty: isDirty || Boolean(bannerFile),
+  })
+
+  const { saveDraft, deleteDraft } = useDraft('election')
+
   const resultsVisibility = watch('resultsVisibility', 'public')
   const startDateValue = watch('startDate', '')
 
-  useEffect(() => {
+useEffect(() => {
     setStep(inferStepFromPath(location.pathname))
   }, [location.pathname])
+
+// Session-boundary cleanup: whenever the session identity changes (mode
+  // switch or eventId change), reset all transient form state before the new
+  // session initializes. This guarantees no stale values/errors/step/uploads
+  // leak from the previous session.
+  useEffect(() => {
+    setBanner(null)
+    setBannerFile(null)
+    setInfoFormSchema(null)
+    setError(null)
+    reset({
+      title: '',
+      description: '',
+      startDate: '',
+      endDate: '',
+      resultsVisibility: 'public',
+    })
+resetProgress()
+    // sessionKey intentionally gates re-runs; resets run on every new session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey])
 
   useEffect(() => {
     if (isNew) return
@@ -172,9 +213,37 @@ try {
     }
   }
 
-  const handleSubmitDetails = rhfHandleSubmit(async () => {
+const handleSubmitDetails = rhfHandleSubmit(async () => {
     setStep('branding')
   })
+
+  // Save the current Create session as a draft, then continue navigation.
+  const handleSaveAsDraft = () => {
+    const data = getValues()
+    saveDraft({
+      step,
+      title: data.title,
+      description: data.description,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      resultsVisibility: data.resultsVisibility,
+      banner,
+    })
+    confirmLeave?.proceed?.()
+  }
+
+  // Discard the draft and continue navigation.
+  const handleDiscard = () => {
+    deleteDraft()
+    confirmLeave?.proceed?.()
+  }
+
+  // Cancel navigation: stay on the form.
+  const handleCancelLeave = () => {
+    confirmLeave?.reset?.()
+  }
+
+  const blocked = confirmLeave?.state === 'blocked'
 
   if (loading) return <p className="v-caption">Loading...</p>
 
@@ -357,7 +426,7 @@ try {
               />
             )}
 
-            <StageFooter
+<StageFooter
               module="election"
               currentKey="information-form"
               eventId={eventId}
@@ -367,6 +436,20 @@ try {
           </div>
         )}
       </Card>
+
+      {blocked && (
+        <UnsavedChangesDialog
+          variant="leave"
+          title="Save this election as a draft?"
+          message="You have unsaved changes. Save your progress as a draft to pick up where you left off, or discard it."
+          onPrimary={handleSaveAsDraft}
+          onSecondary={handleDiscard}
+          onCancel={handleCancelLeave}
+          primaryLabel="Save as Draft"
+          secondaryLabel="Discard"
+          cancelLabel="Cancel"
+        />
+      )}
     </div>
   )
 }

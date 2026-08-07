@@ -16,8 +16,11 @@ import EventStepper from '@/components/ui/EventStepper'
 import StageFooter from '@/components/ui/StageFooter'
 import ParticipantInformationFormBuilder from '@/components/organizer/ParticipantInformationFormBuilder'
 import useEventProgress from '@/hooks/useEventProgress'
+import useFormSession from '@/hooks/useFormSession'
+import useDraft from '@/hooks/useDraft'
+import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
 
-import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
+import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 
 function inferStepFromPath(pathname) {
   if (pathname.includes('/branding')) return 'branding'
@@ -27,7 +30,7 @@ function inferStepFromPath(pathname) {
 }
 
 export default function PollingEventFormPage() {
-  const { eventId } = useParams()
+const { eventId } = useParams()
   const location = useLocation()
   const isNew = !eventId || eventId === 'new'
   const navigate = useNavigate()
@@ -41,13 +44,16 @@ export default function PollingEventFormPage() {
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
 
-  const { completedKeys, markComplete } = useEventProgress('polling', eventId)
+  const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
+    'polling',
+    eventId,
+  )
 
   const {
     register,
     control,
     getValues,
-    formState: { errors },
+    formState: { errors, isDirty },
     trigger,
     reset,
     watch,
@@ -65,9 +71,43 @@ export default function PollingEventFormPage() {
     },
   })
 
-  useEffect(() => {
+  // Session lifecycle: guarantees only one active session, and gives us a
+  // stable session identity keyed by mode + eventId. Also blocks leaving a
+  // dirty Create session so we can offer Save as Draft / Discard / Cancel.
+  const {
+    sessionKey,
+    confirmLeave,
+  } = useFormSession({
+    module: 'polling',
+    eventId,
+    dirty: isDirty || Boolean(bannerFile),
+  })
+
+  const { saveDraft, deleteDraft } = useDraft('polling')
+
+useEffect(() => {
     setStep(inferStepFromPath(location.pathname))
   }, [location.pathname])
+
+  // Session-boundary cleanup: reset all transient form state whenever the
+  // session identity changes so no stale values/errors/step/uploads leak.
+  useEffect(() => {
+    setBanner(null)
+    setBannerFile(null)
+    setInfoFormSchema(null)
+    setError(null)
+reset({
+      title: '',
+      description: '',
+      startDate: '',
+      endDate: '',
+      pollAnonymous: false,
+      pollAllowMultipleSubmissions: false,
+    })
+    resetProgress()
+    // sessionKey intentionally gates re-runs; resets run on every new session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey])
 
   useEffect(() => {
     if (isNew) return
@@ -200,7 +240,7 @@ try {
     }
   }
 
-  function stageHref(stageKey) {
+function stageHref(stageKey) {
     const base = '/organizer/polling/events'
     if (isNew) return `${base}/new`
     const pathByKey = {
@@ -212,11 +252,39 @@ try {
     return `${base}/${eventId}/${pathByKey[stageKey]}`
   }
 
+  // Save the current Create session as a draft, then continue navigation.
+  const handleSaveAsDraft = () => {
+    const data = getValues()
+    saveDraft({
+      step,
+      title: data.title,
+      description: data.description,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      pollAnonymous: data.pollAnonymous,
+      pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
+      banner,
+    })
+    confirmLeave?.proceed?.()
+  }
+
+  // Discard the draft and continue navigation.
+  const handleDiscard = () => {
+    deleteDraft()
+    confirmLeave?.proceed?.()
+  }
+
+  // Cancel navigation: stay on the form.
+  const handleCancelLeave = () => {
+    confirmLeave?.reset?.()
+  }
+
+  const blocked = confirmLeave?.state === 'blocked'
+
   if (loading) return <p className="v-caption">Loading...</p>
 
-  const stepperEventId = isNew ? 'new' : eventId
+const stepperEventId = isNew ? 'new' : eventId
   const startDateValue = watch('startDate', '')
-  const endDateValue = watch('endDate', '')
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -457,7 +525,7 @@ try {
               />
             )}
 
-            <StageFooter
+<StageFooter
               module="polling"
               currentKey="information-form"
               eventId={eventId}
@@ -468,6 +536,20 @@ try {
           </div>
         )}
       </Card>
+
+      {blocked && (
+        <UnsavedChangesDialog
+          variant="leave"
+          title="Save this poll as a draft?"
+          message="You have unsaved changes. Save your progress as a draft to pick up where you left off, or discard it."
+          onPrimary={handleSaveAsDraft}
+          onSecondary={handleDiscard}
+          onCancel={handleCancelLeave}
+          primaryLabel="Save as Draft"
+          secondaryLabel="Discard"
+          cancelLabel="Cancel"
+        />
+      )}
     </div>
   )
 }

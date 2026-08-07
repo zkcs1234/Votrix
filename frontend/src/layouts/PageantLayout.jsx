@@ -64,8 +64,8 @@ export default function PageantLayout() {
       eventId={eventId}
       footerLink={{ to: '/organizer', label: '← Organizer home' }}
     >
-      <ModuleStageLayout module="competition">
-        <Outlet />
+<ModuleStageLayout module="competition">
+        <Outlet key={eventId || 'new'} />
       </ModuleStageLayout>
     </AppShell>
   )

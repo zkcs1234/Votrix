@@ -4,10 +4,13 @@ import { Plus, Edit2 } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
+import useDraft from '@/hooks/useDraft'
+import DraftBanner from '@/components/organizer/DraftBanner'
 
 export default function CompetitionEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const { hasDraft, draft, deleteDraft } = useDraft('competition')
 
   const load = () => {
     pageantService
@@ -54,9 +57,18 @@ export default function CompetitionEventsPage() {
           className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white"
         >
           <Plus className="h-4 w-4" strokeWidth={2} />
-          New event
+New event
         </Link>
       </div>
+
+      {hasDraft && (
+        <DraftBanner
+          module="competition"
+          draft={draft}
+          onDelete={deleteDraft}
+          newEventPath="/organizer/competition/events/new"
+        />
+      )}
 
       {events.map((event) => (
         <div
