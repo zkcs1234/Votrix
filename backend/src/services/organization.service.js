@@ -98,25 +98,48 @@ export async function createOrganization(organizerId, { organizationName, organi
   )
 }
 
+import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
+
 /**
  * Update the organization logo.
  * Logo is now stored on the users table (not organizations.logo).
  */
-export async function updateOrganizationLogo(organizerId, logoUrl) {
+export async function updateOrganizationLogo(organizerId, logoUrl, imageAssetId = null) {
   const org = await getOrCreateOrganization(organizerId)
   if (org.organizer_id !== organizerId) {
     throw forbidden('Not allowed to update this organization')
   }
 
-  // Update logo on the users table (organization_logo column)
+  // Fetch previous image_asset_id to perform reference cleanup if replaced
+  const { data: previousUser } = await db()
+    .from(DB_TABLES.USERS)
+    .select('image_asset_id')
+    .eq('id', organizerId)
+    .maybeSingle()
+
+  const oldAssetId = previousUser?.image_asset_id ?? null
+
+  const updates = { organization_logo: logoUrl }
+  if (imageAssetId !== undefined) {
+    updates.image_asset_id = imageAssetId
+  }
+
+  // Update logo on the users table (organization_logo & image_asset_id columns)
   const { data: userData, error } = await db()
     .from(DB_TABLES.USERS)
-    .update({ organization_logo: logoUrl })
+    .update(updates)
     .eq('id', organizerId)
-    .select('organization_logo')
+    .select('organization_logo, image_asset_id')
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  // Cleanup old asset if it was replaced and has 0 remaining references
+  if (oldAssetId && oldAssetId !== imageAssetId) {
+    removeReferenceAndDeleteIfUnused(oldAssetId).catch((err) =>
+      console.error('[organization] Old logo cleanup error:', err.message),
+    )
+  }
 
   return {
     ...mapOrganization(org),

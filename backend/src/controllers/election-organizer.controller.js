@@ -56,6 +56,7 @@ export const uploadBanner = asyncHandler(async (req, res) => {
   const result = await uploadImageFile(req.file, UPLOAD_KIND.BANNER, `event-${req.params.eventId}`)
   const event = await electionService.updateElectionEvent(req.params.eventId, req.user.id, {
     banner: result.secure_url,
+    image_asset_id: result.image_asset_id ?? null,
   })
   res.json({ success: true, url: result.secure_url, event })
 })
@@ -137,7 +138,7 @@ export const uploadCandidatePhoto = asyncHandler(async (req, res) => {
     req.params.eventId,
     req.user.id,
     req.params.candidateId,
-    { photo: result.secure_url },
+    { photo: result.secure_url, image_asset_id: result.image_asset_id ?? null },
   )
 
   res.json({ success: true, url: result.secure_url, candidate })

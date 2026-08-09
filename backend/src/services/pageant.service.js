@@ -27,6 +27,8 @@ import { emitToEvent } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
 import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
+import { deleteDraft } from './draft.service.js'
+import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
 
 
 
@@ -194,6 +196,9 @@ export async function createCompetitionEvent(organizerId, payload) {
   await syncEventSchedules().catch((err) => {
     console.error('[competition] schedule sync failed after create:', err.message)
   })
+  await deleteDraft(organizerId, 'competition').catch((err) => {
+    console.error('[competition] failed to clear draft after create:', err.message)
+  })
   return mapEvent(data)
 }
 
@@ -206,10 +211,14 @@ export async function updateCompetitionEvent(eventId, organizerId, payload) {
 
   assertEventUpdateAllowed(event, payload)
 
+  // Capture old image_asset_id before updating so we can clean it up if replaced
+  const oldAssetId = event.image_asset_id ?? null
+
   const updates = {}
   if (payload.title !== undefined) updates.title = payload.title
   if (payload.description !== undefined) updates.description = payload.description
   if (payload.banner !== undefined) updates.banner = payload.banner
+  if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
   if (payload.startDate !== undefined) updates.start_date = payload.startDate
   if (payload.endDate !== undefined) updates.end_date = payload.endDate
   if (payload.status !== undefined) updates.status = payload.status
@@ -222,6 +231,14 @@ export async function updateCompetitionEvent(eventId, organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  // Cleanup old banner asset if it was replaced
+  if (oldAssetId && updates.image_asset_id !== undefined && oldAssetId !== updates.image_asset_id) {
+    removeReferenceAndDeleteIfUnused(oldAssetId).catch((err) =>
+      console.error('[competition] Old banner asset cleanup error:', err.message),
+    )
+  }
+
   await syncEventSchedules().catch((err) => {
     console.error('[competition] schedule sync failed after update:', err.message)
   })
@@ -308,9 +325,21 @@ export async function createContestant(eventId, organizerId, payload) {
 export async function updateContestant(eventId, organizerId, contestantId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
 
+  // Capture old image_asset_id before updating so we can clean it up if replaced
+  let oldAssetId = null
+  if (payload.image_asset_id !== undefined) {
+    const { data: prev } = await getClient()
+      .from(DB_TABLES.CONTESTANTS)
+      .select('image_asset_id')
+      .eq('id', contestantId)
+      .maybeSingle()
+    oldAssetId = prev?.image_asset_id ?? null
+  }
+
   const updates = {}
   if (payload.name !== undefined) updates.name = payload.name
   if (payload.photo !== undefined) updates.photo = payload.photo
+  if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
   if (payload.contestantNumber !== undefined) updates.contestant_number = payload.contestantNumber
 
   const { data, error } = await getClient()
@@ -323,11 +352,28 @@ export async function updateContestant(eventId, organizerId, contestantId, paylo
 
   if (error) throw new ApiError(500, error.message)
   if (!data) throw new ApiError(404, 'Contestant not found')
+
+  // Cleanup old photo asset if it was replaced
+  if (oldAssetId && oldAssetId !== payload.image_asset_id) {
+    removeReferenceAndDeleteIfUnused(oldAssetId).catch((err) =>
+      console.error('[competition] Old contestant photo cleanup error:', err.message),
+    )
+  }
+
   return mapContestant(data)
 }
 
 export async function deleteContestant(eventId, organizerId, contestantId) {
   await assertCompetitionEvent(eventId, organizerId)
+
+  // Fetch contestant image_asset_id before deleting for cleanup
+  const { data: contestantData } = await getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .select('image_asset_id')
+    .eq('id', contestantId)
+    .single()
+
+  const assetId = contestantData?.image_asset_id ?? null
 
   const { error } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
@@ -336,6 +382,13 @@ export async function deleteContestant(eventId, organizerId, contestantId) {
     .eq('event_id', eventId)
 
   if (error) throw new ApiError(500, error.message)
+
+  // Cleanup photo asset if no other entities reference it
+  if (assetId) {
+    removeReferenceAndDeleteIfUnused(assetId).catch((err) =>
+      console.error('[competition] Contestant photo cleanup error:', err.message),
+    )
+  }
 }
 
 // ——— Criteria ———

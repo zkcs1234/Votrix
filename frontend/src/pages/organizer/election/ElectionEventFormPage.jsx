@@ -261,23 +261,25 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
 
   // Save the current Create session as a draft, then continue navigation.
   const handleSaveAsDraft = () => {
-    const data = getValues()
-    saveDraft({
-      step,
-      title: data.title,
-      description: data.description,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      resultsVisibility: data.resultsVisibility,
-      banner,
-      payload: {
-        ...data,
+    if (isNew) {
+      const data = getValues()
+      saveDraft({
+        step,
+        title: data.title,
+        description: data.description,
         startDate: data.startDate,
         endDate: data.endDate,
         resultsVisibility: data.resultsVisibility,
-        infoFormSchema,
-      },
-    })
+        banner,
+        payload: {
+          ...data,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          resultsVisibility: data.resultsVisibility,
+          infoFormSchema,
+        },
+      })
+    }
     confirmLeave?.proceed?.()
   }
 

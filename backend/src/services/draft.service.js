@@ -1,6 +1,7 @@
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES } from '../utils/constants.js'
+import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
 
 /**
  * Persistent organizer drafts for unfinished Create sessions.
@@ -27,7 +28,14 @@ export async function getDraft(organizerId, module) {
 }
 
 /** Upsert: creates a fresh draft or updates the existing one for (organizer, module). */
-export async function saveDraft(organizerId, module, { step, title, banner, payload }) {
+export async function saveDraft(organizerId, module, { step, title, banner, payload, image_asset_id }) {
+  // Capture old image_asset_id before updating so we can clean it up if replaced
+  let oldAssetId = null
+  if (image_asset_id !== undefined) {
+    const existing = await getDraft(organizerId, module)
+    oldAssetId = existing?.image_asset_id ?? null
+  }
+
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_DRAFTS)
     .upsert(
@@ -37,6 +45,7 @@ export async function saveDraft(organizerId, module, { step, title, banner, payl
         step: step ?? 'details',
         title: title ?? null,
         banner: banner ?? null,
+        image_asset_id: image_asset_id ?? null,
         payload: payload ?? {},
         updated_at: new Date().toISOString(),
       },
@@ -46,11 +55,23 @@ export async function saveDraft(organizerId, module, { step, title, banner, payl
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  // Cleanup old draft banner asset if it was replaced
+  if (oldAssetId && image_asset_id !== undefined && oldAssetId !== image_asset_id) {
+    removeReferenceAndDeleteIfUnused(oldAssetId).catch((err) =>
+      console.error('[draft] Old draft banner cleanup error:', err.message),
+    )
+  }
+
   return data
 }
 
 /** Delete / discard. Idempotent — a missing draft is not an error. */
 export async function deleteDraft(organizerId, module) {
+  // Fetch draft image_asset_id before deleting for cleanup
+  const draft = await getDraft(organizerId, module)
+  const assetId = draft?.image_asset_id ?? null
+
   const { error } = await getClient()
     .from(DB_TABLES.EVENT_DRAFTS)
     .delete()
@@ -58,6 +79,13 @@ export async function deleteDraft(organizerId, module) {
     .eq('module', module)
 
   if (error) throw new ApiError(500, error.message)
+
+  // Cleanup draft banner asset if no other entities reference it
+  if (assetId) {
+    removeReferenceAndDeleteIfUnused(assetId).catch((err) =>
+      console.error('[draft] Draft banner cleanup error:', err.message),
+    )
+  }
 }
 
 /**

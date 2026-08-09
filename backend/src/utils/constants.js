@@ -144,6 +144,8 @@ export const DB_TABLES = {
   NOTIFICATIONS: 'notifications',
   EVENT_DRAFTS: 'event_drafts',
   USER_SESSIONS: 'user_sessions',
+  IMAGE_ASSETS: 'image_assets',
+  IMAGE_DELETION_QUEUE: 'image_deletion_queue',
 }
 
 // Modules that support persistent Create-session drafts. Values match the

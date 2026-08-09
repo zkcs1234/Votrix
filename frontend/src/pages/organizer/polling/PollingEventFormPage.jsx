@@ -245,8 +245,6 @@ try {
       const isValid = await trigger([
         'pollAnonymous',
         'pollAllowMultipleSubmissions',
-        'startDate',
-        'endDate',
       ])
       if (!isValid) {
         setSaving(false)
@@ -256,6 +254,7 @@ try {
       if (isNew) {
         const { data: res } = await pollingService.createEvent(payload)
         const id = res.event.id
+        await deleteDraft()
         if (bannerFile) await pollingService.uploadBanner(id, bannerFile)
         navigate(`/organizer/polling/events/${id}/form`, { replace: true })
       } else {
@@ -280,7 +279,7 @@ try {
     }
   }
 
-function stageHref(stageKey) {
+  function stageHref(stageKey) {
     const base = '/organizer/polling/events'
     if (isNew) return `${base}/new`
     const pathByKey = {
@@ -294,25 +293,27 @@ function stageHref(stageKey) {
 
   // Save the current Create session as a draft, then continue navigation.
   const handleSaveAsDraft = () => {
-    const data = getValues()
-    saveDraft({
-      step,
-      title: data.title,
-      description: data.description,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      pollAnonymous: data.pollAnonymous,
-      pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
-      banner,
-      payload: {
-        ...data,
+    if (isNew) {
+      const data = getValues()
+      saveDraft({
+        step,
+        title: data.title,
+        description: data.description,
         startDate: data.startDate,
         endDate: data.endDate,
         pollAnonymous: data.pollAnonymous,
         pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
-        infoFormSchema,
-      },
-    })
+        banner,
+        payload: {
+          ...data,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          pollAnonymous: data.pollAnonymous,
+          pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
+          infoFormSchema,
+        },
+      })
+    }
     confirmLeave?.proceed?.()
   }
 

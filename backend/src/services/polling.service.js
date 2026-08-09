@@ -30,6 +30,8 @@ import { createNotification } from './notification.service.js'
 import { USER_ROLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
 import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
+import { deleteDraft } from './draft.service.js'
+import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
 
 // Phase 7 — Polling question types are now registry-driven. The legacy
 // POLL_QUESTION_TYPES constants and the `multiple_choice` alias are kept in
@@ -550,12 +552,18 @@ export async function createPollEvent(organizerId, payload) {
   await syncEventSchedules().catch((err) => {
     console.error('[polling] schedule sync failed after create:', err.message)
   })
+  await deleteDraft(organizerId, 'polling').catch((err) => {
+    console.error('[polling] failed to clear draft after create:', err.message)
+  })
   return mapPollEvent(data)
 }
 
 export async function updatePollEvent(eventId, organizerId, payload) {
   const event = await assertPollingEvent(eventId, organizerId)
   assertEventUpdateAllowed(event, payload)
+
+  // Capture old image_asset_id before updating so we can clean it up if replaced
+  const oldAssetId = event.image_asset_id ?? null
 
   const updates = {}
   if (payload.title !== undefined) updates.title = payload.title
@@ -567,6 +575,7 @@ export async function updatePollEvent(eventId, organizerId, payload) {
     updates.poll_allow_multiple_submissions = payload.pollAllowMultipleSubmissions
   }
   if (payload.banner !== undefined) updates.banner = payload.banner
+  if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
 
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
@@ -576,6 +585,14 @@ export async function updatePollEvent(eventId, organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  // Cleanup old banner asset if it was replaced
+  if (oldAssetId && updates.image_asset_id !== undefined && oldAssetId !== updates.image_asset_id) {
+    removeReferenceAndDeleteIfUnused(oldAssetId).catch((err) =>
+      console.error('[polling] Old banner asset cleanup error:', err.message),
+    )
+  }
+
   await syncEventSchedules().catch((err) => {
     console.error('[polling] schedule sync failed after update:', err.message)
   })
@@ -692,6 +709,17 @@ export async function updateQuestion(eventId, organizerId, questionId, payload) 
   const orgId = await getPollingOrgId(organizerId)
   const registry = await loadQuestionTypeRegistry(orgId)
 
+  // Capture old image_asset_id before updating so we can clean it up if replaced
+  let oldAssetId = null
+  if (payload.image_asset_id !== undefined) {
+    const { data: prev } = await getClient()
+      .from(DB_TABLES.POLL_QUESTIONS)
+      .select('image_asset_id')
+      .eq('id', questionId)
+      .maybeSingle()
+    oldAssetId = prev?.image_asset_id ?? null
+  }
+
   const updates = {}
   if (payload.question !== undefined) updates.question = payload.question
   let typeDef = null
@@ -703,6 +731,7 @@ export async function updateQuestion(eventId, organizerId, questionId, payload) 
   if (payload.sortOrder !== undefined) updates.sort_order = payload.sortOrder
   if (payload.required !== undefined) updates.required = payload.required
   if (payload.imageUrl !== undefined) updates.image_url = payload.imageUrl
+  if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
   if (payload.typeConfig !== undefined) {
     let def = typeDef
     if (!def) {
@@ -723,6 +752,13 @@ export async function updateQuestion(eventId, organizerId, questionId, payload) 
 
   if (error) throw new ApiError(500, error.message)
   if (!question) throw new ApiError(404, 'Question not found')
+
+  // Cleanup old image asset if it was replaced
+  if (oldAssetId && oldAssetId !== payload.image_asset_id) {
+    removeReferenceAndDeleteIfUnused(oldAssetId).catch((err) =>
+      console.error('[polling] Old question image cleanup error:', err.message),
+    )
+  }
 
   // Re-resolve the typeDef in case the type didn't change.
   const finalTypeDef = typeDef ?? registry.find((r) => r.key === question.type) ?? null
@@ -753,6 +789,15 @@ async function currentTypeKey(questionId) {
 export async function deleteQuestion(eventId, organizerId, questionId) {
   await assertPollingEvent(eventId, organizerId)
 
+  // Fetch question image_asset_id before deleting for cleanup
+  const { data: questionData } = await getClient()
+    .from(DB_TABLES.POLL_QUESTIONS)
+    .select('image_asset_id')
+    .eq('id', questionId)
+    .single()
+
+  const assetId = questionData?.image_asset_id ?? null
+
   const { error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
     .delete()
@@ -760,6 +805,13 @@ export async function deleteQuestion(eventId, organizerId, questionId) {
     .eq('event_id', eventId)
 
   if (error) throw new ApiError(500, error.message)
+
+  // Cleanup image asset if no other entities reference it
+  if (assetId) {
+    removeReferenceAndDeleteIfUnused(assetId).catch((err) =>
+      console.error('[polling] Question image cleanup error:', err.message),
+    )
+  }
 }
 
 export async function duplicateQuestion(eventId, organizerId, questionId) {

@@ -55,6 +55,7 @@ export const uploadBanner = asyncHandler(async (req, res) => {
   const result = await uploadImageFile(req.file, UPLOAD_KIND.BANNER, `competition-${req.params.eventId}`)
   const event = await pageantService.updateCompetitionEvent(req.params.eventId, req.user.id, {
     banner: result.secure_url,
+    image_asset_id: result.image_asset_id ?? null,
   })
   res.json({ success: true, url: result.secure_url, event })
 })
@@ -95,7 +96,7 @@ export const uploadContestantPhoto = asyncHandler(async (req, res) => {
     req.params.eventId,
     req.user.id,
     req.params.contestantId,
-    { photo: result.secure_url },
+    { photo: result.secure_url, image_asset_id: result.image_asset_id ?? null },
   )
   res.json({ success: true, url: result.secure_url, contestant })
 })

@@ -9,6 +9,8 @@ import { mapEvent } from '../foundation/mapper.js'
 import { recordAudit } from '../foundation/audit.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
 import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
+import { deleteDraft } from './draft.service.js'
+import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
 
 function mapPosition(row) {
   return {
@@ -169,6 +171,10 @@ export async function createElectionEvent(organizerId, payload) {
     console.error('[election] schedule sync failed after create:', err.message)
   })
 
+  await deleteDraft(organizerId, 'election').catch((err) => {
+    console.error('[election] failed to clear draft after create:', err.message)
+  })
+
   await recordAudit({
     userId: organizerId,
     action: 'election.event.create',
@@ -191,10 +197,14 @@ export async function updateElectionEvent(eventId, organizerId, payload) {
 
   assertEventUpdateAllowed(event, payload)
 
+  // Capture old image_asset_id before updating so we can clean it up if replaced
+  const oldAssetId = event.image_asset_id ?? null
+
   const updates = {}
   if (payload.title !== undefined) updates.title = payload.title
   if (payload.description !== undefined) updates.description = payload.description
   if (payload.banner !== undefined) updates.banner = payload.banner
+  if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
   if (payload.startDate !== undefined) updates.start_date = payload.startDate
   if (payload.endDate !== undefined) updates.end_date = payload.endDate
   if (payload.status !== undefined) updates.status = payload.status
@@ -210,6 +220,13 @@ export async function updateElectionEvent(eventId, organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  // Cleanup old banner asset if it was replaced
+  if (oldAssetId && updates.image_asset_id !== undefined && oldAssetId !== updates.image_asset_id) {
+    removeReferenceAndDeleteIfUnused(oldAssetId).catch((err) =>
+      console.error('[election] Old banner asset cleanup error:', err.message),
+    )
+  }
 
   await syncEventSchedules().catch((err) => {
     console.error('[election] schedule sync failed after update:', err.message)
@@ -509,9 +526,21 @@ export async function updateCandidate(eventId, organizerId, candidateId, payload
 
   await assertCandidateInEvent(eventId, candidateId)
 
+  // Capture old image_asset_id before updating so we can clean it up if replaced
+  let oldAssetId = null
+  if (payload.image_asset_id !== undefined) {
+    const { data: prev } = await getClient()
+      .from(DB_TABLES.CANDIDATES)
+      .select('image_asset_id')
+      .eq('id', candidateId)
+      .maybeSingle()
+    oldAssetId = prev?.image_asset_id ?? null
+  }
+
   const updates = {}
   if (payload.name !== undefined) updates.name = payload.name
   if (payload.photo !== undefined) updates.photo = payload.photo
+  if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
   if (payload.description !== undefined) updates.description = payload.description
   if (payload.biography !== undefined) updates.biography = payload.biography
   if (payload.platform !== undefined) updates.platform = payload.platform
@@ -525,6 +554,14 @@ export async function updateCandidate(eventId, organizerId, candidateId, payload
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  // Cleanup old photo asset if it was replaced
+  if (oldAssetId && oldAssetId !== payload.image_asset_id) {
+    removeReferenceAndDeleteIfUnused(oldAssetId).catch((err) =>
+      console.error('[election] Old candidate photo cleanup error:', err.message),
+    )
+  }
+
   return mapCandidate(data)
 }
 
@@ -542,15 +579,24 @@ export async function deleteCandidate(eventId, organizerId, candidateId) {
     throw new ApiError(409, 'Cannot delete a candidate that already has votes recorded')
   }
 
-  // Fetch candidate name before deleting for audit trail
+  // Fetch candidate name + image_asset_id before deleting for audit and cleanup
   const { data: candData } = await getClient()
     .from(DB_TABLES.CANDIDATES)
-    .select('name')
+    .select('name, image_asset_id')
     .eq('id', candidateId)
     .single()
 
+  const assetId = candData?.image_asset_id ?? null
+
   const { error } = await getClient().from(DB_TABLES.CANDIDATES).delete().eq('id', candidateId)
   if (error) throw new ApiError(500, error.message)
+
+  // Cleanup photo asset if no other entities reference it
+  if (assetId) {
+    removeReferenceAndDeleteIfUnused(assetId).catch((err) =>
+      console.error('[election] Candidate photo cleanup error:', err.message),
+    )
+  }
 
   await recordAudit({
     userId: organizerId,

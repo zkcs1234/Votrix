@@ -1,6 +1,11 @@
 import { Readable } from 'stream'
 import { getCloudinary } from '../config/cloudinary.js'
 import { ApiError } from '../utils/ApiError.js'
+import {
+  calculateHash,
+  findAssetByHash,
+  registerImageAsset,
+} from './imageAsset.service.js'
 
 export const UPLOAD_KIND = {
   LOGO: 'logo',
@@ -44,7 +49,7 @@ export function assertImageFile(file) {
   }
 }
 
-export async function uploadImageBuffer(buffer, { kind, publicId }) {
+export async function uploadImageBuffer(buffer, { kind, publicId, mimetype = 'image/jpeg', originalName = null }) {
   // CWE-918: Reject non-Buffer inputs before piping to Cloudinary's upload
   // stream. A non-buffer value (e.g. a URL string) could be used to trigger
   // SSRF via the stream pipeline.
@@ -57,32 +62,88 @@ export async function uploadImageBuffer(buffer, { kind, publicId }) {
     throw new ApiError(500, 'Unknown upload kind')
   }
 
+  // 1. Calculate SHA-256 hash of raw binary buffer
+  const fileHash = calculateHash(buffer)
+
+  // 2. Check if asset already exists in image_assets database registry
+  try {
+    const existingAsset = await findAssetByHash(fileHash)
+    if (existingAsset) {
+      return {
+        public_id: existingAsset.cloudinary_public_id,
+        secure_url: existingAsset.cloudinary_url,
+        image_asset_id: existingAsset.id,
+        asset: existingAsset,
+        deduplicated: true,
+      }
+    }
+  } catch (err) {
+    console.warn('[upload.service] Could not query image_assets table, proceeding with direct upload:', err.message)
+  }
+
+  // 3. Asset does not exist in registry - proceed with Cloudinary upload
   const cloudinary = getCloudinary()
   if (!cloudinary) {
     throw new ApiError(503, 'Cloudinary is not configured. Set CLOUDINARY_* in .env')
   }
 
-  return new Promise((resolve, reject) => {
+  const targetPublicId = publicId || `${kind}-${fileHash.slice(0, 16)}-${Date.now()}`
+
+  const result = await new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: config.folder,
         resource_type: 'image',
-        public_id: publicId,
+        public_id: targetPublicId,
         transformation: config.transformation,
         overwrite: true,
       },
-      (error, result) => {
+      (error, res) => {
         if (error) reject(new ApiError(502, error.message || 'Upload failed'))
-        else resolve(result)
+        else resolve(res)
       },
     )
 
     Readable.from(buffer).pipe(uploadStream)
   })
+
+  // 4. Register new asset in image_assets database registry
+  try {
+    const assetRecord = await registerImageAsset({
+      fileHash,
+      cloudinaryPublicId: result.public_id,
+      cloudinaryUrl: result.secure_url,
+      mimeType: mimetype,
+      fileSize: buffer.length,
+      width: result.width || null,
+      height: result.height || null,
+      format: result.format || null,
+    })
+
+    return {
+      ...result,
+      image_asset_id: assetRecord.id,
+      asset: assetRecord,
+      deduplicated: false,
+    }
+  } catch (err) {
+    console.warn('[upload.service] Failed to register image_asset row:', err.message)
+    return {
+      ...result,
+      image_asset_id: null,
+      asset: null,
+      deduplicated: false,
+    }
+  }
 }
 
 export async function uploadImageFile(file, kind, idSuffix) {
   assertImageFile(file)
   const publicId = `${kind}-${idSuffix}-${Date.now()}`
-  return uploadImageBuffer(file.buffer, { kind, publicId })
+  return uploadImageBuffer(file.buffer, {
+    kind,
+    publicId,
+    mimetype: file.mimetype,
+    originalName: file.originalname,
+  })
 }

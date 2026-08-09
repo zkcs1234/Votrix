@@ -77,6 +77,7 @@ export const uploadOrganizationLogo = asyncHandler(async (req, res) => {
   const organization = await updateOrganizationLogo(
     req.user.id,
     result.secure_url,
+    result.image_asset_id ?? null,
   )
   res.json({ success: true, url: result.secure_url, organization })
 })
