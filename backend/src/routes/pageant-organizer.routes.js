@@ -60,5 +60,6 @@ router.get('/drafts', draftCtrl.getDraft('competition'))
 router.put('/drafts', draftCtrl.saveDraft('competition'))
 router.delete('/drafts', draftCtrl.deleteDraft('competition'))
 router.post('/drafts/publish', draftCtrl.publishDraft('competition'))
+router.post('/drafts/banner', uploadLimiter, uploadImage('banner'), draftCtrl.uploadBanner('competition'))
 
 export default router

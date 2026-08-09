@@ -180,7 +180,43 @@ try {
   const handleNext = async (e) => {
     e.preventDefault()
     const isValid = await trigger(['title', 'startDate', 'endDate'])
-    if (isValid) setStep('branding')
+    if (!isValid) return
+
+    if (isNew) {
+      const data = getValues()
+      await saveDraft({
+        step: 'branding',
+        title: data.title,
+        description: data.description,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        banner,
+        payload: {
+          ...data,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          infoFormSchema,
+        },
+      })
+      setStep('branding')
+    } else {
+      setSaving(true)
+      try {
+        const data = getValues()
+        const payload = {
+          title: data.title,
+          description: data.description,
+          startDate: localInputToIso(data.startDate),
+          endDate: localInputToIso(data.endDate),
+        }
+        await pageantService.updateEvent(eventId, payload)
+        setStep('branding')
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to update event')
+      } finally {
+        setSaving(false)
+      }
+    }
   }
 
   const handleNextBranding = async (e) => {
@@ -189,6 +225,48 @@ try {
     setError(null)
 
     try {
+      if (isNew) {
+        let currentBanner = banner
+        if (bannerFile) {
+          const res = await draftService.uploadBanner('competition', bannerFile)
+          currentBanner = res.data.url
+          setBanner(currentBanner)
+          setBannerFile(null)
+        }
+        const data = getValues()
+        await saveDraft({
+          step: 'information-form',
+          title: data.title,
+          description: data.description,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          banner: currentBanner,
+          payload: {
+            ...data,
+            startDate: data.startDate,
+            endDate: data.endDate,
+            infoFormSchema,
+          },
+        })
+        setStep('information-form')
+      } else {
+        if (bannerFile) {
+          await pageantService.uploadBanner(eventId, bannerFile)
+          setBannerFile(null)
+        }
+        setStep('information-form')
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save event')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleFinishDraft = async () => {
+    setSaving(true)
+    setError(null)
+    try {
       const data = getValues()
       const payload = {
         title: data.title,
@@ -196,25 +274,10 @@ try {
         startDate: localInputToIso(data.startDate),
         endDate: localInputToIso(data.endDate),
       }
-      let id = eventId
-      if (isNew) {
-        const { data: res } = await pageantService.createEvent(payload)
-        id = res.event.id
-        await deleteDraft()
-      } else {
-        await pageantService.updateEvent(eventId, payload)
-      }
-      if (bannerFile) {
-        await pageantService.uploadBanner(id, bannerFile)
-      }
-
-      if (isNew) {
-        navigate(`/organizer/competition/events/${id}/form`, { replace: true })
-      } else {
-        setStep('information-form')
-      }
+      const { data: res } = await draftService.publishDraft('competition', payload)
+      navigate(`/organizer/competition/events/${res.event.id}/contestants`, { replace: true })
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save event')
+      setError(err.response?.data?.message || 'Failed to publish event')
     } finally {
       setSaving(false)
     }
@@ -421,22 +484,42 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             {infoFormLoading ? (
               <p className="v-caption">Loading information form...</p>
             ) : (
-<ParticipantInformationFormBuilder
+              <ParticipantInformationFormBuilder
                 initialSchema={infoFormSchema}
                 service={pageantService}
                 eventId={eventId}
+                isDraft={isNew}
                 onSave={(schema) => {
                   setInfoFormSchema(schema)
+                  if (isNew) {
+                    const data = getValues()
+                    saveDraft({
+                      step: 'information-form',
+                      title: data.title,
+                      description: data.description,
+                      startDate: data.startDate,
+                      endDate: data.endDate,
+                      banner,
+                      payload: {
+                        ...data,
+                        startDate: data.startDate,
+                        endDate: data.endDate,
+                        infoFormSchema: schema,
+                      },
+                    })
+                  }
                 }}
               />
             )}
 
-<StageFooter
+            <StageFooter
               module="competition"
               currentKey="information-form"
-              eventId={eventId}
+              eventId={stepperEventId}
               saving={saving}
-              nextLabel="Continue to Contestants"
+              onNext={isNew ? handleFinishDraft : undefined}
+              nextLabel={isNew ? 'Finish & Publish' : 'Continue to Contestants'}
+              nextPath={isNew ? undefined : `/organizer/competition/events/${eventId}/contestants`}
             />
           </div>
         )}

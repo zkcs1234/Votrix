@@ -18,4 +18,14 @@ export const draftService = {
   publishDraft(module, payload) {
     return api.post(`${base(module)}/publish`, payload)
   },
+
+  uploadBanner(module, file) {
+    const formData = new FormData()
+    formData.append('banner', file)
+    return api.post(`${base(module)}/banner`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+  },
 }

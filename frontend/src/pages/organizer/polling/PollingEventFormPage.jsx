@@ -211,26 +211,41 @@ try {
     setSaving(true)
     setError(null)
     try {
-      const data = getValues()
-      const payload = buildPayload(data)
-      let id = eventId
       if (isNew) {
-        const { data: res } = await pollingService.createEvent(payload)
-        id = res.event.id
-        await deleteDraft()
+        let currentBanner = banner
+        if (bannerFile) {
+          const res = await draftService.uploadBanner('polling', bannerFile)
+          currentBanner = res.data.url
+          setBanner(currentBanner)
+          setBannerFile(null)
+        }
+        const data = getValues()
+        await saveDraft({
+          step: 'settings',
+          title: data.title,
+          description: data.description,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          pollAnonymous: data.pollAnonymous,
+          pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
+          banner: currentBanner,
+          payload: {
+            ...data,
+            startDate: data.startDate,
+            endDate: data.endDate,
+            infoFormSchema,
+          },
+        })
+        setStep('settings')
       } else {
-        await pollingService.updateEvent(eventId, payload)
-      }
-      if (bannerFile) {
-        await pollingService.uploadBanner(id, bannerFile)
-      }
-      if (isNew) {
-        navigate(`/organizer/polling/events/${id}/settings`, { replace: true })
-      } else {
+        if (bannerFile) {
+          await pollingService.uploadBanner(eventId, bannerFile)
+          setBannerFile(null)
+        }
         navigate(stageHref('settings'))
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save poll')
+      setError(err.response?.data?.message || 'Failed to save banner')
     } finally {
       setSaving(false)
     }
@@ -250,19 +265,46 @@ try {
         setSaving(false)
         return
       }
-      const payload = buildPayload(data)
       if (isNew) {
-        const { data: res } = await pollingService.createEvent(payload)
-        const id = res.event.id
-        await deleteDraft()
-        if (bannerFile) await pollingService.uploadBanner(id, bannerFile)
-        navigate(`/organizer/polling/events/${id}/form`, { replace: true })
+        await saveDraft({
+          step: 'information-form',
+          title: data.title,
+          description: data.description,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          pollAnonymous: data.pollAnonymous,
+          pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
+          banner,
+          payload: {
+            ...data,
+            startDate: data.startDate,
+            endDate: data.endDate,
+            infoFormSchema,
+          },
+        })
+        setStep('information-form')
       } else {
+        const payload = buildPayload(data)
         await pollingService.updateEvent(eventId, payload)
         navigate(`/organizer/polling/events/${eventId}/form`)
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save poll settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleFinishDraft = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const data = getValues()
+      const payload = buildPayload(data)
+      const { data: res } = await draftService.publishDraft('polling', payload)
+      navigate(`/organizer/polling/events/${res.event.id}/builder`, { replace: true })
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to publish event')
     } finally {
       setSaving(false)
     }
@@ -582,23 +624,44 @@ const stepperEventId = isNew ? 'new' : eventId
             {infoFormLoading ? (
               <p className="v-caption">Loading information form...</p>
             ) : (
-<ParticipantInformationFormBuilder
+              <ParticipantInformationFormBuilder
                 initialSchema={infoFormSchema}
                 service={pollingService}
                 eventId={eventId}
+                isDraft={isNew}
                 onSave={(schema) => {
                   setInfoFormSchema(schema)
+                  if (isNew) {
+                    const data = getValues()
+                    saveDraft({
+                      step: 'information-form',
+                      title: data.title,
+                      description: data.description,
+                      startDate: data.startDate,
+                      endDate: data.endDate,
+                      pollAnonymous: data.pollAnonymous,
+                      pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
+                      banner,
+                      payload: {
+                        ...data,
+                        startDate: data.startDate,
+                        endDate: data.endDate,
+                        infoFormSchema: schema,
+                      },
+                    })
+                  }
                 }}
               />
             )}
 
-<StageFooter
+            <StageFooter
               module="polling"
               currentKey="information-form"
-              eventId={eventId}
+              eventId={stepperEventId}
               saving={saving}
-              nextLabel="Continue to Builder"
-              nextPath={`/organizer/polling/events/${eventId}/builder`}
+              onNext={isNew ? handleFinishDraft : undefined}
+              nextLabel={isNew ? 'Finish & Publish' : 'Continue to Builder'}
+              nextPath={isNew ? undefined : `/organizer/polling/events/${eventId}/builder`}
             />
           </div>
         )}

@@ -155,6 +155,7 @@ export async function createElectionEvent(organizerId, payload) {
       title: payload.title,
       description: payload.description ?? null,
       banner: payload.banner ?? null,
+      image_asset_id: payload.image_asset_id ?? null,
       start_date: payload.startDate ?? null,
       end_date: payload.endDate ?? null,
       status: payload.status ?? 'draft',

@@ -53,5 +53,6 @@ router.get('/drafts', draftCtrl.getDraft('polling'))
 router.put('/drafts', draftCtrl.saveDraft('polling'))
 router.delete('/drafts', draftCtrl.deleteDraft('polling'))
 router.post('/drafts/publish', draftCtrl.publishDraft('polling'))
+router.post('/drafts/banner', uploadLimiter, uploadImage('banner'), draftCtrl.uploadBanner('polling'))
 
 export default router

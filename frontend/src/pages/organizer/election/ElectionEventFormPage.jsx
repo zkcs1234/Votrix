@@ -213,7 +213,46 @@ try {
   const handleNext = async (e) => {
     e.preventDefault()
     const isValid = await trigger(['title', 'startDate', 'endDate'])
-    if (isValid) setStep('branding')
+    if (!isValid) return
+
+    if (isNew) {
+      const data = getValues()
+      await saveDraft({
+        step: 'branding',
+        title: data.title,
+        description: data.description,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        resultsVisibility: data.resultsVisibility,
+        banner,
+        payload: {
+          ...data,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          resultsVisibility: data.resultsVisibility,
+          infoFormSchema,
+        },
+      })
+      setStep('branding')
+    } else {
+      setSaving(true)
+      try {
+        const data = getValues()
+        const payload = {
+          title: data.title,
+          description: data.description,
+          startDate: localInputToIso(data.startDate),
+          endDate: localInputToIso(data.endDate),
+          resultsVisibility: data.resultsVisibility,
+        }
+        await electionService.updateEvent(eventId, payload)
+        setStep('branding')
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to update event')
+      } finally {
+        setSaving(false)
+      }
+    }
   }
 
   const handleNextBranding = async (e) => {
@@ -221,6 +260,50 @@ try {
     setSaving(true)
     setError(null)
 
+    try {
+      if (isNew) {
+        let currentBanner = banner
+        if (bannerFile) {
+          const res = await draftService.uploadBanner('election', bannerFile)
+          currentBanner = res.data.url
+          setBanner(currentBanner)
+          setBannerFile(null)
+        }
+        const data = getValues()
+        await saveDraft({
+          step: 'information-form',
+          title: data.title,
+          description: data.description,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          resultsVisibility: data.resultsVisibility,
+          banner: currentBanner,
+          payload: {
+            ...data,
+            startDate: data.startDate,
+            endDate: data.endDate,
+            resultsVisibility: data.resultsVisibility,
+            infoFormSchema,
+          },
+        })
+        setStep('information-form')
+      } else {
+        if (bannerFile) {
+          await electionService.uploadBanner(eventId, bannerFile)
+          setBannerFile(null)
+        }
+        setStep('information-form')
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save event')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleFinishDraft = async () => {
+    setSaving(true)
+    setError(null)
     try {
       const data = getValues()
       const payload = {
@@ -230,26 +313,11 @@ try {
         endDate: localInputToIso(data.endDate),
         resultsVisibility: data.resultsVisibility,
       }
-      let id = eventId
-      if (isNew) {
-        const { data: res } = await electionService.createEvent(payload)
-        id = res.event.id
-        await deleteDraft()
-      } else {
-        await electionService.updateEvent(eventId, payload)
-      }
-
-      if (bannerFile) {
-        await electionService.uploadBanner(id, bannerFile)
-      }
-
-      if (isNew) {
-        navigate(`/organizer/election/events/${id}/form`, { replace: true })
-      } else {
-        setStep('information-form')
-      }
+      // Draft banner and image_asset_id will be injected by backend
+      const { data: res } = await draftService.publishDraft('election', payload)
+      navigate(`/organizer/election/events/${res.event.id}/positions`, { replace: true })
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save event')
+      setError(err.response?.data?.message || 'Failed to publish event')
     } finally {
       setSaving(false)
     }
@@ -484,22 +552,44 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             {infoFormLoading ? (
               <p className="v-caption">Loading information form...</p>
             ) : (
-<ParticipantInformationFormBuilder
+              <ParticipantInformationFormBuilder
                 initialSchema={infoFormSchema}
                 service={electionService}
                 eventId={eventId}
+                isDraft={isNew}
                 onSave={(schema) => {
                   setInfoFormSchema(schema)
+                  if (isNew) {
+                    const data = getValues()
+                    saveDraft({
+                      step: 'information-form',
+                      title: data.title,
+                      description: data.description,
+                      startDate: data.startDate,
+                      endDate: data.endDate,
+                      resultsVisibility: data.resultsVisibility,
+                      banner,
+                      payload: {
+                        ...data,
+                        startDate: data.startDate,
+                        endDate: data.endDate,
+                        resultsVisibility: data.resultsVisibility,
+                        infoFormSchema: schema,
+                      },
+                    })
+                  }
                 }}
               />
             )}
 
-<StageFooter
+            <StageFooter
               module="election"
               currentKey="information-form"
-              eventId={eventId}
+              eventId={stepperEventId}
               saving={saving}
-              nextLabel="Continue to Positions"
+              onNext={isNew ? handleFinishDraft : undefined}
+              nextLabel={isNew ? 'Finish & Publish' : 'Continue to Positions'}
+              nextPath={isNew ? undefined : `/organizer/election/events/${eventId}/positions`}
             />
           </div>
         )}

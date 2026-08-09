@@ -22,6 +22,7 @@ export default function ParticipantInformationFormBuilder({
   onSave,
   service,
   eventId,
+  isDraft = false,
 }) {
 const [enabled, setEnabled] = useState(false)
   const [fields, setFields] = useState([])
@@ -137,7 +138,9 @@ const [enabled, setEnabled] = useState(false)
           : [],
       }
 
-      await service.updateInformationForm(eventId, schema)
+      if (!isDraft) {
+        await service.updateInformationForm(eventId, schema)
+      }
       setDirty(false)
       if (onSave) onSave(schema)
     } catch (err) {

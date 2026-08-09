@@ -537,6 +537,8 @@ export async function createPollEvent(organizerId, payload) {
       organization_id: org.id,
       title: payload.title,
       description: payload.description ?? null,
+      banner: payload.banner ?? null,
+      image_asset_id: payload.image_asset_id ?? null,
       start_date: payload.startDate ?? null,
       end_date: payload.endDate ?? null,
       event_type: EVENT_TYPES.POLLING,
