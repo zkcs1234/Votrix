@@ -29,8 +29,9 @@ const emptyForm = () => ({
   type: 'single_choice',
   required: true,
   typeConfig: {},
-  options: [{ label: '', imageUrl: '' }, { label: '', imageUrl: '' }],
+  options: [{ label: '', imageUrl: '', imageAssetId: null }, { label: '', imageUrl: '', imageAssetId: null }],
   imageUrl: '',
+  imageAssetId: null,
 })
 
 function listQuestionTypes() {
@@ -242,7 +243,7 @@ export default function PollingBuilderPage() {
     setError(null)
   }
 
-  const startEdit = (q) => {
+const startEdit = (q) => {
     setEditingId(q.id)
     setForm({
       question: q.question,
@@ -251,17 +252,22 @@ export default function PollingBuilderPage() {
       typeConfig: q.typeConfig ?? {},
       options:
         q.options?.length > 0
-          ? q.options.map((o) => ({ label: o.label, imageUrl: o.imageUrl ?? '' }))
-          : [{ label: '', imageUrl: '' }, { label: '', imageUrl: '' }],
+          ? q.options.map((o) => ({
+              label: o.label,
+              imageUrl: o.imageUrl ?? '',
+              imageAssetId: o.imageAssetId ?? null,
+            }))
+          : [{ label: '', imageUrl: '', imageAssetId: null }, { label: '', imageUrl: '', imageAssetId: null }],
       imageUrl: q.imageUrl ?? '',
+      imageAssetId: q.imageAssetId ?? null,
     })
   }
 
-  const handleTypeChange = (typeKey) => {
+const handleTypeChange = (typeKey) => {
     const next = { ...form, type: typeKey, typeConfig: {} }
     const def = types.find((t) => t.key === typeKey)
     if (def && needsFreeOptions(def) && form.options.length < 2) {
-      next.options = [{ label: '', imageUrl: '' }, { label: '', imageUrl: '' }]
+      next.options = [{ label: '', imageUrl: '', imageAssetId: null }, { label: '', imageUrl: '', imageAssetId: null }]
     }
     setForm(next)
   }
@@ -270,10 +276,10 @@ export default function PollingBuilderPage() {
     if (!file) {
       if (isOption) {
         const options = [...form.options]
-        options[optionIndex] = { ...options[optionIndex], imageUrl: '' }
+        options[optionIndex] = { ...options[optionIndex], imageUrl: '', imageAssetId: null }
         setForm({ ...form, options })
       } else {
-        setForm({ ...form, imageUrl: '' })
+        setForm({ ...form, imageUrl: '', imageAssetId: null })
       }
       return
     }
@@ -281,10 +287,10 @@ export default function PollingBuilderPage() {
       const { data } = await pollingService.uploadGenericImage(eventId, file)
       if (isOption) {
         const options = [...form.options]
-        options[optionIndex] = { ...options[optionIndex], imageUrl: data.url }
+        options[optionIndex] = { ...options[optionIndex], imageUrl: data.url, imageAssetId: data.image_asset_id ?? null }
         setForm({ ...form, options })
       } else {
-        setForm({ ...form, imageUrl: data.url })
+        setForm({ ...form, imageUrl: data.url, imageAssetId: data.image_asset_id ?? null })
       }
     } catch (err) {
       setError('Failed to upload image')
@@ -302,6 +308,7 @@ export default function PollingBuilderPage() {
       required: form.required,
       typeConfig: form.typeConfig,
       imageUrl: form.imageUrl || null,
+      imageAssetId: form.imageAssetId ?? null,
       sortOrder: editingId
         ? questions.find((q) => q.id === editingId)?.sortOrder ?? 0
         : questions.length,
@@ -317,6 +324,7 @@ export default function PollingBuilderPage() {
       payload.options = options.map((o) => ({
         label: o.label.trim(),
         imageUrl: o.imageUrl?.trim() || null,
+        imageAssetId: o.imageAssetId ?? null,
       }))
     }
 
@@ -520,7 +528,7 @@ export default function PollingBuilderPage() {
             <button
               type="button"
               className="text-sm text-v-text-muted"
-              onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageUrl: '' }] })}
+onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageUrl: '', imageAssetId: null }] })}
             >
               + Add option
             </button>

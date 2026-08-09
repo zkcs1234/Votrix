@@ -50,6 +50,7 @@ export async function validateQuestion(body, organizationId) {
     typeConfig,
     options: body.options,
     imageUrl: body.imageUrl?.trim() || null,
+    imageAssetId: body.imageAssetId ?? null,
   }
 }
 
@@ -118,6 +119,7 @@ export function validatePollQuestion(body) {
     typeConfig: body.typeConfig ?? {},
     options: body.options,
     imageUrl: body.imageUrl?.trim() || null,
+    imageAssetId: body.imageAssetId ?? null,
   }
 }
 

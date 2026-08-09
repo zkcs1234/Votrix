@@ -13,6 +13,7 @@ import ParticipantInformationFormBuilder from '@/components/organizer/Participan
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
+import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'

@@ -18,6 +18,7 @@ import ParticipantInformationFormBuilder from '@/components/organizer/Participan
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
+import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
 
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
@@ -197,11 +198,38 @@ try {
   const handleNextDetails = async (e) => {
     e.preventDefault()
     const isValid = await trigger(['title', 'startDate', 'endDate'])
-    if (isValid) {
-      if (isNew) {
+    if (!isValid) return
+
+    if (isNew) {
+      const data = getValues()
+      await saveDraft({
+        step: 'branding',
+        title: data.title,
+        description: data.description,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        pollAnonymous: data.pollAnonymous,
+        pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
+        banner,
+        payload: {
+          ...data,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          infoFormSchema,
+        },
+      })
+      setStep('branding')
+    } else {
+      setSaving(true)
+      try {
+        const data = getValues()
+        const payload = buildPayload(data)
+        await pollingService.updateEvent(eventId, payload)
         setStep('branding')
-      } else {
-        navigate(stageHref('branding'))
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to update event')
+      } finally {
+        setSaving(false)
       }
     }
   }

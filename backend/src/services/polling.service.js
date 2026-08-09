@@ -77,11 +77,13 @@ function mapQuestion(row, options = [], typeDef = null) {
     required: row.required,
     typeConfig: row.type_config ?? {},
     imageUrl: row.image_url,
+    imageAssetId: row.image_asset_id ?? null,
     options: options.map((o) => ({
       id: o.id,
       label: o.label,
       sortOrder: o.sort_order,
       imageUrl: o.image_url,
+      imageAssetId: o.image_asset_id ?? null,
     })),
   }
   if (typeDef) {
@@ -634,9 +636,9 @@ export async function getPollSettings(eventId, organizerId) {
 async function loadOptionsForQuestions(questionIds) {
   if (!questionIds.length) return {}
 
-  const { data, error } = await getClient()
+const { data, error } = await getClient()
     .from(DB_TABLES.POLL_OPTIONS)
-    .select('id, question_id, label, sort_order, image_url')
+    .select('id, question_id, label, sort_order, image_url, image_asset_id')
     .in('question_id', questionIds)
     .order('sort_order', { ascending: true })
 
@@ -655,9 +657,9 @@ export async function listQuestions(eventId, organizerId) {
   const orgId = await getPollingOrgId(organizerId)
   const registry = await loadQuestionTypeRegistry(orgId)
 
-  const { data, error } = await getClient()
+const { data, error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
-    .select('id, event_id, question, type, sort_order, required, type_config, image_url')
+    .select('id, event_id, question, type, sort_order, required, type_config, image_url, image_asset_id')
     .eq('event_id', eventId)
     .order('sort_order', { ascending: true })
 
@@ -687,8 +689,9 @@ export async function createQuestion(eventId, organizerId, payload) {
       type: typeDef.key,
       sort_order: payload.sortOrder ?? 0,
       required: payload.required !== false,
-      type_config: typeConfig,
+type_config: typeConfig,
       image_url: payload.imageUrl ?? null,
+      image_asset_id: payload.image_asset_id ?? null,
     })
     .select('*')
     .single()
@@ -766,10 +769,23 @@ export async function updateQuestion(eventId, organizerId, questionId, payload) 
   const finalTypeDef = typeDef ?? registry.find((r) => r.key === question.type) ?? null
   const finalTypeConfig = question.type_config ?? {}
 
-  let options = []
+let options = []
   if (payload.options) {
+    // Capture old option image_asset_ids before deleting so we can clean them up if replaced
+    const oldOptMap = await loadOptionsForQuestions([questionId])
+    const oldOptAssetIds = (oldOptMap[questionId] ?? [])
+      .map((o) => o.image_asset_id)
+      .filter(Boolean)
+
     await getClient().from(DB_TABLES.POLL_OPTIONS).delete().eq('question_id', questionId)
     options = await upsertQuestionOptions(question.id, finalTypeDef, finalTypeConfig, payload.options)
+
+    // Cleanup old option image assets that are no longer referenced
+    for (const assetId of oldOptAssetIds) {
+      removeReferenceAndDeleteIfUnused(assetId).catch((err) =>
+        console.error('[polling] Old option image cleanup error:', err.message),
+      )
+    }
   } else {
     const optMap = await loadOptionsForQuestions([questionId])
     options = optMap[questionId] ?? []
@@ -800,6 +816,12 @@ export async function deleteQuestion(eventId, organizerId, questionId) {
 
   const assetId = questionData?.image_asset_id ?? null
 
+  // Fetch option image_asset_ids before deleting options for cleanup
+  const optMap = await loadOptionsForQuestions([questionId])
+  const optAssetIds = (optMap[questionId] ?? [])
+    .map((o) => o.image_asset_id)
+    .filter(Boolean)
+
   const { error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
     .delete()
@@ -808,10 +830,15 @@ export async function deleteQuestion(eventId, organizerId, questionId) {
 
   if (error) throw new ApiError(500, error.message)
 
-  // Cleanup image asset if no other entities reference it
+  // Cleanup image assets if no other entities reference them
   if (assetId) {
     removeReferenceAndDeleteIfUnused(assetId).catch((err) =>
       console.error('[polling] Question image cleanup error:', err.message),
+    )
+  }
+  for (const optAssetId of optAssetIds) {
+    removeReferenceAndDeleteIfUnused(optAssetId).catch((err) =>
+      console.error('[polling] Question option image cleanup error:', err.message),
     )
   }
 }
@@ -821,10 +848,10 @@ export async function duplicateQuestion(eventId, organizerId, questionId) {
   const orgId = await getPollingOrgId(organizerId)
   const registry = await loadQuestionTypeRegistry(orgId)
 
-  // Fetch the source question
+// Fetch the source question
   const { data: sourceQuestion, error: qError } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
-    .select('id, event_id, question, type, sort_order, required, type_config, image_url')
+    .select('id, event_id, question, type, sort_order, required, type_config, image_url, image_asset_id')
     .eq('id', questionId)
     .eq('event_id', eventId)
     .single()
@@ -878,6 +905,7 @@ export async function duplicateQuestion(eventId, organizerId, questionId) {
       required: sourceQuestion.required,
       type_config: typeConfig,
       image_url: sourceQuestion.image_url ?? null,
+      image_asset_id: sourceQuestion.image_asset_id ?? null,
     })
     .select('*')
     .single()
@@ -892,6 +920,7 @@ export async function duplicateQuestion(eventId, organizerId, questionId) {
       label: o.label,
       sort_order: o.sort_order ?? i,
       image_url: o.image_url ?? null,
+      image_asset_id: o.image_asset_id ?? null,
     }))
 
     const { data: opts, error: optErr } = await getClient()
@@ -964,11 +993,12 @@ async function upsertQuestionOptions(questionId, typeDef, typeConfig, optionsInp
 
   if (!options.length) return []
 
-  const rows = options.map((o, i) => ({
+const rows = options.map((o, i) => ({
     question_id: questionId,
     label: typeof o === 'string' ? o : o.label,
     sort_order: typeof o === 'string' ? i : o.sortOrder ?? i,
     image_url: typeof o === 'string' ? null : (o.imageUrl ?? null),
+    image_asset_id: typeof o === 'string' ? null : (o.imageAssetId ?? o.image_asset_id ?? null),
   }))
 
   const { data, error } = await getClient().from(DB_TABLES.POLL_OPTIONS).insert(rows).select('*')
@@ -1028,7 +1058,7 @@ async function listQuestionsPublic(eventId, registry = null) {
   registry = registry ?? (await loadQuestionTypeRegistry())
   const { data, error } = await getClient()
     .from(DB_TABLES.POLL_QUESTIONS)
-    .select('id, event_id, question, type, sort_order, required, type_config, image_url')
+    .select('id, event_id, question, type, sort_order, required, type_config, image_url, image_asset_id')
     .eq('event_id', eventId)
     .order('sort_order', { ascending: true })
 
