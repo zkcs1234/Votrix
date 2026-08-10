@@ -469,36 +469,36 @@ function RoundsTab({ foundation, reload }) {
                   )}
                 </div>
                 <div className="flex gap-2 text-sm">
-                <button
-                  type="button"
-                  onClick={() => setExpandedRoundId(expandedRoundId === round.id ? null : round.id)}
-                  className="rounded-lg border border-v-border px-3 py-1 text-xs text-v-text-muted hover:bg-v-surface-elevated"
-                >
-                  {expandedRoundId === round.id ? 'Hide assignments' : 'Assign contestants & criteria'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleOpen(round)}
-                  className={round.isOpen ? 'text-v-success' : 'text-v-text-muted'}
-                >
-                  {round.isOpen ? 'Open' : 'Closed'}
-                </button>
-                <button
-                  type="button"
-                  className="text-v-danger"
-                  onClick={async () => {
-                    if (confirm('Delete this round?')) {
-                      await pageantService.deleteRound(eventId, round.id)
-                      reload()
-                    }
-                  }}
-                >
-                  Delete
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedRoundId(expandedRoundId === round.id ? null : round.id)}
+                    className="rounded-lg border border-v-border px-3 py-1 text-xs text-v-text-muted hover:bg-v-surface-elevated"
+                  >
+                    {expandedRoundId === round.id ? 'Hide assignments' : 'Assign contestants & criteria'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleOpen(round)}
+                    className={round.isOpen ? 'text-v-success' : 'text-v-text-muted'}
+                  >
+                    {round.isOpen ? 'Open' : 'Closed'}
+                  </button>
+                  <button
+                    type="button"
+                    className="text-v-danger"
+                    onClick={async () => {
+                      if (confirm('Delete this round?')) {
+                        await pageantService.deleteRound(eventId, round.id)
+                        reload()
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Expanded assignment panel */}
+              {/* Expanded assignment panel */}
             {expandedRoundId === round.id && (
               <RoundAssignmentPanel
                 eventId={eventId}
