@@ -509,7 +509,7 @@ function RoundsTab({ foundation, reload }) {
               />
             )}
           </li>
-        ))}
+        )})}
         {!foundation?.rounds?.length && (
           <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
             No rounds yet. Rounds are optional — add them to stage the competition.
@@ -765,14 +765,6 @@ function JudgesTab({ foundation, reload }) {
                   <option value="category">Category</option>
                   <option value="round">Round</option>
                 </select>
-  const getScopeItems = () => {
-    if (scope === 'event') return null
-    if (scope === 'division') return foundation?.divisions
-    if (scope === 'category') return foundation?.categories
-    return foundation?.rounds
-  }
-  const isEventScope = scope === 'event'
-  const scopeItems = getScopeItems()
                 <button
                   type="button"
                   onClick={() => addAssignment(judge)}
