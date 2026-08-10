@@ -686,6 +686,15 @@ function JudgesTab({ foundation, reload }) {
 
   const divisionsEnabled = foundation?.event?.divisions_enabled
 
+  const getScopeItems = () => {
+    if (scope === 'event') return null
+    if (scope === 'division') return foundation?.divisions
+    if (scope === 'category') return foundation?.categories
+    return foundation?.rounds
+  }
+  const isEventScope = scope === 'event'
+  const scopeItems = getScopeItems()
+
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-v-border/50 bg-v-surface-elevated px-4 py-3 text-sm text-v-text-muted">
@@ -756,32 +765,14 @@ function JudgesTab({ foundation, reload }) {
                   <option value="category">Category</option>
                   <option value="round">Round</option>
                 </select>
-                {(() => {
-                  if (scope === 'event') {
-                    return (
-                      <input
-                        className={INPUT_CLASS}
-                        value={foundation?.event?.id ?? ''}
-                        readOnly
-                      />
-                    )
-                  }
-                  const items = scope === 'category' ? foundation?.categories : scope === 'division' ? foundation?.divisions : foundation?.rounds
-                  return (
-                    <select
-                      className={INPUT_CLASS}
-                      value={scopeId}
-                      onChange={(e) => setScopeId(e.target.value)}
-                    >
-                      <option value="">— select —</option>
-                      {(items ?? []).map((x) => (
-                        <option key={x.id} value={x.id}>
-                          {x.name}
-                        </option>
-                      ))}
-                    </select>
-                  )
-                })()}
+  const getScopeItems = () => {
+    if (scope === 'event') return null
+    if (scope === 'division') return foundation?.divisions
+    if (scope === 'category') return foundation?.categories
+    return foundation?.rounds
+  }
+  const isEventScope = scope === 'event'
+  const scopeItems = getScopeItems()
                 <button
                   type="button"
                   onClick={() => addAssignment(judge)}
