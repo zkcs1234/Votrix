@@ -1,4 +1,4 @@
-import { db } from '../foundation/db.js'
+import { db as getClient } from '../foundation/db.js'
 import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
 
 /**
@@ -20,9 +20,13 @@ import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.j
  * @throws {Error} If event not found or wrong type
  */
 async function assertCompetitionEvent(eventId) {
-  const event = await db(DB_TABLES.EVENTS)
-    .where({ id: eventId })
-    .first('id', 'event_type', 'organizer_id')
+  const { data: event, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .select('id, event_type, organizer_id')
+    .eq('id', eventId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
 
   if (!event) {
     throw new Error('Event not found')
@@ -42,9 +46,14 @@ async function assertCompetitionEvent(eventId) {
  * @throws {Error} If organizer doesn't own the event
  */
 async function assertEventOwnership(eventId, organizerId) {
-  const event = await db(DB_TABLES.EVENTS)
-    .where({ id: eventId, organizer_id: organizerId })
-    .first('id')
+  const { data: event, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .select('id')
+    .eq('id', eventId)
+    .eq('organizer_id', organizerId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
 
   if (!event) {
     throw new Error('Event not found or access denied')
@@ -60,16 +69,20 @@ async function assertEventOwnership(eventId, organizerId) {
 export async function listDivisions(eventId, includeInactive = false) {
   await assertCompetitionEvent(eventId)
 
-  let query = db(DB_TABLES.COMPETITION_DIVISIONS)
-    .where({ event_id: eventId })
-    .orderBy('display_order', 'asc')
-    .orderBy('created_at', 'asc')
+  let query = getClient()
+    .from(DB_TABLES.COMPETITION_DIVISIONS)
+    .select('*')
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true })
 
   if (!includeInactive) {
-    query = query.where({ is_active: true })
+    query = query.eq('is_active', true)
   }
 
-  return query
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return data ?? []
 }
 
 /**
@@ -79,9 +92,14 @@ export async function listDivisions(eventId, includeInactive = false) {
  * @returns {Promise<object>} Division object
  */
 export async function getDivisionById(divisionId, eventId) {
-  const division = await db(DB_TABLES.COMPETITION_DIVISIONS)
-    .where({ id: divisionId, event_id: eventId })
-    .first()
+  const { data: division, error } = await getClient()
+    .from(DB_TABLES.COMPETITION_DIVISIONS)
+    .select('*')
+    .eq('id', divisionId)
+    .eq('event_id', eventId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
 
   if (!division) {
     throw new Error('Division not found')
@@ -107,7 +125,8 @@ export async function createDivision(eventId, organizerId, payload) {
     throw new Error('Division name is required')
   }
 
-  const [division] = await db(DB_TABLES.COMPETITION_DIVISIONS)
+  const { data: division, error } = await getClient()
+    .from(DB_TABLES.COMPETITION_DIVISIONS)
     .insert({
       event_id: eventId,
       name: name.trim(),
@@ -115,7 +134,10 @@ export async function createDivision(eventId, organizerId, payload) {
       display_order: displayOrder ?? 0,
       is_active: isActive,
     })
-    .returning('*')
+    .select('*')
+    .single()
+
+  if (error) throw new Error(error.message)
 
   return division
 }
@@ -163,10 +185,15 @@ export async function updateDivision(eventId, divisionId, organizerId, payload) 
     return existing
   }
 
-  const [updated] = await db(DB_TABLES.COMPETITION_DIVISIONS)
-    .where({ id: divisionId, event_id: eventId })
+  const { data: updated, error } = await getClient()
+    .from(DB_TABLES.COMPETITION_DIVISIONS)
     .update(updates)
-    .returning('*')
+    .eq('id', divisionId)
+    .eq('event_id', eventId)
+    .select('*')
+    .single()
+
+  if (error) throw new Error(error.message)
 
   return updated
 }
@@ -197,12 +224,14 @@ export async function deleteDivision(eventId, divisionId, organizerId) {
   ]
 
   for (const { table, column, label } of tables) {
-    const count = await db(table)
-      .where({ [column]: divisionId })
-      .count('* as count')
-      .first()
+    const { count, error } = await getClient()
+      .from(table)
+      .select('*', { count: 'exact', head: true })
+      .eq(column, divisionId)
 
-    if (parseInt(count.count) > 0) {
+    if (error) throw new Error(error.message)
+
+    if (count > 0) {
       throw new Error(
         `Cannot delete division: it has associated ${label}. Deactivate it instead by setting isActive to false.`
       )
@@ -210,9 +239,13 @@ export async function deleteDivision(eventId, divisionId, organizerId) {
   }
 
   // No associated data — safe to delete
-  await db(DB_TABLES.COMPETITION_DIVISIONS)
-    .where({ id: divisionId, event_id: eventId })
+  const { error } = await getClient()
+    .from(DB_TABLES.COMPETITION_DIVISIONS)
     .delete()
+    .eq('id', divisionId)
+    .eq('event_id', eventId)
+
+  if (error) throw new Error(error.message)
 
   return { success: true, message: 'Division deleted successfully' }
 }
@@ -228,10 +261,14 @@ export async function setDivisionsEnabled(eventId, organizerId, enabled) {
   await assertCompetitionEvent(eventId)
   await assertEventOwnership(eventId, organizerId)
 
-  const [updated] = await db(DB_TABLES.EVENTS)
-    .where({ id: eventId })
+  const { data: updated, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
     .update({ divisions_enabled: enabled })
-    .returning('id', 'divisions_enabled')
+    .eq('id', eventId)
+    .select('id, divisions_enabled')
+    .single()
+
+  if (error) throw new Error(error.message)
 
   return updated
 }
@@ -242,9 +279,13 @@ export async function setDivisionsEnabled(eventId, organizerId, enabled) {
  * @returns {Promise<boolean>} True if divisions enabled
  */
 export async function areDivisionsEnabled(eventId) {
-  const event = await db(DB_TABLES.EVENTS)
-    .where({ id: eventId })
-    .first('divisions_enabled')
+  const { data: event, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .select('divisions_enabled')
+    .eq('id', eventId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
 
   return event?.divisions_enabled ?? false
 }
@@ -256,35 +297,30 @@ export async function areDivisionsEnabled(eventId) {
  */
 export async function getDivisionStats(divisionId) {
   const [contestants, criteria, rounds, categories, scores] = await Promise.all([
-    db(DB_TABLES.CONTESTANTS)
-      .where({ division_id: divisionId })
-      .count('* as count')
-      .first(),
-    db(DB_TABLES.CRITERIA)
-      .where({ division_id: divisionId })
-      .count('* as count')
-      .first(),
-    db(DB_TABLES.COMPETITION_ROUNDS)
-      .where({ division_id: divisionId })
-      .count('* as count')
-      .first(),
-    db(DB_TABLES.COMPETITION_CATEGORIES)
-      .where({ division_id: divisionId })
-      .count('* as count')
-      .first(),
-    db(DB_TABLES.JUDGE_SCORES)
-      .where({ division_id: divisionId })
-      .count('* as count')
-      .first(),
+    countRows(DB_TABLES.CONTESTANTS, divisionId),
+    countRows(DB_TABLES.CRITERIA, divisionId),
+    countRows(DB_TABLES.COMPETITION_ROUNDS, divisionId),
+    countRows(DB_TABLES.COMPETITION_CATEGORIES, divisionId),
+    countRows(DB_TABLES.JUDGE_SCORES, divisionId),
   ])
 
   return {
-    contestantsCount: parseInt(contestants.count),
-    criteriaCount: parseInt(criteria.count),
-    roundsCount: parseInt(rounds.count),
-    categoriesCount: parseInt(categories.count),
-    scoresCount: parseInt(scores.count),
+    contestantsCount: contestants,
+    criteriaCount: criteria,
+    roundsCount: rounds,
+    categoriesCount: categories,
+    scoresCount: scores,
   }
+}
+
+async function countRows(table, divisionId) {
+  const { count, error } = await getClient()
+    .from(table)
+    .select('*', { count: 'exact', head: true })
+    .eq('division_id', divisionId)
+
+  if (error) throw new Error(error.message)
+  return count ?? 0
 }
 
 export default {
