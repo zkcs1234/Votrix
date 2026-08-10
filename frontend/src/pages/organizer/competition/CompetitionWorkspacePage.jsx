@@ -756,28 +756,32 @@ function JudgesTab({ foundation, reload }) {
                   <option value="category">Category</option>
                   <option value="round">Round</option>
                 </select>
-                {scope === 'event' ? (
-                  <input
-                    className={INPUT_CLASS}
-                    value={foundation?.event?.id ?? ''}
-                    readOnly
-                  />
-                ) : (
-                  <select
-                    className={INPUT_CLASS}
-                    value={scopeId}
-                    onChange={(e) => setScopeId(e.target.value)}
-                  >
-                    <option value="">— select —</option>
-                    {((scope === 'category' ? foundation?.categories : scope === 'division' ? foundation?.divisions : foundation?.rounds) ?? []).map(
-                      (x) => (
+                {(() => {
+                  if (scope === 'event') {
+                    return (
+                      <input
+                        className={INPUT_CLASS}
+                        value={foundation?.event?.id ?? ''}
+                        readOnly
+                      />
+                    )
+                  }
+                  const items = scope === 'category' ? foundation?.categories : scope === 'division' ? foundation?.divisions : foundation?.rounds
+                  return (
+                    <select
+                      className={INPUT_CLASS}
+                      value={scopeId}
+                      onChange={(e) => setScopeId(e.target.value)}
+                    >
+                      <option value="">— select —</option>
+                      {(items ?? []).map((x) => (
                         <option key={x.id} value={x.id}>
                           {x.name}
                         </option>
-                      ),
-                    )}
-                  </select>
-                )}
+                      ))}
+                    </select>
+                  )
+                })()}
                 <button
                   type="button"
                   onClick={() => addAssignment(judge)}
@@ -818,6 +822,7 @@ function ScoringTab({ foundation, reload }) {
   const [customMax, setCustomMax] = useState(config.customMax ?? 100)
   const [dropHighest, setDropHighest] = useState(config.dropHighest ?? 0)
   const [dropLowest, setDropLowest] = useState(config.dropLowest ?? 0)
+  const [includeOverallRanking, setIncludeOverallRanking] = useState(config.includeOverallRanking ?? false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [saved, setSaved] = useState(false)
@@ -935,8 +940,8 @@ function ScoringTab({ foundation, reload }) {
           <label className="flex items-center gap-3">
             <input
               type="checkbox"
-              checked={Boolean(config?.includeOverallRanking)}
-              onChange={(e) => save(e, { includeOverallRanking: e.target.checked })}
+              checked={Boolean(includeOverallRanking)}
+              onChange={(e) => setIncludeOverallRanking(e.target.checked)}
               disabled={saving}
             />
             <div>

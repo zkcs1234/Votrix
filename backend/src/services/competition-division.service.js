@@ -1,4 +1,4 @@
-import db from '../config/database.js'
+import { db } from '../foundation/db.js'
 import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
 
 /**
