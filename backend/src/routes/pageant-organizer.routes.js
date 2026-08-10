@@ -18,6 +18,7 @@ router.patch('/events/:eventId/scoring', ctrl.setScoring)
 router.post('/events/:eventId/banner', uploadLimiter, uploadImage('banner'), ctrl.uploadBanner)
 
 router.get('/events/:eventId/contestants', ctrl.listContestants)
+router.get('/events/:eventId/contestants/next-number', ctrl.getNextContestantNumber)
 router.post('/events/:eventId/contestants', ctrl.createContestant)
 router.patch('/events/:eventId/contestants/:contestantId', ctrl.updateContestant)
 router.delete('/events/:eventId/contestants/:contestantId', ctrl.deleteContestant)

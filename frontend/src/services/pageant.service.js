@@ -42,6 +42,11 @@ export const pageantService = {
     return api.get(`${org}/events/${eventId}/contestants`)
   },
 
+  getNextContestantNumber(eventId, divisionId = null) {
+    const qs = divisionId ? `?divisionId=${encodeURIComponent(divisionId)}` : ''
+    return api.get(`${org}/events/${eventId}/contestants/next-number${qs}`)
+  },
+
   createContestant(eventId, payload) {
     return api.post(`${org}/events/${eventId}/contestants`, payload)
   },
@@ -134,7 +139,7 @@ export const pageantService = {
     return api.delete(`${org}/events/${eventId}/divisions/${divisionId}`)
   },
   setDivisionsEnabled(eventId, enabled) {
-    return api.patch(`${org}/events/${eventId}/divisions-enabled`, { enabled })
+    return api.patch(`${org}/events/${eventId}/divisions-enabled`, { divisionsEnabled: enabled })
   },
 
   // Phase 4 — Foundation (single round-trip for the workspace UI)

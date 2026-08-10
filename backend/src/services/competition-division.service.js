@@ -1,5 +1,6 @@
 import { db as getClient } from '../foundation/db.js'
 import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
+import { assertOrganizerOwnsEvent } from './event.service.js'
 
 /**
  * Competition Division Service
@@ -22,7 +23,7 @@ import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.j
 async function assertCompetitionEvent(eventId) {
   const { data: event, error } = await getClient()
     .from(DB_TABLES.EVENTS)
-    .select('id, event_type, organizer_id')
+    .select('id, event_type')
     .eq('id', eventId)
     .maybeSingle()
 
@@ -46,18 +47,7 @@ async function assertCompetitionEvent(eventId) {
  * @throws {Error} If organizer doesn't own the event
  */
 async function assertEventOwnership(eventId, organizerId) {
-  const { data: event, error } = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .select('id')
-    .eq('id', eventId)
-    .eq('organizer_id', organizerId)
-    .maybeSingle()
-
-  if (error) throw new Error(error.message)
-
-  if (!event) {
-    throw new Error('Event not found or access denied')
-  }
+  await assertOrganizerOwnsEvent(eventId, organizerId)
 }
 
 /**

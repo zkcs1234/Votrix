@@ -65,6 +65,12 @@ export const listContestants = asyncHandler(async (req, res) => {
   res.json({ success: true, contestants })
 })
 
+export const getNextContestantNumber = asyncHandler(async (req, res) => {
+  const divisionId = req.query.divisionId || null
+  const next = await pageantService.getNextContestantNumber(req.params.eventId, req.user.id, divisionId)
+  res.json({ success: true, nextContestantNumber: next })
+})
+
 export const createContestant = asyncHandler(async (req, res) => {
   const payload = validateContestant(req.body)
   const contestant = await pageantService.createContestant(

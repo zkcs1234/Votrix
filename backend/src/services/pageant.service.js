@@ -335,7 +335,12 @@ export async function createContestant(eventId, organizerId, payload) {
 
   if (error) {
     if (error.code === '23505') {
-      throw new ApiError(409, 'Contestant number already exists for this event')
+      throw new ApiError(
+        409,
+        payload.divisionId
+          ? 'Contestant number already exists for this division'
+          : 'Contestant number already exists for this event',
+      )
     }
     throw new ApiError(500, error.message)
   }
@@ -421,6 +426,29 @@ export async function deleteContestant(eventId, organizerId, contestantId) {
       console.error('[competition] Contestant photo cleanup error:', err.message),
     )
   }
+}
+
+export async function getNextContestantNumber(eventId, organizerId, divisionId = null) {
+  await assertCompetitionEvent(eventId, organizerId)
+
+  let query = getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .select('contestant_number')
+    .eq('event_id', eventId)
+    .order('contestant_number', { ascending: false })
+    .limit(1)
+
+  if (divisionId) {
+    query = query.eq('division_id', divisionId)
+  } else {
+    query = query.is('division_id', null)
+  }
+
+  const { data, error } = await query
+  if (error) throw new ApiError(500, error.message)
+
+  const highest = data?.[0]?.contestant_number ?? 0
+  return highest + 1
 }
 
 // ——— Criteria ———

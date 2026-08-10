@@ -12,9 +12,10 @@ export default function CompetitionContestantsPage() {
   const [list, setList] = useState([])
   const [foundation, setFoundation] = useState(null)
   const [loading, setLoading] = useState(true)
-  
+
   const [name, setName] = useState('')
   const [number, setNumber] = useState(1)
+  const [numberHint, setNumberHint] = useState('')
   const [divisionId, setDivisionId] = useState('')
   const [filterDivisionId, setFilterDivisionId] = useState('')
   const [editingContestant, setEditingContestant] = useState(null)
@@ -37,6 +38,30 @@ export default function CompetitionContestantsPage() {
   const divisionsEnabled = foundation?.event?.divisions_enabled
   const divisions = foundation?.divisions ?? []
 
+  const refreshNextNumber = useCallback(
+    async (divId) => {
+      try {
+        const { data } = await pageantService.getNextContestantNumber(eventId, divId || null)
+        setNumber(data.nextContestantNumber)
+        setNumberHint(
+          divId
+            ? `Next available in this division`
+            : `Next available number`,
+        )
+      } catch {
+        setNumber(1)
+        setNumberHint('')
+      }
+    },
+    [eventId],
+  )
+
+  useEffect(() => {
+    if (editingContestant) return
+    if (!foundation) return
+    refreshNextNumber(divisionId || null)
+  }, [foundation, divisionId, editingContestant, refreshNextNumber])
+
   const handleCreate = async (e) => {
     e.preventDefault()
     const payload = {
@@ -51,12 +76,12 @@ export default function CompetitionContestantsPage() {
       await pageantService.uploadContestantPhoto(eventId, data.contestant.id, photoFile)
     }
     setName('')
-    setNumber(1)
     setDivisionId('')
     setPhotoFile(null)
     setEditingContestant(null)
     setLoading(true)
-    load()
+    await load()
+    await refreshNextNumber(divisionId || null)
   }
 
   const startEditing = (contestant) => {
@@ -65,6 +90,16 @@ export default function CompetitionContestantsPage() {
     setNumber(contestant.contestantNumber ?? contestant.contestant_number)
     setDivisionId(contestant.divisionId ?? contestant.division_id ?? '')
     setPhotoFile(null)
+    setNumberHint('')
+  }
+
+  const cancelEdit = () => {
+    setEditingContestant(null)
+    setName('')
+    setDivisionId('')
+    setPhotoFile(null)
+    setNumberHint('')
+    refreshNextNumber(divisionId || null)
   }
 
   const visibleList = filterDivisionId
@@ -99,7 +134,20 @@ export default function CompetitionContestantsPage() {
       <form onSubmit={handleCreate} className="space-y-4 v-card p-6">
         <div className={`grid gap-4 ${divisionsEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           <input className={inputClass} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-          <input type="number" min={1} className={inputClass} value={number} onChange={(e) => setNumber(e.target.value)} />
+          <div className="space-y-1">
+            <input
+              type="number"
+              min={1}
+              className={inputClass}
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              disabled={Boolean(editingContestant)}
+              aria-label="Contestant number"
+            />
+            {!editingContestant && numberHint && (
+              <p className="text-xs text-v-text-subtle">{numberHint}</p>
+            )}
+          </div>
           {divisionsEnabled && (
             <select
               className={inputClass}
@@ -123,13 +171,7 @@ export default function CompetitionContestantsPage() {
           <button
             type="button"
             className="ml-3 text-sm text-v-text-muted hover:text-v-text"
-            onClick={() => {
-              setEditingContestant(null)
-              setName('')
-              setNumber(1)
-              setDivisionId('')
-              setPhotoFile(null)
-            }}
+            onClick={cancelEdit}
           >
             Cancel edit
           </button>
@@ -138,7 +180,7 @@ export default function CompetitionContestantsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visibleList.map((c) => {
-          // Both DB raw rows (snake_case) or mapped could be present depending on endpoints. 
+          // Both DB raw rows (snake_case) or mapped could be present depending on endpoints.
           // getFoundation returns mapped rows for contestants.
           const currentDivisionId = c.divisionId ?? c.division_id
           const currentContestantNumber = c.contestantNumber ?? c.contestant_number
@@ -166,7 +208,10 @@ export default function CompetitionContestantsPage() {
                   onClick={async () => {
                     if (confirm('Delete?')) {
                       await pageantService.deleteContestant(eventId, c.id)
-                      load()
+                      await load()
+                      if (!editingContestant) {
+                        await refreshNextNumber(divisionId || null)
+                      }
                     }
                   }}
                 >
