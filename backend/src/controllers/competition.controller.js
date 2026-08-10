@@ -1,11 +1,14 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
 import * as competitionService from '../services/competition.service.js'
+import * as divisionService from '../services/competition-division.service.js'
 import {
   validateCategory,
   validateRound,
   validateScoringConfig,
   validateJudgeRole,
   validateAssignment,
+  validateDivision,
+  validateDivisionsToggle,
 } from '../validators/competition.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
 
@@ -210,4 +213,51 @@ export const deleteJudgeAssignment = asyncHandler(async (req, res) => {
 export const getFoundation = asyncHandler(async (req, res) => {
   const foundation = await competitionService.getCompetitionFoundation(req.params.eventId, req.user.id)
   res.json({ success: true, foundation })
+})
+
+// ---------------------------------------------------------------------------
+// Divisions (Competition Module Enhancement)
+// ---------------------------------------------------------------------------
+export const listDivisions = asyncHandler(async (req, res) => {
+  const includeInactive = req.query.includeInactive === 'true'
+  const divisions = await divisionService.listDivisions(req.params.eventId, includeInactive)
+  res.json({ success: true, divisions })
+})
+
+export const getDivision = asyncHandler(async (req, res) => {
+  const division = await divisionService.getDivisionById(req.params.divisionId, req.params.eventId)
+  const stats = await divisionService.getDivisionStats(req.params.divisionId)
+  res.json({ success: true, division: { ...division, stats } })
+})
+
+export const createDivision = asyncHandler(async (req, res) => {
+  const payload = validateDivision(req.body)
+  const division = await divisionService.createDivision(req.params.eventId, req.user.id, payload)
+  res.status(201).json({ success: true, division })
+})
+
+export const updateDivision = asyncHandler(async (req, res) => {
+  const payload = validateDivision(req.body)
+  const division = await divisionService.updateDivision(
+    req.params.eventId,
+    req.params.divisionId,
+    req.user.id,
+    payload,
+  )
+  res.json({ success: true, division })
+})
+
+export const deleteDivision = asyncHandler(async (req, res) => {
+  const result = await divisionService.deleteDivision(
+    req.params.eventId,
+    req.params.divisionId,
+    req.user.id,
+  )
+  res.json(result)
+})
+
+export const setDivisionsEnabled = asyncHandler(async (req, res) => {
+  const enabled = validateDivisionsToggle(req.body)
+  const event = await divisionService.setDivisionsEnabled(req.params.eventId, req.user.id, enabled)
+  res.json({ success: true, event })
 })

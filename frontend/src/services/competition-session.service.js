@@ -61,6 +61,11 @@ export const competitionSessionService = {
     return api.post(`${BASE}/events/${eventId}/session/set-round`, { roundId })
   },
 
+  /** POST /api/organizer/competition/events/:eventId/session/set-division */
+  setActiveDivision(eventId, divisionId) {
+    return api.post(`${BASE}/events/${eventId}/session/set-division`, { divisionId })
+  },
+
   /** GET /api/organizer/competition/events/:eventId/session/judge-progress */
   getJudgeProgress(eventId) {
     return api.get(`${BASE}/events/${eventId}/session/judge-progress`)

@@ -11,21 +11,28 @@ const inputClass = `${INPUT_CLASS} w-full`
 export default function CompetitionCriteriaPage() {
   const { eventId } = useParams()
   const [list, setList] = useState([])
+  const [foundation, setFoundation] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', percentage: 33.33, minScore: 0, maxScore: 100 })
+  const [form, setForm] = useState({ name: '', percentage: 33.33, minScore: 0, maxScore: 100, divisionId: '' })
   const { error: showError } = useToast()
 
   const load = useCallback(() => {
     pageantService
-      .listCriteria(eventId)
-      .then(({ data }) => setList(data.criteria ?? []))
+      .getFoundation(eventId)
+      .then(({ data }) => {
+        setFoundation(data.foundation)
+        setList(data.foundation.criteria ?? [])
+      })
       .finally(() => setLoading(false))
   }, [eventId])
 
   useEffect(() => {
     load()
   }, [load])
+
+  const divisionsEnabled = foundation?.event?.divisions_enabled
+  const divisions = foundation?.divisions ?? []
 
   const totalPct = list.reduce((s, c) => s + Number(c.percentage), 0)
   const previewTotalPct = totalPct + Number(form.percentage || 0)
@@ -46,8 +53,9 @@ export default function CompetitionCriteriaPage() {
         percentage: Number(form.percentage),
         minScore: Number(form.minScore),
         maxScore: Number(form.maxScore),
+        divisionId: form.divisionId || null,
       })
-      setForm({ name: '', percentage: 0, minScore: 0, maxScore: 100 })
+      setForm({ name: '', percentage: 0, minScore: 0, maxScore: 100, divisionId: '' })
       setLoading(true)
       load()
     } catch (err) {
@@ -86,8 +94,8 @@ export default function CompetitionCriteriaPage() {
         </div>
       </div>
 
-      <form onSubmit={handleCreate} className="grid gap-5 v-card p-6 sm:grid-cols-2">
-        <div className="sm:col-span-2">
+      <form onSubmit={handleCreate} className={`grid gap-5 v-card p-6 ${divisionsEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+        <div className={divisionsEnabled ? 'sm:col-span-3' : 'sm:col-span-2'}>
           <label htmlFor="criteria-name" className={LABEL_CLASS}>
             Criteria name
           </label>
@@ -118,7 +126,7 @@ export default function CompetitionCriteriaPage() {
             onChange={(e) => setForm({ ...form, percentage: e.target.value })}
           />
           <p className={HELPER_TEXT}>
-            How much this counts toward the final score. After adding: {previewTotalPct.toFixed(1)}%.
+            After adding: {previewTotalPct.toFixed(1)}%.
           </p>
         </div>
 
@@ -153,13 +161,31 @@ export default function CompetitionCriteriaPage() {
               <p className={HELPER_TEXT}>Highest</p>
             </div>
           </div>
-          <p className={HELPER_TEXT}>Most competitions use 0 to 100.</p>
         </div>
+
+        {divisionsEnabled && (
+          <div>
+            <label className={LABEL_CLASS}>Division (optional)</label>
+            <select
+              className={inputClass}
+              value={form.divisionId}
+              onChange={(e) => setForm({ ...form, divisionId: e.target.value })}
+            >
+              <option value="">— Event-wide —</option>
+              {divisions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            <p className={HELPER_TEXT}>Group by division if needed.</p>
+          </div>
+        )}
 
         <button
           type="submit"
           disabled={saving}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50 sm:col-span-2"
+          className={`inline-flex items-center justify-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50 ${divisionsEnabled ? 'sm:col-span-3' : 'sm:col-span-2'}`}
         >
           <Plus className="h-4 w-4" strokeWidth={1.8} aria-hidden />
           {saving ? 'Adding...' : 'Add criteria'}
@@ -167,30 +193,42 @@ export default function CompetitionCriteriaPage() {
       </form>
 
       <ul className="space-y-2">
-        {list.map((c) => (
-          <li
-            key={c.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-v-border bg-v-surface px-4 py-3"
-          >
-            <div className="min-w-0">
-              <p className="font-medium text-v-text">{c.name}</p>
-              <p className="mt-1 text-xs text-v-text-subtle">
-                Weight: {Number(c.percentage).toFixed(2)}% | Score range: {c.minScore} to {c.maxScore}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-v-danger hover:bg-v-danger-bg"
-              onClick={async () => {
-                await pageantService.deleteCriteria(eventId, c.id)
-                load()
-              }}
+        {list.map((c) => {
+          const currentDivisionId = c.divisionId ?? c.division_id
+          const divisionName = currentDivisionId ? divisions.find(d => d.id === currentDivisionId)?.name : null
+
+          return (
+            <li
+              key={c.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-v-border bg-v-surface px-4 py-3"
             >
-              <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden />
-              Delete
-            </button>
-          </li>
-        ))}
+              <div className="min-w-0 flex items-start gap-3">
+                <div>
+                  <p className="font-medium text-v-text">{c.name}</p>
+                  <p className="mt-1 text-xs text-v-text-subtle">
+                    Weight: {Number(c.percentage).toFixed(2)}% | Score range: {c.minScore} to {c.maxScore}
+                  </p>
+                </div>
+                {divisionsEnabled && divisionName && (
+                  <span className="mt-0.5 rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium text-v-primary uppercase tracking-wide">
+                    {divisionName}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-v-danger hover:bg-v-danger-bg"
+                onClick={async () => {
+                  await pageantService.deleteCriteria(eventId, c.id)
+                  load()
+                }}
+              >
+                <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden />
+                Delete
+              </button>
+            </li>
+          )
+        })}
         {!list.length && (
           <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
             No criteria yet. Add a criteria name, weight, and score range above.

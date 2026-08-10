@@ -4,6 +4,7 @@ import {
   Play, Pause, SkipForward, SkipBack, Square, RefreshCw, Users, Star, CheckCircle, Clock,
 } from 'lucide-react'
 import { competitionSessionService } from '@/services/competition-session.service.js'
+import { pageantService } from '@/services/pageant.service.js'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -24,15 +25,22 @@ export default function CompetitionLiveControlPage() {
   const [actionLoading, setActionLoading] = useState(null)
   const [judgeProgress, setJudgeProgress] = useState([])
   const [event, setEvent] = useState(null)
+  const [foundation, setFoundation] = useState(null)
 
   const showLoader = useDelayedLoading(loading, 300)
 
   const loadSession = useCallback(async () => {
     try {
-      const { data } = await competitionSessionService.getActiveSession(eventId)
-      setSession(data.session)
-      setEvent(data.event)
-      if (data.session?.status === SESSION_STATUS.ACTIVE || data.session?.status === SESSION_STATUS.PAUSED) {
+      const [{ data: sessionData }, { data: foundationData }] = await Promise.all([
+        competitionSessionService.getActiveSession(eventId).catch(() => ({ data: {} })),
+        pageantService.getFoundation(eventId).catch(() => ({ data: {} }))
+      ])
+      
+      setSession(sessionData.session || null)
+      setEvent(sessionData.event || null)
+      setFoundation(foundationData.foundation || null)
+
+      if (sessionData.session?.status === SESSION_STATUS.ACTIVE || sessionData.session?.status === SESSION_STATUS.PAUSED) {
         const { data: progressData } = await competitionSessionService.getJudgeProgress(eventId)
         setJudgeProgress(progressData.judges ?? [])
       }
@@ -94,6 +102,18 @@ export default function CompetitionLiveControlPage() {
       await loadSession()
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to set active round')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const performActionDivision = async (divisionId) => {
+    setActionLoading('setDivision')
+    try {
+      await competitionSessionService.setActiveDivision(eventId, divisionId)
+      await loadSession()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to set active division')
     } finally {
       setActionLoading(null)
     }
@@ -175,38 +195,85 @@ export default function CompetitionLiveControlPage() {
       {/* Current Stage & Contestant */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Current Round/Stage */}
-        <div className="rounded-xl border border-v-border bg-v-surface p-6">
-          <h3 className="mb-1 text-sm font-medium text-v-text-muted uppercase tracking-wider">Current Stage</h3>
-          <div className="mb-4">
-            <p className="text-xl font-bold text-v-text">{session.activeRound?.name ?? 'No round active'}</p>
-            <p className="text-sm text-v-text-subtle">
-              {session.activeRound?.contestants?.length ?? 0} contestants · {session.activeRound?.criteria?.length ?? 0} criteria
-            </p>
+        <div className="rounded-xl border border-v-border bg-v-surface p-6 flex flex-col gap-4">
+          <div>
+            <h3 className="mb-1 text-sm font-medium text-v-text-muted uppercase tracking-wider">Current Stage</h3>
+            <div className="mb-2">
+              <p className="text-xl font-bold text-v-text">{session.activeRound?.name ?? 'No round active'}</p>
+              <p className="text-sm text-v-text-subtle">
+                {session.activeRound?.contestants?.length ?? 0} contestants · {session.activeRound?.criteria?.length ?? 0} criteria
+              </p>
+            </div>
+            
+            {foundation?.event?.divisions_enabled && (
+              <div className="mt-1">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-v-primary/10 px-2 py-1 text-xs font-medium text-v-primary">
+                  Division: {session.activeDivisionId ? foundation?.divisions?.find(d => d.id === session.activeDivisionId)?.name : 'Event-wide'}
+                </span>
+              </div>
+            )}
           </div>
 
-          {session.availableRounds?.length > 1 && (
-            <div className="space-y-1">
-              <p className="text-xs text-v-text-subtle mb-2">Switch round:</p>
-              <div className="flex flex-wrap gap-2">
-                {session.availableRounds.map((round) => (
+          <div className="mt-auto grid gap-4 pt-4 border-t border-v-border">
+            {foundation?.event?.divisions_enabled && foundation?.divisions?.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-v-text-subtle mb-1">Switch division:</p>
+                <div className="flex flex-wrap gap-2">
                   <button
-                    key={round.id}
                     type="button"
-                    onClick={() => setActiveRound(round.id)}
-                    disabled={actionLoading === 'setRound'}
+                    onClick={() => performActionDivision(null)}
+                    disabled={actionLoading === 'setDivision'}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                      session.activeRound?.id === round.id
+                      !session.activeDivisionId
                         ? 'bg-v-primary text-white'
                         : 'border border-v-border text-v-text-muted hover:bg-v-surface-elevated'
                     }`}
                   >
-                    {round.name}
-                    {round.isOpen ? '' : ' (closed)'}
+                    Event-wide
                   </button>
-                ))}
+                  {foundation.divisions.map((div) => (
+                    <button
+                      key={div.id}
+                      type="button"
+                      onClick={() => performActionDivision(div.id)}
+                      disabled={actionLoading === 'setDivision'}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                        session.activeDivisionId === div.id
+                          ? 'bg-v-primary text-white'
+                          : 'border border-v-border text-v-text-muted hover:bg-v-surface-elevated'
+                      }`}
+                    >
+                      {div.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {session.availableRounds?.length > 1 && (
+              <div className="space-y-1">
+                <p className="text-xs text-v-text-subtle mb-1">Switch round:</p>
+                <div className="flex flex-wrap gap-2">
+                  {session.availableRounds.map((round) => (
+                    <button
+                      key={round.id}
+                      type="button"
+                      onClick={() => setActiveRound(round.id)}
+                      disabled={actionLoading === 'setRound'}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                        session.activeRound?.id === round.id
+                          ? 'bg-v-primary text-white'
+                          : 'border border-v-border text-v-text-muted hover:bg-v-surface-elevated'
+                      }`}
+                    >
+                      {round.name}
+                      {round.isOpen ? '' : ' (closed)'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Current Contestant */}

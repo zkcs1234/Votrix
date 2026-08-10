@@ -94,6 +94,7 @@ export const ASSIGNMENT_SCOPES = {
   EVENT: 'event',
   CATEGORY: 'category',
   ROUND: 'round',
+  DIVISION: 'division',
 }
 
 // Event participant types (used for event-scoped roles)
@@ -130,6 +131,7 @@ export const DB_TABLES = {
   COMPETITION_ROUND_CRITERIA: 'competition_round_criteria',
   COMPETITION_JUDGES: 'competition_judges',
   COMPETITION_JUDGE_ASSIGNMENTS: 'competition_judge_assignments',
+  COMPETITION_DIVISIONS: 'competition_divisions',
   SYSTEM_POLL_QUESTION_TYPES: 'system_poll_question_types',
   POLL_QUESTION_TYPES_REGISTRY: 'poll_question_types',
   POLL_QUESTION_TYPES_VIEW: 'v_poll_question_types',

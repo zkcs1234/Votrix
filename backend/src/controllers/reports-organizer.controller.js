@@ -43,7 +43,9 @@ export const getPageantReport = asyncHandler(async (req, res) => {
 })
 
 export const getCompetitionReport = asyncHandler(async (req, res) => {
-  const report = await reportsService.getCompetitionReport(req.params.eventId, req.user.id)
+  const report = await reportsService.getCompetitionReport(req.params.eventId, req.user.id, {
+    divisionId: req.query.divisionId || null,
+  })
   res.json({ success: true, report })
 })
 

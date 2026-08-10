@@ -77,6 +77,18 @@ export const setActiveRound = asyncHandler(async (req, res) => {
   res.json({ success: true, session })
 })
 
+/** POST /api/organizer/competition/events/:eventId/session/set-division */
+export const setActiveDivision = asyncHandler(async (req, res) => {
+  const { divisionId } = req.body
+  // divisionId can be null to clear division (event-wide mode)
+  const session = await sessionService.setActiveDivision(
+    req.params.eventId,
+    req.user.id,
+    divisionId,
+  )
+  res.json({ success: true, session })
+})
+
 /** POST /api/organizer/competition/events/:eventId/session/pause */
 export const pauseSession = asyncHandler(async (req, res) => {
   const session = await sessionService.pauseSession(req.params.eventId, req.user.id)

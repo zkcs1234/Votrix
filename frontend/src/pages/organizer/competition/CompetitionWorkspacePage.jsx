@@ -60,7 +60,8 @@ export default function CompetitionWorkspacePage() {
 
       <div className="flex gap-2 border-b border-v-border text-sm">
         {[
-          { id: 'structure', label: 'Structure' },
+          { id: 'structure', label: 'Categories' },
+          { id: 'divisions', label: 'Divisions' },
           { id: 'rounds', label: 'Rounds' },
           { id: 'judges', label: 'Judge assignments' },
           { id: 'scoring', label: 'Scoring config' },
@@ -81,6 +82,7 @@ export default function CompetitionWorkspacePage() {
       </div>
 
       {activeTab === 'structure' && <StructureTab foundation={foundation} reload={load} />}
+      {activeTab === 'divisions' && <DivisionsTab foundation={foundation} reload={load} />}
       {activeTab === 'rounds' && <RoundsTab foundation={foundation} reload={load} />}
       {activeTab === 'judges' && <JudgesTab foundation={foundation} reload={load} />}
       {activeTab === 'scoring' && <ScoringTab foundation={foundation} reload={load} />}
@@ -104,8 +106,12 @@ function SubNav({ to, children }) {
 // ---------------------------------------------------------------------------
 function StructureTab({ foundation, reload }) {
   const { eventId } = useParams()
+  const divisionsEnabled = foundation?.event?.divisions_enabled
+  const divisions = foundation?.divisions ?? []
+
   const [name, setName] = useState('')
   const [weight, setWeight] = useState(0)
+  const [divisionId, setDivisionId] = useState('')
   const [saving, setSaving] = useState(false)
 
   const totalWeight = useMemo(
@@ -117,9 +123,14 @@ function StructureTab({ foundation, reload }) {
     e.preventDefault()
     setSaving(true)
     try {
-      await pageantService.createCategory(eventId, { name, weight: Number(weight) })
+      await pageantService.createCategory(eventId, { 
+        name, 
+        weight: Number(weight),
+        divisionId: divisionId || null 
+      })
       setName('')
       setWeight(0)
+      setDivisionId('')
       reload()
     } finally {
       setSaving(false)
@@ -130,7 +141,7 @@ function StructureTab({ foundation, reload }) {
     <div className="space-y-6">
       <form
         onSubmit={submit}
-        className="grid gap-4 v-card p-6 sm:grid-cols-[1fr_120px_auto]"
+        className={`grid gap-4 v-card p-6 ${divisionsEnabled ? 'sm:grid-cols-[1fr_120px_1fr_auto]' : 'sm:grid-cols-[1fr_120px_auto]'}`}
       >
         <div>
           <label className={LABEL_CLASS}>Category name</label>
@@ -154,6 +165,21 @@ function StructureTab({ foundation, reload }) {
             max={100}
           />
         </div>
+        {divisionsEnabled && (
+          <div>
+            <label className={LABEL_CLASS}>Division (optional)</label>
+            <select
+              className={INPUT_CLASS}
+              value={divisionId}
+              onChange={(e) => setDivisionId(e.target.value)}
+            >
+              <option value="">— Event-wide —</option>
+              {divisions.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex items-end">
           <button
             type="submit"
@@ -175,7 +201,7 @@ function StructureTab({ foundation, reload }) {
 
       <ul className="space-y-2">
         {(foundation?.categories ?? []).map((cat) => (
-          <CategoryRow key={cat.id} cat={cat} eventId={eventId} reload={reload} />
+          <CategoryRow key={cat.id} cat={cat} eventId={eventId} reload={reload} divisionsEnabled={divisionsEnabled} divisions={divisions} />
         ))}
         {!foundation?.categories?.length && (
           <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
@@ -187,11 +213,12 @@ function StructureTab({ foundation, reload }) {
   )
 }
 
-function CategoryRow({ cat, eventId, reload }) {
+function CategoryRow({ cat, eventId, reload, divisionsEnabled, divisions }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState({
     name: cat.name,
     weight: cat.weight,
+    divisionId: cat.divisionId || '',
     isActive: cat.isActive,
   })
 
@@ -199,6 +226,7 @@ function CategoryRow({ cat, eventId, reload }) {
     await pageantService.updateCategory(eventId, cat.id, {
       name: draft.name,
       weight: Number(draft.weight),
+      divisionId: draft.divisionId || null,
       isActive: draft.isActive,
     })
     setEditing(false)
@@ -210,6 +238,8 @@ function CategoryRow({ cat, eventId, reload }) {
     await pageantService.deleteCategory(eventId, cat.id)
     reload()
   }
+
+  const divisionName = cat.divisionId ? divisions.find(d => d.id === cat.divisionId)?.name : null
 
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-v-border px-4 py-3">
@@ -227,6 +257,18 @@ function CategoryRow({ cat, eventId, reload }) {
             value={draft.weight}
             onChange={(e) => setDraft({ ...draft, weight: e.target.value })}
           />
+          {divisionsEnabled && (
+            <select
+              className={INPUT_CLASS}
+              value={draft.divisionId}
+              onChange={(e) => setDraft({ ...draft, divisionId: e.target.value })}
+            >
+              <option value="">— Event-wide —</option>
+              {divisions.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          )}
           <label className="flex items-center gap-1 text-xs text-v-text-muted">
             <input
               type="checkbox"
@@ -250,11 +292,18 @@ function CategoryRow({ cat, eventId, reload }) {
         </div>
       ) : (
         <>
-          <div>
-            <p className="font-medium text-v-text">{cat.name}</p>
-            <p className="text-xs text-v-text-subtle">
-              {cat.weight}% · {cat.isActive ? 'Active' : 'Inactive'}
-            </p>
+          <div className="flex items-center gap-3">
+            <div>
+              <p className="font-medium text-v-text">{cat.name}</p>
+              <p className="text-xs text-v-text-subtle">
+                {cat.weight}% · {cat.isActive ? 'Active' : 'Inactive'}
+              </p>
+            </div>
+            {divisionsEnabled && divisionName && (
+              <span className="rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium text-v-primary uppercase tracking-wide">
+                {divisionName}
+              </span>
+            )}
           </div>
           <div className="flex gap-2 text-sm">
             <button type="button" onClick={() => setEditing(true)} className="text-v-text-muted">
@@ -272,9 +321,13 @@ function CategoryRow({ cat, eventId, reload }) {
 
 function RoundsTab({ foundation, reload }) {
   const { eventId } = useParams()
+  const divisionsEnabled = foundation?.event?.divisions_enabled
+  const divisions = foundation?.divisions ?? []
+
   const [name, setName] = useState('')
   const [weight, setWeight] = useState(0)
   const [categoryId, setCategoryId] = useState('')
+  const [divisionId, setDivisionId] = useState('')
   const [saving, setSaving] = useState(false)
   const [expandedRoundId, setExpandedRoundId] = useState(null)
 
@@ -291,10 +344,12 @@ function RoundsTab({ foundation, reload }) {
         name,
         weight: Number(weight),
         categoryId: categoryId || null,
+        divisionId: divisionId || null,
       })
       setName('')
       setWeight(0)
       setCategoryId('')
+      setDivisionId('')
       reload()
     } finally {
       setSaving(false)
@@ -310,7 +365,7 @@ function RoundsTab({ foundation, reload }) {
     <div className="space-y-6">
       <form
         onSubmit={submit}
-        className="grid gap-4 v-card p-6 sm:grid-cols-[1fr_120px_1fr_auto]"
+        className={`grid gap-4 v-card p-6 ${divisionsEnabled ? 'sm:grid-cols-[1fr_120px_1fr_1fr_auto]' : 'sm:grid-cols-[1fr_120px_1fr_auto]'}`}
       >
         <div>
           <label className={LABEL_CLASS}>Round name</label>
@@ -349,6 +404,23 @@ function RoundsTab({ foundation, reload }) {
             ))}
           </select>
         </div>
+        {divisionsEnabled && (
+          <div>
+            <label className={LABEL_CLASS}>Division (optional)</label>
+            <select
+              className={INPUT_CLASS}
+              value={divisionId}
+              onChange={(e) => setDivisionId(e.target.value)}
+            >
+              <option value="">— Event-wide —</option>
+              {divisions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex items-end">
           <button
             type="submit"
@@ -369,24 +441,34 @@ function RoundsTab({ foundation, reload }) {
       </p>
 
       <ul className="space-y-3">
-        {(foundation?.rounds ?? []).map((round) => (
-          <li
-            key={round.id}
-            className="rounded-xl border border-v-border bg-v-surface"
-          >
-            {/* Round header row */}
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-              <div>
-                <p className="font-medium text-v-text">{round.name}</p>
-                <p className="text-xs text-v-text-subtle">
-                  {round.weight}% · {round.contestantIds?.length ?? 0} contestants ·{' '}
-                  {round.criteriaIds?.length ?? 0} criteria ·{' '}
-                  {round.categoryId
-                    ? foundation?.categories?.find((c) => c.id === round.categoryId)?.name ?? 'Category'
-                    : 'Event-wide'}
-                </p>
-              </div>
-              <div className="flex gap-2 text-sm">
+        {(foundation?.rounds ?? []).map((round) => {
+          const divisionName = round.division_id ? divisions.find(d => d.id === round.division_id)?.name : null
+
+          return (
+            <li
+              key={round.id}
+              className="rounded-xl border border-v-border bg-v-surface"
+            >
+              {/* Round header row */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <div>
+                    <p className="font-medium text-v-text">{round.name}</p>
+                    <p className="text-xs text-v-text-subtle mt-0.5">
+                      {round.weight}% · {round.contestantIds?.length ?? 0} contestants ·{' '}
+                      {round.criteriaIds?.length ?? 0} criteria ·{' '}
+                      {round.categoryId
+                        ? foundation?.categories?.find((c) => c.id === round.categoryId)?.name ?? 'Category'
+                        : 'Event-wide'}
+                    </p>
+                  </div>
+                  {divisionsEnabled && divisionName && (
+                    <span className="rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium text-v-primary uppercase tracking-wide">
+                      {divisionName}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2 text-sm">
                 <button
                   type="button"
                   onClick={() => setExpandedRoundId(expandedRoundId === round.id ? null : round.id)}
@@ -589,6 +671,10 @@ function JudgesTab({ foundation, reload }) {
 
   const scopeLabel = (a) => {
     if (a.scope === 'event') return 'Event-wide'
+    if (a.scope === 'division')
+      return `Division: ${
+        foundation?.divisions?.find((d) => d.id === a.scopeId)?.name ?? a.scopeId
+      }`
     if (a.scope === 'category')
       return `Category: ${
         foundation?.categories?.find((c) => c.id === a.scopeId)?.name ?? a.scopeId
@@ -597,6 +683,8 @@ function JudgesTab({ foundation, reload }) {
       foundation?.rounds?.find((r) => r.id === a.scopeId)?.name ?? a.scopeId
     }`
   }
+
+  const divisionsEnabled = foundation?.event?.divisions_enabled
 
   return (
     <div className="space-y-6">
@@ -664,6 +752,7 @@ function JudgesTab({ foundation, reload }) {
                   }}
                 >
                   <option value="event">Event</option>
+                  {divisionsEnabled && <option value="division">Division</option>}
                   <option value="category">Category</option>
                   <option value="round">Round</option>
                 </select>
@@ -680,7 +769,7 @@ function JudgesTab({ foundation, reload }) {
                     onChange={(e) => setScopeId(e.target.value)}
                   >
                     <option value="">— select —</option>
-                    {((scope === 'category' ? foundation?.categories : foundation?.rounds) ?? []).map(
+                    {((scope === 'category' ? foundation?.categories : scope === 'division' ? foundation?.divisions : foundation?.rounds) ?? []).map(
                       (x) => (
                         <option key={x.id} value={x.id}>
                           {x.name}
@@ -747,6 +836,7 @@ function ScoringTab({ foundation, reload }) {
         customMax: Number(customMax),
         dropHighest: Number(dropHighest),
         dropLowest: Number(dropLowest),
+        includeOverallRanking: Boolean(includeOverallRanking),
       })
       setSaved(true)
       reload()
@@ -839,6 +929,26 @@ function ScoringTab({ foundation, reload }) {
           onChange={(e) => setDropLowest(e.target.value)}
         />
       </div>
+      
+      {foundation?.event?.divisions_enabled && (
+        <div className="sm:col-span-2 v-card p-4 border border-v-primary/30">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={Boolean(config?.includeOverallRanking)}
+              onChange={(e) => save(e, { includeOverallRanking: e.target.checked })}
+              disabled={saving}
+            />
+            <div>
+              <span className="block font-medium text-v-text">Enable Overall Rankings</span>
+              <span className="text-sm text-v-text-subtle">
+                When divisions are enabled, this displays a combined ranking of all contestants alongside division rankings.
+              </span>
+            </div>
+          </label>
+        </div>
+      )}
+
       <div className="sm:col-span-2 flex items-center justify-between">
         <div>
           {error && <p className="text-sm text-v-danger">{error}</p>}
@@ -853,5 +963,213 @@ function ScoringTab({ foundation, reload }) {
         </button>
       </div>
     </form>
+  )
+}
+
+function DivisionsTab({ foundation, reload }) {
+  const { eventId } = useParams()
+  const divisionsEnabled = foundation?.event?.divisions_enabled ?? false
+  const divisions = foundation?.divisions ?? []
+
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const toggleEnabled = async () => {
+    setSaving(true)
+    try {
+      await pageantService.setDivisionsEnabled(eventId, !divisionsEnabled)
+      reload()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await pageantService.createDivision(eventId, { name, description })
+      setName('')
+      setDescription('')
+      reload()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="v-card p-6 flex flex-wrap items-center justify-between gap-4 border border-v-primary/30 bg-v-primary/5">
+        <div>
+          <h3 className="text-lg font-semibold text-v-text">Enable Divisions</h3>
+          <p className="text-sm text-v-text-subtle mt-1">
+            Group contestants by category (e.g., Male, Female, Junior, Senior) to compute separate rankings.
+          </p>
+        </div>
+        <button
+          onClick={toggleEnabled}
+          disabled={saving}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${
+            divisionsEnabled 
+              ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' 
+              : 'bg-v-primary text-white hover:bg-v-primary/90'
+          }`}
+        >
+          {divisionsEnabled ? 'Disable Divisions' : 'Enable Divisions'}
+        </button>
+      </div>
+
+      {divisionsEnabled && (
+        <>
+          <form onSubmit={submit} className="grid gap-4 v-card p-6 sm:grid-cols-[1fr_2fr_auto]">
+            <div>
+              <label className={LABEL_CLASS}>Division name</label>
+              <input
+                className={INPUT_CLASS}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Senior"
+                required
+              />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>Description (Optional)</label>
+              <input
+                className={INPUT_CLASS}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. Contestants aged 18 and above"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={saving || !name.trim()}
+                className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-60"
+              >
+                Add division
+              </button>
+            </div>
+          </form>
+
+          <ul className="space-y-2">
+            {divisions.map((div) => (
+              <DivisionRow key={div.id} division={div} eventId={eventId} reload={reload} />
+            ))}
+            {divisions.length === 0 && (
+              <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
+                No divisions added yet. Add a division above to group your contestants.
+              </li>
+            )}
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+
+function DivisionRow({ division, eventId, reload }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState({
+    name: division.name,
+    description: division.description || '',
+    isActive: division.isActive,
+  })
+
+  const save = async () => {
+    await pageantService.updateDivision(eventId, division.id, draft)
+    setEditing(false)
+    reload()
+  }
+
+  const remove = async () => {
+    if (!window.confirm('Delete this division? This will only work if it has no data associated with it.')) return
+    try {
+      await pageantService.deleteDivision(eventId, division.id)
+      reload()
+    } catch (err) {
+      if (err.response?.status === 409) {
+        if (window.confirm('This division contains data and cannot be deleted. Deactivate it instead?')) {
+          await pageantService.updateDivision(eventId, division.id, { isActive: false })
+          reload()
+        }
+      } else {
+        alert(err.message)
+      }
+    }
+  }
+
+  if (editing) {
+    return (
+      <li className="flex items-end gap-3 rounded-lg border border-v-border bg-v-surface p-4">
+        <div className="flex-1">
+          <label className="text-xs text-v-text-subtle mb-1 block">Name</label>
+          <input
+            className={INPUT_CLASS}
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-xs text-v-text-subtle mb-1 block">Description</label>
+          <input
+            className={INPUT_CLASS}
+            value={draft.description}
+            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+          />
+        </div>
+        <label className="flex items-center gap-2 pb-2">
+          <input
+            type="checkbox"
+            checked={draft.isActive}
+            onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
+          />
+          <span className="text-sm text-v-text">Active</span>
+        </label>
+        <button
+          onClick={save}
+          className="rounded-lg bg-v-primary px-3 py-2 text-sm text-white hover:bg-opacity-90"
+        >
+          Save
+        </button>
+        <button
+          onClick={() => setEditing(false)}
+          className="rounded-lg border border-v-border px-3 py-2 text-sm text-v-text-muted hover:text-v-text"
+        >
+          Cancel
+        </button>
+      </li>
+    )
+  }
+
+  return (
+    <li className="flex items-center justify-between rounded-lg border border-v-border bg-v-surface p-4">
+      <div className={!division.isActive ? 'opacity-50' : ''}>
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-v-text">{division.name}</span>
+          {!division.isActive && (
+            <span className="rounded-full bg-v-border px-2 py-0.5 text-xs text-v-text-muted">
+              Inactive
+            </span>
+          )}
+        </div>
+        {division.description && <p className="text-sm text-v-text-subtle">{division.description}</p>}
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setEditing(true)}
+          className="rounded-lg px-3 py-1.5 text-sm text-v-primary hover:bg-v-primary/10"
+        >
+          Edit
+        </button>
+        <button
+          onClick={remove}
+          className="rounded-lg px-3 py-1.5 text-sm text-red-400 hover:bg-red-400/10"
+        >
+          Delete
+        </button>
+      </div>
+    </li>
   )
 }

@@ -112,12 +112,29 @@ export const pageantService = {
     return api.post(`${org}/events/${eventId}/judges/import-register`, { data })
   },
 
-  getRankings(eventId) {
-    return api.get(`${org}/events/${eventId}/rankings`)
+  getRankings(eventId, params = {}) {
+    return api.get(`${org}/events/${eventId}/rankings`, { params })
   },
 
-  getAnalytics(eventId) {
-    return api.get(`${org}/events/${eventId}/analytics`)
+  getAnalytics(eventId, params = {}) {
+    return api.get(`${org}/events/${eventId}/analytics`, { params })
+  },
+
+  // ——— Divisions ———
+  listDivisions(eventId) {
+    return api.get(`${org}/events/${eventId}/divisions`)
+  },
+  createDivision(eventId, payload) {
+    return api.post(`${org}/events/${eventId}/divisions`, payload)
+  },
+  updateDivision(eventId, divisionId, payload) {
+    return api.patch(`${org}/events/${eventId}/divisions/${divisionId}`, payload)
+  },
+  deleteDivision(eventId, divisionId) {
+    return api.delete(`${org}/events/${eventId}/divisions/${divisionId}`)
+  },
+  setDivisionsEnabled(eventId, enabled) {
+    return api.patch(`${org}/events/${eventId}/divisions-enabled`, { enabled })
   },
 
   // Phase 4 — Foundation (single round-trip for the workspace UI)

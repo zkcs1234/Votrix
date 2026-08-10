@@ -55,6 +55,7 @@ export function validateContestant(body) {
     name: body.name.trim(),
     photo: body.photo || null,
     contestantNumber: num,
+    divisionId: body.divisionId || null,
   }
 }
 
@@ -71,7 +72,13 @@ export function validateCriteria(body) {
     throw new ApiError(400, 'maxScore must be >= minScore')
   }
 
-  return { name: body.name.trim(), percentage, minScore, maxScore }
+  return { 
+    name: body.name.trim(), 
+    percentage, 
+    minScore, 
+    maxScore,
+    divisionId: body.divisionId || null,
+  }
 }
 
 export function validateScoringToggle(body) {
@@ -92,6 +99,7 @@ export function validateJudgeScores(body) {
     criteriaId: validateUUID(s.criteriaId, 'criteriaId'),
     roundId: s.roundId ? validateUUID(s.roundId, 'roundId') : null,
     categoryId: s.categoryId ? validateUUID(s.categoryId, 'categoryId') : null,
+    divisionId: s.divisionId ? validateUUID(s.divisionId, 'divisionId') : null,
     score: s.score,
   }))
 }
@@ -116,6 +124,7 @@ export function validateCategory(body) {
     displayOrder: Number.isInteger(displayOrder) ? displayOrder : 0,
     weight,
     isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
+    divisionId: body.divisionId || null,
   }
 }
 
@@ -133,6 +142,7 @@ export function validateRound(body) {
     name: body.name.trim(),
     description: body.description?.trim() || null,
     categoryId: body.categoryId || null,
+    divisionId: body.divisionId || null,
     displayOrder: Number.isInteger(displayOrder) ? displayOrder : 0,
     weight,
     isOpen: body.isOpen !== undefined ? Boolean(body.isOpen) : false,
@@ -205,6 +215,11 @@ export function validateScoringConfig(body) {
     config.dropLowest = n
   }
 
+  // Division support: includeOverallRanking flag
+  if (body.includeOverallRanking !== undefined) {
+    config.includeOverallRanking = Boolean(body.includeOverallRanking)
+  }
+
   return config
 }
 
@@ -231,4 +246,25 @@ export function validateAssignment(body) {
     throw new ApiError(400, 'scopeId is required')
   }
   return { scope: body.scope, scopeId: body.scopeId }
+}
+
+// ---------------------------------------------------------------------------
+// Division validators
+// ---------------------------------------------------------------------------
+export function validateDivision(body) {
+  if (!body?.name?.trim()) throw new ApiError(400, 'Division name is required')
+  const displayOrder = body.displayOrder !== undefined ? Number(body.displayOrder) : 0
+  return {
+    name: body.name.trim(),
+    description: body.description?.trim() || null,
+    displayOrder: Number.isInteger(displayOrder) ? displayOrder : 0,
+    isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
+  }
+}
+
+export function validateDivisionsToggle(body) {
+  if (typeof body?.divisionsEnabled !== 'boolean') {
+    throw new ApiError(400, 'divisionsEnabled must be a boolean')
+  }
+  return body.divisionsEnabled
 }

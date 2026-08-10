@@ -8,6 +8,7 @@ import {
   ASSIGNMENT_SCOPES,
 } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
+import { listDivisions } from './competition-division.service.js'
 
 // ---------------------------------------------------------------------------
 // Phase 4 — Competition Scoring Foundation service.
@@ -87,6 +88,7 @@ function mapCategory(row) {
   return {
     id: row.id,
     eventId: row.event_id,
+    divisionId: row.division_id ?? null,
     name: row.name,
     description: row.description,
     displayOrder: row.display_order,
@@ -97,24 +99,47 @@ function mapCategory(row) {
   }
 }
 
-export async function listCategories(eventId, organizerId) {
+export async function listCategories(eventId, organizerId, filters = {}) {
   await assertCompetitionEvent(eventId, organizerId)
-  const { data, error } = await getClient()
+  let query = getClient()
     .from(DB_TABLES.COMPETITION_CATEGORIES)
     .select('*')
     .eq('event_id', eventId)
+
+  // Division filter (optional)
+  if (filters.divisionId !== undefined) {
+    query = query.eq('division_id', filters.divisionId)
+  }
+
+  query = query
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
+
+  const { data, error } = await query
   if (error) throw new ApiError(500, error.message)
   return (data ?? []).map(mapCategory)
 }
 
 export async function createCategory(eventId, organizerId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
+
+  // Validate division belongs to event if provided
+  if (payload.divisionId) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_CATEGORIES)
     .insert({
       event_id: eventId,
+      division_id: payload.divisionId ?? null,
       name: payload.name,
       description: payload.description ?? null,
       display_order: payload.displayOrder ?? 0,
@@ -129,12 +154,26 @@ export async function createCategory(eventId, organizerId, payload) {
 
 export async function updateCategory(eventId, organizerId, categoryId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
+
+  // Validate division if being updated
+  if (payload.divisionId !== undefined && payload.divisionId !== null) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
   const updates = {}
   if (payload.name !== undefined) updates.name = payload.name
   if (payload.description !== undefined) updates.description = payload.description
   if (payload.displayOrder !== undefined) updates.display_order = payload.displayOrder
   if (payload.weight !== undefined) updates.weight = payload.weight
   if (payload.isActive !== undefined) updates.is_active = payload.isActive
+  if (payload.divisionId !== undefined) updates.division_id = payload.divisionId
 
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_CATEGORIES)
@@ -167,6 +206,7 @@ function mapRound(row) {
     id: row.id,
     eventId: row.event_id,
     categoryId: row.category_id,
+    divisionId: row.division_id ?? null,
     name: row.name,
     description: row.description,
     displayOrder: row.display_order,
@@ -179,14 +219,22 @@ function mapRound(row) {
   }
 }
 
-export async function listRounds(eventId, organizerId) {
+export async function listRounds(eventId, organizerId, filters = {}) {
   await assertCompetitionEvent(eventId, organizerId)
-  const { data, error } = await getClient()
+  
+  let query = getClient()
     .from(DB_TABLES.COMPETITION_ROUNDS)
     .select('*')
     .eq('event_id', eventId)
+
+  if (filters.divisionId !== undefined) {
+    query = query.eq('division_id', filters.divisionId)
+  }
+
+  const { data, error } = await query
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
+
   if (error) throw new ApiError(500, error.message)
   return (data ?? []).map(mapRound)
 }
@@ -205,11 +253,23 @@ export async function createRound(eventId, organizerId, payload) {
     if (!cat) throw new ApiError(400, 'Category does not belong to this event')
   }
 
+  if (payload.divisionId) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_ROUNDS)
     .insert({
       event_id: eventId,
       category_id: payload.categoryId ?? null,
+      division_id: payload.divisionId ?? null,
       name: payload.name,
       description: payload.description ?? null,
       display_order: payload.displayOrder ?? 0,
@@ -226,6 +286,18 @@ export async function createRound(eventId, organizerId, payload) {
 
 export async function updateRound(eventId, organizerId, roundId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
+  
+  if (payload.divisionId !== undefined && payload.divisionId !== null) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
   const updates = {}
   if (payload.name !== undefined) updates.name = payload.name
   if (payload.description !== undefined) updates.description = payload.description
@@ -235,6 +307,7 @@ export async function updateRound(eventId, organizerId, roundId, payload) {
   if (payload.isOpen !== undefined) updates.is_open = payload.isOpen
   if (payload.startsAt !== undefined) updates.starts_at = payload.startsAt
   if (payload.endsAt !== undefined) updates.ends_at = payload.endsAt
+  if (payload.divisionId !== undefined) updates.division_id = payload.divisionId
 
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_ROUNDS)
@@ -544,11 +617,11 @@ export async function setScoringConfig(eventId, organizerId, partialConfig) {
 export async function getCompetitionFoundation(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
 
-  const [eventRes, cats, rounds, criteria, contestants, judges, assignments, roundLinks] =
+  const [eventRes, cats, rounds, criteria, contestants, judges, assignments, roundLinks, divisions] =
     await Promise.all([
       getClient()
         .from(DB_TABLES.EVENTS)
-        .select('id, title, scoring_config, scoring_enabled, event_type')
+        .select('id, title, scoring_config, scoring_enabled, event_type, divisions_enabled')
         .eq('id', eventId)
         .single(),
       listCategories(eventId, organizerId),
@@ -573,6 +646,7 @@ export async function getCompetitionFoundation(eventId, organizerId) {
         getClient().from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS).select('round_id, contestant_id'),
         getClient().from(DB_TABLES.COMPETITION_ROUND_CRITERIA).select('round_id, criteria_id'),
       ]).then(([rc, cr]) => ({ contestants: rc.data ?? [], criteria: cr.data ?? [] })),
+      listDivisions(eventId, true), // includeInactive = true to get all divisions
     ])
 
   if (eventRes.error) throw new ApiError(500, eventRes.error.message)
@@ -583,6 +657,7 @@ export async function getCompetitionFoundation(eventId, organizerId) {
   return {
     event: eventRes.data,
     scoringConfig: mergeScoringConfig(eventRes.data.scoring_config),
+    divisions,
     categories: cats,
     rounds: rounds.map((r) => ({
       ...r,

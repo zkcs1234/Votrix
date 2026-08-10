@@ -10,6 +10,14 @@ import { validateRouteUUIDParams } from '../utils/sanitize.js'
 const router = Router({ mergeParams: true })
 router.use(validateRouteUUIDParams)
 
+// Divisions
+router.get('/divisions', ctrl.listDivisions)
+router.post('/divisions', ctrl.createDivision)
+router.get('/divisions/:divisionId', ctrl.getDivision)
+router.patch('/divisions/:divisionId', ctrl.updateDivision)
+router.delete('/divisions/:divisionId', ctrl.deleteDivision)
+router.patch('/divisions-enabled', ctrl.setDivisionsEnabled)
+
 // Categories
 router.get('/categories', ctrl.listCategories)
 router.post('/categories', ctrl.createCategory)
@@ -65,6 +73,7 @@ router.post('/session/next-contestant', sessionCtrl.nextContestant)
 router.post('/session/prev-contestant', sessionCtrl.previousContestant)
 router.post('/session/set-contestant', sessionCtrl.setActiveContestant)
 router.post('/session/set-round', sessionCtrl.setActiveRound)
+router.post('/session/set-division', sessionCtrl.setActiveDivision)
 
 // Judge progress (organizer view)
 router.get('/session/judge-progress', sessionCtrl.getJudgeProgress)

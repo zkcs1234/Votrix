@@ -6,7 +6,7 @@ import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
-import { assertJudgeEnrolled } from './pageant.service.js'
+import { assertJudgeEnrolled, canJudgeScore } from './pageant.service.js'
 import { emitToEvent, emitToEventOrganizer, emitToEventVoters, emitToUser } from '../websocket/ws-emitter.js'
 
 // ---------------------------------------------------------------------------
@@ -19,6 +19,7 @@ function mapSession(row) {
     id: row.id,
     eventId: row.event_id,
     status: row.status,
+    currentDivisionId: row.current_division_id ?? null,
     currentRoundId: row.current_round_id,
     currentRoundName: row.current_round_name ?? null,
     activeContestantId: row.active_contestant_id,
@@ -112,6 +113,53 @@ export async function getSession(sessionId, eventId, organizerId) {
   return mapSession(data)
 }
 
+async function buildContestantOrder(eventId, roundId, divisionId) {
+  let query = getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .select('id')
+    .eq('event_id', eventId)
+    .order('contestant_number', { ascending: true })
+
+  if (divisionId) {
+    query = query.eq('division_id', divisionId)
+  }
+
+  const { data: allContestants } = await query
+  const eligibleContestants = allContestants ?? []
+
+  if (!roundId) {
+    return eligibleContestants.map(c => c.id)
+  }
+
+  const { data: roundContestants } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS)
+    .select('contestant_id')
+    .eq('round_id', roundId)
+    .order('created_at', { ascending: true })
+
+  if (roundContestants && roundContestants.length > 0) {
+    const eligibleSet = new Set(eligibleContestants.map(c => c.id))
+    const order = []
+    const inRound = new Set()
+    
+    for (const rc of roundContestants) {
+      if (eligibleSet.has(rc.contestant_id)) {
+        order.push(rc.contestant_id)
+        inRound.add(rc.contestant_id)
+      }
+    }
+    
+    for (const c of eligibleContestants) {
+      if (!inRound.has(c.id)) {
+        order.push(c.id)
+      }
+    }
+    return order
+  }
+
+  return eligibleContestants.map(c => c.id)
+}
+
 // ---------------------------------------------------------------------------
 // Start a live session — organizer initiates the competition
 // ---------------------------------------------------------------------------
@@ -139,49 +187,10 @@ export async function startSession(eventId, organizerId) {
 
   if (rounds && rounds.length > 0) {
     firstRoundId = rounds[0].id
-    // Get contestants for this round
-    const { data: roundContestants } = await getClient()
-      .from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS)
-      .select('contestant_id')
-      .eq('round_id', firstRoundId)
-      .order('created_at', { ascending: true })
-
-    if (roundContestants && roundContestants.length > 0) {
-      // Preserve order from round_contestants table
-      const idSet = new Set(roundContestants.map(rc => rc.contestant_id))
-      contestantOrder = roundContestants.map(rc => rc.contestant_id)
-      // Also add any contestants not in the round (they appear at the end)
-      const { data: allContestants } = await getClient()
-        .from(DB_TABLES.CONTESTANTS)
-        .select('id')
-        .eq('event_id', eventId)
-        .order('contestant_number', { ascending: true })
-
-      for (const c of allContestants ?? []) {
-        if (!idSet.has(c.id)) {
-          contestantOrder.push(c.id)
-        }
-      }
-    } else {
-      // Round has no specific contestants — use all contestants
-      const { data: allContestants } = await getClient()
-        .from(DB_TABLES.CONTESTANTS)
-        .select('id')
-        .eq('event_id', eventId)
-        .order('contestant_number', { ascending: true })
-
-      contestantOrder = (allContestants ?? []).map(c => c.id)
-    }
-  } else {
-    // No rounds defined — use all contestants ordered by number
-    const { data: allContestants } = await getClient()
-      .from(DB_TABLES.CONTESTANTS)
-      .select('id')
-      .eq('event_id', eventId)
-      .order('contestant_number', { ascending: true })
-
-    contestantOrder = (allContestants ?? []).map(c => c.id)
   }
+  
+  // By default a new session starts without an active division
+  contestantOrder = await buildContestantOrder(eventId, firstRoundId, null)
 
   const now = new Date().toISOString()
 
@@ -331,26 +340,8 @@ export async function setActiveRound(eventId, organizerId, roundId) {
   if (roundErr) throw new ApiError(500, roundErr.message)
   if (!round) throw new ApiError(400, 'Round does not belong to this event')
 
-  // Get contestant order for this round
-  const { data: roundContestants } = await getClient()
-    .from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS)
-    .select('contestant_id')
-    .eq('round_id', roundId)
-    .order('created_at', { ascending: true })
-
-  let contestantOrder = []
-  if (roundContestants && roundContestants.length > 0) {
-    contestantOrder = roundContestants.map(rc => rc.contestant_id)
-  } else {
-    // Fallback to all contestants
-    const { data: allContestants } = await getClient()
-      .from(DB_TABLES.CONTESTANTS)
-      .select('id')
-      .eq('event_id', eventId)
-      .order('contestant_number', { ascending: true })
-
-    contestantOrder = (allContestants ?? []).map(c => c.id)
-  }
+  // Get contestant order for this round and current division
+  const contestantOrder = await buildContestantOrder(eventId, roundId, session.currentDivisionId)
 
   const { data, error } = await getClient()
     .from('competition_sessions')
@@ -371,6 +362,49 @@ export async function setActiveRound(eventId, organizerId, roundId) {
   emitToEvent(eventId, 'session:round-changed', {
     session: updated,
     previousRoundId: session.currentRoundId,
+  })
+
+  return updated
+}
+
+// ---------------------------------------------------------------------------
+// Set Active Division
+// ---------------------------------------------------------------------------
+export async function setActiveDivision(eventId, organizerId, divisionId) {
+  const session = await assertActiveSession(eventId, organizerId)
+
+  if (divisionId) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
+  const contestantOrder = await buildContestantOrder(eventId, session.currentRoundId, divisionId || null)
+
+  const { data, error } = await getClient()
+    .from('competition_sessions')
+    .update({
+      current_division_id: divisionId || null,
+      active_contestant_id: contestantOrder.length > 0 ? contestantOrder[0] : null,
+      current_contestant_order: 0,
+      contestant_order: contestantOrder,
+    })
+    .eq('id', session.id)
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+
+  const updated = mapSession(data)
+
+  emitToEvent(eventId, 'session:division-changed', {
+    session: updated,
+    previousDivisionId: session.currentDivisionId,
   })
 
   return updated
@@ -710,14 +744,26 @@ export async function getJudgeSessionView(eventId, judgeId) {
 export async function getJudgeProgress(eventId, organizerId) {
   const session = await assertActiveSession(eventId, organizerId)
 
-  // Get all judges for this event
+  // Get all judges for this event and their assignments
   const { data: judges } = await getClient()
     .from(DB_TABLES.COMPETITION_JUDGES)
-    .select('id, user_id, display_name, role')
+    .select('id, user_id, display_name, role, competition_judge_assignments (scope, scope_id)')
     .eq('event_id', eventId)
     .eq('is_active', true)
 
-  if (!judges || judges.length === 0) {
+  const eligibleJudges = (judges ?? []).filter(j => {
+    const ctx = {
+      isFirstClass: true,
+      role: j.role,
+      assignments: j.competition_judge_assignments || []
+    }
+    return canJudgeScore(ctx, {
+      divisionId: session.currentDivisionId,
+      roundId: session.currentRoundId,
+    })
+  })
+
+  if (eligibleJudges.length === 0) {
     return { judges: [] }
   }
 
@@ -735,14 +781,15 @@ export async function getJudgeProgress(eventId, organizerId) {
   return {
     contestantId: session.activeContestantId,
     roundId: session.currentRoundId,
-    judges: (judges ?? []).map(j => ({
+    divisionId: session.currentDivisionId,
+    judges: eligibleJudges.map(j => ({
       judgeId: j.user_id,
       judgeRowId: j.id,
       displayName: j.display_name,
       role: j.role,
       hasSubmitted: submittedJudgeIds.has(j.user_id),
     })),
-    totalJudges: judges.length,
+    totalJudges: eligibleJudges.length,
     submittedCount: submittedJudgeIds.size,
   }
 }

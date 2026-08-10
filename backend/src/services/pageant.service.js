@@ -36,6 +36,7 @@ function mapContestant(row) {
   return {
     id: row.id,
     eventId: row.event_id,
+    divisionId: row.division_id ?? null,
     name: row.name,
     photo: row.photo,
     contestantNumber: row.contestant_number,
@@ -46,6 +47,7 @@ function mapCriteria(row) {
   return {
     id: row.id,
     eventId: row.event_id,
+    divisionId: row.division_id ?? null,
     name: row.name,
     percentage: Number(row.percentage),
     minScore: Number(row.min_score),
@@ -287,14 +289,19 @@ export async function setEventScoring(eventId, organizerId, scoringEnabled) {
 
 // ——— Contestants ———
 
-export async function listContestants(eventId, organizerId) {
+export async function listContestants(eventId, organizerId, filters = {}) {
   await assertCompetitionEvent(eventId, organizerId)
 
-  const { data, error } = await getClient()
+  let query = getClient()
     .from(DB_TABLES.CONTESTANTS)
-    .select('id, event_id, name, photo, contestant_number')
+    .select('id, event_id, division_id, name, photo, contestant_number')
     .eq('event_id', eventId)
-    .order('contestant_number', { ascending: true })
+
+  if (filters.divisionId !== undefined) {
+    query = query.eq('division_id', filters.divisionId)
+  }
+
+  const { data, error } = await query.order('contestant_number', { ascending: true })
 
   if (error) throw new ApiError(500, error.message)
   return (data ?? []).map(mapContestant)
@@ -303,10 +310,22 @@ export async function listContestants(eventId, organizerId) {
 export async function createContestant(eventId, organizerId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
 
+  if (payload.divisionId) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
   const { data, error } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
     .insert({
       event_id: eventId,
+      division_id: payload.divisionId ?? null,
       name: payload.name,
       photo: payload.photo ?? null,
       contestant_number: payload.contestantNumber,
@@ -326,6 +345,17 @@ export async function createContestant(eventId, organizerId, payload) {
 export async function updateContestant(eventId, organizerId, contestantId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
 
+  if (payload.divisionId !== undefined && payload.divisionId !== null) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
   // Capture old image_asset_id before updating so we can clean it up if replaced
   let oldAssetId = null
   if (payload.image_asset_id !== undefined) {
@@ -342,6 +372,7 @@ export async function updateContestant(eventId, organizerId, contestantId, paylo
   if (payload.photo !== undefined) updates.photo = payload.photo
   if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
   if (payload.contestantNumber !== undefined) updates.contestant_number = payload.contestantNumber
+  if (payload.divisionId !== undefined) updates.division_id = payload.divisionId
 
   const { data, error } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
@@ -394,14 +425,19 @@ export async function deleteContestant(eventId, organizerId, contestantId) {
 
 // ——— Criteria ———
 
-export async function listCriteria(eventId, organizerId) {
+export async function listCriteria(eventId, organizerId, filters = {}) {
   await assertCompetitionEvent(eventId, organizerId)
 
-  const { data, error } = await getClient()
+  let query = getClient()
     .from(DB_TABLES.CRITERIA)
-    .select('id, event_id, name, percentage, min_score, max_score')
+    .select('id, event_id, division_id, name, percentage, min_score, max_score')
     .eq('event_id', eventId)
-    .order('created_at', { ascending: true })
+
+  if (filters.divisionId !== undefined) {
+    query = query.eq('division_id', filters.divisionId)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: true })
 
   if (error) throw new ApiError(500, error.message)
   return (data ?? []).map(mapCriteria)
@@ -410,10 +446,22 @@ export async function listCriteria(eventId, organizerId) {
 export async function createCriteria(eventId, organizerId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
 
+  if (payload.divisionId) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
   const { data, error } = await getClient()
     .from(DB_TABLES.CRITERIA)
     .insert({
       event_id: eventId,
+      division_id: payload.divisionId ?? null,
       name: payload.name,
       percentage: payload.percentage,
       min_score: payload.minScore,
@@ -429,11 +477,23 @@ export async function createCriteria(eventId, organizerId, payload) {
 export async function updateCriteria(eventId, organizerId, criteriaId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
 
+  if (payload.divisionId !== undefined && payload.divisionId !== null) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
   const updates = {}
   if (payload.name !== undefined) updates.name = payload.name
   if (payload.percentage !== undefined) updates.percentage = payload.percentage
   if (payload.minScore !== undefined) updates.min_score = payload.minScore
   if (payload.maxScore !== undefined) updates.max_score = payload.maxScore
+  if (payload.divisionId !== undefined) updates.division_id = payload.divisionId
 
   const { data, error } = await getClient()
     .from(DB_TABLES.CRITERIA)
@@ -851,13 +911,57 @@ export async function getJudgeAssignmentContext(eventId, judgeId) {
   }
 }
 
-export function canJudgeScore(assignmentContext, { roundId = null, categoryId = null } = {}) {
+export async function resolveAllowedDivisions(eventId, judgeId) {
+  const ctx = await getJudgeAssignmentContext(eventId, judgeId)
+  if (!ctx.isFirstClass) return null
+  if (ctx.role === 'score_reviewer') return new Set()
+  const list = ctx.assignments
+  if (!list || list.length === 0) return null
+
+  const allowed = new Set()
+  let hasEventScope = false
+  const roundIds = []
+  const categoryIds = []
+
+  for (const a of list) {
+    if (a.scope === 'event') {
+      hasEventScope = true
+      break
+    }
+    if (a.scope === 'division') allowed.add(a.scope_id)
+    if (a.scope === 'round') roundIds.push(a.scope_id)
+    if (a.scope === 'category') categoryIds.push(a.scope_id)
+  }
+
+  if (hasEventScope) return null
+
+  if (roundIds.length > 0) {
+    const { data } = await getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('division_id').in('id', roundIds)
+    for (const r of data ?? []) {
+      if (r.division_id) allowed.add(r.division_id)
+      else return null // Event-wide round grants access to all divisions for scoring purposes
+    }
+  }
+
+  if (categoryIds.length > 0) {
+    const { data } = await getClient().from(DB_TABLES.COMPETITION_CATEGORIES).select('division_id').in('id', categoryIds)
+    for (const c of data ?? []) {
+      if (c.division_id) allowed.add(c.division_id)
+      else return null
+    }
+  }
+
+  return allowed
+}
+
+export function canJudgeScore(assignmentContext, { roundId = null, categoryId = null, divisionId = null } = {}) {
   if (!assignmentContext.isFirstClass) return true
   if (assignmentContext.role === 'score_reviewer') return false
   const list = assignmentContext.assignments
   if (!list || list.length === 0) return true
   return list.some((a) => {
     if (a.scope === 'event') return true
+    if (a.scope === 'division' && divisionId && a.scope_id === divisionId) return true
     if (a.scope === 'round' && roundId && a.scope_id === roundId) return true
     if (a.scope === 'category' && categoryId && a.scope_id === categoryId) return true
     return false
@@ -872,9 +976,30 @@ export async function getJudgeScoringSheet(eventId, judgeId) {
     throw new ApiError(400, 'Not a competition scoring event')
   }
 
+  const allowedDivisions = await resolveAllowedDivisions(eventId, judgeId)
+
+  let contestantsQuery = getClient().from(DB_TABLES.CONTESTANTS).select('id, event_id, division_id, name, photo, contestant_number').eq('event_id', eventId).order('contestant_number')
+  let criteriaQuery = getClient().from(DB_TABLES.CRITERIA).select('id, event_id, division_id, name, percentage, min_score, max_score').eq('event_id', eventId)
+
+  if (allowedDivisions !== null) {
+    if (allowedDivisions.size === 0) {
+      return {
+        event: mapEvent(event),
+        contestants: [],
+        criteria: [],
+        existingScores: {},
+        hasScored: enrollment.has_scored,
+        scoringOpen: isCompetitionScoringOpen(event),
+      }
+    }
+    const divIds = Array.from(allowedDivisions)
+    contestantsQuery = contestantsQuery.or(`division_id.in.(${divIds.join(',')}),division_id.is.null`)
+    criteriaQuery = criteriaQuery.or(`division_id.in.(${divIds.join(',')}),division_id.is.null`)
+  }
+
   const [contestants, criteria] = await Promise.all([
-    getClient().from(DB_TABLES.CONTESTANTS).select('id, event_id, name, photo, contestant_number').eq('event_id', eventId).order('contestant_number'),
-    getClient().from(DB_TABLES.CRITERIA).select('id, event_id, name, percentage, min_score, max_score').eq('event_id', eventId),
+    contestantsQuery,
+    criteriaQuery,
   ])
 
   if (contestants.error) throw new ApiError(500, contestants.error.message)
@@ -936,12 +1061,24 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
     }
   }
 
-  const contestants = await getClient()
-    .from(DB_TABLES.CONTESTANTS)
-    .select('id')
-    .eq('event_id', eventId)
+  const allowedDivisions = await resolveAllowedDivisions(eventId, judgeId)
 
-  const criteria = await getClient().from(DB_TABLES.CRITERIA).select('id, event_id, name, percentage, min_score, max_score').eq('event_id', eventId)
+  let contestantsQuery = getClient().from(DB_TABLES.CONTESTANTS).select('id').eq('event_id', eventId)
+  let criteriaQuery = getClient().from(DB_TABLES.CRITERIA).select('id, event_id, name, percentage, min_score, max_score').eq('event_id', eventId)
+
+  if (allowedDivisions !== null) {
+    if (allowedDivisions.size === 0) {
+      throw new ApiError(403, 'You are not assigned to score any divisions')
+    }
+    const divIds = Array.from(allowedDivisions)
+    contestantsQuery = contestantsQuery.or(`division_id.in.(${divIds.join(',')}),division_id.is.null`)
+    criteriaQuery = criteriaQuery.or(`division_id.in.(${divIds.join(',')}),division_id.is.null`)
+  }
+
+  const [contestants, criteria] = await Promise.all([
+    contestantsQuery,
+    criteriaQuery,
+  ])
 
   if (contestants.error || criteria.error) {
     throw new ApiError(500, 'Failed to load competition scoring data')
@@ -998,6 +1135,7 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
 
     // Phase 6: assignment scope check.
     if (judgeCtx.isFirstClass && !canJudgeScore(judgeCtx, {
+      divisionId: entry.divisionId ?? null,
       roundId: entry.roundId ?? null,
       categoryId: entry.categoryId ?? null,
     })) {
@@ -1011,6 +1149,7 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
       judge_id: judgeId,
       contestant_id: entry.contestantId,
       criteria_id: entry.criteriaId,
+      division_id: entry.divisionId ?? null,
       round_id: entry.roundId ?? null,
       category_id: entry.categoryId ?? null,
       score,
@@ -1099,28 +1238,41 @@ export async function listJudgeCompetitionEvents(judgeId) {
 
 // ——— Live rankings ———
 
-export async function getLiveRankings(eventId, organizerId) {
+export async function getLiveRankings(eventId, organizerId, { divisionId = null } = {}) {
   await assertCompetitionEvent(eventId, organizerId)
+
+  // Build division-aware queries
+  let contestantsQuery = getClient().from(DB_TABLES.CONTESTANTS).select('id, event_id, division_id, name, photo, contestant_number').eq('event_id', eventId)
+  let criteriaQuery = getClient().from(DB_TABLES.CRITERIA).select('id, event_id, division_id, name, percentage, min_score, max_score').eq('event_id', eventId)
+  let roundsQuery = getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('*').eq('event_id', eventId)
+  let categoriesQuery = getClient().from(DB_TABLES.COMPETITION_CATEGORIES).select('*').eq('event_id', eventId)
+
+  if (divisionId) {
+    contestantsQuery = contestantsQuery.or(`division_id.eq.${divisionId},division_id.is.null`)
+    criteriaQuery = criteriaQuery.or(`division_id.eq.${divisionId},division_id.is.null`)
+    roundsQuery = roundsQuery.or(`division_id.eq.${divisionId},division_id.is.null`)
+    categoriesQuery = categoriesQuery.or(`division_id.eq.${divisionId},division_id.is.null`)
+  }
 
   const [eventRes, contestantsRes, criteriaRes, judgesRes, roundsRes, categoriesRes, scoresRes] =
     await Promise.all([
       getClient()
         .from(DB_TABLES.EVENTS)
-        .select('scoring_config')
+        .select('scoring_config, divisions_enabled')
         .eq('id', eventId)
         .single(),
-      getClient().from(DB_TABLES.CONTESTANTS).select('id, event_id, name, photo, contestant_number').eq('event_id', eventId),
-      getClient().from(DB_TABLES.CRITERIA).select('id, event_id, name, percentage, min_score, max_score').eq('event_id', eventId),
+      contestantsQuery,
+      criteriaQuery,
       getClient()
         .from(DB_TABLES.EVENT_VOTERS)
         .select('id', { count: 'exact', head: true })
         .eq('event_id', eventId)
         .eq('is_judge', true),
-      getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('*').eq('event_id', eventId),
-      getClient().from(DB_TABLES.COMPETITION_CATEGORIES).select('*').eq('event_id', eventId),
+      roundsQuery,
+      categoriesQuery,
       getClient()
         .from(DB_TABLES.JUDGE_SCORES)
-        .select('contestant_id, criteria_id, round_id, category_id, score, judge_id')
+        .select('contestant_id, criteria_id, round_id, category_id, division_id, score, judge_id')
     ])
 
   if (eventRes.error) throw new ApiError(500, eventRes.error.message)
@@ -1135,6 +1287,11 @@ export async function getLiveRankings(eventId, organizerId) {
     scores = scores.filter((s) => contestantIds.includes(s.contestant_id))
   } else {
     scores = []
+  }
+
+  // When filtering by division, also restrict scores to that division (or null)
+  if (divisionId) {
+    scores = scores.filter((s) => s.division_id === divisionId || !s.division_id)
   }
 
   const { count: totalJudges } = judgesRes
@@ -1161,6 +1318,7 @@ export async function getLiveRankings(eventId, organizerId) {
     contestantNumber: row.contestantNumber,
     photo: row.photo,
     rank: row.rank,
+    divisionId: divisionId ?? null,
     weightedScore: row.finalScore,
     finalScore: row.finalScore,
     criteriaBreakdown: Object.values(row.perCriterion).map((c) => ({
@@ -1175,6 +1333,8 @@ export async function getLiveRankings(eventId, organizerId) {
   }))
 
   return {
+    divisionId: divisionId ?? null,
+    divisionsEnabled: Boolean(eventRes.data?.divisions_enabled),
     rankings: publicRankings,
     criteriaTotalPercentage: debug.criterionTotals,
     roundWeightTotal: debug.roundTotals,

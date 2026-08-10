@@ -5,18 +5,25 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import { subscribeRoom } from '@/services/socket.service'
+import { INPUT_CLASS } from '@/utils/uiClasses'
 
 export default function CompetitionRankingsPage() {
   const { eventId } = useParams()
   const [data, setData] = useState(null)
+  const [foundation, setFoundation] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [divisionId, setDivisionId] = useState('')
 
   const load = useCallback(() => {
-    pageantService
-      .getRankings(eventId)
-      .then(({ data }) => setData(data))
-      .finally(() => setLoading(false))
-  }, [eventId])
+    setLoading(true)
+    Promise.all([
+      pageantService.getRankings(eventId, { divisionId: divisionId || undefined }).catch(() => ({ data: {} })),
+      pageantService.getFoundation(eventId).catch(() => ({ data: {} }))
+    ]).then(([rankingsRes, foundationRes]) => {
+      if (rankingsRes.data) setData(rankingsRes.data)
+      if (foundationRes.data?.foundation) setFoundation(foundationRes.data.foundation)
+    }).finally(() => setLoading(false))
+  }, [eventId, divisionId])
 
   useEffect(() => {
     load()
@@ -24,12 +31,17 @@ export default function CompetitionRankingsPage() {
   }, [eventId, load])
 
   useSocketEvent('rankings:updated', ({ rankings }) => {
-    if (rankings) {
+    // Note: real-time updates might not have division filter applied, 
+    // so we should probably re-fetch if we have a filter, or just use the data if no filter.
+    // To be safe, we just reload the data if there's a specific division selected.
+    if (divisionId) {
+      load()
+    } else if (rankings) {
       setData(rankings)
     }
-  }, [eventId])
+  }, [eventId, divisionId, load])
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="flex justify-center py-20">
         <LoadingSpinner />
@@ -37,16 +49,33 @@ export default function CompetitionRankingsPage() {
     )
   }
 
+  const divisionsEnabled = foundation?.event?.divisions_enabled
+  const divisions = foundation?.divisions ?? []
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-semibold text-v-text">Live rankings</h2>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          {divisionsEnabled && divisions.length > 0 && (
+            <select
+              className={`${INPUT_CLASS} py-1.5 text-sm w-auto`}
+              value={divisionId}
+              onChange={(e) => setDivisionId(e.target.value)}
+            >
+              <option value="">— Event-wide —</option>
+              {divisions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          )}
           <Link
             to={`/organizer/reports/competition/${eventId}`}
             className="text-sm text-v-text-muted hover:text-v-text"
           >
-            Full competition scoring report â†’
+            Full competition scoring report →
           </Link>
           <button type="button" onClick={load} className="text-sm text-v-text-subtle hover:text-v-text-muted">
             Refresh

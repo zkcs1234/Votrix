@@ -214,17 +214,19 @@ export async function getPageantReport(eventId, organizerId) {
   return getCompetitionReport(eventId, organizerId)
 }
 
-export async function getCompetitionReport(eventId, organizerId) {
+export async function getCompetitionReport(eventId, organizerId, { divisionId = null } = {}) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
   if (!COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)) {
     throw new ApiError(400, 'Not a competition scoring event')
   }
 
-  const rankingsData = await getLiveRankings(eventId, organizerId)
+  const rankingsData = await getLiveRankings(eventId, organizerId, { divisionId })
 
   return {
     generatedAt: new Date().toISOString(),
     reportType: 'competition_scoring',
+    divisionId: divisionId ?? null,
+    divisionsEnabled: rankingsData.divisionsEnabled,
     event: {
       id: event.id,
       title: event.title,
