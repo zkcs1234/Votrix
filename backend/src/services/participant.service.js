@@ -144,6 +144,8 @@ export async function registerParticipant(eventId, userId, options = {}) {
     .select('*')
     .single()
 
+  console.log('[DEBUG registerParticipant] eventId=', eventId, 'userId=', userId, 'type=', resolvedType, 'error=', error?.message ?? 'none', 'inserted=', !!data)
+
   if (error) throw new ApiError(500, error.message)
 
   return data

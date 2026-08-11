@@ -85,3 +85,9 @@ ehthumbs.db
 # ───────────────────────────────────────────────────────────────
 .vercel
 .render
+
+# ───────────────────────────────────────────────────────────────
+# Local safety archive for deprecations and risky cleanup items
+# This folder is intentionally excluded from production pushes.
+# ───────────────────────────────────────────────────────────────
+archive/

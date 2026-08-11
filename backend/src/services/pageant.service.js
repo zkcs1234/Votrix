@@ -640,11 +640,15 @@ export async function registerJudge(eventId, organizerId, { email, temporaryPass
   const tempPassword = temporaryPassword || generateTemporaryPassword()
   const { user, isNew } = await ensureJudgeAccount(email, tempPassword, resetPasswordForExisting)
 
+  console.log('[DEBUG registerJudge] eventId=', eventId, 'userId=', user.id, 'email=', email)
+
   await registerParticipant(eventId, user.id, {
-    participantType: 'COMPETITION_JUDGE',
+    participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE,
     firstName: firstName || null,
     lastName: lastName || null,
   })
+
+  console.log('[DEBUG registerJudge] registerParticipant completed for userId=', user.id)
 
   try {
     await getClient().from(DB_TABLES.INVITATIONS).upsert(
@@ -859,6 +863,8 @@ export async function listJudges(eventId, organizerId) {
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .order('created_at', { ascending: false })
+
+  console.log('[DEBUG listJudges] eventId=', eventId, 'rows=', data?.length ?? 0, 'error=', error?.message ?? 'none')
 
   if (error) throw new ApiError(500, error.message)
 
