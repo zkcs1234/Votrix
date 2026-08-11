@@ -432,13 +432,59 @@ function mapJudge(row) {
 
 export async function listCompetitionJudges(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
-  const { data, error } = await getClient()
-    .from(DB_TABLES.COMPETITION_JUDGES)
-    .select('*, users (id, email)')
-    .eq('event_id', eventId)
-    .order('created_at', { ascending: false })
-  if (error) throw new ApiError(500, error.message)
-  return (data ?? []).map(mapJudge)
+
+  const [participantsRes, judgesRes] = await Promise.all([
+    getClient()
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .select('id, event_id, user_id, first_name, last_name, has_scored, metadata, created_at, users!inner (id, email)')
+      .eq('event_id', eventId)
+      .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+      .order('created_at', { ascending: false }),
+    getClient()
+      .from(DB_TABLES.COMPETITION_JUDGES)
+      .select('*, users (id, email)')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: false }),
+  ])
+
+  if (participantsRes.error) throw new ApiError(500, participantsRes.error.message)
+  if (judgesRes.error) throw new ApiError(500, judgesRes.error.message)
+
+  const merged = new Map()
+
+  for (const row of participantsRes.data ?? []) {
+    merged.set(row.user_id, {
+      id: row.id,
+      eventId: row.event_id,
+      judgeId: row.user_id,
+      email: row.users?.email ?? null,
+      displayName: [row.first_name, row.last_name].filter(Boolean).join(' ') || row.users?.email || null,
+      role: 'judge',
+      isActive: true,
+      hasSubmitted: Boolean(row.has_scored),
+      createdAt: row.created_at,
+      updatedAt: row.created_at,
+    })
+  }
+
+  for (const row of judgesRes.data ?? []) {
+    const current = merged.get(row.user_id) ?? { id: row.id, eventId: row.event_id, judgeId: row.user_id, email: row.users?.email ?? null, displayName: row.display_name ?? row.users?.email ?? null, role: row.role ?? 'judge', isActive: row.is_active ?? true, hasSubmitted: Boolean(row.has_submitted), createdAt: row.created_at, updatedAt: row.updated_at }
+    merged.set(row.user_id, {
+      ...current,
+      id: current.id ?? row.id,
+      eventId: current.eventId ?? row.event_id,
+      judgeId: current.judgeId ?? row.user_id,
+      email: current.email ?? row.users?.email ?? null,
+      displayName: current.displayName ?? row.display_name ?? row.users?.email ?? null,
+      role: current.role ?? row.role ?? 'judge',
+      isActive: current.isActive ?? row.is_active ?? true,
+      hasSubmitted: current.hasSubmitted || Boolean(row.has_submitted),
+      createdAt: current.createdAt ?? row.created_at,
+      updatedAt: current.updatedAt ?? row.updated_at,
+    })
+  }
+
+  return Array.from(merged.values()).map(mapJudge)
 }
 
 export async function inviteCompetitionJudge(eventId, organizerId, payload) {
