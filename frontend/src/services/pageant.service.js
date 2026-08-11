@@ -81,8 +81,10 @@ export const pageantService = {
     return api.delete(`${org}/events/${eventId}/criteria/${criteriaId}`)
   },
 
+  // Canonical read path uses the first-class judge model.
+  // The legacy /judges endpoint remains only for compatibility during migration.
   listJudges(eventId) {
-    return api.get(`${org}/events/${eventId}/judges`)
+    return api.get(`${org}/events/${eventId}/judges-v2`)
   },
 
   inviteJudge(eventId, payload) {

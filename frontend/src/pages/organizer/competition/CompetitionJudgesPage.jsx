@@ -95,47 +95,27 @@ const [csvPreview, setCsvPreview] = useState(null)
 
   const load = useCallback(async () => {
     try {
-      const [legacyRes, v2Res] = await Promise.allSettled([
-        pageantService.listJudges(eventId),
-        pageantService.listJudgesV2(eventId),
-      ])
+      const { data } = await pageantService.listJudges(eventId)
+      const normalized = Array.isArray(data?.judges)
+        ? data.judges.map((judge) => ({
+            ...judge,
+            id: judge.id ?? judge.judgeId ?? judge.userId ?? judge.email,
+            judgeId: judge.judgeId ?? judge.userId ?? judge.id,
+            email: judge.email ?? null,
+            firstName: judge.firstName ?? null,
+            lastName: judge.lastName ?? null,
+            hasScored: Boolean(judge.hasScored ?? false),
+            invitationSent: Boolean(judge.invitationSent ?? false),
+            metadata: judge.metadata ?? {},
+          }))
+        : []
 
-      const legacyList = legacyRes.status === 'fulfilled' ? (legacyRes.value?.data?.judges ?? []) : []
-      const v2List = v2Res.status === 'fulfilled' ? (v2Res.value?.data?.judges ?? []) : []
-
-      const merged = new Map()
-
-      for (const judge of [...legacyList, ...v2List]) {
-        const key = judge.judgeId ?? judge.userId ?? judge.id ?? judge.email
-        if (!key) continue
-
-        const existing = merged.get(key) ?? {}
-        merged.set(key, {
-          ...existing,
-          ...judge,
-          id: judge.id ?? existing.id ?? judge.judgeId ?? judge.userId ?? judge.email,
-          judgeId: judge.judgeId ?? existing.judgeId ?? judge.userId ?? judge.id,
-          email: judge.email ?? existing.email ?? null,
-          firstName: judge.firstName ?? existing.firstName ?? null,
-          lastName: judge.lastName ?? existing.lastName ?? null,
-          hasScored: Boolean(judge.hasScored ?? existing.hasScored ?? false),
-          invitationSent: judge.invitationSent ?? existing.invitationSent ?? false,
-          metadata: judge.metadata ?? existing.metadata ?? {},
-        })
-      }
-
-      const normalized = Array.from(merged.values())
       setJudges(normalized)
-
-      const schema = legacyRes.status === 'fulfilled'
-        ? legacyRes.value?.data?.informationFormSchema
-        : v2Res.status === 'fulfilled'
-          ? v2Res.value?.data?.informationFormSchema
-          : null
-      setFormSchema(schema ?? null)
+      setFormSchema(data?.informationFormSchema ?? null)
     } catch (err) {
       console.error('Failed to load judges:', err)
       setJudges([])
+      setFormSchema(null)
     } finally {
       setLoading(false)
     }

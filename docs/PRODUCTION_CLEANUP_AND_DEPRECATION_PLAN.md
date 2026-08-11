@@ -128,6 +128,25 @@ This is not necessarily wrong if a backward-compatibility layer is intentionally
 
 These files are safe to keep in the workspace for rollback or debugging, but they should not be used as the basis for functionality decisions. They are not the clean code path to edit.
 
+#### 3. Duplicate judge implementation paths created a real production bug
+
+This repo contains overlapping judge logic across more than one service and API surface, which is a textbook cleanup candidate.
+
+Examples of the duplication:
+
+- `backend/src/services/pageant.service.js` still contains legacy competition judge registration/listing logic
+- `backend/src/services/competition.service.js` contains newer competition judge logic with a separate model path
+- `frontend/src/pages/organizer/competition/CompetitionJudgesPage.jsx` had to merge results from both paths before the table could display judges correctly
+- the same competition judge data was being stored in both `event_participants` and `competition_judges` depending on the flow
+
+This is not just a code smell. It caused a real functional bug where judges existed in the database but did not appear in the organizer table because the app was reading only one of the duplicate sources. This is exactly the kind of issue that should be flagged in a production cleanup plan: two overlapping implementations with different data contracts can silently drift apart and produce inconsistent UI behavior.
+
+Recommendation:
+
+- identify the canonical judge model and enforce it in one service path
+- keep legacy support only behind a compatibility layer during migration
+- archive or deprecate the duplicate implementation after a data-contract audit and regression test pass
+
 ### C. Missing or incomplete file issues
 
 #### 1. Missing runtime API implementations in polling service
