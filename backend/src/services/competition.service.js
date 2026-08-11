@@ -583,22 +583,39 @@ export async function createJudgeAssignment(eventId, organizerId, judgeId, paylo
     throw new ApiError(400, `Invalid scope. Must be one of: ${Object.values(ASSIGNMENT_SCOPES).join(', ')}`)
   }
 
+  const { data: judgeRow, error: judgeErr } = await getClient()
+    .from(DB_TABLES.COMPETITION_JUDGES)
+    .select('id, event_id')
+    .eq('id', judgeId)
+    .maybeSingle()
+
+  if (judgeErr) throw new ApiError(500, judgeErr.message)
+  if (!judgeRow) throw new ApiError(400, 'Judge not found for this event')
+  if (judgeRow.event_id !== eventId) {
+    throw new ApiError(400, 'Judge does not belong to this event')
+  }
+
   // Validate scope_id belongs to the right table + event.
   const scopeId = payload.scopeId
-  let table
-  if (payload.scope === ASSIGNMENT_SCOPES.EVENT) table = DB_TABLES.EVENTS
-  else if (payload.scope === ASSIGNMENT_SCOPES.CATEGORY) table = DB_TABLES.COMPETITION_CATEGORIES
-  else table = DB_TABLES.COMPETITION_ROUNDS
+  if (payload.scope === ASSIGNMENT_SCOPES.EVENT) {
+    if (scopeId !== eventId) {
+      throw new ApiError(400, 'Event assignments must use the current event id')
+    }
+  } else {
+    let table
+    if (payload.scope === ASSIGNMENT_SCOPES.CATEGORY) table = DB_TABLES.COMPETITION_CATEGORIES
+    else table = DB_TABLES.COMPETITION_ROUNDS
 
-  const { data: scopeRow, error: scopeErr } = await getClient()
-    .from(table)
-    .select('id, event_id')
-    .eq('id', scopeId)
-    .maybeSingle()
-  if (scopeErr) throw new ApiError(500, scopeErr.message)
-  if (!scopeRow) throw new ApiError(400, 'scopeId does not exist')
-  if (scopeRow.event_id !== eventId) {
-    throw new ApiError(400, 'scopeId does not belong to this event')
+    const { data: scopeRow, error: scopeErr } = await getClient()
+      .from(table)
+      .select('id, event_id')
+      .eq('id', scopeId)
+      .maybeSingle()
+    if (scopeErr) throw new ApiError(500, scopeErr.message)
+    if (!scopeRow) throw new ApiError(400, 'scopeId does not exist')
+    if (scopeRow.event_id !== eventId) {
+      throw new ApiError(400, 'scopeId does not belong to this event')
+    }
   }
 
   const { data, error } = await getClient()
