@@ -1,10 +1,44 @@
 import { describe, test, expect } from 'vitest'
-import { canJudgeScore } from '../../src/services/pageant.service.js'
+import { canJudgeScore, mergeJudgeRows } from '../../src/services/pageant.service.js'
 
 // We import the pure helper from the service module to assert the
 // Phase 6 assignment-scope logic without standing up a Supabase client.
 
 describe('Phase 6: canJudgeScore', () => {
+  test('mergeJudgeRows prefers the competition_judges record id for assignment FK integrity', () => {
+    const merged = mergeJudgeRows(
+      {
+        id: 'participant-row-id',
+        event_id: 'evt-1',
+        user_id: 'user-1',
+        email: 'judge@example.com',
+        display_name: null,
+        role: 'judge',
+        is_active: true,
+        has_submitted: false,
+        created_at: '2024-01-01',
+        updated_at: '2024-01-02',
+      },
+      {
+        id: 'competition-judge-id',
+        event_id: 'evt-1',
+        user_id: 'user-1',
+        users: { email: 'judge@example.com' },
+        display_name: 'Judge One',
+        role: 'judge',
+        is_active: true,
+        has_submitted: false,
+        created_at: '2024-01-01',
+        updated_at: '2024-01-02',
+      },
+    )
+
+    expect(merged.id).toBe('competition-judge-id')
+    expect(merged.judgeId).toBe('user-1')
+    expect(merged.eventId).toBe('evt-1')
+    expect(merged.displayName).toBe('Judge One')
+  })
+
   test('non-first-class judges are always allowed (legacy path)', () => {
     const ctx = { isFirstClass: false, role: 'judge', assignments: [] }
     expect(canJudgeScore(ctx, { roundId: 'r1' })).toBe(true)

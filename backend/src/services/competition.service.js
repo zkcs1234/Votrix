@@ -472,16 +472,16 @@ export async function listCompetitionJudges(eventId, organizerId) {
     const current = merged.get(row.user_id) ?? { id: row.id, eventId: row.event_id, judgeId: row.user_id, email: row.users?.email ?? null, displayName: row.display_name ?? row.users?.email ?? null, role: row.role ?? 'judge', isActive: row.is_active ?? true, hasSubmitted: Boolean(row.has_submitted), createdAt: row.created_at, updatedAt: row.updated_at }
     merged.set(row.user_id, {
       ...current,
-      id: current.id ?? row.id,
-      eventId: current.eventId ?? row.event_id,
-      judgeId: current.judgeId ?? row.user_id,
-      email: current.email ?? row.users?.email ?? null,
-      displayName: current.displayName ?? row.display_name ?? row.users?.email ?? null,
-      role: current.role ?? row.role ?? 'judge',
-      isActive: current.isActive ?? row.is_active ?? true,
+      id: row.id ?? current.id,
+      eventId: row.event_id ?? current.eventId,
+      judgeId: row.user_id ?? current.judgeId,
+      email: row.users?.email ?? current.email ?? null,
+      displayName: row.display_name ?? current.displayName ?? row.users?.email ?? null,
+      role: row.role ?? current.role ?? 'judge',
+      isActive: row.is_active ?? current.isActive ?? true,
       hasSubmitted: current.hasSubmitted || Boolean(row.has_submitted),
-      createdAt: current.createdAt ?? row.created_at,
-      updatedAt: current.updatedAt ?? row.updated_at,
+      createdAt: row.created_at ?? current.createdAt,
+      updatedAt: row.updated_at ?? current.updatedAt,
     })
   }
 

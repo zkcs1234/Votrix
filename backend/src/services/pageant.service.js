@@ -874,6 +874,40 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
   return { total: pendingJudges.length, sent, failed, results }
 }
 
+export function mergeJudgeRows(participantRow = null, firstClassRow = null) {
+  const fromParticipant = participantRow ?? {}
+  const fromCompetition = firstClassRow ?? {}
+
+  const participantDisplayName = [fromParticipant.first_name, fromParticipant.last_name]
+    .filter(Boolean)
+    .join(' ') || fromParticipant.users?.email || null
+
+  const competitionDisplayName = typeof fromCompetition.display_name === 'string' && fromCompetition.display_name.trim()
+    ? fromCompetition.display_name.trim()
+    : null
+
+  const competitionNameParts = competitionDisplayName ? competitionDisplayName.split(/\s+/) : []
+
+  const displayName = competitionDisplayName ?? participantDisplayName
+
+  return {
+    id: fromCompetition.id ?? fromParticipant.id ?? null,
+    eventId: fromCompetition.event_id ?? fromParticipant.event_id ?? null,
+    judgeId: fromCompetition.user_id ?? fromParticipant.user_id ?? fromParticipant.users?.id ?? null,
+    email: fromCompetition.users?.email ?? fromParticipant.users?.email ?? fromParticipant.email ?? null,
+    firstName: fromParticipant.first_name ?? (competitionNameParts[0] ?? null),
+    lastName: fromParticipant.last_name ?? (competitionNameParts.slice(1).join(' ') || null),
+    displayName,
+    hasScored: Boolean(fromParticipant.has_scored || fromCompetition.has_submitted),
+    metadata: fromParticipant.metadata ?? {},
+    invitationSent: false,
+    source: fromCompetition.id ? 'competition_judges' : 'event_participants',
+    role: fromCompetition.role ?? 'judge',
+    isActive: fromCompetition.is_active ?? true,
+    hasSubmitted: Boolean(fromCompetition.has_submitted),
+  }
+}
+
 export async function listJudges(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
 
@@ -935,9 +969,9 @@ export async function listJudges(eventId, organizerId) {
 
     merged.set(row.user_id, {
       ...current,
-      id: current.id ?? row.id,
-      judgeId: current.judgeId ?? row.users?.id ?? row.user_id,
-      email: current.email ?? row.users?.email ?? null,
+      id: row.id ?? current.id,
+      judgeId: row.user_id ?? current.judgeId,
+      email: row.users?.email ?? current.email ?? null,
       firstName: current.firstName ?? row.display_name?.split(' ')?.[0] ?? null,
       lastName: current.lastName ?? row.display_name?.split(' ')?.slice(1).join(' ') ?? null,
       hasScored: current.hasScored || row.has_submitted || false,
