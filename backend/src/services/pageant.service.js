@@ -593,6 +593,28 @@ async function ensureJudgeAccount(email, plainPassword, resetPasswordForExisting
   return { user: sanitizeUser(data), isNew: true }
 }
 
+async function syncCompetitionJudgeRow(eventId, userId, { firstName = null, lastName = null, role = 'judge' } = {}) {
+  const displayName = [firstName, lastName].filter(Boolean).join(' ') || null
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.COMPETITION_JUDGES)
+    .upsert({
+      event_id: eventId,
+      user_id: userId,
+      role,
+      display_name: displayName,
+      is_active: true,
+    }, { onConflict: 'event_id,user_id', ignoreDuplicates: false })
+    .select('id, user_id, role, display_name, is_active, has_submitted, created_at, users (id, email)')
+    .maybeSingle()
+
+  if (error) {
+    throw new ApiError(500, error.message)
+  }
+
+  return data
+}
+
 export async function inviteJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName }) {
   await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
@@ -605,6 +627,12 @@ export async function inviteJudge(eventId, organizerId, { email, temporaryPasswo
     participantType: 'COMPETITION_JUDGE',
     firstName: firstName || null,
     lastName: lastName || null,
+  })
+
+  await syncCompetitionJudgeRow(eventId, user.id, {
+    firstName: firstName || null,
+    lastName: lastName || null,
+    role: 'judge',
   })
 
   const emailResult = isNew
@@ -646,6 +674,12 @@ export async function registerJudge(eventId, organizerId, { email, temporaryPass
     participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE,
     firstName: firstName || null,
     lastName: lastName || null,
+  })
+
+  await syncCompetitionJudgeRow(eventId, user.id, {
+    firstName: firstName || null,
+    lastName: lastName || null,
+    role: 'judge',
   })
 
   console.log('[DEBUG registerJudge] registerParticipant completed for userId=', user.id)
@@ -843,32 +877,79 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
 export async function listJudges(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
 
-  // Read from event_participants (the canonical table). The legacy
-  // v_event_voters view cannot satisfy PostgREST's `users(...)` embed
-  // because views don't carry FK relationships, so queries through it
-  // either error or return rows with null `users`.
-  const { data, error } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select(
-      `
-      id,
-      has_scored,
-      first_name,
-      last_name,
-      metadata,
-      user_id,
-      users!inner (id, email)
-    `,
-    )
-    .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
-    .order('created_at', { ascending: false })
+  const [participantsRes, competitionJudgesRes] = await Promise.all([
+    getClient()
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .select(
+        `
+        id,
+        has_scored,
+        first_name,
+        last_name,
+        metadata,
+        user_id,
+        users!inner (id, email)
+      `,
+      )
+      .eq('event_id', eventId)
+      .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+      .order('created_at', { ascending: false }),
+    getClient()
+      .from(DB_TABLES.COMPETITION_JUDGES)
+      .select('id, user_id, role, display_name, is_active, has_submitted, created_at, users (id, email)')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: false }),
+  ])
 
-  console.log('[DEBUG listJudges] eventId=', eventId, 'rows=', data?.length ?? 0, 'error=', error?.message ?? 'none')
+  const participantRows = participantsRes.data ?? []
+  const firstClassRows = competitionJudgesRes.data ?? []
 
-  if (error) throw new ApiError(500, error.message)
+  const merged = new Map()
 
-  const judgeUserIds = (data ?? []).map((r) => r.user_id).filter(Boolean)
+  for (const row of participantRows) {
+    merged.set(row.user_id, {
+      id: row.id,
+      judgeId: row.users?.id ?? row.user_id,
+      email: row.users?.email ?? null,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      hasScored: row.has_scored ?? false,
+      metadata: row.metadata ?? {},
+      invitationSent: false,
+      source: 'event_participants',
+    })
+  }
+
+  for (const row of firstClassRows) {
+    const current = merged.get(row.user_id) ?? {
+      id: row.id,
+      judgeId: row.users?.id ?? row.user_id,
+      email: row.users?.email ?? null,
+      firstName: null,
+      lastName: null,
+      hasScored: row.has_submitted ?? false,
+      metadata: {},
+      invitationSent: false,
+      source: 'competition_judges',
+    }
+
+    merged.set(row.user_id, {
+      ...current,
+      id: current.id ?? row.id,
+      judgeId: current.judgeId ?? row.users?.id ?? row.user_id,
+      email: current.email ?? row.users?.email ?? null,
+      firstName: current.firstName ?? row.display_name?.split(' ')?.[0] ?? null,
+      lastName: current.lastName ?? row.display_name?.split(' ')?.slice(1).join(' ') ?? null,
+      hasScored: current.hasScored || row.has_submitted || false,
+      metadata: current.metadata ?? {},
+      source: 'competition_judges',
+    })
+  }
+
+  if (participantsRes.error) throw new ApiError(500, participantsRes.error.message)
+  if (competitionJudgesRes.error) throw new ApiError(500, competitionJudgesRes.error.message)
+
+  const judgeUserIds = Array.from(merged.keys()).filter(Boolean)
   let invitationMap = {}
 
   if (judgeUserIds.length) {
@@ -883,20 +964,24 @@ export async function listJudges(eventId, organizerId) {
     }
   }
 
+  for (const judge of merged.values()) {
+    judge.invitationSent = invitationMap[judge.judgeId] ?? judge.invitationSent ?? false
+  }
+
   // Fetch the event's information form schema for dynamic columns
   const event = await getEventById(eventId)
   const informationFormSchema = event?.information_form_schema ?? { enabled: false, fields: [] }
 
   return {
-    judges: (data ?? []).map((row) => ({
+    judges: Array.from(merged.values()).map((row) => ({
       id: row.id,
-      judgeId: row.users?.id,
-      email: row.users?.email,
-      firstName: row.first_name,
-      lastName: row.last_name,
-      hasScored: row.has_scored,
+      judgeId: row.judgeId,
+      email: row.email,
+      firstName: row.firstName,
+      lastName: row.lastName,
+      hasScored: row.hasScored,
       metadata: row.metadata ?? {},
-      invitationSent: invitationMap[row.user_id] ?? false,
+      invitationSent: row.invitationSent ?? false,
     })),
     informationFormSchema,
   }

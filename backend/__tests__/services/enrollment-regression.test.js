@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
+  db: vi.fn(),
   registerParticipant: vi.fn(),
   findUserByEmail: vi.fn(),
   findUserById: vi.fn(),
@@ -17,27 +18,7 @@ const mocks = vi.hoisted(() => ({
 let dbUpdateSpy
 
 vi.mock('../../src/foundation/db.js', () => ({
-  db: () => ({
-    from(table) {
-      if (table === 'v_event_voters') {
-        throw new Error('legacy event_voters table should not be used')
-      }
-
-      const chain = {
-        select: vi.fn().mockReturnThis(),
-        insert: vi.fn().mockReturnThis(),
-        update: vi.fn((...args) => { mocks.dbUpdate(...args); return chain }),
-        upsert: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        in: vi.fn().mockReturnThis(),
-        order: vi.fn().mockReturnThis(),
-        range: vi.fn().mockResolvedValue({ data: [], error: null }),
-        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-        single: vi.fn().mockResolvedValue({ data: { id: 'user-1', email: 'judge@example.com' }, error: null }),
-      }
-      return chain
-    },
-  }),
+  db: mocks.db,
 }))
 
 vi.mock('../../src/services/event.service.js', () => ({
@@ -81,7 +62,7 @@ vi.mock('../../src/websocket/ws-emitter.js', () => ({
   emitToRole: vi.fn(),
 }))
 
-import { inviteJudge, registerJudge } from '../../src/services/pageant.service.js'
+import { inviteJudge, registerJudge, listJudges } from '../../src/services/pageant.service.js'
 import * as pollingService from '../../src/services/polling.service.js'
 import * as invitationService from '../../src/services/invitation.service.js'
 import { previewCsv } from '../../src/services/csv-import.service.js'
@@ -91,6 +72,27 @@ const existingVoter = { id: 'user-existing', email: 'voter@example.com', role: '
 describe('enrollment regression coverage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.db.mockImplementation(() => ({
+      from(table) {
+        if (table === 'v_event_voters') {
+          throw new Error('legacy event_voters table should not be used')
+        }
+
+        const chain = {
+          select: vi.fn().mockReturnThis(),
+          insert: vi.fn().mockReturnThis(),
+          update: vi.fn((...args) => { mocks.dbUpdate(...args); return chain }),
+          upsert: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          in: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          range: vi.fn().mockResolvedValue({ data: [], error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          single: vi.fn().mockResolvedValue({ data: { id: 'user-1', email: 'judge@example.com' }, error: null }),
+        }
+        return chain
+      },
+    }))
     mocks.findUserByEmail.mockResolvedValue(null)
     mocks.findUserById.mockResolvedValue(null)
     mocks.sanitizeUser.mockImplementation((user) => { const { password, ...safe } = user ?? {}; return safe })
@@ -134,6 +136,64 @@ describe('enrollment regression coverage', () => {
       valid: 1,
       summary: { newAccounts: 1, existingAccounts: 0, alreadyEnrolled: 0 },
     })
+  })
+
+  test('listJudges merges legacy participant records and first-class competition_judges rows', async () => {
+    mocks.db.mockImplementation(() => ({
+      from(table) {
+        if (table === 'event_participants') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            order: vi.fn().mockResolvedValue({
+              data: [{
+                id: 'ep-1', user_id: 'u-1', participant_type: 'COMPETITION_JUDGE', first_name: 'Legacy', last_name: 'Judge', has_scored: false, metadata: {}, users: { id: 'u-1', email: 'legacy@example.com' }, created_at: '2024-01-01' }],
+              error: null,
+            }),
+          }
+        }
+
+        if (table === 'competition_judges') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            order: vi.fn().mockResolvedValue({
+              data: [{
+                id: 'cj-1', user_id: 'u-2', role: 'judge', display_name: 'First Class Judge', is_active: true, has_submitted: false, created_at: '2024-01-02', users: { id: 'u-2', email: 'firstclass@example.com' } }],
+              error: null,
+            }),
+          }
+        }
+
+        if (table === 'invitations') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            in: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }
+        }
+
+        if (table === 'events') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { information_form_schema: { enabled: false, fields: [] } }, error: null }),
+          }
+        }
+
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }
+      },
+    }))
+
+    const result = await listJudges('event-1', 'organizer-1')
+
+    expect(result.judges).toHaveLength(2)
+    expect(result.judges.map((j) => j.email)).toEqual(expect.arrayContaining(['legacy@example.com', 'firstclass@example.com']))
   })
 
   test('polling service exposes respondent enrollment helpers', () => {
