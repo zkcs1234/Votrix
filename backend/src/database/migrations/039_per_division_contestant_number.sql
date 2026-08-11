@@ -22,6 +22,12 @@ BEGIN;
 ALTER TABLE competition_contestants
   DROP CONSTRAINT IF EXISTS contestants_number_unique;
 
+-- 1b. Drop the auto-converted index (Postgres turns a unique constraint into a
+-- unique index; dropping the constraint leaves the index behind on some
+-- versions and migration paths). It must be removed too or it will continue
+-- to block cross-division inserts.
+DROP INDEX IF EXISTS public.competition_contestants_number_unique;
+
 -- 2. Per-division uniqueness (covers division_id IS NOT NULL rows)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_competition_contestants_event_division_number
   ON competition_contestants (event_id, division_id, contestant_number)

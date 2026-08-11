@@ -3,6 +3,7 @@ import { ApiError } from '../utils/ApiError.js'
 import {
   DB_TABLES,
   COMPETITION_SCORING_EVENT_TYPES,
+  PARTICIPANT_TYPES,
   USER_ROLES,
 } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
@@ -838,8 +839,12 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
 export async function listJudges(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
 
+  // Read from event_participants (the canonical table). The legacy
+  // v_event_voters view cannot satisfy PostgREST's `users(...)` embed
+  // because views don't carry FK relationships, so queries through it
+  // either error or return rows with null `users`.
   const { data, error } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select(
       `
       id,
@@ -847,24 +852,25 @@ export async function listJudges(eventId, organizerId) {
       first_name,
       last_name,
       metadata,
-      users (id, email)
+      user_id,
+      users!inner (id, email)
     `,
     )
     .eq('event_id', eventId)
-    .eq('is_judge', true)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .order('created_at', { ascending: false })
 
   if (error) throw new ApiError(500, error.message)
 
-  const judgeIds = (data ?? []).map((r) => r.users?.id).filter(Boolean)
+  const judgeUserIds = (data ?? []).map((r) => r.user_id).filter(Boolean)
   let invitationMap = {}
 
-  if (judgeIds.length) {
+  if (judgeUserIds.length) {
     const { data: invitations } = await getClient()
       .from(DB_TABLES.INVITATIONS)
       .select('voter_id, invitation_sent')
       .eq('event_id', eventId)
-      .in('voter_id', judgeIds)
+      .in('voter_id', judgeUserIds)
 
     for (const inv of invitations ?? []) {
       invitationMap[inv.voter_id] = inv.invitation_sent
@@ -884,7 +890,7 @@ export async function listJudges(eventId, organizerId) {
       lastName: row.last_name,
       hasScored: row.has_scored,
       metadata: row.metadata ?? {},
-invitationSent: invitationMap[row.users?.id] ?? false,
+      invitationSent: invitationMap[row.user_id] ?? false,
     })),
     informationFormSchema,
   }

@@ -1,6 +1,6 @@
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, EVENT_TYPES } from '../utils/constants.js'
+import { DB_TABLES, EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
 import { isElectionVotingOpen, canVoterViewElectionResults } from '../utils/eventSchedule.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { getOrCreateElectionOrganization, mapOrganization } from './organization.service.js'
@@ -616,11 +616,13 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
   const from = (page - 1) * limit
   const to = from + limit - 1
 
-  // Fetch voters with user email. Invitation status is fetched separately
-  // below, because there is no foreign key from `invitations` to
-  // `event_voters`, so PostgREST cannot resolve the embedded resource.
+  // Read directly from event_participants (canonical table). The legacy
+  // v_event_voters view cannot satisfy PostgREST's `users(...)` embed
+  // because views don't carry FK relationships, so queries through it
+  // either error or return rows with null `users`. Invitation status is
+  // fetched separately because invitations has no FK back here.
   const { data, error, count } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select(
       `
       id,
@@ -628,20 +630,21 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
       first_name,
       last_name,
       created_at,
-      voter_id,
+      user_id,
       metadata,
       users!inner (id, email)
     `,
       { count: 'exact' }
     )
     .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
     .order('created_at', { ascending: false })
     .range(from, to)
 
   if (error) throw new ApiError(500, error.message)
 
   const voterRows = data ?? []
-  const voterIds = voterRows.map((row) => row.voter_id).filter(Boolean)
+  const voterIds = voterRows.map((row) => row.user_id).filter(Boolean)
 
   // Fetch invitation statuses in a single query and index by voter_id.
   const invitationSentByVoter = new Map()
@@ -674,7 +677,7 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
       createdAt: row.created_at,
       metadata: row.metadata ?? {},
       // Invitation status: true = sent, false = pending, no record = false
-      invitationSent: invitationSentByVoter.get(row.voter_id) ?? false,
+      invitationSent: invitationSentByVoter.get(row.user_id) ?? false,
     })),
     informationFormSchema,
     meta: {

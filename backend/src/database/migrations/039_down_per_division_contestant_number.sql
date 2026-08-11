@@ -18,4 +18,9 @@ BEGIN
 END
 $$;
 
+-- Restore old index (in case the previous deployment left the auto-created
+-- one behind; harmless if it doesn't exist).
+CREATE UNIQUE INDEX IF NOT EXISTS competition_contestants_number_unique
+  ON competition_contestants (event_id, contestant_number);
+
 COMMIT;
