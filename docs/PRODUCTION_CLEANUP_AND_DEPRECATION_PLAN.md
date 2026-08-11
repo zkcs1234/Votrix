@@ -56,6 +56,114 @@ Only after the deprecation period and validation passes:
 
 ## Findings from the current system
 
+### System-wide old vs new migration map
+
+The app is currently in a mixed state where legacy structures still exist alongside newer canonical ones. This is the exact pattern responsible for the duplicate judge bug and other latent inconsistencies.
+
+#### 1. Canonical event enrollment model
+
+Old / legacy:
+
+- `event_voters`
+- `v_event_voters`
+- `is_judge` / `has_voted` handling in legacy voter logic
+- older organizer flows that read the legacy voter view before enrollment was normalized
+
+New / canonical:
+
+- `event_participants`
+- `participant_type` values such as `ELECTION_VOTER`, `COMPETITION_JUDGE`, and `POLLING_RESPONDENT`
+- `user_id`-based enrollment with a single participant record per event/user/role
+
+This is the main migration boundary in the system. The app should treat `event_participants` as the single source of truth for enrollment, and keep `event_voters` / `v_event_voters` as compatibility-only structures until verified empty.
+
+#### 2. User identity model
+
+Old / legacy:
+
+- `users.username`
+- username-based lookups and older bootstrap/admin flows
+- older docs, scripts, and migration comments that still assume login identity is username-based
+
+New / canonical:
+
+- `users.email`
+- email-first account lookup and authentication flow
+- JWT/session identity centered around user email and `user.id`
+
+`username` remains a compatibility field in some migration paths, but it is no longer the primary identity contract for active flows.
+
+#### 3. Competition judge model
+
+Old / legacy:
+
+- `event_voters.is_judge`
+- `event_participants` rows with `participant_type = 'COMPETITION_JUDGE'` in older code paths
+- legacy pageant judge registration and listing in `pageant.service.js`
+- old `pageant` routes and organizer pages that still expose judge operations under pageant naming
+
+New / canonical:
+
+- `competition_judges` table
+- `competition_judge_assignments` table for scope-based judging
+- `listCompetitionJudges(...)` and related first-class judge APIs
+- newer competition routes and services that treat judges as a dedicated first-class entity rather than a voter role
+
+This is the exact duplicate path that caused the bug: the app had both legacy judge registration/listing and newer first-class judge logic active at the same time. The correct cleanup target is to make `competition_judges` the only active judge model and keep the old pageant/event_voters-based flow behind a temporary compatibility wrapper only.
+
+#### 4. Election and polling participant model
+
+Old / legacy patterns to watch:
+
+- older voter respondent logic that still mixes event enrollment and role flags in legacy tables/views
+- any code that still depends on `event_voters` or generic voter-type queries instead of `event_participants`
+
+New / canonical patterns:
+
+- `PARTICIPANT_TYPES.ELECTION_VOTER`
+- `PARTICIPANT_TYPES.POLLING_RESPONDENT`
+- `event_participants` filtering by `participant_type`
+- `users!inner (id, email)` joins for active lists and enrollment validation
+
+The election and polling modules are already closer to the intended canonical design than the competition judge flow.
+
+#### 5. Legacy naming and compatibility aliases
+
+Old / legacy:
+
+- `/organizer/pageant/*` routes
+- `frontend/src/services/pageant.service.js`
+- `frontend/src/modules/pageant/*`
+- `PageantLayout` and older pageant-specific components
+
+New / canonical:
+
+- `/organizer/competition/*`
+- `competitionService` / `pageantService` compatibility wrapper pattern
+- competition routes and modules that own the current scoring lifecycle
+
+The pageant alias is acceptable during migration only if it is clearly marked compatibility-only. The app should not keep both old and new module surfaces as active production logic.
+
+#### 6. Database columns and flags that are old but still linger
+
+Old / legacy columns or flags:
+
+- `event_voters.is_judge`
+- `event_voters.has_voted` in older flows
+- `users.username`
+- older invitation logic keyed to `voter_id` in legacy voter tables
+
+New / canonical columns and flags:
+
+- `event_participants.participant_type`
+- `event_participants.has_voted`
+- `event_participants.has_scored`
+- `event_participants.has_responded`
+- `competition_judges.role`, `competition_judges.is_active`, `competition_judges.has_submitted`
+- `users.email` as the primary identity field
+
+The cleanup plan should treat old columns and flags as migration debt until verified empty and no longer used in any active write path.
+
 ### A. Database risks
 
 #### 1. Legacy `event_voters` still exists

@@ -643,17 +643,43 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
 function JudgesTab({ foundation, reload }) {
   const { eventId } = useParams()
   const [scope, setScope] = useState('event')
-  const [scopeId, setScopeId] = useState('')
+  const [scopeId, setScopeId] = useState(eventId || '')
+
+  useEffect(() => {
+    if (scope === 'event') {
+      setScopeId(eventId || '')
+      return
+    }
+
+    const items = getScopeItems(scope, foundation)
+    if (!items?.length) {
+      setScopeId('')
+      return
+    }
+
+    setScopeId((current) => {
+      if (current && items.some((item) => item.id === current)) return current
+      return items[0].id
+    })
+  }, [scope, eventId, foundation])
+
+  const getScopeItems = (currentScope, currentFoundation) => {
+    if (currentScope === 'event') return null
+    if (currentScope === 'division') return currentFoundation?.divisions ?? []
+    if (currentScope === 'category') return currentFoundation?.categories ?? []
+    return currentFoundation?.rounds ?? []
+  }
 
   const addAssignment = async (judge) => {
-    if (!scopeId) {
-      alert('Pick a category or round id')
+    const targetScopeId = scope === 'event' ? eventId : scopeId
+    if (!targetScopeId) {
+      alert('Pick a category, division, or round id')
       return
     }
     try {
       await pageantService.createJudgeAssignment(eventId, judge.id, {
         scope,
-        scopeId,
+        scopeId: targetScopeId,
       })
       reload()
     } catch (err) {
@@ -686,14 +712,14 @@ function JudgesTab({ foundation, reload }) {
 
   const divisionsEnabled = foundation?.event?.divisions_enabled
 
-  const getScopeItems = () => {
-    if (scope === 'event') return null
-    if (scope === 'division') return foundation?.divisions
-    if (scope === 'category') return foundation?.categories
-    return foundation?.rounds
-  }
+  const scopeItems = getScopeItems(scope, foundation)
   const isEventScope = scope === 'event'
-  const scopeItems = getScopeItems()
+  const scopeOptions = {
+    event: 'Event',
+    division: 'Division',
+    category: 'Category',
+    round: 'Round',
+  }
 
   return (
     <div className="space-y-6">
@@ -757,7 +783,6 @@ function JudgesTab({ foundation, reload }) {
                   value={scope}
                   onChange={(e) => {
                     setScope(e.target.value)
-                    setScopeId('')
                   }}
                 >
                   <option value="event">Event</option>
@@ -765,6 +790,23 @@ function JudgesTab({ foundation, reload }) {
                   <option value="category">Category</option>
                   <option value="round">Round</option>
                 </select>
+
+                {!isEventScope && (
+                  <select
+                    className={INPUT_CLASS}
+                    value={scopeId}
+                    onChange={(e) => setScopeId(e.target.value)}
+                    disabled={!scopeItems?.length}
+                  >
+                    <option value="">Select {scopeOptions[scope]}</option>
+                    {(scopeItems ?? []).map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
                 <button
                   type="button"
                   onClick={() => addAssignment(judge)}
