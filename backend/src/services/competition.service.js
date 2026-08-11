@@ -6,6 +6,7 @@ import {
   CALCULATION_METHODS,
   JUDGE_ROLES,
   ASSIGNMENT_SCOPES,
+  PARTICIPANT_TYPES,
 } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
 import { listDivisions } from './competition-division.service.js'
