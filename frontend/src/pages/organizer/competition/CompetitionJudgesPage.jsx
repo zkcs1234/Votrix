@@ -95,12 +95,47 @@ const [csvPreview, setCsvPreview] = useState(null)
 
   const load = useCallback(async () => {
     try {
-      const { data } = await pageantService.listJudges(eventId)
-      const judgeList = data.judges
-      setJudges(Array.isArray(judgeList) ? judgeList : [])
-      setFormSchema(data.informationFormSchema ?? null)
+      const [legacyRes, v2Res] = await Promise.allSettled([
+        pageantService.listJudges(eventId),
+        pageantService.listJudgesV2(eventId),
+      ])
+
+      const legacyList = legacyRes.status === 'fulfilled' ? (legacyRes.value?.data?.judges ?? []) : []
+      const v2List = v2Res.status === 'fulfilled' ? (v2Res.value?.data?.judges ?? []) : []
+
+      const merged = new Map()
+
+      for (const judge of [...legacyList, ...v2List]) {
+        const key = judge.judgeId ?? judge.userId ?? judge.id ?? judge.email
+        if (!key) continue
+
+        const existing = merged.get(key) ?? {}
+        merged.set(key, {
+          ...existing,
+          ...judge,
+          id: judge.id ?? existing.id ?? judge.judgeId ?? judge.userId ?? judge.email,
+          judgeId: judge.judgeId ?? existing.judgeId ?? judge.userId ?? judge.id,
+          email: judge.email ?? existing.email ?? null,
+          firstName: judge.firstName ?? existing.firstName ?? null,
+          lastName: judge.lastName ?? existing.lastName ?? null,
+          hasScored: Boolean(judge.hasScored ?? existing.hasScored ?? false),
+          invitationSent: judge.invitationSent ?? existing.invitationSent ?? false,
+          metadata: judge.metadata ?? existing.metadata ?? {},
+        })
+      }
+
+      const normalized = Array.from(merged.values())
+      setJudges(normalized)
+
+      const schema = legacyRes.status === 'fulfilled'
+        ? legacyRes.value?.data?.informationFormSchema
+        : v2Res.status === 'fulfilled'
+          ? v2Res.value?.data?.informationFormSchema
+          : null
+      setFormSchema(schema ?? null)
     } catch (err) {
       console.error('Failed to load judges:', err)
+      setJudges([])
     } finally {
       setLoading(false)
     }
