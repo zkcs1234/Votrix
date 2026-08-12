@@ -1382,7 +1382,12 @@ export async function listJudgeCompetitionEvents(judgeId) {
         scoring_enabled,
         status,
         event_type,
-        organization_id
+        organization_id,
+        organizations (
+          id,
+          organization_name,
+          logo
+        )
       )
     `,
     )

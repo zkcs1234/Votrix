@@ -1269,7 +1269,12 @@ export async function listVoterPollEvents(voterId) {
         poll_expires_at,
         start_date,
         end_date,
-        organization_id
+        organization_id,
+        organizations (
+          id,
+          organization_name,
+          logo
+        )
       )
     `,
     )

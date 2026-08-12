@@ -982,7 +982,12 @@ export async function listVoterElectionEvents(voterId) {
         event_type,
         start_date,
         end_date,
-        organization_id
+        organization_id,
+        organizations (
+          id,
+          organization_name,
+          logo
+        )
       )
     `,
     )
