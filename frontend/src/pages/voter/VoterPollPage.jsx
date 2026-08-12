@@ -171,26 +171,28 @@ const [done, setDone] = useState(false)
   return (
     <form onSubmit={handleSubmit}>
       {/* Fixed Progress Bar at Top */}
-      <div className="sticky top-0 z-20 border-b border-v-border bg-v-surface shadow-sm">
+      <div className="sticky top-0 z-40 border-b border-v-border bg-v-background shadow-sm">
         <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
-          <div className="flex items-center justify-between text-sm mb-2">
-            <span className="text-v-text-muted font-medium">
-              {answeredCount} of {questions.length} questions answered
-            </span>
-            <span className="text-v-text-muted font-semibold">{progressPercent}%</span>
-          </div>
-          <div
-            className="h-2 overflow-hidden rounded-full bg-v-surface-elevated"
-            role="progressbar"
-            aria-valuenow={progressPercent}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="Poll progress"
-          >
+          <div className="v-card-sm">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-v-text-muted">
+                {answeredCount} of {questions.length} questions answered
+              </span>
+              <span className="text-v-text-muted font-semibold">{progressPercent}%</span>
+            </div>
             <div
-              className="h-full rounded-full bg-v-primary transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
+              className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
+              role="progressbar"
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Poll progress"
+            >
+              <div
+                className="h-full rounded-full bg-v-primary transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -230,9 +232,9 @@ const [done, setDone] = useState(false)
         {error && <p className="text-sm text-v-danger">{error}</p>}
       </div>
 
-      {/* Fixed Submit Footer at Bottom */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-v-border bg-v-surface shadow-[0_-4px_16px_rgba(0,0,0,0.1)]">
-        <div className="mx-auto max-w-2xl px-4 py-4 md:px-8">
+      {/* Fixed Submit Footer - matches header style */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-v-border bg-v-surface shadow-v-shadow">
+        <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
           <Button type="submit" loading={submitting} className="w-full">
             {submitting ? 'Submitting…' : 'Submit response'}
           </Button>
