@@ -109,15 +109,15 @@ export async function getOrganizerDashboard(organizerId) {
         .select('*', { count: 'exact', head: true })
         .in('event_id', eventIds),
       getClient()
-        .from(DB_TABLES.EVENT_VOTERS)
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
         .select('*', { count: 'exact', head: true })
         .in('event_id', eventIds)
-        .eq('is_judge', true),
+        .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
       getClient()
-        .from(DB_TABLES.EVENT_VOTERS)
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
         .select('*', { count: 'exact', head: true })
         .in('event_id', eventIds)
-        .eq('is_judge', true)
+        .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
         .eq('has_scored', true),
       getClient()
         .from(DB_TABLES.JUDGE_SCORES)
@@ -706,11 +706,11 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
   const event = await getEventById(eventId)
 
   const { data: enrollment } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('id, users (id, email, must_change_password)')
     .eq('event_id', eventId)
-    .eq('voter_id', judgeId)
-    .eq('is_judge', true)
+    .eq('user_id', judgeId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .maybeSingle()
 
   if (!enrollment) throw new ApiError(404, 'Judge is not enrolled in this event')
@@ -789,12 +789,12 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
 
   // Only send to judges
   const { data: judgeRows } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
-    .select('voter_id')
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('user_id')
     .eq('event_id', eventId)
-    .eq('is_judge', true)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
 
-  const judgeIds = new Set((judgeRows ?? []).map((r) => r.voter_id))
+  const judgeIds = new Set((judgeRows ?? []).map((r) => r.user_id))
   const pendingJudges = pending.filter((p) => judgeIds.has(p.voter_id))
 
   let sent = 0, failed = 0
@@ -1025,16 +1025,17 @@ export async function listJudges(eventId, organizerId) {
 
 export async function assertJudgeEnrolled(eventId, judgeId) {
   const { data, error } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
-    .select('id, event_id, voter_id, is_judge, has_scored, has_voted')
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id, event_id, user_id, has_scored')
     .eq('event_id', eventId)
-    .eq('voter_id', judgeId)
-    .eq('is_judge', true)
+    .eq('user_id', judgeId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .maybeSingle()
 
   if (error) throw new ApiError(500, error.message)
   if (!data) throw new ApiError(403, 'You are not a judge for this event')
-  return data
+  // Normalize to the shape callers expect
+  return { ...data, voter_id: data.user_id, is_judge: true, has_voted: false }
 }
 
 // ---------------------------------------------------------------------------
@@ -1316,10 +1317,11 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
   }
 
   const { data: locked, error: lockErr } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .update({ has_scored: true })
     .eq('event_id', eventId)
-    .eq('voter_id', judgeId)
+    .eq('user_id', judgeId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .eq('has_scored', false)
     .select('id')
 
@@ -1350,10 +1352,11 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
     }
   } catch (err) {
     await getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
       .update({ has_scored: false })
       .eq('event_id', eventId)
-      .eq('voter_id', judgeId)
+      .eq('user_id', judgeId)
+      .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     throw err
   }
 
@@ -1366,7 +1369,7 @@ export async function listJudgePageantEvents(judgeId) {
 
 export async function listJudgeCompetitionEvents(judgeId) {
   const { data, error } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select(
       `
       has_scored,
@@ -1382,8 +1385,8 @@ export async function listJudgeCompetitionEvents(judgeId) {
       )
     `,
     )
-    .eq('voter_id', judgeId)
-    .eq('is_judge', true)
+    .eq('user_id', judgeId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
 
   if (error) throw new ApiError(500, error.message)
 
@@ -1423,10 +1426,10 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
       contestantsQuery,
       criteriaQuery,
       getClient()
-        .from(DB_TABLES.EVENT_VOTERS)
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
         .select('id', { count: 'exact', head: true })
         .eq('event_id', eventId)
-        .eq('is_judge', true),
+        .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
       roundsQuery,
       categoriesQuery,
       getClient()
@@ -1455,10 +1458,10 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
 
   const { count: totalJudges } = judgesRes
   const { count: submittedJudges } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
-    .eq('is_judge', true)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .eq('has_scored', true)
 
   const { rankings, debug } = computeRankings({
