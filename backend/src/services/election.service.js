@@ -985,8 +985,7 @@ export async function listVoterElectionEvents(voterId) {
         organization_id,
         organizations (
           id,
-          organization_name,
-          logo
+          organization_name
         )
       )
     `,

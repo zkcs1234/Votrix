@@ -61,7 +61,7 @@ function mapPollEvent(row) {
       ? {
           id: org.id,
           name: org.organization_name,
-          logo: org.logo ?? null,
+          logo: null, // Logo moved to users table in migration 028
         }
       : null,
   }
@@ -1272,8 +1272,7 @@ export async function listVoterPollEvents(voterId) {
         organization_id,
         organizations (
           id,
-          organization_name,
-          logo
+          organization_name
         )
       )
     `,

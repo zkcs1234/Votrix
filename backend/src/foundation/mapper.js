@@ -57,11 +57,12 @@ export function mapEvent(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     // Organization data from join
+    // Note: logo is now on users.organization_logo, not organizations.logo
     organization: org
       ? {
           id: org.id,
           name: org.organization_name,
-          logo: org.logo ?? null,
+          logo: null, // Logo moved to users table in migration 028
         }
       : null,
   }
