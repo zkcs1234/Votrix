@@ -705,11 +705,11 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
   await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
 
-  // judgeId here is competition_judges.id — resolve the user_id first
+  // judgeId may be competition_judges.id OR users.id — try user_id first, fall back to row id
   const { data: judgeRow, error: judgeRowErr } = await getClient()
     .from(DB_TABLES.COMPETITION_JUDGES)
     .select('user_id, users (id, email, must_change_password)')
-    .eq('id', judgeId)
+    .eq('user_id', judgeId)
     .eq('event_id', eventId)
     .maybeSingle()
 
@@ -754,12 +754,10 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
     try {
       await getClient()
         .from(DB_TABLES.INVITATIONS)
-        .update({
-          invitation_sent: true,
-          is_new_account: !isExistingAccount,
-        })
-        .eq('event_id', eventId)
-        .eq('voter_id', enrollment.user_id)
+        .upsert(
+          { event_id: eventId, voter_id: enrollment.user_id, invitation_sent: true, is_new_account: !isExistingAccount },
+          { onConflict: 'event_id,voter_id' },
+        )
     } catch (dbErr) {
       console.error('[sendJudgeInvitation] failed to mark invitation_sent=true:', dbErr.message)
     }
