@@ -453,36 +453,70 @@ export async function listCompetitionJudges(eventId, organizerId) {
 
   const merged = new Map()
 
+  // Index competition_judges rows by user_id for fast lookup
+  const judgeRowByUserId = new Map()
+  for (const row of judgesRes.data ?? []) {
+    judgeRowByUserId.set(row.user_id, row)
+  }
+
+  // Auto-create missing competition_judges rows for participants that don't have one yet
+  const missingUserIds = (participantsRes.data ?? [])
+    .filter((p) => !judgeRowByUserId.has(p.user_id))
+    .map((p) => p.user_id)
+
+  if (missingUserIds.length > 0) {
+    const inserts = missingUserIds.map((userId) => {
+      const p = participantsRes.data.find((r) => r.user_id === userId)
+      return {
+        event_id: eventId,
+        user_id: userId,
+        role: 'judge',
+        display_name: [p.first_name, p.last_name].filter(Boolean).join(' ') || p.users?.email || null,
+        is_active: true,
+      }
+    })
+    const { data: newRows } = await getClient()
+      .from(DB_TABLES.COMPETITION_JUDGES)
+      .upsert(inserts, { onConflict: 'event_id,user_id', ignoreDuplicates: false })
+      .select('*, users (id, email)')
+    for (const row of newRows ?? []) {
+      judgeRowByUserId.set(row.user_id, row)
+    }
+  }
+
   for (const row of participantsRes.data ?? []) {
+    const judgeRow = judgeRowByUserId.get(row.user_id)
     merged.set(row.user_id, {
-      id: row.id,
-      eventId: row.event_id,
+      // Always use competition_judges.id so assignment endpoints work
+      id: judgeRow?.id ?? row.id,
+      eventId: eventId,
       judgeId: row.user_id,
-      email: row.users?.email ?? null,
-      displayName: [row.first_name, row.last_name].filter(Boolean).join(' ') || row.users?.email || null,
-      role: 'judge',
-      isActive: true,
-      hasSubmitted: Boolean(row.has_scored),
+      email: judgeRow?.users?.email ?? row.users?.email ?? null,
+      displayName: judgeRow?.display_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || row.users?.email || null,
+      role: judgeRow?.role ?? 'judge',
+      isActive: judgeRow?.is_active ?? true,
+      hasSubmitted: Boolean(row.has_scored) || Boolean(judgeRow?.has_submitted),
       createdAt: row.created_at,
-      updatedAt: row.created_at,
+      updatedAt: judgeRow?.updated_at ?? row.updated_at ?? row.created_at,
     })
   }
 
+  // Include any competition_judges rows not in event_participants (edge case)
   for (const row of judgesRes.data ?? []) {
-    const current = merged.get(row.user_id) ?? { id: row.id, eventId: row.event_id, judgeId: row.user_id, email: row.users?.email ?? null, displayName: row.display_name ?? row.users?.email ?? null, role: row.role ?? 'judge', isActive: row.is_active ?? true, hasSubmitted: Boolean(row.has_submitted), createdAt: row.created_at, updatedAt: row.updated_at }
-    merged.set(row.user_id, {
-      ...current,
-      id: row.id ?? current.id,
-      eventId: row.event_id ?? current.eventId,
-      judgeId: row.user_id ?? current.judgeId,
-      email: row.users?.email ?? current.email ?? null,
-      displayName: row.display_name ?? current.displayName ?? row.users?.email ?? null,
-      role: row.role ?? current.role ?? 'judge',
-      isActive: row.is_active ?? current.isActive ?? true,
-      hasSubmitted: current.hasSubmitted || Boolean(row.has_submitted),
-      createdAt: row.created_at ?? current.createdAt,
-      updatedAt: row.updated_at ?? current.updatedAt,
-    })
+    if (!merged.has(row.user_id)) {
+      merged.set(row.user_id, {
+        id: row.id,
+        eventId: row.event_id,
+        judgeId: row.user_id,
+        email: row.users?.email ?? null,
+        displayName: row.display_name ?? row.users?.email ?? null,
+        role: row.role ?? 'judge',
+        isActive: row.is_active ?? true,
+        hasSubmitted: Boolean(row.has_submitted),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })
+    }
   }
 
   return Array.from(merged.values()).map(mapJudge)
@@ -587,13 +621,11 @@ export async function createJudgeAssignment(eventId, organizerId, judgeId, paylo
     .from(DB_TABLES.COMPETITION_JUDGES)
     .select('id, event_id')
     .eq('id', judgeId)
+    .eq('event_id', eventId)
     .maybeSingle()
 
   if (judgeErr) throw new ApiError(500, judgeErr.message)
-  if (!judgeRow) throw new ApiError(400, 'Judge not found for this event')
-  if (judgeRow.event_id !== eventId) {
-    throw new ApiError(400, 'Judge does not belong to this event')
-  }
+  if (!judgeRow) throw new ApiError(404, 'Judge not found for this event')
 
   // Validate scope_id belongs to the right table + event.
   const scopeId = payload.scopeId
