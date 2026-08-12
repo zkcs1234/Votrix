@@ -705,15 +705,18 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
   await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
 
-  const { data: enrollment } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id, users (id, email, must_change_password)')
+  // judgeId here is competition_judges.id — resolve the user_id first
+  const { data: judgeRow, error: judgeRowErr } = await getClient()
+    .from(DB_TABLES.COMPETITION_JUDGES)
+    .select('user_id, users (id, email, must_change_password)')
+    .eq('id', judgeId)
     .eq('event_id', eventId)
-    .eq('user_id', judgeId)
-    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .maybeSingle()
 
-  if (!enrollment) throw new ApiError(404, 'Judge is not enrolled in this event')
+  if (judgeRowErr) throw new ApiError(500, judgeRowErr.message)
+  if (!judgeRow) throw new ApiError(404, 'Judge is not enrolled in this event')
+
+  const enrollment = { users: judgeRow.users, user_id: judgeRow.user_id }
 
   const judgeEmail = enrollment.users?.email
   // A judge who has already set their own password is an existing account.
@@ -737,7 +740,7 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
     tempPassword = generateTemporaryPassword()
     const passwordHash = await hashPassword(tempPassword)
 
-    await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', judgeId)
+    await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', enrollment.user_id)
 
     emailResult = await sendJudgeInvitationEmail({
       email: judgeEmail,
@@ -756,7 +759,7 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
           is_new_account: !isExistingAccount,
         })
         .eq('event_id', eventId)
-        .eq('voter_id', judgeId)
+        .eq('voter_id', enrollment.user_id)
     } catch (dbErr) {
       console.error('[sendJudgeInvitation] failed to mark invitation_sent=true:', dbErr.message)
     }
