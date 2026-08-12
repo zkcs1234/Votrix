@@ -169,37 +169,18 @@ const [done, setDone] = useState(false)
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-6 pb-28">
-      {/* Autosave restoration notification */}
-      {draftRestored && (
-        <div
-          className="rounded-lg border border-v-border bg-v-surface-elevated px-4 py-3 text-sm text-v-text-muted"
-          role="status"
-          aria-live="polite"
-        >
-          We restored your previous answers.
-        </div>
-      )}
-
-      <VoterEventHeader event={poll.event} eyebrow="Poll">
-        {poll.event.pollAnonymous && (
-          <p className="text-xs font-medium text-white/70">Your responses are anonymous.</p>
-        )}
-      </VoterEventHeader>
-
-      <ParticipantInformationGate eventId={eventId} />
-
-      {/* Sticky progress bar */}
-      <div className="sticky top-0 z-10 bg-v-background pt-2 pb-4 -mx-4 px-4 sm:-mx-0 sm:px-0">
-        <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 shadow-md">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-v-text-muted">
+    <form onSubmit={handleSubmit}>
+      {/* Fixed Progress Bar at Top */}
+      <div className="sticky top-0 z-20 border-b border-v-border bg-v-surface shadow-sm">
+        <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
+          <div className="flex items-center justify-between text-sm mb-2">
+            <span className="text-v-text-muted font-medium">
               {answeredCount} of {questions.length} questions answered
             </span>
-            <span className="text-xs text-v-text-subtle">{progressPercent}%</span>
+            <span className="text-v-text-muted font-semibold">{progressPercent}%</span>
           </div>
           <div
-            className="mt-2 h-2 overflow-hidden rounded-full bg-v-border"
+            className="h-2 overflow-hidden rounded-full bg-v-surface-elevated"
             role="progressbar"
             aria-valuenow={progressPercent}
             aria-valuemin={0}
@@ -214,22 +195,44 @@ const [done, setDone] = useState(false)
         </div>
       </div>
 
-      {questions.map((q, idx) => (
-        <PollQuestionField
-          key={q.id}
-          question={q}
-          index={idx}
-          value={answers[q.id]}
-          onChange={(val) => setAnswer(q.id, val)}
-          disabled={submitting}
-        />
-      ))}
+      {/* Scrollable Content */}
+      <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8 pb-32">
+        {/* Autosave restoration notification */}
+        {draftRestored && (
+          <div
+            className="rounded-lg border border-v-border bg-v-surface-elevated px-4 py-3 text-sm text-v-text-muted"
+            role="status"
+            aria-live="polite"
+          >
+            We restored your previous answers.
+          </div>
+        )}
 
-      {error && <p className="text-sm text-v-danger px-4">{error}</p>}
+        <VoterEventHeader event={poll.event} eyebrow="Poll">
+          {poll.event.pollAnonymous && (
+            <p className="text-xs font-medium text-white/70">Your responses are anonymous.</p>
+          )}
+        </VoterEventHeader>
 
-      {/* Sticky submit footer */}
-      <div className="fixed bottom-0 left-0 right-0 border-t border-v-border bg-v-surface p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.1)] z-10">
-        <div className="mx-auto max-w-2xl">
+        <ParticipantInformationGate eventId={eventId} />
+
+        {questions.map((q, idx) => (
+          <PollQuestionField
+            key={q.id}
+            question={q}
+            index={idx}
+            value={answers[q.id]}
+            onChange={(val) => setAnswer(q.id, val)}
+            disabled={submitting}
+          />
+        ))}
+
+        {error && <p className="text-sm text-v-danger">{error}</p>}
+      </div>
+
+      {/* Fixed Submit Footer at Bottom */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-v-border bg-v-surface shadow-[0_-4px_16px_rgba(0,0,0,0.1)]">
+        <div className="mx-auto max-w-2xl px-4 py-4 md:px-8">
           <Button type="submit" loading={submitting} className="w-full">
             {submitting ? 'Submitting…' : 'Submit response'}
           </Button>

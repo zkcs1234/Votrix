@@ -96,6 +96,8 @@ export default function ParticipantInformationGate({ eventId }) {
               ...prev,
               metadata: savedMetadata,
             }))
+            // Form is now complete - voter stays on current event page
+            // No navigation needed; modal will close automatically
           }}
         />
         {showDebugInfo && (
