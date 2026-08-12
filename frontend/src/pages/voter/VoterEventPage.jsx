@@ -270,9 +270,10 @@ export default function VoterEventPage() {
             })}
           </div>
 
-          {error && <p className="text-sm text-v-danger">{error}</p>}
+          {error && <p className="text-sm text-v-danger px-4">{error}</p>}
 
-          <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-v-border">
+          {/* Sticky submit footer for review */}
+          <div className="sticky bottom-0 left-0 right-0 flex flex-wrap gap-3 justify-end pt-4 border-t border-v-border bg-v-surface shadow-[0_-4px_12px_rgba(0,0,0,0.1)]">
             <Button
               variant="secondary"
               onClick={() => setIsReviewing(false)}
@@ -287,24 +288,27 @@ export default function VoterEventPage() {
         </div>
       ) : (
         <>
-          <div className="v-card-sm">
-            <div className="flex justify-between text-sm">
-              <span className="v-caption">Ballot progress</span>
-              <span className="v-caption">{progress}%</span>
+          {/* Sticky progress bar */}
+          <div className="sticky top-0 z-10 bg-v-background pt-2 pb-4 -mx-4 px-4 sm:-mx-0 sm:px-0">
+            <div className="v-card-sm shadow-md">
+              <div className="flex justify-between text-sm">
+                <span className="v-caption">Ballot progress</span>
+                <span className="v-caption">{progress}%</span>
+              </div>
+              <div
+                className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={progress}
+                aria-label="Ballot progress"
+              >
+                <div className="h-full bg-v-primary transition-all" style={{ width: `${progress}%` }} />
+              </div>
+              <p className="v-caption mt-2">
+                {positions.length} position{positions.length !== 1 ? 's' : ''} on this ballot
+              </p>
             </div>
-            <div
-              className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={progress}
-              aria-label="Ballot progress"
-            >
-              <div className="h-full bg-v-primary transition-all" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="v-caption mt-2">
-              {positions.length} position{positions.length !== 1 ? 's' : ''} on this ballot
-            </p>
           </div>
 
           {positions.map((position) => (
@@ -317,19 +321,22 @@ export default function VoterEventPage() {
             />
           ))}
 
-          {error && <p className="text-sm text-v-danger">{error}</p>}
+          {error && <p className="text-sm text-v-danger px-4">{error}</p>}
 
-          <div className="fixed bottom-0 left-0 right-0 border-t border-v-border bg-v-surface p-4 md:static md:border-0 md:bg-transparent md:p-0">
-            <Button
-              onClick={handleStartReview}
-              disabled={submitting}
-              className="w-full md:w-auto"
-            >
-              Review ballot
-            </Button>
-            <p className="v-caption mt-2 text-center md:hidden">
-              You can review your selections before final submission
-            </p>
+          {/* Sticky submit footer */}
+          <div className="fixed bottom-0 left-0 right-0 border-t border-v-border bg-v-surface p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.1)] z-10">
+            <div className="mx-auto max-w-2xl flex flex-col gap-2">
+              <Button
+                onClick={handleStartReview}
+                disabled={submitting}
+                className="w-full"
+              >
+                Review ballot
+              </Button>
+              <p className="v-caption text-center text-v-text-subtle">
+                You can review your selections before final submission
+              </p>
+            </div>
           </div>
         </>
       )}

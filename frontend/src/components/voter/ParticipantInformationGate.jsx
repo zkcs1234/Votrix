@@ -7,7 +7,7 @@ import { voterService } from '@/services/voter.service'
 export default function ParticipantInformationGate({ eventId }) {
   const [participantInfo, setParticipantInfo] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false) // Start as false, only open if incomplete
 
   useEffect(() => {
     let alive = true
@@ -54,16 +54,10 @@ export default function ParticipantInformationGate({ eventId }) {
     setIsOpen(!isComplete)
   }, [participantInfo, fields])
 
+  // Don't show loading spinner - just wait silently until we know if form is needed
+  // This prevents the flash of loading modal when form is already complete
   if (loading) {
-    return createPortal(
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-        <div className="w-full max-w-sm rounded-xl bg-v-surface p-6 shadow-2xl text-center">
-          <LoadingSpinner />
-          <p className="v-caption mt-3">Loading participant information...</p>
-        </div>
-      </div>,
-      document.body,
-    )
+    return null
   }
 
   if (!schema?.enabled || fields.length === 0) {
