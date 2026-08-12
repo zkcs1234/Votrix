@@ -40,10 +40,10 @@ export async function assertOrganizerOwnsEvent(eventId, organizerId) {
 export async function getEventVoterAccounts(eventId) {
   const data = wrap(
     await db()
-      .from(DB_TABLES.EVENT_VOTERS)
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
       .select(
         `
-        voter_id,
+        user_id,
         users (
           id,
           email,

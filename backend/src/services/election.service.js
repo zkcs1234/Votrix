@@ -81,13 +81,15 @@ export async function getOrganizerDashboard(organizerId) {
     if (eventIds.length) {
       const [assignedRes, votedRes, votesRes] = await Promise.all([
         getClient()
-          .from(DB_TABLES.EVENT_VOTERS)
-          .select('*', { count: 'exact', head: true })
-          .in('event_id', eventIds),
-        getClient()
-          .from(DB_TABLES.EVENT_VOTERS)
+          .from(DB_TABLES.EVENT_PARTICIPANTS)
           .select('*', { count: 'exact', head: true })
           .in('event_id', eventIds)
+          .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
+        getClient()
+          .from(DB_TABLES.EVENT_PARTICIPANTS)
+          .select('*', { count: 'exact', head: true })
+          .in('event_id', eventIds)
+          .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
           .eq('has_voted', true),
         getClient()
           .from(DB_TABLES.ELECTION_VOTES)
@@ -922,15 +924,17 @@ export async function submitBallot(eventId, voterId, payload) {
 
   // Fetch updated stats for real-time dashboard update
   const { count: votedCount } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
     .eq('has_voted', true)
 
   const { count: totalVoters } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
 
   const { count: votesCast } = await getClient()
     .from(DB_TABLES.ELECTION_VOTES)
@@ -963,7 +967,7 @@ export async function submitBallot(eventId, voterId, payload) {
 
 export async function listVoterElectionEvents(voterId) {
   const { data, error } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select(
       `
       has_voted,
@@ -982,7 +986,8 @@ export async function listVoterElectionEvents(voterId) {
       )
     `,
     )
-    .eq('voter_id', voterId)
+    .eq('user_id', voterId)
+    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
 
   if (error) throw new ApiError(500, error.message)
 
@@ -1003,8 +1008,17 @@ async function fetchElectionResultsData(eventId) {
     { data: voteRows, error: voteErr },
     { data: candidates, error: candErr },
   ] = await Promise.all([
-    getClient().from(DB_TABLES.EVENT_VOTERS).select('*', { count: 'exact', head: true }).eq('event_id', eventId),
-    getClient().from(DB_TABLES.EVENT_VOTERS).select('*', { count: 'exact', head: true }).eq('event_id', eventId).eq('has_voted', true),
+    getClient()
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
+    getClient()
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
+      .eq('has_voted', true),
     getClient().from(DB_TABLES.ELECTION_VOTES).select('candidate_id, position_id').eq('event_id', eventId),
     getClient().from(DB_TABLES.CANDIDATES).select('id, name, position_id, positions!inner(event_id)').eq('positions.event_id', eventId),
   ])

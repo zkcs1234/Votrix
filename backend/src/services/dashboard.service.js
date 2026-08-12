@@ -6,6 +6,7 @@ import {
   EVENT_STATUS,
   COMPETITION_SCORING_EVENT_TYPES,
   USER_ROLES,
+  PARTICIPANT_TYPES,
 } from '../utils/constants.js'
 
 
@@ -161,8 +162,8 @@ async function loadRecentActivity({ eventIds, includeOrganizerCreations = false,
     }
 
     const { data: csvRows, error: csvErr } = await getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
-      .select('event_id, voter_id, created_at, first_name, last_name')
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .select('event_id, user_id, created_at, first_name, last_name')
       .in('event_id', eventIds)
       .or('first_name.not.is.null,last_name.not.is.null')
       .order('created_at', { ascending: false })
@@ -174,7 +175,7 @@ async function loadRecentActivity({ eventIds, includeOrganizerCreations = false,
         type: 'csv_uploaded',
         label: `CSV import row added for ${eventTitleById.get(row.event_id) ?? 'an event'}`,
         timestamp: row.created_at,
-        metadata: { eventId: row.event_id, voterId: row.voter_id },
+        metadata: { eventId: row.event_id, voterId: row.user_id },
       })
     }
   }
@@ -357,7 +358,7 @@ export async function getOrganizerDashboardStats(organizerId) {
   ] = await Promise.all([
     events.length
       ? countRows(
-          getClient().from(DB_TABLES.EVENT_VOTERS).select('*', { count: 'exact', head: true }).in('event_id', events.map((e) => e.id)),
+          getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('*', { count: 'exact', head: true }).in('event_id', events.map((e) => e.id)),
         )
       : Promise.resolve(0),
     electionEventIds.length
@@ -384,29 +385,31 @@ export async function getOrganizerDashboardStats(organizerId) {
     electionEventIds.length
       ? countRows(
           getClient()
-            .from(DB_TABLES.EVENT_VOTERS)
+            .from(DB_TABLES.EVENT_PARTICIPANTS)
             .select('*', { count: 'exact', head: true })
             .in('event_id', electionEventIds)
+            .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
             .eq('has_voted', true),
         )
       : Promise.resolve(0),
     competitionEventIds.length
       ? countRows(
           getClient()
-            .from(DB_TABLES.EVENT_VOTERS)
+            .from(DB_TABLES.EVENT_PARTICIPANTS)
             .select('*', { count: 'exact', head: true })
             .in('event_id', competitionEventIds)
-            .eq('is_judge', true)
+            .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
             .eq('has_scored', true),
         )
       : Promise.resolve(0),
     pollingEventIds.length
       ? countRows(
           getClient()
-            .from(DB_TABLES.EVENT_VOTERS)
+            .from(DB_TABLES.EVENT_PARTICIPANTS)
             .select('*', { count: 'exact', head: true })
             .in('event_id', pollingEventIds)
-            .eq('has_voted', true),
+            .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+            .eq('has_responded', true),
         )
       : Promise.resolve(0),
   ])
@@ -445,9 +448,9 @@ export async function getOrganizerAnalytics(organizerId) {
   const events = await getEventRowsByOrganizer(organizerId)
   const { electionEventIds, competitionEventIds, pollingEventIds } = collectEventIdsByType(events)
 
-  const [voterRowsRes, electionVotesRes, judgeScoresRes, pollAnswersRes] = await Promise.all([
+  const [participantRowsRes, electionVotesRes, judgeScoresRes, pollAnswersRes] = await Promise.all([
     events.length
-      ? getClient().from(DB_TABLES.EVENT_VOTERS).select('event_id, has_voted, is_judge, has_scored').in('event_id', events.map((e) => e.id))
+      ? getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('event_id, participant_type, has_voted, has_scored, has_responded').in('event_id', events.map((e) => e.id))
       : Promise.resolve({ data: [], error: null }),
     electionEventIds.length
       ? getClient().from(DB_TABLES.ELECTION_VOTES).select('created_at, event_id').in('event_id', electionEventIds)
@@ -460,25 +463,25 @@ export async function getOrganizerAnalytics(organizerId) {
       : Promise.resolve({ data: [], error: null }),
   ])
 
-  if (voterRowsRes.error) throw new ApiError(500, voterRowsRes.error.message)
+  if (participantRowsRes.error) throw new ApiError(500, participantRowsRes.error.message)
   if (electionVotesRes.error) throw new ApiError(500, electionVotesRes.error.message)
   if (judgeScoresRes.error) throw new ApiError(500, judgeScoresRes.error.message)
   if (pollAnswersRes.error) throw new ApiError(500, pollAnswersRes.error.message)
 
-  const voterRows = voterRowsRes.data ?? []
-  const electionAssigned = voterRows.filter((r) => electionEventIds.includes(r.event_id)).length
-  const electionVoted = voterRows.filter((r) => electionEventIds.includes(r.event_id) && r.has_voted).length
+  const voterRows = participantRowsRes.data ?? []
+  const electionAssigned = voterRows.filter((r) => electionEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.ELECTION_VOTER).length
+  const electionVoted = voterRows.filter((r) => electionEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.ELECTION_VOTER && r.has_voted).length
 
   const pageantJudges = voterRows.filter(
-    (r) => competitionEventIds.includes(r.event_id) && r.is_judge,
+    (r) => competitionEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.COMPETITION_JUDGE,
   ).length
   const pageantCompleted = voterRows.filter(
-    (r) => competitionEventIds.includes(r.event_id) && r.is_judge && r.has_scored,
+    (r) => competitionEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.COMPETITION_JUDGE && r.has_scored,
   ).length
 
-  const pollingAssigned = voterRows.filter((r) => pollingEventIds.includes(r.event_id)).length
+  const pollingAssigned = voterRows.filter((r) => pollingEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.POLLING_RESPONDENT).length
   const pollingResponded = voterRows.filter(
-    (r) => pollingEventIds.includes(r.event_id) && r.has_voted,
+    (r) => pollingEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.POLLING_RESPONDENT && r.has_responded,
   ).length
 
   const participationGrowth = aggregateByMonth([

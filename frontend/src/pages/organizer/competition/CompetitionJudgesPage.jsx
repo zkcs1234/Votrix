@@ -185,10 +185,10 @@ const handleCsvPreview = async (e) => {
       const { data } = await pageantService.sendJudgeInvitation(eventId, judgeId)
       if (data.invitationSent) {
         success('Invitation sent successfully')
+        load()
       } else {
         showError('Failed to send invitation')
       }
-      load()
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to send invitation')
     } finally {

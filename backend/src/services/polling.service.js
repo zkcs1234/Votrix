@@ -1252,10 +1252,10 @@ function validateAnswers(questions, answers) {
 
 export async function listVoterPollEvents(voterId) {
   const { data, error } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select(
       `
-      has_voted,
+      has_responded,
       events (
         id,
         title,
@@ -1273,7 +1273,8 @@ export async function listVoterPollEvents(voterId) {
       )
     `,
     )
-    .eq('voter_id', voterId)
+    .eq('user_id', voterId)
+    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
 
   if (error) throw new ApiError(500, error.message)
 
@@ -1281,7 +1282,7 @@ export async function listVoterPollEvents(voterId) {
     .filter((r) => r.events?.event_type === EVENT_TYPES.POLLING)
     .map((r) => ({
       ...mapPollEvent(r.events),
-      hasResponded: r.has_voted,
+      hasResponded: r.has_responded,
     }))
 }
 
