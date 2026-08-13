@@ -1081,7 +1081,11 @@
 
   /* ===== Motion utilities ===== */
 
-  /* Page fade-in — apply to route Outlet containers. */
+  /* Page fade-in — apply to route Outlet containers.
+     NOTE: use the standalone `translate` property (not `transform`) so a
+     persistent value on the scroll container does NOT create a containing
+     block for `position: fixed` descendants. `transform` would demote
+     `fixed` to behave like `absolute`; `translate` does not. */
   .v-page-enter {
     animation: v-fade-up var(--duration-normal) var(--ease-out) both;
   }
@@ -1089,11 +1093,11 @@
   @keyframes v-fade-up {
     from {
       opacity: 0;
-      transform: translateY(8px);
+      translate: 0 8px;
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      translate: 0 0;
     }
   }
 

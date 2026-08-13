@@ -228,10 +228,10 @@ export default function VoterEventPage() {
 
   return (
     <>
-      {/* Sticky Progress Bar at Top - matches AppShell header style */}
+      {/* Progress card — rounded, sits just below the AppShell header */}
       {!isReviewing && (
-        <div className="sticky top-0 z-30 -mx-4 mb-4 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:-mx-8 md:px-8">
-          <div className="mx-auto max-w-2xl">
+        <div className="mx-auto mb-6 max-w-2xl">
+          <div className="v-card-sm">
             <div className="flex items-center justify-between text-sm">
               <span className="v-caption">Ballot progress</span>
               <span className="v-caption font-medium">{progress}%</span>
@@ -254,7 +254,7 @@ export default function VoterEventPage() {
       )}
 
       {/* Scrollable Content */}
-      <div className="mx-auto max-w-2xl space-y-6 pb-4">
+      <div className="mx-auto max-w-2xl space-y-6 px-4 pb-28 md:px-8">
         <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
 
         {!done && !ballot?.hasVoted && <ParticipantInformationGate eventId={eventId} />}
@@ -316,8 +316,8 @@ export default function VoterEventPage() {
         )}
       </div>
 
-      {/* Sticky Submit Footer - matches header's sticky pattern */}
-      <div className="sticky bottom-0 z-30 -mx-4 mt-4 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:-mx-8 md:px-8">
+      {/* Fixed Submit Footer — pinned to viewport bottom in both scroll directions */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:px-8">
         <div className="mx-auto max-w-2xl">
           {isReviewing ? (
             <div className="flex flex-wrap gap-3 justify-end">

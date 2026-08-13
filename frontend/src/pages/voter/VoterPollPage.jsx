@@ -170,9 +170,9 @@ const [done, setDone] = useState(false)
 
   return (
     <form onSubmit={handleSubmit}>
-      {/* Sticky Progress Bar at Top - matches AppShell header style */}
-      <div className="sticky top-0 z-30 -mx-4 mb-4 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:-mx-8 md:px-8">
-        <div className="mx-auto max-w-2xl">
+      {/* Progress card — rounded, sits just below the AppShell header */}
+      <div className="mx-auto mb-6 max-w-2xl">
+        <div className="v-card-sm">
           <div className="flex items-center justify-between text-sm">
             <span className="text-v-text-muted">
               {answeredCount} of {questions.length} questions answered
@@ -196,7 +196,7 @@ const [done, setDone] = useState(false)
       </div>
 
       {/* Scrollable Content */}
-      <div className="mx-auto max-w-2xl space-y-6 pb-4">
+      <div className="mx-auto max-w-2xl space-y-6 px-4 pb-28 md:px-8">
         {/* Autosave restoration notification */}
         {draftRestored && (
           <div
@@ -230,8 +230,8 @@ const [done, setDone] = useState(false)
         {error && <p className="text-sm text-v-danger">{error}</p>}
       </div>
 
-      {/* Sticky Submit Footer - matches header's sticky pattern */}
-      <div className="sticky bottom-0 z-30 -mx-4 mt-4 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:-mx-8 md:px-8">
+      {/* Fixed Submit Footer — pinned to viewport bottom in both scroll directions */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:px-8">
         <div className="mx-auto max-w-2xl">
           <Button type="submit" loading={submitting} className="w-full">
             {submitting ? 'Submitting…' : 'Submit response'}
