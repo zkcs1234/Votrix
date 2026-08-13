@@ -228,35 +228,33 @@ export default function VoterEventPage() {
 
   return (
     <>
-      {/* Fixed Progress Bar at Top */}
+      {/* Sticky Progress Bar at Top - matches AppShell header style */}
       {!isReviewing && (
-        <div className="sticky top-0 z-40 border-b border-v-border bg-v-background shadow-sm">
-          <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
-            <div className="v-card-sm">
-              <div className="flex justify-between text-sm">
-                <span className="v-caption">Ballot progress</span>
-                <span className="v-caption">{progress}%</span>
-              </div>
-              <div
-                className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={progress}
-                aria-label="Ballot progress"
-              >
-                <div className="h-full bg-v-primary transition-all duration-300" style={{ width: `${progress}%` }} />
-              </div>
-              <p className="v-caption mt-2">
-                {positions.length} position{positions.length !== 1 ? 's' : ''} on this ballot
-              </p>
+        <div className="sticky top-0 z-30 -mx-4 mb-4 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:-mx-8 md:px-8">
+          <div className="mx-auto max-w-2xl">
+            <div className="flex items-center justify-between text-sm">
+              <span className="v-caption">Ballot progress</span>
+              <span className="v-caption font-medium">{progress}%</span>
             </div>
+            <div
+              className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              aria-label="Ballot progress"
+            >
+              <div className="h-full bg-v-primary transition-all duration-300" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="v-caption mt-2">
+              {positions.length} position{positions.length !== 1 ? 's' : ''} on this ballot
+            </p>
           </div>
         </div>
       )}
 
       {/* Scrollable Content */}
-      <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8 pb-32">
+      <div className="mx-auto max-w-2xl space-y-6 pb-4">
         <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
 
         {!done && !ballot?.hasVoted && <ParticipantInformationGate eventId={eventId} />}
@@ -318,9 +316,9 @@ export default function VoterEventPage() {
         )}
       </div>
 
-      {/* Fixed Submit Footer - matches header style */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-v-border bg-v-surface shadow-v-shadow">
-        <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
+      {/* Sticky Submit Footer - matches header's sticky pattern */}
+      <div className="sticky bottom-0 z-30 -mx-4 mt-4 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:-mx-8 md:px-8">
+        <div className="mx-auto max-w-2xl">
           {isReviewing ? (
             <div className="flex flex-wrap gap-3 justify-end">
               <Button

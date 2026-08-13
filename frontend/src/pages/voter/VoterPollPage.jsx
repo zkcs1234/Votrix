@@ -170,35 +170,33 @@ const [done, setDone] = useState(false)
 
   return (
     <form onSubmit={handleSubmit}>
-      {/* Fixed Progress Bar at Top */}
-      <div className="sticky top-0 z-40 border-b border-v-border bg-v-background shadow-sm">
-        <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
-          <div className="v-card-sm">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-v-text-muted">
-                {answeredCount} of {questions.length} questions answered
-              </span>
-              <span className="text-v-text-muted font-semibold">{progressPercent}%</span>
-            </div>
+      {/* Sticky Progress Bar at Top - matches AppShell header style */}
+      <div className="sticky top-0 z-30 -mx-4 mb-4 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:-mx-8 md:px-8">
+        <div className="mx-auto max-w-2xl">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-v-text-muted">
+              {answeredCount} of {questions.length} questions answered
+            </span>
+            <span className="text-v-text-muted font-semibold">{progressPercent}%</span>
+          </div>
+          <div
+            className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
+            role="progressbar"
+            aria-valuenow={progressPercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Poll progress"
+          >
             <div
-              className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
-              role="progressbar"
-              aria-valuenow={progressPercent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Poll progress"
-            >
-              <div
-                className="h-full rounded-full bg-v-primary transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+              className="h-full rounded-full bg-v-primary transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
         </div>
       </div>
 
       {/* Scrollable Content */}
-      <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8 pb-32">
+      <div className="mx-auto max-w-2xl space-y-6 pb-4">
         {/* Autosave restoration notification */}
         {draftRestored && (
           <div
@@ -232,9 +230,9 @@ const [done, setDone] = useState(false)
         {error && <p className="text-sm text-v-danger">{error}</p>}
       </div>
 
-      {/* Fixed Submit Footer - matches header style */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-v-border bg-v-surface shadow-v-shadow">
-        <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
+      {/* Sticky Submit Footer - matches header's sticky pattern */}
+      <div className="sticky bottom-0 z-30 -mx-4 mt-4 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:-mx-8 md:px-8">
+        <div className="mx-auto max-w-2xl">
           <Button type="submit" loading={submitting} className="w-full">
             {submitting ? 'Submitting…' : 'Submit response'}
           </Button>
