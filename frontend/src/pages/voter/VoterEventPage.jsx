@@ -227,97 +227,106 @@ export default function VoterEventPage() {
   }
 
   return (
-    <>
-      {/* Progress card — rounded, sits just below the AppShell header */}
+    /*
+      Full-viewport shell using dynamic viewport height (dvh) so mobile
+      browser toolbars showing/hiding never shift the fixed footer.
+      Layout: [fixed progress bar] · [scrollable middle] · [fixed footer]
+    */
+    <div className="fixed inset-0 flex flex-col h-[100dvh] bg-v-surface">
+      {/* ===== FIXED TOP: Progress bar only (does not scroll) ===== */}
       {!isReviewing && (
-        <div className="mx-auto mb-6 max-w-2xl">
-          <div className="v-card-sm">
-            <div className="flex items-center justify-between text-sm">
-              <span className="v-caption">Ballot progress</span>
-              <span className="v-caption font-medium">{progress}%</span>
+        <div className="shrink-0 border-b border-v-border bg-v-surface">
+          <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
+            <div className="v-card-sm">
+              <div className="flex items-center justify-between text-sm">
+                <span className="v-caption">Ballot progress</span>
+                <span className="v-caption font-medium">{progress}%</span>
+              </div>
+              <div
+                className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={progress}
+                aria-label="Ballot progress"
+              >
+                <div className="h-full bg-v-primary transition-all duration-300" style={{ width: `${progress}%` }} />
+              </div>
+              <p className="v-caption mt-2">
+                {positions.length} position{positions.length !== 1 ? 's' : ''} on this ballot
+              </p>
             </div>
-            <div
-              className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={progress}
-              aria-label="Ballot progress"
-            >
-              <div className="h-full bg-v-primary transition-all duration-300" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="v-caption mt-2">
-              {positions.length} position{positions.length !== 1 ? 's' : ''} on this ballot
-            </p>
           </div>
         </div>
       )}
 
-      {/* Scrollable Content */}
-      <div className="mx-auto max-w-2xl space-y-6 px-4 pb-28 md:px-8">
-        <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
+      {/* ===== SCROLLABLE MIDDLE: header + ballot content scroll here ===== */}
+      <div className="flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8">
+          <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
 
-        {!done && !ballot?.hasVoted && <ParticipantInformationGate eventId={eventId} />}
+          {!done && !ballot?.hasVoted && <ParticipantInformationGate eventId={eventId} />}
 
-        {isReviewing ? (
-          <div className="v-card p-6 space-y-6">
-            <div className="border-b border-v-border pb-4">
-              <h2 className="text-xl font-semibold text-v-text">Review your ballot</h2>
-              <p className="v-caption mt-1">Please confirm your selections before submitting.</p>
+          {isReviewing ? (
+            <div className="v-card p-6 space-y-6">
+              <div className="border-b border-v-border pb-4">
+                <h2 className="text-xl font-semibold text-v-text">Review your ballot</h2>
+                <p className="v-caption mt-1">Please confirm your selections before submitting.</p>
+              </div>
+
+              <div className="space-y-4">
+                {positions.map((position) => {
+                  const selectedCandidateIds = selections[position.id] ?? []
+                  const selectedCandidates = position.candidates.filter((c) =>
+                    selectedCandidateIds.includes(c.id),
+                  )
+                  const isUnanswered = selectedCandidates.length === 0
+
+                  return (
+                    <div key={position.id} className="rounded-xl border border-v-border p-4 bg-v-surface-elevated">
+                      <p className="font-medium text-v-text text-sm">{position.name}</p>
+                      {isUnanswered ? (
+                        <p className="mt-1 text-xs text-v-danger font-medium">No selection</p>
+                      ) : (
+                        <ul className="mt-2 space-y-1">
+                          {selectedCandidates.map((cand) => (
+                            <li key={cand.id} className="text-xs text-v-text-muted flex items-center gap-2">
+                              <span className="text-v-primary">✓</span>
+                              <span className="font-medium text-v-text">{cand.name}</span>
+                              {(cand.party || cand.partylist) && (
+                                <span className="text-v-text-subtle">({cand.party || cand.partylist})</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {error && <p className="text-sm text-v-danger">{error}</p>}
             </div>
+          ) : (
+            <>
+              {positions.map((position) => (
+                <ElectionPositionSection
+                  key={position.id}
+                  position={position}
+                  selectedIds={selections[position.id]}
+                  onToggle={toggleCandidate}
+                  disabled={submitting}
+                />
+              ))}
 
-            <div className="space-y-4">
-              {positions.map((position) => {
-                const selectedCandidateIds = selections[position.id] ?? []
-                const selectedCandidates = position.candidates.filter((c) =>
-                  selectedCandidateIds.includes(c.id),
-                )
-                const isUnanswered = selectedCandidates.length === 0
-
-                return (
-                  <div key={position.id} className="rounded-xl border border-v-border p-4 bg-v-surface-elevated">
-                    <p className="font-medium text-v-text text-sm">{position.name}</p>
-                    {isUnanswered ? (
-                      <p className="mt-1 text-xs text-v-danger font-medium">No selection</p>
-                    ) : (
-                      <ul className="mt-2 space-y-1">
-                        {selectedCandidates.map((cand) => (
-                          <li key={cand.id} className="text-xs text-v-text-muted flex items-center gap-2">
-                            <span className="text-v-primary">✓</span>
-                            <span className="font-medium text-v-text">{cand.name}</span>
-                            {(cand.party || cand.partylist) && (
-                              <span className="text-v-text-subtle">({cand.party || cand.partylist})</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            {error && <p className="text-sm text-v-danger">{error}</p>}
-          </div>
-        ) : (
-          <>
-            {positions.map((position) => (
-              <ElectionPositionSection
-                key={position.id}
-                position={position}
-                selectedIds={selections[position.id]}
-                onToggle={toggleCandidate}
-                disabled={submitting}
-              />
-            ))}
-
-            {error && <p className="text-sm text-v-danger">{error}</p>}
-          </>
-        )}
+              {error && <p className="text-sm text-v-danger">{error}</p>}
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Fixed Submit Footer — pinned to viewport bottom in both scroll directions */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:px-8">
+      {/* ===== FIXED BOTTOM: Submit footer (does not scroll) ===== */}
+      <div className="shrink-0 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:px-8 pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto max-w-2xl">
           {isReviewing ? (
             <div className="flex flex-wrap gap-3 justify-end">
@@ -348,6 +357,6 @@ export default function VoterEventPage() {
           )}
         </div>
       </div>
-    </>
+    </div>
   )
 }

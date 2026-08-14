@@ -29,7 +29,7 @@ export default function VoterPollPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
-const [done, setDone] = useState(false)
+  const [done, setDone] = useState(false)
   const [startedAt] = useState(() => new Date().toISOString())
 
   // Auto-dismiss the draft restoration toast after 4 seconds
@@ -169,69 +169,79 @@ const [done, setDone] = useState(false)
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      {/* Progress card — rounded, sits just below the AppShell header */}
-      <div className="mx-auto mb-6 max-w-2xl">
-        <div className="v-card-sm">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-v-text-muted">
-              {answeredCount} of {questions.length} questions answered
-            </span>
-            <span className="text-v-text-muted font-semibold">{progressPercent}%</span>
-          </div>
-          <div
-            className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
-            role="progressbar"
-            aria-valuenow={progressPercent}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="Poll progress"
-          >
+    /*
+      Full-viewport shell using dynamic viewport height (dvh) so mobile
+      browser toolbars showing/hiding never shift the fixed footer.
+      Layout: [fixed progress bar] · [scrollable middle] · [fixed footer]
+      Mirrors the VoterEventPage (ballot) shell structure.
+    */
+    <form onSubmit={handleSubmit} className="fixed inset-0 flex flex-col h-[100dvh] bg-v-surface">
+      {/* ===== FIXED TOP: Progress bar only (does not scroll) ===== */}
+      <div className="shrink-0 border-b border-v-border bg-v-surface">
+        <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
+          <div className="v-card-sm">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-v-text-muted">
+                {answeredCount} of {questions.length} questions answered
+              </span>
+              <span className="text-v-text-muted font-semibold">{progressPercent}%</span>
+            </div>
             <div
-              className="h-full rounded-full bg-v-primary transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
+              className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
+              role="progressbar"
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Poll progress"
+            >
+              <div
+                className="h-full rounded-full bg-v-primary transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Scrollable Content */}
-      <div className="mx-auto max-w-2xl space-y-6 px-4 pb-28 md:px-8">
-        {/* Autosave restoration notification */}
-        {draftRestored && (
-          <div
-            className="rounded-lg border border-v-border bg-v-surface-elevated px-4 py-3 text-sm text-v-text-muted"
-            role="status"
-            aria-live="polite"
-          >
-            We restored your previous answers.
-          </div>
-        )}
-
-        <VoterEventHeader event={poll.event} eyebrow="Poll">
-          {poll.event.pollAnonymous && (
-            <p className="text-xs font-medium text-white/70">Your responses are anonymous.</p>
+      {/* ===== SCROLLABLE MIDDLE: header + questions scroll here ===== */}
+      <div className="flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8">
+          {/* Autosave restoration notification */}
+          {draftRestored && (
+            <div
+              className="rounded-lg border border-v-border bg-v-surface-elevated px-4 py-3 text-sm text-v-text-muted"
+              role="status"
+              aria-live="polite"
+            >
+              We restored your previous answers.
+            </div>
           )}
-        </VoterEventHeader>
 
-        <ParticipantInformationGate eventId={eventId} />
+          <VoterEventHeader event={poll.event} eyebrow="Poll">
+            {poll.event.pollAnonymous && (
+              <p className="text-xs font-medium text-white/70">Your responses are anonymous.</p>
+            )}
+          </VoterEventHeader>
 
-        {questions.map((q, idx) => (
-          <PollQuestionField
-            key={q.id}
-            question={q}
-            index={idx}
-            value={answers[q.id]}
-            onChange={(val) => setAnswer(q.id, val)}
-            disabled={submitting}
-          />
-        ))}
+          <ParticipantInformationGate eventId={eventId} />
 
-        {error && <p className="text-sm text-v-danger">{error}</p>}
+          {questions.map((q, idx) => (
+            <PollQuestionField
+              key={q.id}
+              question={q}
+              index={idx}
+              value={answers[q.id]}
+              onChange={(val) => setAnswer(q.id, val)}
+              disabled={submitting}
+            />
+          ))}
+
+          {error && <p className="text-sm text-v-danger">{error}</p>}
+        </div>
       </div>
 
-      {/* Fixed Submit Footer — pinned to viewport bottom in both scroll directions */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:px-8">
+      {/* ===== FIXED BOTTOM: Submit footer (does not scroll) ===== */}
+      <div className="shrink-0 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:px-8 pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto max-w-2xl">
           <Button type="submit" loading={submitting} className="w-full">
             {submitting ? 'Submitting…' : 'Submit response'}
