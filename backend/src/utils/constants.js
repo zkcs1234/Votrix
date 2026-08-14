@@ -115,9 +115,6 @@ export const DB_TABLES = {
   USERS: 'users',
   ORGANIZATIONS: 'organizations',
   EVENTS: 'events',
-  // Backward compatibility: use view for event_voters queries
-  // The view v_event_voters wraps event_participants with the old schema
-  EVENT_VOTERS: 'v_event_voters',
   EVENT_PARTICIPANTS: 'event_participants',
   INVITATIONS: 'invitations',
   POSITIONS: 'positions',

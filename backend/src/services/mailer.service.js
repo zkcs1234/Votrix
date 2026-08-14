@@ -12,7 +12,7 @@ import { judgeInvitationRegisteredTemplate } from '../templates/email/judgeInvit
 import {
   organizerLoginUrl,
   voterLoginUrl,
-  eventUrl,
+  participantEventUrl,
   competitionScoreUrl,
   passwordResetUrl,
 } from '../utils/urls.js'
@@ -67,8 +67,9 @@ export async function sendVoterInvitationEmail({
   temporaryPassword,
   eventId,
   eventTitle,
+  eventType = 'election',
 }) {
-  const link = eventUrl(eventId)
+  const link = participantEventUrl(eventId, eventType)
   const html = voterInvitationTemplate({
     email,
     temporaryPassword,
@@ -88,8 +89,9 @@ export async function sendVoterInvitationEmailRegistered({
   email,
   eventId,
   eventTitle,
+  eventType = 'election',
 }) {
-  const link = eventUrl(eventId)
+  const link = participantEventUrl(eventId, eventType)
   const html = voterInvitationRegisteredTemplate({
     email,
     eventLink: link,
@@ -168,10 +170,11 @@ export async function sendEventNotificationEmail({
   organizationName,
   startDate,
   endDate,
+  eventType = 'election',
 }) {
   const html = eventNotificationTemplate({
     eventTitle,
-    eventLink: eventUrl(eventId),
+    eventLink: participantEventUrl(eventId, eventType),
     message,
     organizationName,
     startDate,

@@ -153,9 +153,9 @@ async function setupRooms(ws) {
   if (role === 'voter') {
     const db = getClient()
     const { data: assignments } = await db
-      .from('event_voters')
+      .from('event_participants')
       .select('event_id')
-      .eq('voter_id', userId)
+      .eq('user_id', userId)
     assignments?.forEach((a) => {
       joinRoom(ws, `event:${a.event_id}`)
       joinRoom(ws, `event:${a.event_id}:voters`)

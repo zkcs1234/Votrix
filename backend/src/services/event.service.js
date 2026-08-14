@@ -134,6 +134,7 @@ export async function notifyEventParticipants(eventId, organizerId, { message })
         email: voter.email,
         eventTitle: event.title,
         eventId: event.id,
+        eventType: event.event_type,
         message: defaultMessage,
         organizationName: event.organizations?.organization_name,
         startDate: formatDate(event.start_date),

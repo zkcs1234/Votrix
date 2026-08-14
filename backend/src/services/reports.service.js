@@ -4,6 +4,7 @@ import {
   DB_TABLES,
   EVENT_TYPES,
   COMPETITION_SCORING_EVENT_TYPES,
+  PARTICIPANT_TYPES,
 } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
 import { listElectionEvents, getElectionAnalytics, listPositions } from './election.service.js'
@@ -72,8 +73,8 @@ async function loadElectionStats(eventIds) {
   if (!eventIds.length) return map
 
   const [totalRes, votedRes] = await Promise.all([
-    getClient().from(DB_TABLES.EVENT_VOTERS).select('event_id', { count: 'exact' }).in('event_id', eventIds),
-    getClient().from(DB_TABLES.EVENT_VOTERS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('has_voted', true),
+    getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
+    getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER).eq('has_voted', true),
   ])
 
   const totalByEvent = {}
@@ -98,8 +99,8 @@ async function loadCompetitionStats(eventIds) {
   if (!eventIds.length) return map
 
   const [totalRes, submittedRes] = await Promise.all([
-    getClient().from(DB_TABLES.EVENT_VOTERS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('is_judge', true),
-    getClient().from(DB_TABLES.EVENT_VOTERS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('is_judge', true).eq('has_scored', true),
+    getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
+    getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE).eq('has_scored', true),
   ])
 
   const totalByEvent = {}
@@ -125,7 +126,7 @@ async function loadPollStats(eventIds) {
 
   const [submissionsRes, respondentsRes] = await Promise.all([
     getClient().from(DB_TABLES.POLL_SUBMISSIONS).select('event_id', { count: 'exact' }).in('event_id', eventIds),
-    getClient().from(DB_TABLES.EVENT_VOTERS).select('event_id', { count: 'exact' }).in('event_id', eventIds),
+    getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT),
   ])
 
   const submissionsByEvent = {}
@@ -254,9 +255,10 @@ export async function getPollingReport(eventId, organizerId) {
   const analytics = await getPollAnalytics(eventId, organizerId)
 
   const { count: enrolled } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
 
   return {
     generatedAt: new Date().toISOString(),

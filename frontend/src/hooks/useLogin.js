@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { getRoleDashboardPath } from '@/utils/auth'
+import { getRoleDashboardPath, getSafeVoterDestination } from '@/utils/auth'
 import { useToast } from '@/hooks/useToast'
 import { voterService } from '@/services/voter.service'
 import { USER_ROLES } from '@/utils/constants'
@@ -9,6 +9,7 @@ import { USER_ROLES } from '@/utils/constants'
 
 export function useLogin(loginFn) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { setSession, clearSession } = useAuth()
 
 
@@ -46,23 +47,24 @@ export function useLogin(loginFn) {
       success('Signed in successfully')
 
 
+      const voterDestination = getSafeVoterDestination(location.state?.from)
+
       if (data.user.mustChangePassword) {
-        navigate('/change-password', { replace: true })
+        navigate('/change-password', {
+          replace: true,
+          state: voterDestination ? { from: voterDestination } : null,
+        })
       } else if (data.user.role === USER_ROLES.VOTER) {
-        // Get redirect path from server - go directly to assigned event
-        voterService.getLoginRedirect()
-          .then(({ data: res }) => {
-            if (res.redirect?.path) {
-              navigate(res.redirect.path, { replace: true })
-            } else {
-              // No events - go to dashboard
-              navigate('/voter', { replace: true })
-            }
-          })
-          .catch(() => {
-            // Fallback to dashboard on error
+        if (voterDestination) {
+          navigate(voterDestination, { replace: true })
+        } else {
+          try {
+            const { data: res } = await voterService.getLoginRedirect()
+            navigate(res.redirect?.path || '/voter', { replace: true })
+          } catch {
             navigate('/voter', { replace: true })
-          })
+          }
+        }
       } else {
         navigate(getRoleDashboardPath(data.user.role), { replace: true })
       }

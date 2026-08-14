@@ -94,11 +94,13 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
         temporaryPassword: tempPassword,
         eventId: event.id,
         eventTitle: event.title,
+        eventType: event.event_type,
       })
     : await sendVoterInvitationEmailRegistered({
         email: user.email,
         eventId: event.id,
         eventTitle: event.title,
+        eventType: event.event_type,
       })
 
   console.log(`[invitation] email to ${user.email}: sent=${emailResult.sent}`, emailResult.error ?? '')
@@ -185,6 +187,7 @@ export async function inviteRegisteredVoter({ eventId, email, organizerId }) {
     email: voter.email,
     eventId: event.id,
     eventTitle: event.title,
+    eventType: event.event_type,
   })
 
   // Record the invitation as sent so the organizer list stays consistent.
@@ -241,6 +244,7 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
       email: voter.email,
       eventId: event.id,
       eventTitle: event.title,
+      eventType: event.event_type,
     })
   } else {
     // New account - generate new temp password
@@ -260,6 +264,7 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
       temporaryPassword: tempPassword,
       eventId: event.id,
       eventTitle: event.title,
+      eventType: event.event_type,
     })
   }
 
@@ -291,7 +296,7 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
   return {
     email: emailResult,
     invitationType,
-    temporaryPassword, // null for existing accounts
+    temporaryPassword: tempPassword, // null for existing accounts
   }
 }
 
@@ -481,6 +486,7 @@ export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
       email: voter.email,
       eventId: event.id,
       eventTitle: event.title,
+      eventType: event.event_type,
     })
   } else {
     // New account - generate temp password and send it
@@ -501,6 +507,7 @@ export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
       temporaryPassword: tempPassword,
       eventId: event.id,
       eventTitle: event.title,
+      eventType: event.event_type,
     })
   }
 
@@ -590,10 +597,12 @@ export async function sendAllPendingInvitations({ eventId, organizerId }) {
     try {
       if (isExistingAccount) {
         // Existing account - send registered email without password reset
+        // Send registered email without password reset
         emailResult = await sendVoterInvitationEmailRegistered({
           email: voter.email,
           eventId: event.id,
           eventTitle: event.title,
+          eventType: event.event_type,
         })
       } else {
         // New account - generate temp password and send it
@@ -615,6 +624,7 @@ export async function sendAllPendingInvitations({ eventId, organizerId }) {
           temporaryPassword: tempPassword,
           eventId: event.id,
           eventTitle: event.title,
+          eventType: event.event_type,
         })
       }
 

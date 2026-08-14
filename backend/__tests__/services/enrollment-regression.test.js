@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   hashPassword: vi.fn(async () => 'hashed'),
   generateTemporaryPassword: vi.fn(() => 'temp-pass'),
   dbUpdate: vi.fn(),
+  eventType: 'competition_scoring',
+  maybeSingleData: null,
+  fromTables: [],
 }))
 
 let dbUpdateSpy
@@ -22,8 +25,8 @@ vi.mock('../../src/foundation/db.js', () => ({
 }))
 
 vi.mock('../../src/services/event.service.js', () => ({
-  assertOrganizerOwnsEvent: vi.fn(async () => ({ id: 'event-1', event_type: 'competition_scoring' })),
-  getEventById: vi.fn(async () => ({ id: 'event-1', title: 'Test Event', event_type: 'competition_scoring' })),
+  assertOrganizerOwnsEvent: vi.fn(async () => ({ id: 'event-1', event_type: mocks.eventType })),
+  getEventById: vi.fn(async () => ({ id: 'event-1', title: 'Test Event', event_type: mocks.eventType })),
 }))
 
 vi.mock('../../src/services/user.service.js', () => ({
@@ -74,6 +77,7 @@ describe('enrollment regression coverage', () => {
     vi.clearAllMocks()
     mocks.db.mockImplementation(() => ({
       from(table) {
+        mocks.fromTables.push(table)
         if (table === 'v_event_voters') {
           throw new Error('legacy event_voters table should not be used')
         }
@@ -87,12 +91,15 @@ describe('enrollment regression coverage', () => {
           in: vi.fn().mockReturnThis(),
           order: vi.fn().mockReturnThis(),
           range: vi.fn().mockResolvedValue({ data: [], error: null }),
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn(async () => ({ data: mocks.maybeSingleData, error: null })),
           single: vi.fn().mockResolvedValue({ data: { id: 'user-1', email: 'judge@example.com' }, error: null }),
         }
         return chain
       },
     }))
+    mocks.eventType = 'competition_scoring'
+    mocks.maybeSingleData = null
+    mocks.fromTables.length = 0
     mocks.findUserByEmail.mockResolvedValue(null)
     mocks.findUserById.mockResolvedValue(null)
     mocks.sanitizeUser.mockImplementation((user) => { const { password, ...safe } = user ?? {}; return safe })
@@ -207,6 +214,7 @@ describe('enrollment regression coverage', () => {
   // ── No-reset-on-existing assertions ──────────────────────────────────────
 
   test('registerRespondentToPoll: existing voter is not password-reset', async () => {
+    mocks.eventType = 'polling'
     mocks.findUserByEmail.mockResolvedValue(existingVoter)
     mocks.sanitizeUser.mockImplementation((u) => { const { password, ...safe } = u ?? {}; return safe })
 
@@ -254,6 +262,7 @@ describe('enrollment regression coverage', () => {
 
   test('sendVoterInvitation: voter with must_change_password=false gets registered email, no reset', async () => {
     mocks.findUserById.mockResolvedValue(existingVoter)
+    mocks.maybeSingleData = { id: 'participant-1' }
 
     const result = await invitationService.sendVoterInvitation({
       eventId: 'event-1',
@@ -269,6 +278,7 @@ describe('enrollment regression coverage', () => {
   })
 
   test('returned user objects do not contain a password field', async () => {
+    mocks.eventType = 'polling'
     mocks.findUserByEmail.mockResolvedValue(existingVoter)
 
     const pollResult = await pollingService.registerRespondentToPoll({
@@ -284,5 +294,23 @@ describe('enrollment regression coverage', () => {
       organizerId: 'organizer-1',
     })
     expect(invResult.user).not.toHaveProperty('password')
+  })
+
+  test('poll access checks canonical participant enrollment', async () => {
+    mocks.maybeSingleData = {
+      id: 'participant-1',
+      event_id: 'event-1',
+      user_id: 'user-1',
+      has_responded: false,
+    }
+
+    await expect(pollingService.assertVoterCanRespond('event-1', 'user-1')).resolves.toMatchObject({
+      user_id: 'user-1',
+      has_responded: false,
+    })
+
+    expect(mocks.fromTables).toContain('event_participants')
+    expect(mocks.fromTables).not.toContain('v_event_voters')
+    expect(mocks.fromTables).not.toContain('event_voters')
   })
 })

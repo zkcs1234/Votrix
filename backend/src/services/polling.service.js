@@ -325,6 +325,7 @@ export async function sendRespondentInvitation({ eventId, voterId, organizerId }
       email: voter.email,
       eventId: event.id,
       eventTitle: event.title,
+      eventType: event.event_type,
     })
   } else {
     tempPassword = generateTemporaryPassword()
@@ -340,6 +341,7 @@ export async function sendRespondentInvitation({ eventId, voterId, organizerId }
       temporaryPassword: tempPassword,
       eventId: event.id,
       eventTitle: event.title,
+      eventType: event.event_type,
     })
   }
 
@@ -412,6 +414,7 @@ export async function sendAllPendingRespondentInvitations({ eventId, organizerId
           email: voter.email,
           eventId: event.id,
           eventTitle: event.title,
+          eventType: event.event_type,
         })
       } else {
         tempPassword = generateTemporaryPassword()
@@ -427,6 +430,7 @@ export async function sendAllPendingRespondentInvitations({ eventId, organizerId
           temporaryPassword: tempPassword,
           eventId: event.id,
           eventTitle: event.title,
+          eventType: event.event_type,
         })
       }
 
@@ -476,14 +480,16 @@ export async function getOrganizerDashboard(organizerId) {
   if (eventIds.length) {
     const [assignedRes, respondedRes, answersRes] = await Promise.all([
       getClient()
-        .from(DB_TABLES.EVENT_VOTERS)
-        .select('*', { count: 'exact', head: true })
-        .in('event_id', eventIds),
-      getClient()
-        .from(DB_TABLES.EVENT_VOTERS)
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
         .select('*', { count: 'exact', head: true })
         .in('event_id', eventIds)
-        .eq('has_voted', true),
+        .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT),
+      getClient()
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
+        .select('*', { count: 'exact', head: true })
+        .in('event_id', eventIds)
+        .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+        .eq('has_responded', true),
       getClient()
         .from(DB_TABLES.POLL_ANSWERS)
         .select('id, poll_questions!inner(event_id)', { count: 'exact', head: true })
@@ -1010,10 +1016,11 @@ const rows = options.map((o, i) => ({
 
 export async function assertVoterCanRespond(eventId, voterId) {
   const { data, error } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
-    .select('id, event_id, voter_id, has_voted')
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id, event_id, user_id, has_responded')
     .eq('event_id', eventId)
-    .eq('voter_id', voterId)
+    .eq('user_id', voterId)
+    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
     .maybeSingle()
 
   if (error) throw new ApiError(500, error.message)
@@ -1101,11 +1108,12 @@ export async function submitPollResponse(eventId, voterId, answers, startedAt) {
 
   if (!event.poll_allow_multiple_submissions) {
     const { data: locked, error: lockErr } = await getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
-      .update({ has_voted: true })
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .update({ has_responded: true })
       .eq('event_id', eventId)
-      .eq('voter_id', voterId)
-      .eq('has_voted', false)
+      .eq('user_id', voterId)
+      .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+      .eq('has_responded', false)
       .select('id')
 
     if (lockErr) throw new ApiError(500, lockErr.message)
@@ -1132,10 +1140,11 @@ export async function submitPollResponse(eventId, voterId, answers, startedAt) {
   if (subErr) {
     if (!event.poll_allow_multiple_submissions) {
       await getClient()
-        .from(DB_TABLES.EVENT_VOTERS)
-        .update({ has_voted: false })
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
+        .update({ has_responded: false })
         .eq('event_id', eventId)
-        .eq('voter_id', voterId)
+        .eq('user_id', voterId)
+        .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
     }
     throw new ApiError(500, subErr.message)
   }
@@ -1168,20 +1177,22 @@ export async function submitPollResponse(eventId, voterId, answers, startedAt) {
   } catch (err) {
     if (!event.poll_allow_multiple_submissions) {
       await getClient()
-        .from(DB_TABLES.EVENT_VOTERS)
-        .update({ has_voted: false })
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
+        .update({ has_responded: false })
         .eq('event_id', eventId)
-        .eq('voter_id', voterId)
+        .eq('user_id', voterId)
+        .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
     }
     throw err
   }
 
   if (event.poll_allow_multiple_submissions) {
     await getClient()
-      .from(DB_TABLES.EVENT_VOTERS)
-      .update({ has_voted: true })
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .update({ has_responded: true })
       .eq('event_id', eventId)
-      .eq('voter_id', voterId)
+      .eq('user_id', voterId)
+      .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
   }
 
   // A voter who has cast a vote has clearly received/accessed their
@@ -1200,15 +1211,17 @@ export async function submitPollResponse(eventId, voterId, answers, startedAt) {
 
   // Fetch updated stats for real-time dashboard update
   const { count: respondedCount } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
-    .eq('has_voted', true)
+    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+    .eq('has_responded', true)
 
   const { count: totalVoters } = await getClient()
-    .from(DB_TABLES.EVENT_VOTERS)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
 
   const { count: responsesSubmitted } = await getClient()
     .from(DB_TABLES.POLL_SUBMISSIONS)

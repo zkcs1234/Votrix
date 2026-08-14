@@ -18,6 +18,18 @@ export function eventUrl(eventId) {
   return `${base}/voter/events/${eventId}`
 }
 
+export function pollingEventUrl(eventId) {
+  return `${base}/voter/polling/events/${eventId}`
+}
+
+export function participantEventUrl(eventId, eventType) {
+  if (eventType === 'polling') return pollingEventUrl(eventId)
+  if (eventType === 'pageant' || eventType === 'competition_scoring') {
+    return competitionScoreUrl(eventId)
+  }
+  return eventUrl(eventId)
+}
+
 export function pageantScoreUrl(eventId) {
   return `${base}/voter/competition/events/${eventId}/score`
 }

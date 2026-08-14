@@ -1,20 +1,25 @@
-# VOTRIX Database (Phase 9)
+# VOTRIX Database
 
 PostgreSQL schema for Supabase. All primary keys are **UUID** (`gen_random_uuid()`).
 
 ## Apply migrations
 
 1. Open [Supabase Dashboard](https://supabase.com/dashboard) → your project → **SQL Editor**.
-2. Paste and run the migrations in numeric order (`001_*` → `020_*`).
-   - `001_initial_schema.sql` is the base schema.
-   - `004_election_module.sql` … `018_*` add Election, Competition Scoring,
-     and Polling incrementally.
-   - `019_phase9_indexes_and_optimizations.sql` adds Phase 9 composite
-     indexes and the `v_audit_log_with_user` view. Additive only —
-     safe to apply on top of an existing schema.
-3. To reset: run `020_phase9_indexes_and_optimizations_down.sql` to drop
-   the Phase 9 indexes, then the down migration that matches the
-   last phase you want to roll back, then re-apply in numeric order.
+2. Apply every forward migration in numeric order through the latest file.
+   Files prefixed with `*_down_*` are rollback scripts and must not be applied
+   during a forward migration. When multiple forward files share a number,
+   apply them in filename order before moving to the next number.
+3. Migration `029_event_participant_roles.sql` introduces
+   `event_participants` as the canonical enrollment table.
+4. Migration `033_fix_voter_registration_participants.sql` reconciles legacy
+   enrollment and adds voting nonces to the canonical table.
+5. Migration `040_reconcile_event_participants.sql` performs the final repair,
+   including judges that existed only in `competition_judges`. Apply it before
+   deploying application code that no longer reads `event_voters`.
+6. Roll back only with the down migration matching the specific forward
+   migration. `040_down_reconcile_event_participants.sql` removes the indexes
+   added by `040` and restores the migration `033` compatibility view, but
+   intentionally retains repaired participant rows to prevent enrollment loss.
 
 ## Entity relationship
 
@@ -22,9 +27,9 @@ PostgreSQL schema for Supabase. All primary keys are **UUID** (`gen_random_uuid(
 erDiagram
   users ||--o{ organizations : "organizer_id"
   organizations ||--o{ events : "organization_id"
-  events ||--o{ event_voters : "event_id"
+  events ||--o{ event_participants : "event_id"
   events ||--o{ invitations : "event_id"
-  users ||--o{ event_voters : "voter_id"
+  users ||--o{ event_participants : "user_id"
   users ||--o{ invitations : "voter_id"
   events ||--o{ positions : "event_id"
   positions ||--o{ candidates : "position_id"
@@ -45,7 +50,9 @@ erDiagram
 | `users` | Admin, organizer, voter accounts |
 | `organizations` | Organizer-owned org (election / pageant / polling) |
 | `events` | Event under an organization |
-| `event_voters` | Voter enrollment + `has_voted` |
+| `event_participants` | Canonical voter, judge, and respondent enrollment |
+| `event_voters` | Legacy physical table retained only for migration compatibility |
+| `v_event_voters` | Read-only compatibility view over `event_participants` |
 | `invitations` | Invite + temp password + sent flag |
 | `positions` | Election ballot positions |
 | `candidates` | Election candidates |
@@ -118,6 +125,6 @@ Copy the hash into `seeds/001_admin_user.example.sql`, then run that SQL in Supa
 ## Design notes
 
 - **Cascade deletes:** Removing an `organization` deletes its `events` and dependent rows.
-- **Uniqueness:** One voter per event (`event_voters`, `invitations`); one answer per voter per question (`poll_answers`); one score per judge/contestant/criterion (`judge_scores`).
+- **Uniqueness:** One participant role per user and event (`event_participants`), one invitation per user and event (`invitations`), one answer per voter and question (`poll_answers`), and one score per judge/contestant/criterion (`judge_scores`).
 - **Judges:** `judge_scores.judge_id` → `users.id` (assignment handled in application layer in later phases).
 - **RLS:** Not enabled in Phase 2; API uses service role. Add Row Level Security in a later phase if needed.

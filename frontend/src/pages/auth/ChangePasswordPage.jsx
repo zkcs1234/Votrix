@@ -1,18 +1,21 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Lock, ShieldCheck, AlertCircle, ArrowRight, SkipForward } from 'lucide-react'
 import { changePasswordSchema } from '@/schemas/auth.schemas'
 import { authService } from '@/services/auth.service'
 import { useAuth } from '@/hooks/useAuth'
-import { getRoleDashboardPath } from '@/utils/auth'
+import { getRoleDashboardPath, getSafeVoterDestination } from '@/utils/auth'
+import { voterService } from '@/services/voter.service'
+import { USER_ROLES } from '@/utils/constants'
 import AuthFormField from '@/components/auth/AuthFormField'
 import SubmitButton from '@/components/auth/SubmitButton'
 import PasswordInput from '@/components/ui/PasswordInput'
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { setSession, role } = useAuth()
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -26,6 +29,26 @@ export default function ChangePasswordPage() {
     resolver: zodResolver(changePasswordSchema),
   })
 
+  const continueAfterPasswordChange = async (userRole) => {
+    if (userRole !== USER_ROLES.VOTER) {
+      navigate(getRoleDashboardPath(userRole), { replace: true })
+      return
+    }
+
+    const destination = getSafeVoterDestination(location.state?.from)
+    if (destination) {
+      navigate(destination, { replace: true })
+      return
+    }
+
+    try {
+      const { data } = await voterService.getLoginRedirect()
+      navigate(data.redirect?.path || '/voter', { replace: true })
+    } catch {
+      navigate('/voter', { replace: true })
+    }
+  }
+
   const onSubmit = async (values) => {
     setError(null)
     setLoading(true)
@@ -36,7 +59,7 @@ export default function ChangePasswordPage() {
         user: data.user,
         csrfToken: data.csrfToken,
       })
-      navigate(getRoleDashboardPath(data.user.role), { replace: true })
+      await continueAfterPasswordChange(data.user.role)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update password')
     } finally {
@@ -54,7 +77,7 @@ export default function ChangePasswordPage() {
         user: data.user,
         csrfToken: data.csrfToken,
       })
-      navigate(getRoleDashboardPath(data.user.role), { replace: true })
+      await continueAfterPasswordChange(data.user.role)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to skip password change')
     } finally {

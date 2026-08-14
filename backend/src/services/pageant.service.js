@@ -767,7 +767,7 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
     email: emailResult,
     invitationSent: emailResult?.sent,
     invitationType,
-    temporaryPassword,
+    temporaryPassword: tempPassword,
   }
 }
 
@@ -848,7 +848,7 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
           email: judgeEmail,
           success: true,
           invitationType,
-          temporaryPassword,
+          temporaryPassword: tempPassword,
         })
       } else {
         failed++

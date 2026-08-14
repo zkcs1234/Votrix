@@ -57,7 +57,7 @@ export default function ProtectedRoute({
 
   // Password change check
   if (mustChangePassword && !allowPasswordChange && !allowOnboarding) {
-    return <Navigate to="/change-password" replace />
+    return <Navigate to="/change-password" state={{ from: location }} replace />
   }
 
   if (!mustChangePassword && allowPasswordChange && !allowOnboarding) {
