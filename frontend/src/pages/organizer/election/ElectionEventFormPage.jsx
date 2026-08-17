@@ -15,6 +15,7 @@ import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
 import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
+import DraftRecoveryBanner from '@/components/ui/DraftRecoveryBanner'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
@@ -61,8 +62,8 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [error, setError] = useState(null)
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
+  const [infoFormLoading, setInfoFormLoading] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
-  const [showDraftPrompt, setShowDraftPrompt] = useState(false)
 
   const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'election',
@@ -102,7 +103,7 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
     dirty: isDirty || Boolean(bannerFile),
   })
 
-  const { saveDraft, deleteDraft, draft } = useDraft('election')
+  const { saveDraft, saveDraftAsync, deleteDraft, draft, saveStatus, lastSavedAt } = useDraft('election')
 
   const resultsVisibility = watch('resultsVisibility', 'public')
   const startDateValue = watch('startDate', '')
@@ -121,7 +122,6 @@ useEffect(() => {
     setInfoFormSchema(null)
     setError(null)
     setDraftRestored(false)
-    setShowDraftPrompt(false)
     reset({
       title: '',
       description: '',
@@ -134,10 +134,8 @@ resetProgress()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey])
 
-  useEffect(() => {
-    if (!isNew || !draft || draftRestored || showDraftPrompt) return
-    setShowDraftPrompt(true)
-  }, [draft, draftRestored, isNew, showDraftPrompt])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey])
 
   const restoreDraft = useCallback(() => {
     if (!draft) return
@@ -145,7 +143,6 @@ resetProgress()
     const payload = draft.payload || {}
     const nextStep = normalizeDraftStep(draft.step)
     setDraftRestored(true)
-    setShowDraftPrompt(false)
     setStep(nextStep)
     reset({
       title: payload.title ?? draft.title ?? '',
@@ -218,7 +215,7 @@ try {
 
     if (isNew) {
       const data = getValues()
-      await saveDraft({
+      saveDraftAsync({
         step: 'branding',
         title: data.title,
         description: data.description,
@@ -271,7 +268,7 @@ try {
           setBannerFile(null)
         }
         const data = getValues()
-        await saveDraft({
+        saveDraftAsync({
           step: 'information-form',
           title: data.title,
           description: data.description,
@@ -361,7 +358,6 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
   const startNewDraftSession = async () => {
     await deleteDraft()
     setDraftRestored(true)
-    setShowDraftPrompt(false)
     setBanner(null)
     setBannerFile(null)
     setInfoFormSchema(null)
@@ -396,15 +392,24 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
         </p>
       </header>
 
-      <EventStepper
-        module="election"
-        currentKey={step}
-        eventId={stepperEventId}
-        completedKeys={completedKeys}
-      />
+      {isNew && draft && !draftRestored ? (
+        <DraftRecoveryBanner
+          module="election"
+          draft={draft}
+          onRestore={restoreDraft}
+          onDiscard={startNewDraftSession}
+        />
+      ) : (
+        <>
+          <EventStepper
+            module="election"
+            currentKey={step}
+            eventId={stepperEventId}
+            completedKeys={completedKeys}
+          />
 
-      <Card padding="md">
-        {step === 'details' && (
+          <Card padding="md">
+            {step === 'details' && (
           <form className="space-y-4" onSubmit={handleSubmitDetails}>
             <div className="v-form-field">
               <label className={LABEL_CLASS} htmlFor="title">
@@ -520,6 +525,8 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               onNext={handleNext}
               nextLabel="Next: Branding"
               backLabel={null}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
             />
           </form>
         )}
@@ -544,6 +551,8 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               saving={saving}
               onNext={handleNextBranding}
               nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
             />
           </form>
         )}
@@ -562,7 +571,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                   setInfoFormSchema(schema)
                   if (isNew) {
                     const data = getValues()
-                    saveDraft({
+                    saveDraftAsync({
                       step: 'information-form',
                       title: data.title,
                       description: data.description,
@@ -591,38 +600,12 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               onNext={isNew ? handleFinishDraft : undefined}
               nextLabel={isNew ? 'Finish & Publish' : 'Continue to Positions'}
               nextPath={isNew ? undefined : `/organizer/election/events/${eventId}/positions`}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
             />
           </div>
         )}
       </Card>
-
-      {showDraftPrompt && (
-        <UnsavedChangesDialog
-          variant="resume"
-          title="Resume your draft?"
-          message="You already have a saved draft for this election. Resume it, delete it, or start a fresh event."
-          onPrimary={restoreDraft}
-          onSecondary={async () => {
-            await deleteDraft()
-            setShowDraftPrompt(false)
-            setDraftRestored(true)
-            setBanner(null)
-            setBannerFile(null)
-            setInfoFormSchema(null)
-            reset({
-              title: '',
-              description: '',
-              startDate: '',
-              endDate: '',
-              resultsVisibility: 'public',
-            })
-            resetProgress()
-          }}
-          onCancel={startNewDraftSession}
-          primaryLabel="Resume Draft"
-          secondaryLabel="Delete Draft"
-          cancelLabel="Start New Event"
-        />
       )}
 
       {blocked && (
@@ -633,8 +616,8 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
           onPrimary={handleSaveAsDraft}
           onSecondary={handleDiscard}
           onCancel={handleCancelLeave}
-          primaryLabel="Save as Draft"
-          secondaryLabel="Discard"
+          primaryLabel="Save & leave"
+          secondaryLabel="Leave without saving"
           cancelLabel="Cancel"
         />
       )}

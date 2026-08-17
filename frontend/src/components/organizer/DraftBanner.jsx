@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileEdit, FilePlus2, Trash2 } from 'lucide-react'
+import { FileEdit, FilePlus2, Trash2, ArrowRight } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
+import { EVENT_STAGES } from '@/utils/eventStages'
 
 /**
  * "Unfinished draft" banner shown on a module's events list when a
- * Create-session draft exists in localStorage. Offers Resume / Start New /
- * Delete Draft.
+ * Create-session draft exists in localStorage. Offers Continue / Discard.
  *
  * @param {object} props
  * @param {string} props.module - 'election' | 'competition' | 'polling'
@@ -24,49 +24,46 @@ export default function DraftBanner({ module, draft, onDelete, newEventPath }) {
   const moduleLabel =
     module === 'election' ? 'election' : module === 'competition' ? 'competition' : 'poll'
 
-  const resume = () => {
-    // Drafts are Create-only; the create route reads the draft on mount.
-    navigate(newEventPath)
-  }
+  const stages = EVENT_STAGES[module] ?? []
+  const stepIndex = stages.findIndex((s) => s.key === draft.step)
+  const stepNumber = stepIndex >= 0 ? stepIndex + 1 : 1
+  const stepLabel = stepIndex >= 0 ? stages[stepIndex].label : 'Details'
 
-  const startNew = () => {
-    onDelete()
+  const resume = () => {
     navigate(newEventPath)
   }
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-primary/40 bg-v-primary/5 p-4">
       <div className="flex items-center gap-3">
-        <FileEdit className="h-5 w-5 text-v-primary" strokeWidth={2} />
+        <div className="mt-0.5 rounded-full bg-v-primary/10 p-1.5 text-v-primary">
+          <FileEdit className="h-5 w-5" strokeWidth={2} />
+        </div>
         <div>
           <p className="text-sm font-semibold text-v-text">
-            You have an unfinished {moduleLabel} draft.
+            Continue editing your {moduleLabel}
           </p>
-          <p className="text-xs text-v-text-muted">
-            {draft.title ? `"${draft.title}"` : 'Untitled'} · saved {formatWhen(draft.updatedAt)}
+          <p className="text-xs text-v-text-muted mt-0.5">
+            {draft.title ? `"${draft.title}"` : 'Untitled'} · Step {stepNumber} of {stages.length}: {stepLabel} · saved {formatWhen(draft.updatedAt)}
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="secondary" onClick={resume}>
-          <FileEdit className="h-4 w-4" strokeWidth={2} />
-          Resume Draft
+        <Button size="sm" onClick={resume}>
+          Continue
+          <ArrowRight className="h-4 w-4" strokeWidth={2} />
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setConfirming(true)}>
           <Trash2 className="h-4 w-4" strokeWidth={2} />
-          Delete Draft
-        </Button>
-        <Button size="sm" onClick={startNew}>
-          <FilePlus2 className="h-4 w-4" strokeWidth={2} />
-          Start New
+          Discard
         </Button>
       </div>
 
       {confirming && (
         <UnsavedChangesDialog
           variant="resume"
-          title="Delete draft?"
+          title="Discard draft?"
           message="This will permanently remove your unfinished draft. This cannot be undone."
           onPrimary={() => {
             setConfirming(false)
@@ -74,7 +71,7 @@ export default function DraftBanner({ module, draft, onDelete, newEventPath }) {
           }}
           onSecondary={() => setConfirming(false)}
           onCancel={() => setConfirming(false)}
-          primaryLabel="Delete Draft"
+          primaryLabel="Discard Draft"
           secondaryLabel="Keep Draft"
           cancelLabel="Cancel"
         />
@@ -87,10 +84,19 @@ function formatWhen(iso) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+  
+  const now = new Date()
+  const diffMs = now - d
+  const diffMins = Math.round(diffMs / 60000)
+  
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`
+  
+  const diffHours = Math.round(diffMins / 60)
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+  
+  const diffDays = Math.round(diffHours / 24)
+  if (diffDays < 14) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }

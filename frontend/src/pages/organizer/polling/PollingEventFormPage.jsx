@@ -20,6 +20,7 @@ import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
 import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
+import DraftRecoveryBanner from '@/components/ui/DraftRecoveryBanner'
 
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 
@@ -49,8 +50,8 @@ const { eventId } = useParams()
   const [error, setError] = useState(null)
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
+  const [infoFormLoading, setInfoFormLoading] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
-  const [showDraftPrompt, setShowDraftPrompt] = useState(false)
 
   const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'polling',
@@ -91,7 +92,7 @@ const { eventId } = useParams()
     dirty: isDirty || Boolean(bannerFile),
   })
 
-  const { saveDraft, deleteDraft, draft } = useDraft('polling')
+  const { saveDraft, saveDraftAsync, deleteDraft, draft, saveStatus, lastSavedAt } = useDraft('polling')
 
 useEffect(() => {
     setStep(inferStepFromPath(location.pathname))
@@ -105,8 +106,7 @@ useEffect(() => {
     setInfoFormSchema(null)
     setError(null)
     setDraftRestored(false)
-    setShowDraftPrompt(false)
-reset({
+    reset({
       title: '',
       description: '',
       startDate: '',
@@ -119,10 +119,8 @@ reset({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey])
 
-  useEffect(() => {
-    if (!isNew || !draft || draftRestored || showDraftPrompt) return
-    setShowDraftPrompt(true)
-  }, [draft, draftRestored, isNew, showDraftPrompt])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey])
 
   const restoreDraft = useCallback(() => {
     if (!draft) return
@@ -130,7 +128,6 @@ reset({
     const payload = draft.payload || {}
     const nextStep = normalizeDraftStep(draft.step)
     setDraftRestored(true)
-    setShowDraftPrompt(false)
     setStep(nextStep)
     reset({
       title: payload.title ?? draft.title ?? '',
@@ -202,7 +199,7 @@ try {
 
     if (isNew) {
       const data = getValues()
-      await saveDraft({
+      saveDraftAsync({
         step: 'branding',
         title: data.title,
         description: data.description,
@@ -248,7 +245,7 @@ try {
           setBannerFile(null)
         }
         const data = getValues()
-        await saveDraft({
+        saveDraftAsync({
           step: 'settings',
           title: data.title,
           description: data.description,
@@ -294,7 +291,7 @@ try {
         return
       }
       if (isNew) {
-        await saveDraft({
+        saveDraftAsync({
           step: 'information-form',
           title: data.title,
           description: data.description,
@@ -396,7 +393,6 @@ try {
   const startNewDraftSession = async () => {
     await deleteDraft()
     setDraftRestored(true)
-    setShowDraftPrompt(false)
     setBanner(null)
     setBannerFile(null)
     setInfoFormSchema(null)
@@ -435,15 +431,24 @@ const stepperEventId = isNew ? 'new' : eventId
         </p>
       </header>
 
-<EventStepper
-        module="polling"
-        currentKey={step}
-        eventId={stepperEventId}
-        completedKeys={completedKeys}
-      />
+      {isNew && draft && !draftRestored ? (
+        <DraftRecoveryBanner
+          module="polling"
+          draft={draft}
+          onRestore={restoreDraft}
+          onDiscard={startNewDraftSession}
+        />
+      ) : (
+        <>
+          <EventStepper
+            module="polling"
+            currentKey={step}
+            eventId={stepperEventId}
+            completedKeys={completedKeys}
+          />
 
-      <Card padding="md">
-        {step === 'details' && (
+          <Card padding="md">
+            {step === 'details' && (
           <form className="space-y-4" onSubmit={handleNextDetails}>
             <div className="v-form-field">
               <label className={LABEL_CLASS} htmlFor="title">
@@ -530,6 +535,8 @@ const stepperEventId = isNew ? 'new' : eventId
               onNext={handleNextDetails}
               nextLabel="Next: Branding"
               backLabel={null}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
             />
           </form>
         )}
@@ -554,6 +561,8 @@ const stepperEventId = isNew ? 'new' : eventId
               saving={saving}
               onNext={handleNextBranding}
               nextLabel={isNew ? 'Save & continue' : 'Next: Settings'}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
             />
           </form>
         )}
@@ -643,6 +652,8 @@ const stepperEventId = isNew ? 'new' : eventId
               saving={saving}
               onNext={handleSaveSettings}
               nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
             />
           </form>
         )}
@@ -661,7 +672,7 @@ const stepperEventId = isNew ? 'new' : eventId
                   setInfoFormSchema(schema)
                   if (isNew) {
                     const data = getValues()
-                    saveDraft({
+                    saveDraftAsync({
                       step: 'information-form',
                       title: data.title,
                       description: data.description,
@@ -690,39 +701,12 @@ const stepperEventId = isNew ? 'new' : eventId
               onNext={isNew ? handleFinishDraft : undefined}
               nextLabel={isNew ? 'Finish & Publish' : 'Continue to Builder'}
               nextPath={isNew ? undefined : `/organizer/polling/events/${eventId}/builder`}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
             />
           </div>
         )}
       </Card>
-
-      {showDraftPrompt && (
-        <UnsavedChangesDialog
-          variant="resume"
-          title="Resume your draft?"
-          message="You already have a saved draft for this poll. Resume it, delete it, or start a fresh event."
-          onPrimary={restoreDraft}
-          onSecondary={async () => {
-            await deleteDraft()
-            setShowDraftPrompt(false)
-            setDraftRestored(true)
-            setBanner(null)
-            setBannerFile(null)
-            setInfoFormSchema(null)
-            reset({
-              title: '',
-              description: '',
-              startDate: '',
-              endDate: '',
-              pollAnonymous: false,
-              pollAllowMultipleSubmissions: false,
-            })
-            resetProgress()
-          }}
-          onCancel={startNewDraftSession}
-          primaryLabel="Resume Draft"
-          secondaryLabel="Delete Draft"
-          cancelLabel="Start New Event"
-        />
       )}
 
       {blocked && (
@@ -733,8 +717,8 @@ const stepperEventId = isNew ? 'new' : eventId
           onPrimary={handleSaveAsDraft}
           onSecondary={handleDiscard}
           onCancel={handleCancelLeave}
-          primaryLabel="Save as Draft"
-          secondaryLabel="Discard"
+          primaryLabel="Save & leave"
+          secondaryLabel="Leave without saving"
           cancelLabel="Cancel"
         />
       )}

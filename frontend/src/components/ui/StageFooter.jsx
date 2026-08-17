@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import SaveStatus from '@/components/ui/SaveStatus'
 import { getNextStage, getPrevStage, stagePath } from '@/utils/eventStages'
 
 export default function StageFooter({
@@ -13,6 +14,8 @@ export default function StageFooter({
   backLabel,
   showSidebarHint = true,
   nextPath,
+  saveStatus = 'idle',
+  lastSavedAt = null,
 }) {
   const next = getNextStage(module, currentKey)
   const prev = getPrevStage(module, currentKey)
@@ -58,6 +61,12 @@ export default function StageFooter({
         <p className="text-xs text-v-text-subtle">
           Tip: you can also jump to any section using the sidebar.
         </p>
+      )}
+      
+      {(saveStatus !== 'idle' || lastSavedAt) && (
+        <div className="flex justify-end pt-1">
+          <SaveStatus status={saveStatus} lastSavedAt={lastSavedAt} />
+        </div>
       )}
     </div>
   )

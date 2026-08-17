@@ -40,10 +40,10 @@ export default function UnsavedChangesDialog({
           {variant === 'leave' ? (
             <>
               <Button type="button" variant="secondary" size="sm" onClick={onSecondary}>
-                {secondaryLabel ?? 'Discard'}
+                {secondaryLabel ?? 'Leave without saving'}
               </Button>
               <Button type="button" size="sm" onClick={onPrimary}>
-                {primaryLabel ?? 'Save as Draft'}
+                {primaryLabel ?? 'Save & leave'}
               </Button>
               <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
                 {cancelLabel ?? 'Cancel'}

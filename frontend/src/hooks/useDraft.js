@@ -38,15 +38,20 @@ function removeCachedDraft(module) {
  *   hasDraft: boolean,
  *   draft: object|null,
  *   saveDraft: (data: object) => Promise<object|null>,
+ *   saveDraftAsync: (data: object) => void,
  *   resumeDraft: () => object|null,
  *   deleteDraft: () => Promise<void>,
  *   refreshDraft: () => Promise<object|null>,
  *   loading: boolean,
+ *   saveStatus: 'idle'|'saving'|'saved'|'error',
+ *   lastSavedAt: string|null,
  * }}
  */
 export default function useDraft(module) {
   const [draft, setDraft] = useState(() => readCachedDraft(module))
   const [loading, setLoading] = useState(false)
+  const [saveStatus, setSaveStatus] = useState('idle')
+  const [lastSavedAt, setLastSavedAt] = useState(() => readCachedDraft(module)?.updatedAt || null)
 
   const refreshDraft = useCallback(async () => {
     setLoading(true)
@@ -106,6 +111,23 @@ export default function useDraft(module) {
     }
   }, [module])
 
+  // Non-blocking fire-and-forget save that manages the saveStatus state
+  const saveDraftAsync = useCallback(async (data) => {
+    setSaveStatus('saving')
+    try {
+      const savedDraft = await saveDraft(data)
+      setSaveStatus('saved')
+      setLastSavedAt(savedDraft?.updatedAt || new Date().toISOString())
+      
+      // Clear the "saved" indicator after a few seconds
+      setTimeout(() => {
+        setSaveStatus((prev) => (prev === 'saved' ? 'idle' : prev))
+      }, 3000)
+    } catch (error) {
+      setSaveStatus('error')
+    }
+  }, [saveDraft])
+
   const resumeDraft = useCallback(() => draft, [draft])
 
   const deleteDraft = useCallback(async () => {
@@ -123,9 +145,12 @@ export default function useDraft(module) {
     hasDraft: Boolean(draft),
     draft,
     saveDraft,
+    saveDraftAsync,
     resumeDraft,
     deleteDraft,
     refreshDraft,
     loading,
+    saveStatus,
+    lastSavedAt,
   }
 }
