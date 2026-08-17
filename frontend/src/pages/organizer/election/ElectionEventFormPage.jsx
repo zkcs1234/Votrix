@@ -62,7 +62,6 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [error, setError] = useState(null)
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
-  const [infoFormLoading, setInfoFormLoading] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
 
   const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
@@ -131,9 +130,6 @@ useEffect(() => {
     })
 resetProgress()
     // sessionKey intentionally gates re-runs; resets run on every new session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionKey])
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey])
 
@@ -606,6 +602,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
           </div>
         )}
       </Card>
+        </>
       )}
 
       {blocked && (
