@@ -1147,6 +1147,39 @@
       background-position: -200% 0;
     }
   }
+  /* Management Workspace */
+  .v-workspace {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  @media (min-width: 1024px) {
+    .v-workspace {
+      grid-template-columns: minmax(320px, 40%) 1fr;
+    }
+  }
+  
+  .v-workspace-form, .v-workspace-records {
+    max-height: calc(100vh - 11rem);
+    overflow-y: auto;
+    padding-right: 0.5rem;
+  }
+
+  .v-scroll-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .v-scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .v-scroll-thin::-webkit-scrollbar-thumb {
+    background: var(--v-border-strong);
+    border-radius: 3px;
+  }
+  .v-scroll-thin::-webkit-scrollbar-thumb:hover {
+    background: var(--v-text-subtle);
+  }
 }
 
 /* Respect users who prefer reduced motion: disable animations. */

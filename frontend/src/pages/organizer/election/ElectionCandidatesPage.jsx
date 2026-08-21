@@ -6,6 +6,7 @@ import ImageUploadField from '@/components/upload/ImageUploadField'
 import SearchInput from '@/components/ui/SearchInput'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
+import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
 
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
@@ -82,7 +83,7 @@ function CandidateFormSkeleton() {
 
 const EMPTY_FORM = { name: '', biography: '', platform: '', party: '' }
 
-export default function ElectionCandidatesPage() {
+function ElectionCandidatesPageContent() {
   const { eventId } = useParams()
   const [positions, setPositions] = useState([])
   const [candidates, setCandidates] = useState([])
@@ -210,10 +211,10 @@ export default function ElectionCandidatesPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <h2 className="text-xl font-semibold text-v-text">Candidate Management</h2>
-
-      <form onSubmit={handleCreate} className="space-y-4 v-card p-6">
+    <ManagementWorkspace
+      title="Candidate Management"
+      formPanel={
+        <form onSubmit={handleCreate} className="space-y-4 v-card p-6 mb-4">
         <div>
           <label className="mb-1 block text-sm text-v-text-muted">Position</label>
           <select
@@ -279,49 +280,60 @@ export default function ElectionCandidatesPage() {
           {saving ? 'Adding...' : 'Add candidate'}
         </button>
       </form>
+      }
+      recordsPanel={
+        <div className="space-y-4 pb-8">
+          {/* Search & filter bar */}
+          <div className="flex flex-wrap items-center gap-3">
+            <SearchInput
+              placeholder="Search candidates by name, party, or position…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 min-w-[200px]"
+            />
+            <select
+              className={`${inputClass} w-auto`}
+              value={filterPositionId}
+              onChange={(e) => setFilterPositionId(e.target.value)}
+              aria-label="Filter by position"
+            >
+              <option value="">All positions</option>
+              {positions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-sm text-v-text-subtle whitespace-nowrap">
+              {filteredCandidates.length} of {candidates.length} candidates
+            </span>
+          </div>
 
-      {/* Search & filter bar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <SearchInput
-          placeholder="Search candidates by name, party, or position…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-[200px]"
-        />
-        <select
-          className={`${inputClass} w-auto`}
-          value={filterPositionId}
-          onChange={(e) => setFilterPositionId(e.target.value)}
-          aria-label="Filter by position"
-        >
-          <option value="">All positions</option>
-          {positions.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <span className="text-sm text-v-text-subtle whitespace-nowrap">
-          {filteredCandidates.length} of {candidates.length} candidates
-        </span>
-      </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {filteredCandidates.map((c) => (
+              <CandidateCard
+                key={c.id}
+                candidate={c}
+                positionName={positionName(c.positionId)}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {filteredCandidates.map((c) => (
-          <CandidateCard
-            key={c.id}
-            candidate={c}
-            positionName={positionName(c.positionId)}
-            onDelete={handleDelete}
-          />
-        ))}
-      </div>
-
-      {!filteredCandidates.length && (
-        <p className="text-center text-v-text-subtle">
-          {search || filterPositionId ? 'No candidates match your filters.' : 'No candidates yet.'}
-        </p>
-      )}
-    </div>
+          {!filteredCandidates.length && (
+            <p className="text-center text-v-text-subtle">
+              {search || filterPositionId ? 'No candidates match your filters.' : 'No candidates yet.'}
+            </p>
+          )}
+        </div>
+      }
+    />
   )
 }
+
+export default function ElectionCandidatesPage() {
+  return (
+    <ElectionCandidatesPageContent />
+  )
+}
+

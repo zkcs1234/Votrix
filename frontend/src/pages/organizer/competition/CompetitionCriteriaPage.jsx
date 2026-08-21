@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/hooks/useToast'
+import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
 import { HELPER_TEXT, INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 
 const inputClass = `${INPUT_CLASS} w-full`
@@ -74,14 +75,10 @@ export default function CompetitionCriteriaPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-v-text">Criteria</h2>
-          <p className="mt-1 text-sm text-v-text-subtle">
-            Create the scoring items judges will use for this competition.
-          </p>
-        </div>
+    <ManagementWorkspace
+      title="Criteria"
+      subtitle="Create the scoring items judges will use for this competition."
+      headerActions={
         <div
           className={`rounded-lg border px-3 py-2 text-sm ${
             isReadyForScoring
@@ -92,9 +89,9 @@ export default function CompetitionCriteriaPage() {
           <span className="font-medium">Saved total:</span> {totalPct.toFixed(1)}%
           <span className="block text-xs opacity-80">Must equal 100% to open scoring</span>
         </div>
-      </div>
-
-      <form onSubmit={handleCreate} className={`grid gap-5 v-card p-6 ${divisionsEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+      }
+      formPanel={
+        <form onSubmit={handleCreate} className={`grid gap-5 v-card p-6 mb-4 ${divisionsEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <div className={divisionsEnabled ? 'sm:col-span-3' : 'sm:col-span-2'}>
           <label htmlFor="criteria-name" className={LABEL_CLASS}>
             Criteria name
@@ -191,9 +188,10 @@ export default function CompetitionCriteriaPage() {
           {saving ? 'Adding...' : 'Add criteria'}
         </button>
       </form>
-
-      <ul className="space-y-2">
-        {list.map((c) => {
+      }
+      recordsPanel={
+        <ul className="space-y-2 pb-8">
+          {list.map((c) => {
           const currentDivisionId = c.divisionId ?? c.division_id
           const divisionName = currentDivisionId ? divisions.find(d => d.id === currentDivisionId)?.name : null
 
@@ -235,6 +233,7 @@ export default function CompetitionCriteriaPage() {
           </li>
         )}
       </ul>
-    </div>
+      }
+    />
   )
 }

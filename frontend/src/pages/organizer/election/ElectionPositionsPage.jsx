@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/hooks/useToast'
+import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
 
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
@@ -95,13 +96,13 @@ export default function ElectionPositionsPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <h2 className="text-xl font-semibold text-v-text">Position Builder</h2>
-
-      <form
-        onSubmit={handleCreate}
-        className="grid gap-4 v-card p-6 sm:grid-cols-2"
-      >
+    <ManagementWorkspace
+      title="Position Builder"
+      formPanel={
+        <form
+          onSubmit={handleCreate}
+          className="grid gap-4 v-card p-6 sm:grid-cols-2 mb-4"
+        >
         <div className="sm:col-span-2">
           <label className="mb-1 block text-sm text-v-text-muted">Position name</label>
           <input
@@ -169,9 +170,10 @@ export default function ElectionPositionsPage() {
           {saving ? 'Adding...' : 'Add position'}
         </button>
       </form>
-
-      <ul className="space-y-3">
-        {positions.map((p, idx) => (
+      }
+      recordsPanel={
+        <ul className="space-y-3 pb-8">
+          {positions.map((p, idx) => (
           <li
             key={p.id}
             className="flex items-start justify-between gap-3 rounded-xl border border-v-border bg-v-surface px-4 py-3"
@@ -216,6 +218,7 @@ export default function ElectionPositionsPage() {
           </li>
         ))}
       </ul>
-    </div>
+      }
+    />
   )
 }

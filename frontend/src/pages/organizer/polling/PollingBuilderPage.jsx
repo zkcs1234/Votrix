@@ -4,6 +4,7 @@ import api from '@/services/api'
 import { pollingService } from '@/services/polling.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageUploadField from '@/components/upload/ImageUploadField'
+import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 import {
   DndContext,
@@ -192,6 +193,7 @@ export default function PollingBuilderPage() {
   const [types, setTypes] = useState([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState(emptyForm())
+  const [formKey, setFormKey] = useState(0)
   const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -241,10 +243,12 @@ export default function PollingBuilderPage() {
     setForm(emptyForm())
     setEditingId(null)
     setError(null)
+    setFormKey((k) => k + 1)
   }
 
 const startEdit = (q) => {
     setEditingId(q.id)
+    setFormKey((k) => k + 1)
     setForm({
       question: q.question,
       type: q.type,
@@ -392,10 +396,10 @@ const handleTypeChange = (typeKey) => {
   }
 
   return (
-    <div className="space-y-8">
-      <h2 className="text-xl font-semibold text-v-text">Poll builder</h2>
-
-      <form onSubmit={handleSubmit} className="v-card p-6 space-y-4">
+    <ManagementWorkspace
+      title="Poll builder"
+      formPanel={
+        <form key={formKey} onSubmit={handleSubmit} className="v-card p-6 space-y-4 mb-4">
         <h3 className="text-sm font-medium text-v-text-muted">
           {editingId ? 'Edit question' : 'Add question'}
         </h3>
@@ -561,9 +565,11 @@ onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageU
           )}
         </div>
       </form>
-
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={questions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
+      }
+      recordsPanel={
+        <div className="pb-8">
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={questions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
           <ul className="space-y-3">
             {questions.map((q, idx) => (
               <SortableQuestionCard
@@ -582,7 +588,9 @@ onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageU
           </ul>
         </SortableContext>
       </DndContext>
-    </div>
+        </div>
+      }
+    />
   )
 }
 

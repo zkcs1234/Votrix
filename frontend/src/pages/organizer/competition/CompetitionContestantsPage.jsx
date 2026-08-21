@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageUploadField from '@/components/upload/ImageUploadField'
+import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
 
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
@@ -115,10 +116,10 @@ export default function CompetitionContestantsPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold text-v-text">Contestants</h2>
-        {divisionsEnabled && divisions.length > 0 && (
+    <ManagementWorkspace
+      title="Contestants"
+      headerActions={
+        divisionsEnabled && divisions.length > 0 && (
           <select
             className={`${inputClass} w-auto`}
             value={filterDivisionId}
@@ -128,10 +129,10 @@ export default function CompetitionContestantsPage() {
             <option value="">All divisions</option>
             {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
-        )}
-      </div>
-
-      <form onSubmit={handleCreate} className="space-y-4 v-card p-6">
+        )
+      }
+      formPanel={
+        <form onSubmit={handleCreate} className="space-y-4 v-card p-6 mb-4">
         <div className={`grid gap-4 ${divisionsEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           <input className={inputClass} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
           <div className="space-y-1">
@@ -177,9 +178,10 @@ export default function CompetitionContestantsPage() {
           </button>
         )}
       </form>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {visibleList.map((c) => {
+      }
+      recordsPanel={
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-8">
+          {visibleList.map((c) => {
           // Both DB raw rows (snake_case) or mapped could be present depending on endpoints.
           // getFoundation returns mapped rows for contestants.
           const currentDivisionId = c.divisionId ?? c.division_id
@@ -222,7 +224,8 @@ export default function CompetitionContestantsPage() {
           )
         })}
         {!visibleList.length && <p className="text-sm text-v-text-subtle">No contestants match this division.</p>}
-      </div>
-    </div>
+        </div>
+      }
+    />
   )
 }
