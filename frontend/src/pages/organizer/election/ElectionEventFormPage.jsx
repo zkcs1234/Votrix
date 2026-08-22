@@ -379,22 +379,26 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
   const stepperEventId = isNew ? 'new' : eventId
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header>
-        <h2 className="v-page-title mb-2">{isNew ? 'Create election event' : 'Edit election event'}</h2>
-        <p className="v-helper-text">
-          Fill out the event basics, branding, and optional information form. Use the stepper or sidebar
-          to jump between sections.
-        </p>
-      </header>
+    <div className="space-y-6">
+      <div className="mx-auto max-w-3xl">
+        <header>
+          <h2 className="v-page-title mb-2">{isNew ? 'Create election event' : 'Edit election event'}</h2>
+          <p className="v-helper-text">
+            Fill out the event basics, branding, and optional information form. Use the stepper or sidebar
+            to jump between sections.
+          </p>
+        </header>
+      </div>
 
       {isNew && draft && !draftRestored ? (
-        <DraftRecoveryBanner
-          module="election"
-          draft={draft}
-          onRestore={restoreDraft}
-          onDiscard={startNewDraftSession}
-        />
+        <div className="mx-auto max-w-3xl">
+          <DraftRecoveryBanner
+            module="election"
+            draft={draft}
+            onRestore={restoreDraft}
+            onDiscard={startNewDraftSession}
+          />
+        </div>
       ) : (
         <>
           <EventStepper
@@ -404,7 +408,8 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             completedKeys={completedKeys}
           />
 
-          <Card padding="md">
+          <div className="mx-auto max-w-3xl w-full">
+            <Card padding="md">
             {step === 'details' && (
           <form className="space-y-4" onSubmit={handleSubmitDetails}>
             <div className="v-form-field">
@@ -600,8 +605,8 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               lastSavedAt={lastSavedAt}
             />
           </div>
-        )}
-      </Card>
+                </Card>
+          </div>
         </>
       )}
 

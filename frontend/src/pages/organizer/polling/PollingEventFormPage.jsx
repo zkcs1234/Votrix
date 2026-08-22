@@ -416,24 +416,28 @@ const stepperEventId = isNew ? 'new' : eventId
   const startDateValue = watch('startDate', '')
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header>
-        <h2 className="v-page-title mb-2">
-          {isNew ? 'Create poll' : 'Poll settings'}
-        </h2>
-        <p className="v-helper-text">
-          Fill out the poll basics, branding, and settings. Use the stepper or sidebar
-          to jump between sections.
-        </p>
-      </header>
+    <div className="space-y-6">
+      <div className="mx-auto max-w-3xl">
+        <header>
+          <h2 className="v-page-title mb-2">
+            {isNew ? 'Create poll' : 'Poll settings'}
+          </h2>
+          <p className="v-helper-text">
+            Fill out the poll basics, branding, and settings. Use the stepper or sidebar
+            to jump between sections.
+          </p>
+        </header>
+      </div>
 
       {isNew && draft && !draftRestored ? (
-        <DraftRecoveryBanner
-          module="polling"
-          draft={draft}
-          onRestore={restoreDraft}
-          onDiscard={startNewDraftSession}
-        />
+        <div className="mx-auto max-w-3xl">
+          <DraftRecoveryBanner
+            module="polling"
+            draft={draft}
+            onRestore={restoreDraft}
+            onDiscard={startNewDraftSession}
+          />
+        </div>
       ) : (
         <>
           <EventStepper
@@ -443,7 +447,8 @@ const stepperEventId = isNew ? 'new' : eventId
             completedKeys={completedKeys}
           />
 
-          <Card padding="md">
+          <div className="mx-auto max-w-3xl w-full">
+            <Card padding="md">
             {step === 'details' && (
           <form className="space-y-4" onSubmit={handleNextDetails}>
             <div className="v-form-field">
@@ -703,6 +708,7 @@ const stepperEventId = isNew ? 'new' : eventId
           </div>
         )}
       </Card>
+          </div>
         </>
       )}
 
