@@ -517,18 +517,6 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                 ))}
               </div>
             </fieldset>
-
-            <StageFooter
-              module="election"
-              currentKey="details"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleNext}
-              nextLabel="Next: Branding"
-              backLabel={null}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
           </form>
         )}
 
@@ -544,17 +532,6 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             />
 
             {error && <p className="v-error-text">{error}</p>}
-
-            <StageFooter
-              module="election"
-              currentKey="branding"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleNextBranding}
-              nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
           </form>
         )}
 
@@ -592,7 +569,38 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                 }}
               />
             )}
-
+          </div>
+        )}
+      </Card>
+      
+        {step === 'details' && (
+            <StageFooter
+              module="election"
+              currentKey="details"
+              eventId={stepperEventId}
+              saving={saving}
+              onNext={handleNext}
+              nextLabel="Next: Branding"
+              backLabel={null}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
+            />
+        )}
+        
+        {step === 'branding' && (
+            <StageFooter
+              module="election"
+              currentKey="branding"
+              eventId={stepperEventId}
+              saving={saving}
+              onNext={handleNextBranding}
+              nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
+            />
+        )}
+        
+        {step === 'information-form' && (
             <StageFooter
               module="election"
               currentKey="information-form"
@@ -604,9 +612,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               saveStatus={saveStatus}
               lastSavedAt={lastSavedAt}
             />
-          </div>
         )}
-      </Card>
           </div>
         </>
       )}

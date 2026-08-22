@@ -527,18 +527,6 @@ const stepperEventId = isNew ? 'new' : eventId
                 {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
               </div>
             </div>
-
-            <StageFooter
-              module="polling"
-              currentKey="details"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleNextDetails}
-              nextLabel="Next: Branding"
-              backLabel={null}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
           </form>
         )}
 
@@ -554,17 +542,6 @@ const stepperEventId = isNew ? 'new' : eventId
             />
 
             {error && <p className="v-error-text">{error}</p>}
-
-            <StageFooter
-              module="polling"
-              currentKey="branding"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleNextBranding}
-              nextLabel={isNew ? 'Save & continue' : 'Next: Settings'}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
           </form>
         )}
 
@@ -645,17 +622,6 @@ const stepperEventId = isNew ? 'new' : eventId
 
 
             {error && <p className="v-error-text">{error}</p>}
-
-            <StageFooter
-              module="polling"
-              currentKey="settings"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleSaveSettings}
-              nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
           </form>
         )}
 
@@ -693,7 +659,51 @@ const stepperEventId = isNew ? 'new' : eventId
                 }}
               />
             )}
-
+          </div>
+        )}
+      </Card>
+      
+        {step === 'details' && (
+            <StageFooter
+              module="polling"
+              currentKey="details"
+              eventId={stepperEventId}
+              saving={saving}
+              onNext={handleNextDetails}
+              nextLabel="Next: Branding"
+              backLabel={null}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
+            />
+        )}
+        
+        {step === 'branding' && (
+            <StageFooter
+              module="polling"
+              currentKey="branding"
+              eventId={stepperEventId}
+              saving={saving}
+              onNext={handleNextBranding}
+              nextLabel={isNew ? 'Save & continue' : 'Next: Settings'}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
+            />
+        )}
+        
+        {step === 'settings' && (
+            <StageFooter
+              module="polling"
+              currentKey="settings"
+              eventId={stepperEventId}
+              saving={saving}
+              onNext={handleSaveSettings}
+              nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
+              saveStatus={saveStatus}
+              lastSavedAt={lastSavedAt}
+            />
+        )}
+        
+        {step === 'information-form' && (
             <StageFooter
               module="polling"
               currentKey="information-form"
@@ -705,9 +715,7 @@ const stepperEventId = isNew ? 'new' : eventId
               saveStatus={saveStatus}
               lastSavedAt={lastSavedAt}
             />
-          </div>
         )}
-      </Card>
           </div>
         </>
       )}
