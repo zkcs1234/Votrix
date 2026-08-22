@@ -337,7 +337,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
 
   return (
     <div className="space-y-6">
-      <div className="max-w-3xl">
+      <div className="w-full">
         <header>
           <h2 className="v-page-title mb-2">
             {isNew ? 'Create Competition Scoring Event' : 'Edit Competition Scoring Event'}
@@ -350,7 +350,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
       </div>
 
       {isNew && draft && !draftRestored ? (
-        <div className="max-w-3xl">
+        <div className="w-full">
           <DraftRecoveryBanner
             module="competition"
             draft={draft}
@@ -367,7 +367,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             completedKeys={completedKeys}
           />
 
-          <div className="max-w-3xl w-full">
+          <div className="w-full">
             <Card padding="md">
             {step === 'details' && (
           <form className="space-y-4" onSubmit={handleSubmitDetails}>
