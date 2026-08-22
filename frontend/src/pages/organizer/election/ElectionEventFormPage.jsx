@@ -605,7 +605,8 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               lastSavedAt={lastSavedAt}
             />
           </div>
-                </Card>
+        )}
+      </Card>
           </div>
         </>
       )}
