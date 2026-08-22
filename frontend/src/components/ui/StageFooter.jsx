@@ -25,7 +25,7 @@ export default function StageFooter({
   const prevHref = prev ? stagePath(module, prev.key, eventId) : null
 
   return (
-    <div className="sticky -bottom-4 md:-bottom-8 -mx-4 md:-mx-8 -mb-4 md:-mb-8 mt-8 z-40 space-y-2 border-t border-v-border bg-v-surface px-4 py-3 sm:px-6 sm:py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+    <div className="fixed bottom-0 right-0 left-0 lg:left-[var(--sidebar-width)] z-40 border-t border-v-border bg-v-surface px-4 py-3 sm:px-6 sm:py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {prevHref ? (
           <Link to={prevHref}>

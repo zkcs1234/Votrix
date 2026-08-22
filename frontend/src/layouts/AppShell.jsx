@@ -291,7 +291,7 @@ export default function AppShell({
   )
 
   return (
-    <div className="flex h-screen overflow-hidden bg-v-bg">
+    <div className="flex h-screen overflow-hidden bg-v-bg" style={{ '--sidebar-width': showSidebar ? (isCollapsed ? '4.5rem' : '16rem') : '0px' }}>
       {showSidebar && (
         <aside
           className={`hidden shrink-0 bg-v-sidebar lg:block sticky top-0 self-start h-screen min-h-screen overflow-y-auto transition-[width,padding] duration-200 ease-in-out ${
@@ -432,7 +432,7 @@ export default function AppShell({
           </div>
         </header>
 
-        <main className="v-page-enter flex-1 overflow-y-auto p-4 md:p-8">{children ?? <Outlet />}</main>
+        <main className="v-page-enter flex-1 overflow-y-auto p-4 pb-20 md:p-8 md:pb-24">{children ?? <Outlet />}</main>
       </div>
     </div>
   )
