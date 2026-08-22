@@ -417,7 +417,7 @@ const stepperEventId = isNew ? 'new' : eventId
 
   return (
     <div className="space-y-6">
-      <div className="mx-auto max-w-3xl">
+      <div className="max-w-3xl">
         <header>
           <h2 className="v-page-title mb-2">
             {isNew ? 'Create poll' : 'Poll settings'}
@@ -430,7 +430,7 @@ const stepperEventId = isNew ? 'new' : eventId
       </div>
 
       {isNew && draft && !draftRestored ? (
-        <div className="mx-auto max-w-3xl">
+        <div className="max-w-3xl">
           <DraftRecoveryBanner
             module="polling"
             draft={draft}
@@ -447,7 +447,7 @@ const stepperEventId = isNew ? 'new' : eventId
             completedKeys={completedKeys}
           />
 
-          <div className="mx-auto max-w-3xl w-full">
+          <div className="max-w-3xl w-full">
             <Card padding="md">
             {step === 'details' && (
           <form className="space-y-4" onSubmit={handleNextDetails}>

@@ -380,7 +380,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
 
   return (
     <div className="space-y-6">
-      <div className="mx-auto max-w-3xl">
+      <div className="max-w-3xl">
         <header>
           <h2 className="v-page-title mb-2">{isNew ? 'Create election event' : 'Edit election event'}</h2>
           <p className="v-helper-text">
@@ -391,7 +391,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
       </div>
 
       {isNew && draft && !draftRestored ? (
-        <div className="mx-auto max-w-3xl">
+        <div className="max-w-3xl">
           <DraftRecoveryBanner
             module="election"
             draft={draft}
@@ -408,7 +408,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             completedKeys={completedKeys}
           />
 
-          <div className="mx-auto max-w-3xl w-full">
+          <div className="max-w-3xl w-full">
             <Card padding="md">
             {step === 'details' && (
           <form className="space-y-4" onSubmit={handleSubmitDetails}>
