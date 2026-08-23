@@ -18,9 +18,9 @@ import ParticipantInformationFormBuilder from '@/components/organizer/Participan
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
+import useSilentDraftAutosave from '@/hooks/useSilentDraftAutosave'
 import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
-import DraftRecoveryBanner from '@/components/ui/DraftRecoveryBanner'
 
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 
@@ -79,19 +79,45 @@ const { eventId } = useParams()
     },
   })
 
+  const { saveDraft, saveDraftAsync, deleteDraft, draft, saveStatus, lastSavedAt } = useDraft('polling')
+
   // Session lifecycle: guarantees only one active session, and gives us a
-  // stable session identity keyed by mode + eventId. Also blocks leaving a
-  // dirty Create session so we can offer Save as Draft / Discard / Cancel.
+  // stable session identity keyed by mode + eventId. With silent drafts, it
+  // only blocks when there is work the background save could not protect.
   const {
     sessionKey,
     confirmLeave,
   } = useFormSession({
     module: 'polling',
     eventId,
-    dirty: isDirty || Boolean(bannerFile),
+    dirty: Boolean(bannerFile) || saveStatus === 'error',
   })
 
-  const { saveDraft, saveDraftAsync, deleteDraft, draft, saveStatus, lastSavedAt } = useDraft('polling')
+  const formValues = watch()
+  const startDateValue = formValues.startDate ?? ''
+
+  const buildDraftSnapshot = useCallback((data = getValues(), draftStep = step, currentBanner = banner, schema = infoFormSchema) => ({
+    step: draftStep,
+    title: data.title,
+    description: data.description,
+    startDate: data.startDate,
+    endDate: data.endDate,
+    pollAnonymous: data.pollAnonymous,
+    pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
+    banner: currentBanner,
+    payload: {
+      ...data,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      pollAnonymous: data.pollAnonymous,
+      pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
+      infoFormSchema: schema,
+    },
+  }), [banner, getValues, infoFormSchema, step])
+
+  const markDraftTouched = useCallback(() => {
+    setDraftRestored(true)
+  }, [])
 
 useEffect(() => {
     setStep(inferStepFromPath(location.pathname))
@@ -134,6 +160,9 @@ useEffect(() => {
       pollAllowMultipleSubmissions: payload.pollAllowMultipleSubmissions ?? false,
     })
     setBanner(draft.banner ?? null)
+    if (payload.infoFormSchema) {
+      setInfoFormSchema(payload.infoFormSchema)
+    }
     if (draft.banner) {
       markComplete('branding')
     }
@@ -141,6 +170,18 @@ useEffect(() => {
       markComplete('details')
     }
   }, [draft, reset, markComplete])
+
+  useEffect(() => {
+    if (!isNew || !draft || draftRestored || isDirty) return
+    restoreDraft()
+  }, [draft, draftRestored, isDirty, isNew, restoreDraft])
+
+  useSilentDraftAutosave({
+    enabled: isNew && !bannerFile,
+    data: buildDraftSnapshot(formValues),
+    saveDraftAsync,
+    onAutosave: markDraftTouched,
+  })
 
   useEffect(() => {
     if (isNew) return
@@ -195,22 +236,8 @@ try {
 
     if (isNew) {
       const data = getValues()
-      saveDraftAsync({
-        step: 'branding',
-        title: data.title,
-        description: data.description,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        pollAnonymous: data.pollAnonymous,
-        pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
-        banner,
-        payload: {
-          ...data,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          infoFormSchema,
-        },
-      })
+      setDraftRestored(true)
+      saveDraftAsync(buildDraftSnapshot(data, 'branding'))
       setStep('branding')
     } else {
       setSaving(true)
@@ -241,22 +268,8 @@ try {
           setBannerFile(null)
         }
         const data = getValues()
-        saveDraftAsync({
-          step: 'settings',
-          title: data.title,
-          description: data.description,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          pollAnonymous: data.pollAnonymous,
-          pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
-          banner: currentBanner,
-          payload: {
-            ...data,
-            startDate: data.startDate,
-            endDate: data.endDate,
-            infoFormSchema,
-          },
-        })
+        setDraftRestored(true)
+        saveDraftAsync(buildDraftSnapshot(data, 'settings', currentBanner))
         setStep('settings')
       } else {
         if (bannerFile) {
@@ -287,22 +300,8 @@ try {
         return
       }
       if (isNew) {
-        saveDraftAsync({
-          step: 'information-form',
-          title: data.title,
-          description: data.description,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          pollAnonymous: data.pollAnonymous,
-          pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
-          banner,
-          payload: {
-            ...data,
-            startDate: data.startDate,
-            endDate: data.endDate,
-            infoFormSchema,
-          },
-        })
+        setDraftRestored(true)
+        saveDraftAsync(buildDraftSnapshot(data, 'information-form'))
         setStep('information-form')
       } else {
         const payload = buildPayload(data)
@@ -355,27 +354,22 @@ try {
   }
 
   // Save the current Create session as a draft, then continue navigation.
-  const handleSaveAsDraft = () => {
+  const handleSaveAsDraft = async () => {
     if (isNew) {
-      const data = getValues()
-      saveDraft({
-        step,
-        title: data.title,
-        description: data.description,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        pollAnonymous: data.pollAnonymous,
-        pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
-        banner,
-        payload: {
-          ...data,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          pollAnonymous: data.pollAnonymous,
-          pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
-          infoFormSchema,
-        },
-      })
+      try {
+        let currentBanner = banner
+        if (bannerFile) {
+          const res = await draftService.uploadBanner('polling', bannerFile)
+          currentBanner = res.data.url
+          setBanner(currentBanner)
+          setBannerFile(null)
+        }
+        await saveDraft(buildDraftSnapshot(getValues(), step, currentBanner))
+        setDraftRestored(true)
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to save draft')
+        return
+      }
     }
     confirmLeave?.proceed?.()
   }
@@ -384,23 +378,6 @@ try {
   const handleDiscard = () => {
     deleteDraft()
     confirmLeave?.proceed?.()
-  }
-
-  const startNewDraftSession = async () => {
-    await deleteDraft()
-    setDraftRestored(true)
-    setBanner(null)
-    setBannerFile(null)
-    setInfoFormSchema(null)
-    reset({
-      title: '',
-      description: '',
-      startDate: '',
-      endDate: '',
-      pollAnonymous: false,
-      pollAllowMultipleSubmissions: false,
-    })
-    resetProgress()
   }
 
   // Cancel navigation: stay on the form.
@@ -413,39 +390,28 @@ try {
   if (loading) return <p className="v-caption">Loading...</p>
 
 const stepperEventId = isNew ? 'new' : eventId
-  const startDateValue = watch('startDate', '')
 
   return (
     <div className="space-y-6">
-      <div className="w-full">
-        <header>
-          <h2 className="v-page-title mb-2">
-            {isNew ? 'Create poll' : 'Poll settings'}
-          </h2>
-          <p className="v-helper-text">
-            Fill out the poll basics, branding, and settings. Use the stepper or sidebar
-            to jump between sections.
-          </p>
-        </header>
-      </div>
-
-      {isNew && draft && !draftRestored ? (
-        <div className="w-full">
-          <DraftRecoveryBanner
-            module="polling"
-            draft={draft}
-            onRestore={restoreDraft}
-            onDiscard={startNewDraftSession}
-          />
-        </div>
-      ) : (
-        <>
+      <>
           <EventStepper
             module="polling"
             currentKey={step}
             eventId={stepperEventId}
             completedKeys={completedKeys}
           />
+
+          <div className="w-full">
+            <header>
+              <h2 className="v-page-title mb-2">
+                {isNew ? 'Create poll' : 'Poll settings'}
+              </h2>
+              <p className="v-helper-text">
+                Fill out the poll basics, branding, and settings. Use the stepper or sidebar
+                to jump between sections.
+              </p>
+            </header>
+          </div>
 
           <div className="w-full">
             <Card padding="md">
@@ -639,22 +605,8 @@ const stepperEventId = isNew ? 'new' : eventId
                   setInfoFormSchema(schema)
                   if (isNew) {
                     const data = getValues()
-                    saveDraftAsync({
-                      step: 'information-form',
-                      title: data.title,
-                      description: data.description,
-                      startDate: data.startDate,
-                      endDate: data.endDate,
-                      pollAnonymous: data.pollAnonymous,
-                      pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
-                      banner,
-                      payload: {
-                        ...data,
-                        startDate: data.startDate,
-                        endDate: data.endDate,
-                        infoFormSchema: schema,
-                      },
-                    })
+                    setDraftRestored(true)
+                    saveDraftAsync(buildDraftSnapshot(data, 'information-form', banner, schema))
                   }
                 }}
               />
@@ -718,7 +670,6 @@ const stepperEventId = isNew ? 'new' : eventId
         )}
           </div>
         </>
-      )}
 
       {blocked && (
         <UnsavedChangesDialog

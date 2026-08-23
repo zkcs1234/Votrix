@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileEdit, FilePlus2, Trash2, ArrowRight } from 'lucide-react'
+import { FileEdit, Trash2, ArrowRight } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
 import { EVENT_STAGES } from '@/utils/eventStages'
 
 /**
- * "Unfinished draft" banner shown on a module's events list when a
- * Create-session draft exists in localStorage. Offers Continue / Discard.
+ * Quiet draft banner shown on a module's events list when a Create-session
+ * draft exists. The create form itself restores silently.
  *
  * @param {object} props
  * @param {string} props.module - 'election' | 'competition' | 'polling'
@@ -41,17 +41,17 @@ export default function DraftBanner({ module, draft, onDelete, newEventPath }) {
         </div>
         <div>
           <p className="text-sm font-semibold text-v-text">
-            Continue editing your {moduleLabel}
+            Draft saved
           </p>
           <p className="text-xs text-v-text-muted mt-0.5">
-            {draft.title ? `"${draft.title}"` : 'Untitled'} · Step {stepNumber} of {stages.length}: {stepLabel} · saved {formatWhen(draft.updatedAt)}
+            {draft.title ? `"${draft.title}"` : `Untitled ${moduleLabel}`} · Step {stepNumber} of {stages.length}: {stepLabel} · saved {formatWhen(draft.updatedAt)}
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" onClick={resume}>
-          Continue
+          Open draft
           <ArrowRight className="h-4 w-4" strokeWidth={2} />
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setConfirming(true)}>
