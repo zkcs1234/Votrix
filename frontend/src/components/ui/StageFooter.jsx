@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -24,8 +25,8 @@ export default function StageFooter({
   const nextHref = nextPath ?? defaultNextHref
   const prevHref = prev ? stagePath(module, prev.key, eventId) : null
 
-  return (
-    <div className="sticky bottom-0 z-40 -mx-4 -mb-20 mt-8 border-t border-v-border bg-v-surface shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:-mx-8 md:-mb-24">
+  const content = (
+    <div className="z-40 border-t border-v-border bg-v-surface shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
       <div className="mx-auto flex w-full items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3 md:px-8">
         <div className="flex items-center gap-3">
         {prevHref ? (
@@ -70,4 +71,9 @@ export default function StageFooter({
       </div>
     </div>
   )
+
+  const portalTarget = document.getElementById('stage-footer-portal')
+  if (!portalTarget) return content // Fallback if portal isn't mounted yet
+
+  return createPortal(content, portalTarget)
 }
