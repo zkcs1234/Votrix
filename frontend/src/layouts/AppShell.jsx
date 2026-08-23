@@ -433,7 +433,7 @@ export default function AppShell({
         </header>
 
         <main className="v-page-enter flex-1 p-4 md:p-8">{children ?? <Outlet />}</main>
-        <div id="stage-footer-portal" className="shrink-0 empty:hidden" />
+        <div id="stage-footer-portal" className="shrink-0 empty:hidden sticky bottom-0 z-40" />
       </div>
     </div>
   )
