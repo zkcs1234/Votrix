@@ -30,6 +30,7 @@ import { syncEventSchedules } from './event-schedule-sync.service.js'
 import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
 import { deleteDraft } from './draft.service.js'
 import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
+import { getActiveSession } from './competition-session.service.js'
 
 
 
@@ -1129,7 +1130,7 @@ export function canJudgeScore(assignmentContext, { roundId = null, categoryId = 
   })
 }
 
-export async function getJudgeScoringSheet(eventId, judgeId) {
+export async function getJudgeScoringSheet(eventId, judgeId, options = {}) {
   const enrollment = await assertJudgeEnrolled(eventId, judgeId)
   const event = await getEventById(eventId)
 
@@ -1137,12 +1138,45 @@ export async function getJudgeScoringSheet(eventId, judgeId) {
     throw new ApiError(400, 'Not a competition scoring event')
   }
 
+  // Get active session to include live session state
+  const activeSession = await getActiveSession(eventId).catch(() => null)
+
+  // Query competition_divisions table to populate allowedDivisions array  
+  const { data: divisionRows } = await getClient()
+    .from(DB_TABLES.COMPETITION_DIVISIONS)
+    .select('id, name, description')
+    .eq('event_id', eventId)
+    .order('name')
+
+  const divisionsEnabled = (divisionRows?.length ?? 0) > 0
   const allowedDivisions = await resolveAllowedDivisions(eventId, judgeId)
+
+  // Convert allowedDivisions Set to array with division details
+  let allowedDivisionsArray = []
+  if (allowedDivisions !== null && divisionsEnabled) {
+    const divisionMap = new Map((divisionRows ?? []).map(div => [div.id, div]))
+    allowedDivisionsArray = Array.from(allowedDivisions)
+      .map(id => divisionMap.get(id))
+      .filter(Boolean)
+  }
+
+  // Validate division access if specific division requested
+  if (options.divisionId) {
+    if (!allowedDivisions || !allowedDivisions.has(options.divisionId)) {
+      throw new ApiError(403, 'You are not assigned to judge this division')
+    }
+  }
 
   let contestantsQuery = getClient().from(DB_TABLES.CONTESTANTS).select('id, event_id, division_id, name, photo, contestant_number').eq('event_id', eventId).order('contestant_number')
   let criteriaQuery = getClient().from(DB_TABLES.CRITERIA).select('id, event_id, division_id, name, percentage, min_score, max_score').eq('event_id', eventId)
 
-  if (allowedDivisions !== null) {
+  // Apply division filtering logic
+  if (options.divisionId) {
+    // Filter to specific division if requested AND judge is assigned to it
+    contestantsQuery = contestantsQuery.or(`division_id.eq.${options.divisionId},division_id.is.null`)
+    criteriaQuery = criteriaQuery.or(`division_id.eq.${options.divisionId},division_id.is.null`)
+  } else if (allowedDivisions !== null) {
+    // Apply normal division restrictions
     if (allowedDivisions.size === 0) {
       return {
         event: mapEvent(event),
@@ -1151,6 +1185,9 @@ export async function getJudgeScoringSheet(eventId, judgeId) {
         existingScores: {},
         hasScored: enrollment.has_scored,
         scoringOpen: isCompetitionScoringOpen(event),
+        divisionsEnabled,
+        allowedDivisions: allowedDivisionsArray,
+        activeSession,
       }
     }
     const divIds = Array.from(allowedDivisions)
@@ -1187,6 +1224,9 @@ export async function getJudgeScoringSheet(eventId, judgeId) {
     existingScores: scoreMap,
     hasScored: enrollment.has_scored,
     scoringOpen: isCompetitionScoringOpen(event),
+    divisionsEnabled,
+    allowedDivisions: allowedDivisionsArray,
+    activeSession,
   }
 }
 

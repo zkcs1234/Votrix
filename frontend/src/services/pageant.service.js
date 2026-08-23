@@ -234,12 +234,25 @@ export const pageantService = {
     return api.get(`${judge}/events`)
   },
 
-  getScoringSheet(eventId) {
-    return api.get(`${judge}/events/${eventId}/score`)
+  getScoringSheet(eventId, params = {}) {
+    return api.get(`${judge}/events/${eventId}/score`, { params })
   },
 
-  submitScores(eventId, scores) {
-    return api.post(`${judge}/events/${eventId}/score`, { scores })
+  getSessionView(eventId) {
+    return api.get(`${judge}/events/${eventId}/session-view`)
+  },
+
+  getActiveSession(eventId) {
+    return api.get(`${org}/events/${eventId}/session/active`)
+  },
+
+  submitScores(eventId, scores, sessionContext = {}) {
+    return api.post(`${judge}/events/${eventId}/score`, {
+      scores,
+      sessionId: sessionContext.sessionId || null,
+      roundId: sessionContext.roundId || null,
+      contestantId: sessionContext.contestantId || null
+    })
   },
 }
 

@@ -8,7 +8,12 @@ export const listMyEvents = asyncHandler(async (req, res) => {
 })
 
 export const getScoringSheet = asyncHandler(async (req, res) => {
-  const sheet = await pageantService.getJudgeScoringSheet(req.params.eventId, req.user.id)
+  const { divisionId } = req.query
+  const sheet = await pageantService.getJudgeScoringSheet(
+    req.params.eventId,
+    req.user.id,
+    { divisionId: divisionId || null }
+  )
   res.json({ success: true, ...sheet })
 })
 
