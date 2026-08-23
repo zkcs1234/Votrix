@@ -25,8 +25,9 @@ export default function StageFooter({
   const prevHref = prev ? stagePath(module, prev.key, eventId) : null
 
   return (
-    <div className="fixed bottom-0 right-0 left-0 lg:left-[var(--sidebar-width)] z-40 flex items-center justify-between gap-3 border-t border-v-border bg-v-surface px-4 py-2.5 sm:px-6 sm:py-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-      <div className="flex items-center gap-3">
+    <div className="fixed bottom-0 right-0 left-0 z-40 border-t border-v-border bg-v-surface shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] lg:left-[var(--sidebar-width)]">
+      <div className="mx-auto flex w-full items-center justify-between gap-3 px-4 py-2.5 md:px-8 sm:py-3">
+        <div className="flex items-center gap-3">
         {prevHref ? (
           <Link to={prevHref}>
             <Button type="button" variant="secondary" disabled={saving}>
@@ -65,6 +66,7 @@ export default function StageFooter({
         ) : (
           <span />
         )}
+      </div>
       </div>
     </div>
   )
