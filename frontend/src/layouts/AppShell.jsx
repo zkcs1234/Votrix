@@ -291,7 +291,7 @@ export default function AppShell({
   )
 
   return (
-    <div className="flex h-screen overflow-hidden bg-v-bg" style={{ '--sidebar-width': showSidebar ? (isCollapsed ? '4.5rem' : '16rem') : '0px' }}>
+    <div className="flex min-h-screen bg-v-bg" style={{ '--sidebar-width': showSidebar ? (isCollapsed ? '4.5rem' : '16rem') : '0px' }}>
       {showSidebar && (
         <aside
           className={`hidden shrink-0 bg-v-sidebar lg:block sticky top-0 self-start h-screen min-h-screen overflow-y-auto transition-[width,padding] duration-200 ease-in-out ${
@@ -317,7 +317,7 @@ export default function AppShell({
         </div>
       )}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow sm:px-6 sm:py-4">
           {showSidebar && (
             <button
@@ -432,7 +432,7 @@ export default function AppShell({
           </div>
         </header>
 
-        <main className="v-page-enter flex-1 overflow-y-auto p-4 md:p-8">{children ?? <Outlet />}</main>
+        <main className="v-page-enter flex-1 p-4 md:p-8">{children ?? <Outlet />}</main>
         <div id="stage-footer-portal" className="shrink-0 empty:hidden" />
       </div>
     </div>
