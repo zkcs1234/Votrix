@@ -144,7 +144,7 @@ export default function PollingReportPage() {
             </>
           )}
           {q.type === 'text' && (
-            <ul className="max-h-72 space-y-2 overflow-y-auto text-sm text-v-text-muted">
+            <ul className="space-y-2 text-sm text-v-text-muted">
               {(q.responses ?? []).map((r, i) => (
                 <li key={i} className="rounded-lg border border-v-border px-3 py-2">
                   {r.text}

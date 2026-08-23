@@ -24,7 +24,7 @@ function TextResponses({ responses = [] }) {
     return <p className="text-sm text-v-text-subtle">No text responses yet.</p>
   }
   return (
-    <ul className="mt-4 max-h-64 space-y-2 overflow-y-auto text-sm text-v-text-muted">
+    <ul className="mt-4 space-y-2 text-sm text-v-text-muted">
       {responses.map((r, i) => (
         <li key={i} className="rounded-lg border border-v-border px-3 py-2">
           {r.text}

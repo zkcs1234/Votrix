@@ -1161,8 +1161,6 @@
   }
   
   .v-workspace-form, .v-workspace-records {
-    max-height: calc(100vh - 11rem);
-    overflow-y: auto;
     padding-right: 0.5rem;
   }
 

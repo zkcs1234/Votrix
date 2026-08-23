@@ -45,7 +45,7 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
 
         <p className="v-label mb-4">{data.valid} of {data.total} valid</p>
 
-        <div className="v-table-wrap max-h-64 overflow-auto mb-4">
+        <div className="v-table-wrap mb-4">
           <table className="v-table">
             <thead>
               <tr>
