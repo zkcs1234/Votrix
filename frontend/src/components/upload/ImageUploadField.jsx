@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Upload, ImageIcon } from 'lucide-react'
 
 const VARIANT_STYLES = {
@@ -18,8 +18,19 @@ export default function ImageUploadField({
 }) {
   // The local preview is only updated when the user picks a new file.
   // When the parent passes a new `currentUrl` (e.g. after a successful
-  // upload) we re-derive the preview by remounting the field via a key.
+  // upload or when loading existing data), update the preview.
   const [preview, setPreview] = useState(currentUrl ?? null)
+
+  // Sync preview with currentUrl when it changes (e.g., when editing existing event)
+  useEffect(() => {
+    if (currentUrl !== preview) {
+      // Clean up old blob URL if it exists
+      if (preview?.startsWith('blob:')) {
+        URL.revokeObjectURL(preview)
+      }
+      setPreview(currentUrl ?? null)
+    }
+  }, [currentUrl]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (e) => {
     const file = e.target.files?.[0]

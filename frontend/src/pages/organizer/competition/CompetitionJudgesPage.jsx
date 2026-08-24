@@ -24,7 +24,7 @@ function downloadCsv(filename, headers, rows) {
 function downloadCsvTemplate() {
   const headers = ['email']
   const exampleRows = [['judge@example.com']]
-  downloadCsv('judge-import-template.csv', headers, exampleRows)
+  downloadCsv('judge.csv', headers, exampleRows)
 }
 
 function CsvPreviewModal({ data, onClose, onRegister, registering }) {
