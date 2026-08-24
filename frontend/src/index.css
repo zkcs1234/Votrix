@@ -763,15 +763,19 @@
     display: grid;
     gap: 1rem;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
+    align-items: baseline;
   }
   @media (max-width: 639px) {
     .v-date-row {
       grid-template-columns: 1fr;
+      align-items: start;
     }
   }
   .v-date-row > .v-form-field {
-    min-height: 5rem;
+    min-height: 7rem;
+  }
+  .v-date-row > .v-form-field > label {
+    align-self: start;
   }
 
   /* Button hierarchy */
