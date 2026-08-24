@@ -254,6 +254,11 @@ export const pageantService = {
       contestantId: sessionContext.contestantId || null
     })
   },
+
+  // Live session scoring - individual score submission during live sessions
+  submitSessionScore(eventId, scores) {
+    return api.post(`${judge}/events/${eventId}/session-score`, { scores })
+  },
 }
 
 // Legacy alias — `/pageant` paths still resolve on the server, so older

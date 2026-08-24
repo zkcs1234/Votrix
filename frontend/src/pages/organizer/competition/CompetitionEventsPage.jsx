@@ -23,22 +23,10 @@ export default function CompetitionEventsPage() {
     load()
   }, [])
 
-  useSocketEvent('competition:scoring-toggled', ({ eventId, scoringEnabled }) => {
-    setEvents((prev) =>
-      prev.map((e) =>
-        e.id === eventId ? { ...e, scoringEnabled } : e
-      )
-    )
+  // Listen for session status changes to update event list
+  useSocketEvent('session:status-changed', () => {
+    load()
   })
-
-  const toggle = async (event) => {
-    try {
-      await pageantService.setScoring(event.id, !event.scoringEnabled)
-      load()
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to toggle scoring')
-    }
-  }
 
   if (loading) {
     return (
@@ -82,17 +70,12 @@ New event
             {event.title}
           </Link>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => toggle(event)}
-              className={`rounded-lg px-3 py-1.5 text-sm ${
-                event.scoringEnabled
-                  ? 'border border-red-800 text-v-danger'
-                  : 'border border-emerald-800 text-emerald-300'
-              }`}
+            <Link
+              to={`/organizer/competition/events/${event.id}/live`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-800 bg-emerald-950/30 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-950/50"
             >
-              {event.scoringEnabled ? 'Close scoring' : 'Open scoring'}
-            </button>
+              Live Control
+            </Link>
             <Link
               to={`/organizer/competition/events/${event.id}/edit`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"

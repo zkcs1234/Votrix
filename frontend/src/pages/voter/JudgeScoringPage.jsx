@@ -1,7 +1,6 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
-import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
@@ -10,126 +9,87 @@ import VoterEventHeader from '@/components/voter/VoterEventHeader'
 
 export default function JudgeScoringPage() {
   const { eventId } = useParams()
-  const competitionDraftKey = getDraftStorageKey('competitionDraft', eventId)
-  const pageantDraftKey = getDraftStorageKey('pageantDraft', eventId)
   const [sheet, setSheet] = useState(null)
   const [scores, setScores] = useState({})
   const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
-  const [done, setDone] = useState(false)
   
   // Live session state variables
-  const [liveMode, setLiveMode] = useState(false)
   const [sessionState, setSessionState] = useState(null)
   const [activeContestantId, setActiveContestantId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
+  const [autoSaving, setAutoSaving] = useState(false)
   
   // Division selector state
   const [selectedDivisionId, setSelectedDivisionId] = useState(null)
 
+  // Check if session is active
+  const isSessionActive = sessionState?.status === 'active'
+
   // Division selector visibility logic
   const shouldShowDivisionSelector = useMemo(() => {
-    if (!sheet?.event?.divisionsEnabled) return false
+    if (!sheet?.divisionsEnabled) return false
     if (!sheet?.allowedDivisions || sheet.allowedDivisions.length === 0) return false
     return sheet.allowedDivisions.length > 1
   }, [sheet])
 
   const shouldShowSingleDivision = useMemo(() => {
-    if (!sheet?.event?.divisionsEnabled) return false
+    if (!sheet?.divisionsEnabled) return false
     return sheet?.allowedDivisions?.length === 1
   }, [sheet])
 
-  // Division-aware draft key generation
-  const getDraftKey = useCallback((eventId, divisionId) => {
-    if (divisionId) {
-      return `competition_draft_${eventId}_div_${divisionId}`
-    }
-    return `competition_draft_${eventId}`
-  }, [])
-
+  // Load session view (live-session-only API)
   useEffect(() => {
     pageantService
-      .getScoringSheet(eventId)
+      .getSessionView(eventId)
       .then(({ data }) => {
         setSheet(data)
-        if (data.hasScored) setDone(true)
-        
-        // Load drafts for current division (null = all divisions)
-        try {
-          const savedStr = localStorage.getItem(getDraftKey(eventId, selectedDivisionId))
-          const saved = savedStr ? JSON.parse(savedStr) : {}
-          setScores({ ...data.existingScores, ...saved })
-        } catch {
-          setScores({ ...data.existingScores })
+        // Initialize scores from existing locked submissions
+        if (data.existingScores) {
+          setScores(data.existingScores)
         }
       })
+      .catch((err) => {
+        console.error('[Load session view]', err)
+        setError(err.response?.data?.message || 'Failed to load scoring sheet')
+      })
       .finally(() => setLoading(false))
-  }, [eventId, getDraftKey, selectedDivisionId])
+  }, [eventId])
 
-  // Save draft scores with division awareness
-  useEffect(() => {
-    if (Object.keys(scores).length > 0) {
-      try {
-        localStorage.setItem(getDraftKey(eventId, selectedDivisionId), JSON.stringify(scores))
-      } catch (err) {
-        if (err.name === 'QuotaExceededError') {
-          console.warn('LocalStorage quota exceeded, could not save draft scores')
-        } else {
-          console.error('Failed to save draft scores:', err)
-        }
-      }
-    }
-  }, [scores, eventId, selectedDivisionId, getDraftKey])
-
-  // Live Mode state management based on session status
-  useEffect(() => {
-    if (sessionState) {
-      if (sessionState.status === 'active') {
-        setLiveMode(true)
-        if (sessionState.activeContestantId) {
-          setActiveContestantId(sessionState.activeContestantId)
-        }
-      } else if (sessionState.status === 'completed' || sessionState.status === 'paused') {
-        setLiveMode(false)
-        setActiveContestantId(null)
-      }
-    } else {
-      setLiveMode(false)
-      setActiveContestantId(null)
-    }
-  }, [sessionState])
-
-  // Initial sync with activeSession from sheet
+  // Update session state from activeSession field
   useEffect(() => {
     if (sheet?.activeSession) {
       setSessionState(sheet.activeSession)
+      if (sheet.activeSession.status === 'active' && sheet.activeSession.activeContestantId) {
+        setActiveContestantId(sheet.activeSession.activeContestantId)
+      } else {
+        setActiveContestantId(null)
+      }
     }
   }, [sheet?.activeSession])
 
   // Websocket connection and event subscriptions
   useEffect(() => {
-    const socket = window.socketClient
+    if (!eventId) return
     
-    if (!socket || !eventId) return
+    const socket = window.socketClient
+    if (!socket) {
+      console.warn('[Judge Scoring] Socket client not available')
+      return
+    }
 
     // Handle session status changes
     const handleStatusChange = (payload) => {
       const { session } = payload.data
       setSessionState(session)
       
-      if (session.status === 'completed') {
-        // Exit live mode
-        setLiveMode(false)
-        setActiveContestantId(null)
-      } else if (session.status === 'active') {
-        setLiveMode(true)
+      if (session.status === 'active') {
         if (session.activeContestantId) {
           setActiveContestantId(session.activeContestantId)
         }
-      } else if (session.status === 'paused') {
-        setLiveMode(false)
+      } else {
+        setActiveContestantId(null)
       }
     }
 
@@ -138,10 +98,10 @@ export default function JudgeScoringPage() {
       const { session } = payload.data
       setSessionState(session)
       
-      // Update active contestant and trigger scroll
       if (session.activeContestantId) {
         setActiveContestantId(session.activeContestantId)
-        // Scroll will be handled by a separate effect in the scoring form component
+        // Clear scores for new contestant
+        setScores({})
       } else {
         setActiveContestantId(null)
       }
@@ -154,7 +114,6 @@ export default function JudgeScoringPage() {
       
       // Reload scoring sheet if division changes and judge is assigned
       if (session.currentDivisionId && sheet?.divisionsEnabled) {
-        // Check if the judge is assigned to the new division
         const isAssigned = sheet?.allowedDivisions?.some(
           (div) => div.id === session.currentDivisionId
         )
@@ -162,26 +121,17 @@ export default function JudgeScoringPage() {
         if (isAssigned) {
           // Reload scoring sheet for new division
           pageantService
-            .getScoringSheet(eventId, { divisionId: session.currentDivisionId })
+            .getSessionView(eventId, { divisionId: session.currentDivisionId })
             .then(({ data }) => {
               setSheet(data)
-              // Restore draft scores for this division
-              try {
-                const savedStr = localStorage.getItem(competitionDraftKey)
-                const saved = savedStr ? JSON.parse(savedStr) : {}
-                setScores({ ...data.existingScores, ...saved })
-              } catch {
-                setScores({ ...data.existingScores })
-              }
+              setScores(data.existingScores || {})
             })
             .catch((err) => {
               console.error('[Division change] Failed to reload scoring sheet:', err)
               setConnectionError('Failed to update division')
             })
         } else {
-          // Judge not assigned to this division
           setConnectionError('You are not assigned to this division')
-          setLiveMode(false)
         }
       }
     }
@@ -190,7 +140,6 @@ export default function JudgeScoringPage() {
     const handleConnectError = (error) => {
       console.error('[WS] Connection error:', error)
       setConnectionError('Connection failed - real-time updates unavailable')
-      setLiveMode(false)
     }
 
     // Disconnect handler
@@ -198,10 +147,8 @@ export default function JudgeScoringPage() {
       console.warn('[WS] Disconnected:', reason)
       
       if (reason === 'io server disconnect') {
-        // Server forcibly closed connection, don't auto-reconnect
         setConnectionError('Disconnected by server - please refresh')
       } else {
-        // Connection lost, attempt reconnection
         setReconnectAttempts((prev) => prev + 1)
       }
     }
@@ -213,16 +160,13 @@ export default function JudgeScoringPage() {
       setReconnectAttempts(0)
       
       // Fetch current session state to sync UI
-      pageantService.getScoringSheet(eventId)
+      pageantService.getSessionView(eventId)
         .then(({ data }) => {
           setSheet(data)
           if (data.activeSession) {
             setSessionState(data.activeSession)
-            if (data.activeSession.status === 'active') {
-              setLiveMode(true)
-              if (data.activeSession.activeContestantId) {
-                setActiveContestantId(data.activeSession.activeContestantId)
-              }
+            if (data.activeSession.status === 'active' && data.activeSession.activeContestantId) {
+              setActiveContestantId(data.activeSession.activeContestantId)
             }
           }
         })
@@ -246,12 +190,78 @@ export default function JudgeScoringPage() {
       socket.off('disconnect', handleDisconnect)
       socket.off('reconnect', handleReconnect)
     }
-  }, [eventId, sheet?.divisionsEnabled, sheet?.allowedDivisions, competitionDraftKey])
+  }, [eventId, sheet?.divisionsEnabled, sheet?.allowedDivisions])
 
-  const setScore = (contestantId, criteriaId, value) => {
+  // Auto-save score when changed in live session
+  const autoSaveTimeouts = useRef({})
+  
+  const setScore = useCallback((contestantId, criteriaId, value) => {
     const key = `${contestantId}:${criteriaId}`
-    setScores((prev) => ({ ...prev, [key]: value }))
-  }
+    
+    setScores(prev => ({ ...prev, [key]: value }))
+    
+    // Only auto-save for active contestant in active session
+    if (!isSessionActive || contestantId !== activeContestantId || !sheet?.criteria) {
+      return
+    }
+    
+    // Clear existing timeout for this contestant
+    const contestantTimeoutKey = `contestant_${contestantId}`
+    if (autoSaveTimeouts.current[contestantTimeoutKey]) {
+      clearTimeout(autoSaveTimeouts.current[contestantTimeoutKey])
+    }
+    
+    // Debounce the auto-save to avoid too many API calls
+    autoSaveTimeouts.current[contestantTimeoutKey] = setTimeout(async () => {
+      try {
+        setAutoSaving(true)
+        
+        // Build scores object for current contestant
+        const contestantScores = {}
+        let allScored = true
+        
+        for (const criteria of sheet.criteria) {
+          const scoreKey = `${contestantId}:${criteria.id}`
+          const score = scores[scoreKey]
+          
+          if (score === undefined || score === '' || score === null) {
+            allScored = false
+            break
+          }
+          
+          const numValue = Number(score)
+          if (isNaN(numValue) || numValue < criteria.minScore || numValue > criteria.maxScore) {
+            allScored = false
+            break
+          }
+          
+          contestantScores[criteria.id] = numValue
+        }
+        
+        // Only submit if all criteria are scored for this contestant
+        if (allScored) {
+          await pageantService.submitSessionScore(eventId, contestantScores)
+          console.log(`[Auto-save] Submitted scores for contestant ${contestantId}`)
+        }
+        
+      } catch (err) {
+        console.error('[Auto-save] Failed:', err)
+        setError(err.response?.data?.message || 'Auto-save failed')
+      } finally {
+        setAutoSaving(false)
+      }
+      
+      // Clean up the timeout reference
+      delete autoSaveTimeouts.current[contestantTimeoutKey]
+    }, 2000) // 2 second debounce
+  }, [isSessionActive, sheet?.criteria, eventId, activeContestantId, scores])
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(autoSaveTimeouts.current).forEach(clearTimeout)
+    }
+  }, [])
 
   // Handle division change with scoring sheet reload  
   const handleDivisionChange = useCallback(async (divisionId) => {
@@ -260,34 +270,14 @@ export default function JudgeScoringPage() {
       setError(null)
       
       // Call API with division filter
-      const { data } = await pageantService.getScoringSheet(eventId, { 
+      const { data } = await pageantService.getSessionView(eventId, { 
         divisionId: divisionId || null 
       })
       
       // Update sheet with filtered data
       setSheet(data)
       setSelectedDivisionId(divisionId)
-      
-      // Generate division-specific draft key
-      const getDraftKey = (eventId, divisionId) => {
-        if (divisionId) {
-          return `competition_draft_${eventId}_div_${divisionId}`
-        }
-        return `competition_draft_${eventId}`
-      }
-      
-      // Restore draft scores for selected division
-      let restoredScores = {}
-      try {
-        const savedStr = localStorage.getItem(getDraftKey(eventId, divisionId))
-        restoredScores = savedStr ? JSON.parse(savedStr) : {}
-      } catch (err) {
-        console.warn('Failed to restore division draft:', err)
-        restoredScores = {}
-      }
-      
-      // Merge restored drafts with existing scores
-      setScores({ ...data.existingScores, ...restoredScores })
+      setScores(data.existingScores || {})
       
     } catch (err) {
       console.error('Division change error:', err)
@@ -297,76 +287,6 @@ export default function JudgeScoringPage() {
     }
   }, [eventId])
 
-  const filledCount =
-    sheet?.contestants?.length && sheet?.criteria?.length
-      ? sheet.contestants.length * sheet.criteria.length
-      : 0
-
-  const enteredCount = Object.values(scores).filter((v) => v !== '' && v !== undefined).length
-
-  // Error state for retry logic
-  const [showRetry, setShowRetry] = useState(false)
-
-  const handleSubmit = async () => {
-    setSubmitting(true)
-    setError(null)
-    setShowRetry(false)
-
-    const payload = []
-    for (const contestant of sheet.contestants) {
-      for (const crit of sheet.criteria) {
-        const key = `${contestant.id}:${crit.id}`
-        const val = scores[key]
-        if (val === undefined || val === '') {
-          setError('Please score every contestant on every criterion before submitting.')
-          setSubmitting(false)
-          return
-        }
-        const num = Number(val)
-        if (Number.isNaN(num) || num < crit.minScore || num > crit.maxScore) {
-          setError(
-            `Score for ${contestant.name} — ${crit.name} must be between ${crit.minScore} and ${crit.maxScore}.`,
-          )
-          setSubmitting(false)
-          return
-        }
-        payload.push({
-          contestantId: contestant.id,
-          criteriaId: crit.id,
-          score: num,
-        })
-      }
-    }
-
-    try {
-      // Include session context for real-time feedback
-      const sessionContext = {
-        sessionId: sessionState?.id || null,
-        roundId: sessionState?.currentRoundId || null,
-        contestantId: activeContestantId || null,
-      }
-
-      await pageantService.submitScores(eventId, payload, sessionContext)
-      
-      // Clear current division draft and legacy drafts
-      localStorage.removeItem(getDraftKey(eventId, selectedDivisionId))
-      localStorage.removeItem(competitionDraftKey)
-      localStorage.removeItem(pageantDraftKey)
-      
-      setDone(true)
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Submit failed'
-      setError(errorMessage)
-      
-      // Show retry button for network errors (no response)
-      if (!err.response) {
-        setShowRetry(true)
-      }
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -375,33 +295,42 @@ export default function JudgeScoringPage() {
     )
   }
 
-  if (done || sheet?.hasScored) {
+  // Show waiting message if no active session
+  if (!sessionState || sessionState.status !== 'active') {
     return (
-      <div className="mx-auto max-w-lg rounded-2xl border border-emerald-900/50 bg-emerald-950/30 p-8 text-center">
-        <p className="text-lg font-semibold text-emerald-300">Scores submitted</p>
-        <p className="mt-2 text-sm text-v-text-subtle">Your scores are locked for {sheet?.event?.title}.</p>
-        <Link to="/voter" className="mt-6 inline-block text-v-text-muted">
-          Back to dashboard
-        </Link>
-      </div>
-    )
-  }
-
-  if (!sheet?.scoringOpen) {
-    return (
-      <div className="mx-auto max-w-lg v-card p-8 text-center">
-        <p className="text-white">Scoring is not open yet.</p>
-        <Link to="/voter" className="mt-4 inline-block text-v-text-muted">
-          Back to dashboard
-        </Link>
+      <div className="mx-auto max-w-lg space-y-6">
+        <VoterEventHeader event={sheet?.event} eyebrow="Judge scoring">
+          <p className="text-sm font-medium text-white/75">Waiting for session to start</p>
+        </VoterEventHeader>
+        
+        <div className="v-card p-8 text-center space-y-4">
+          <div className="h-12 w-12 rounded-full bg-v-surface border border-v-border mx-auto flex items-center justify-center">
+            <div className="h-2 w-2 rounded-full bg-v-text-muted"></div>
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-white">No active session</p>
+            <p className="mt-2 text-sm text-v-text-muted">
+              The organizer has not started a live session yet. You'll be able to score contestants once the session begins.
+            </p>
+          </div>
+          {sessionState?.status === 'paused' && (
+            <p className="text-sm text-amber-400">Session is paused</p>
+          )}
+          {sessionState?.status === 'completed' && (
+            <p className="text-sm text-emerald-400">Session has ended</p>
+          )}
+          <Link to="/voter" className="inline-block text-v-primary hover:underline text-sm">
+            Back to dashboard
+          </Link>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-24">
-      <VoterEventHeader event={sheet.event} eyebrow="Judge scoring">
-        <p className="text-sm font-medium text-white/75">One submission only</p>
+      <VoterEventHeader event={sheet?.event} eyebrow="Judge scoring">
+        <p className="text-sm font-medium text-white/75">Live session scoring</p>
       </VoterEventHeader>
 
       <ParticipantInformationGate eventId={eventId} />
@@ -425,33 +354,27 @@ export default function JudgeScoringPage() {
       )}
 
       {/* Live Mode Status */}
-      {liveMode ? (
-        <div className="rounded-xl border border-emerald-900/50 bg-emerald-950/30 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-emerald-300">Live Session Active</p>
-              {sessionState?.currentRoundId && (
-                <p className="text-xs text-emerald-400/80">
-                  Round: {sessionState.currentRoundName || sessionState.currentRoundId}
-                  {activeContestantId && sessionState.contestantOrder && (
-                    <span className="ml-2">
-                      Contestant {sessionState.contestantOrder.indexOf(activeContestantId) + 1} of {sessionState.contestantOrder.length}
-                    </span>
-                  )}
-                </p>
-              )}
-            </div>
+      <div className="rounded-xl border border-emerald-900/50 bg-emerald-950/30 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-emerald-300">Live Session Active</p>
+            {sessionState?.currentRoundId && (
+              <p className="text-xs text-emerald-400/80">
+                Round: {sessionState.currentRoundName || sessionState.currentRoundId}
+                {activeContestantId && sessionState.contestantOrder && (
+                  <span className="ml-2">
+                    Contestant {sessionState.contestantOrder.indexOf(activeContestantId) + 1} of {sessionState.contestantOrder.length}
+                  </span>
+                )}
+              </p>
+            )}
           </div>
+          {autoSaving && (
+            <span className="text-xs text-emerald-400">Saving...</span>
+          )}
         </div>
-      ) : (
-        <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="h-2 w-2 rounded-full bg-v-text-muted"></div>
-            <p className="text-sm text-v-text-muted">Offline Mode - Navigate freely between contestants</p>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Division Selector */}
       {shouldShowSingleDivision && (
@@ -485,57 +408,59 @@ export default function JudgeScoringPage() {
 
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-sm">
         <p className="text-v-text-muted">
-          Score all <strong className="text-white">{sheet.contestants.length}</strong> contestants on{' '}
-          <strong className="text-white">{sheet.criteria.length}</strong> criteria.
+          {activeContestantId ? (
+            <>
+              Scoring contestant: <strong className="text-white">
+                {sheet?.contestants?.find(c => c.id === activeContestantId)?.name || 'Unknown'}
+              </strong>{' '}
+              on <strong className="text-white">{sheet?.criteria?.length || 0}</strong> criteria
+            </>
+          ) : (
+            'Waiting for organizer to select contestant...'
+          )}
         </p>
-        <p className="mt-1 text-xs text-v-text-subtle">
-          Progress: {enteredCount} / {filledCount} scores entered
-        </p>
+        {activeContestantId && sheet?.criteria && (
+          <p className="mt-1 text-xs text-v-text-subtle">
+            {(() => {
+              const activeContestant = sheet.contestants?.find(c => c.id === activeContestantId)
+              if (!activeContestant) return 'Contestant not found'
+              
+              const contestantScores = sheet.criteria.map(crit => {
+                const key = `${activeContestant.id}:${crit.id}`
+                const score = scores[key]
+                return score !== undefined && score !== '' && score !== null ? score : null
+              }).filter(score => score !== null)
+              
+              const isComplete = contestantScores.length === sheet.criteria.length
+              
+              return `Progress: ${contestantScores.length} / ${sheet.criteria.length} criteria scored${isComplete ? ' ✓' : ''}`
+            })()}
+          </p>
+        )}
       </div>
 
       <CompetitionScoringForm
         sheet={sheet}
         scores={scores}
         onScoreChange={setScore}
-        disabled={submitting}
-        liveMode={liveMode}
+        disabled={autoSaving}
+        liveMode={true}
         activeContestantId={activeContestantId}
         sessionState={sessionState}
       />
 
-      {done && (
-        <div className="rounded-xl border border-emerald-900/50 bg-emerald-950/30 px-4 py-3 text-center">
-          <div className="flex items-center justify-center gap-2">
-            <div className="h-5 w-5 rounded-full bg-emerald-400 flex items-center justify-center">
-              <svg className="h-3 w-3 text-emerald-900" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium text-emerald-300">Scores successfully submitted!</p>
-          </div>
-        </div>
-      )}
-
       {error && (
         <div className="rounded-xl border border-red-500/50 bg-red-950/30 px-4 py-3">
           <p className="text-sm text-red-300">{error}</p>
-          {showRetry && (
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              className="mt-2"
-              size="sm"
-              disabled={submitting}
-            >
-              Retry submission
-            </Button>
-          )}
         </div>
       )}
 
-      <Button type="button" onClick={handleSubmit} loading={submitting} className="w-full">
-        {submitting ? 'Submitting…' : 'Submit all scores (locked)'}
-      </Button>
+      {/* Live mode scoring instructions */}
+      <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-center">
+        <p className="text-sm text-v-text-muted">
+          Complete all criteria for the active contestant - scores auto-save when finished
+        </p>
+      </div>
     </div>
   )
 }

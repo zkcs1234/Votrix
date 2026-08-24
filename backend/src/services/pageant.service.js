@@ -102,9 +102,10 @@ export async function getOrganizerDashboard(organizerId) {
   let totalJudges = 0
   let completedJudges = 0
   let scoresSubmitted = 0
+  let activeSessions = 0
 
   if (eventIds.length) {
-    const [contestantsRes, judgesRes, completedJudgesRes, scoresRes] = await Promise.all([
+    const [contestantsRes, judgesRes, completedJudgesRes, scoresRes, sessionsRes] = await Promise.all([
       getClient()
         .from(DB_TABLES.CONTESTANTS)
         .select('*', { count: 'exact', head: true })
@@ -124,17 +125,37 @@ export async function getOrganizerDashboard(organizerId) {
         .from(DB_TABLES.JUDGE_SCORES)
         .select('id, competition_contestants!inner(event_id)', { count: 'exact', head: true })
         .in('competition_contestants.event_id', eventIds),
+      getClient()
+        .from('competition_sessions')
+        .select('event_id, status')
+        .in('event_id', eventIds)
+        .eq('status', 'active'),
     ])
 
     if (contestantsRes.error) throw new ApiError(500, contestantsRes.error.message)
     if (judgesRes.error) throw new ApiError(500, judgesRes.error.message)
     if (completedJudgesRes.error) throw new ApiError(500, completedJudgesRes.error.message)
     if (scoresRes.error) throw new ApiError(500, scoresRes.error.message)
+    if (sessionsRes.error) throw new ApiError(500, sessionsRes.error.message)
 
     totalContestants = contestantsRes.count ?? 0
     totalJudges = judgesRes.count ?? 0
     completedJudges = completedJudgesRes.count ?? 0
     scoresSubmitted = scoresRes.count ?? 0
+    activeSessions = sessionsRes.data?.length ?? 0
+
+    // Add session status to each event
+    const sessionsByEvent = new Map()
+    if (sessionsRes.data) {
+      for (const session of sessionsRes.data) {
+        sessionsByEvent.set(session.event_id, session.status)
+      }
+    }
+
+    // Enrich events with session status
+    events.forEach((event) => {
+      event.sessionStatus = sessionsByEvent.get(event.id) || null
+    })
   }
 
   const judgeCompletionRate =
@@ -145,7 +166,7 @@ export async function getOrganizerDashboard(organizerId) {
     events: (events ?? []).map(mapEvent),
     stats: {
       totalEvents: events?.length ?? 0,
-      activeScoring: events?.filter((e) => e.scoring_enabled).length ?? 0,
+      activeSessions,
       totalContestants,
       totalJudges,
       completedJudges,

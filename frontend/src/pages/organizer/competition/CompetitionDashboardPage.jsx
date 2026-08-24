@@ -41,7 +41,7 @@ export default function CompetitionDashboardPage() {
     pageantService.getDashboard().then(({ data }) => setData(data))
   })
 
-  useSocketEvent('competition:scoring-toggled', () => {
+  useSocketEvent('session:status-changed', () => {
     pageantService.getDashboard().then(({ data }) => setData(data))
   })
 
@@ -79,7 +79,7 @@ export default function CompetitionDashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Events" value={data?.stats?.totalEvents ?? 0} icon={CalendarDays} />
-        <StatCard label="Scoring active" value={data?.stats?.activeScoring ?? 0} icon={Zap} />
+        <StatCard label="Active sessions" value={data?.stats?.activeSessions ?? 0} icon={Zap} />
         <StatCard label="Total contestants" value={data?.stats?.totalContestants ?? 0} icon={Users} />
         <StatCard label="Total judges" value={data?.stats?.totalJudges ?? 0} icon={Star} />
         <StatCard label="Scores submitted" value={data?.stats?.scoresSubmitted ?? 0} icon={CheckSquare} />
@@ -99,8 +99,11 @@ export default function CompetitionDashboardPage() {
                 className="flex justify-between px-6 py-4 transition hover:bg-v-surface-elevated"
               >
                 <span className="text-v-text-muted">{e.title}</span>
-                <span className={e.scoringEnabled ? 'text-v-success text-xs' : 'text-v-text-subtle text-xs'}>
-                  {e.scoringEnabled ? 'Scoring open' : e.status}
+                <span className={e.sessionStatus === 'active' ? 'text-v-success text-xs' : 'text-v-text-subtle text-xs'}>
+                  {e.sessionStatus === 'active' ? 'Live session active' : 
+                   e.sessionStatus === 'paused' ? 'Session paused' : 
+                   e.sessionStatus === 'completed' ? 'Session ended' : 
+                   e.status}
                 </span>
               </Link>
             </li>

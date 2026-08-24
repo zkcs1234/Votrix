@@ -172,6 +172,16 @@ export async function startSession(eventId, organizerId) {
     throw new ApiError(409, 'A live session is already active for this event')
   }
 
+  // Auto-enable scoring when starting a live session
+  const { error: scoringError } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({ scoring_enabled: true })
+    .eq('id', eventId)
+
+  if (scoringError) {
+    console.warn('[startSession] Failed to auto-enable scoring:', scoringError.message)
+  }
+
   // Get the first open round (ordered by display_order)
   const { data: rounds, error: roundsError } = await getClient()
     .from(DB_TABLES.COMPETITION_ROUNDS)
