@@ -114,6 +114,30 @@ export default function JudgeScoringPage() {
     }
   }, [loadRetryQueueFromStorage])
 
+  // Handle division change with scoring sheet reload - MOVED UP to fix temporal dead zone issue
+  const handleDivisionChange = useCallback(async (divisionId) => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // Call API with division filter
+      const { data } = await pageantService.getSessionView(eventId, { 
+        divisionId: divisionId || null 
+      })
+      
+      // Update sheet with filtered data
+      setSheet(data)
+      setSelectedDivisionId(divisionId)
+      setScores(data.existingScores || {})
+      
+    } catch (err) {
+      console.error('Division change error:', err)
+      setError(err.response?.data?.message || 'Failed to load division data')
+    } finally {
+      setLoading(false)
+    }
+  }, [eventId])
+
   // Auto-select single division when divisions are enabled and only one is allowed (Requirement 19.2, 19.5)
   useEffect(() => {
     if (shouldShowSingleDivision && sheet?.allowedDivisions?.length === 1) {
@@ -176,8 +200,8 @@ export default function JudgeScoringPage() {
       }
     }
 
-    // Handle division changes
-    const handleDivisionChange = (payload) => {
+    // Handle websocket division changes
+    const handleWebsocketDivisionChange = (payload) => {
       const { session } = payload.data
       setSessionState(session)
       
@@ -255,7 +279,7 @@ export default function JudgeScoringPage() {
     socket.on('connect', handleConnect)
     socket.on('session:status-changed', handleStatusChange)
     socket.on('session:contestant-changed', handleContestantChange)
-    socket.on('session:division-changed', handleDivisionChange)
+    socket.on('session:division-changed', handleWebsocketDivisionChange)
     socket.on('connect_error', handleConnectError)
     socket.on('disconnect', handleDisconnect)
     socket.on('reconnect', handleReconnect)
@@ -268,7 +292,7 @@ export default function JudgeScoringPage() {
       socket.off('connect', handleConnect)
       socket.off('session:status-changed', handleStatusChange)
       socket.off('session:contestant-changed', handleContestantChange)
-      socket.off('session:division-changed', handleDivisionChange)
+      socket.off('session:division-changed', handleWebsocketDivisionChange)
       socket.off('connect_error', handleConnectError)
       socket.off('disconnect', handleDisconnect)
       socket.off('reconnect', handleReconnect)
@@ -452,30 +476,6 @@ export default function JudgeScoringPage() {
       }
     }
   }, [submissionQueue, eventId, saveRetryQueueToStorage])
-
-  // Handle division change with scoring sheet reload  
-  const handleDivisionChange = useCallback(async (divisionId) => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      // Call API with division filter
-      const { data } = await pageantService.getSessionView(eventId, { 
-        divisionId: divisionId || null 
-      })
-      
-      // Update sheet with filtered data
-      setSheet(data)
-      setSelectedDivisionId(divisionId)
-      setScores(data.existingScores || {})
-      
-    } catch (err) {
-      console.error('Division change error:', err)
-      setError(err.response?.data?.message || 'Failed to load division data')
-    } finally {
-      setLoading(false)
-    }
-  }, [eventId])
 
   if (loading) {
     return (
