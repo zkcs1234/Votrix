@@ -178,6 +178,20 @@ export const scoreLimiters = makeEventLimiters({
   message: 'Too many score submissions. Please wait before scoring again.',
 })
 
+/**
+ * Judge score submission rate limiter (Live-Aware Judge Scoring)
+ * Requirement 17: Rate Limiting on Score Submissions
+ * - Limits judge score submissions to 30 per minute per judge
+ * - Tracks by judge ID (req.user.id) to isolate per judge
+ * - Applies to both manual submit and auto-save endpoints
+ */
+export const judgeScoreLimiter = createLimiter({
+  windowMs: ONE_MINUTE,
+  max: parseEnvInt('RATE_LIMIT_JUDGE_SCORE_MAX', 30),
+  keyGenerator: createKey({ user: true, suffix: 'judge-score' }),
+  message: stdMessage('Too many score submissions, please slow down'),
+})
+
 /** Legacy generic submit limiter (kept for backward compatibility) */
 export const submitLimiter = createLimiter({
   windowMs: ONE_MINUTE,

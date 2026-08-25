@@ -172,6 +172,98 @@ export async function startSession(eventId, organizerId) {
     throw new ApiError(409, 'A live session is already active for this event')
   }
 
+  // ===== PRE-FLIGHT VALIDATION (Requirements 13.1-13.6) =====
+  
+  // 13.1: Validate at least one contestant exists
+  const { count: contestantCount, error: contestantError } = await getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+
+  if (contestantError) throw new ApiError(500, contestantError.message)
+  
+  if (contestantCount === 0) {
+    throw new ApiError(
+      400,
+      'Cannot start session: No contestants added. Add contestants first.'
+    )
+  }
+
+  // 13.2: Validate at least one active judge is enrolled
+  const { count: judgeCount, error: judgeError } = await getClient()
+    .from(DB_TABLES.COMPETITION_JUDGES)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .eq('is_active', true)
+
+  if (judgeError) throw new ApiError(500, judgeError.message)
+  
+  if (judgeCount === 0) {
+    throw new ApiError(
+      400,
+      'Cannot start session: No judges enrolled. Add judges first.'
+    )
+  }
+
+  // 13.3: Validate at least one criterion exists
+  const { data: criteriaData, error: criteriaError } = await getClient()
+    .from(DB_TABLES.CRITERIA)
+    .select('percentage')
+    .eq('event_id', eventId)
+
+  if (criteriaError) throw new ApiError(500, criteriaError.message)
+  
+  if (!criteriaData || criteriaData.length === 0) {
+    throw new ApiError(
+      400,
+      'Cannot start session: No criteria added. Add criteria first.'
+    )
+  }
+
+  // 13.4: Validate criteria percentages sum to 100%
+  const totalPercentage = criteriaData.reduce(
+    (sum, criterion) => sum + Number(criterion.percentage),
+    0
+  )
+
+  if (Math.abs(totalPercentage - 100) > 0.1) {
+    throw new ApiError(
+      400,
+      `Cannot start session: Criteria percentages total ${totalPercentage.toFixed(1)}% (must equal 100%)`
+    )
+  }
+
+  // Get rounds for validation
+  const { data: rounds, error: roundsError } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUNDS)
+    .select('id, name, display_order')
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (roundsError) throw new ApiError(500, roundsError.message)
+
+  // 13.5 & 13.6: Validate rounds if they exist
+  if (rounds && rounds.length > 0) {
+    // Check if at least one round has assigned contestants
+    const { data: roundContestants, error: roundContestantsError } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS)
+      .select('round_id')
+      .in('round_id', rounds.map(r => r.id))
+      .limit(1)
+
+    if (roundContestantsError) throw new ApiError(500, roundContestantsError.message)
+
+    if (!roundContestants || roundContestants.length === 0) {
+      throw new ApiError(
+        400,
+        'Cannot start session: No open rounds with assigned contestants'
+      )
+    }
+  }
+
+  // ===== END PRE-FLIGHT VALIDATION =====
+
   // Auto-enable scoring when starting a live session
   const { error: scoringError } = await getClient()
     .from(DB_TABLES.EVENTS)
@@ -182,16 +274,7 @@ export async function startSession(eventId, organizerId) {
     console.warn('[startSession] Failed to auto-enable scoring:', scoringError.message)
   }
 
-  // Get the first open round (ordered by display_order)
-  const { data: rounds, error: roundsError } = await getClient()
-    .from(DB_TABLES.COMPETITION_ROUNDS)
-    .select('id, name, display_order')
-    .eq('event_id', eventId)
-    .order('display_order', { ascending: true })
-    .order('created_at', { ascending: true })
-
-  if (roundsError) throw new ApiError(500, roundsError.message)
-
+  // Use the rounds already fetched during validation
   let firstRoundId = null
   let contestantOrder = []
 

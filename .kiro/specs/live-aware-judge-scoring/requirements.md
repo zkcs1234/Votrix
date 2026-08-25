@@ -169,3 +169,107 @@ The Live-Aware Judge Scoring Experience enhances the judge scoring page to respo
 5. FOR ALL successful score submissions during Live_Mode, THE backend SHALL emit a `session:judge-score-submitted` event to the organizer
 6. FOR ALL score submissions, THE backend SHALL validate that the Active_Contestant matches the contestant being scored
 
+### Requirement 13: Pre-Flight Session Validation
+
+**User Story:** As an organizer, I want the system to validate all prerequisites before allowing session start, so that I cannot start a live session with invalid configurations that will cause failures.
+
+#### Acceptance Criteria
+
+1. WHEN THE organizer attempts to start a Live_Session, THE backend startSession service SHALL validate that at least 1 contestant exists in the event
+2. WHEN THE organizer attempts to start a Live_Session, THE backend startSession service SHALL validate that at least 1 active judge is enrolled in the event
+3. WHEN THE organizer attempts to start a Live_Session, THE backend startSession service SHALL validate that at least 1 criterion exists in the event
+4. WHEN THE organizer attempts to start a Live_Session, THE backend startSession service SHALL calculate the total of all criteria percentages and validate they sum to exactly 100% with a tolerance of ±0.1%
+5. WHEN using rounds AND THE organizer attempts to start a Live_Session, THE backend startSession service SHALL validate that at least 1 round exists and is marked as open
+6. IF any pre-flight validation fails, THEN THE backend SHALL return a 400 error with a descriptive message indicating which prerequisite is missing or invalid
+
+### Requirement 14: Judge Score Submission Confirmation
+
+**User Story:** As a judge, I want to see a prominent visual confirmation after my scores are successfully submitted, so that I have confidence my scores were saved and I don't attempt duplicate submissions.
+
+#### Acceptance Criteria
+
+1. WHEN auto-save completes successfully for a contestant, THE Judge_Scoring_Page SHALL display a toast notification with a success checkmark icon
+2. THE success toast SHALL display the heading "Scores Submitted!" in a prominent font
+3. THE success toast SHALL include the contestant name for context to confirm which contestant was scored
+4. THE success toast SHALL display the message "Your scores are locked" to indicate immutability
+5. THE success toast SHALL auto-dismiss after 3 seconds without requiring user interaction
+6. THE success toast SHALL appear in a fixed position at the bottom-right or top-right of the viewport with high z-index to ensure visibility
+
+### Requirement 15: Failed Submission Retry Queue
+
+**User Story:** As a judge, I want failed score submissions to be automatically retried when connection is restored, so that I don't lose scoring progress due to temporary network issues.
+
+#### Acceptance Criteria
+
+1. WHEN auto-save fails due to network error, THE Judge_Scoring_Page SHALL add the failed submission to an in-memory retry queue
+2. WHEN auto-save fails due to network error, THE Judge_Scoring_Page SHALL also persist the failed submission to localStorage as a backup
+3. WHEN auto-save fails, THE Judge_Scoring_Page SHALL display a prominent error banner at the top of the page (not at the bottom)
+4. THE error banner SHALL include a manual "Retry Now" button to allow immediate retry without waiting for automatic reconnection
+5. WHEN THE websocket connection is restored, THE Judge_Scoring_Page SHALL automatically attempt to submit all queued submissions in order
+6. WHEN a queued submission succeeds, THE Judge_Scoring_Page SHALL remove it from both the in-memory queue and localStorage backup
+7. WHEN all queued submissions succeed, THE Judge_Scoring_Page SHALL dismiss the error banner automatically
+
+### Requirement 16: Database Performance Indexes
+
+**User Story:** As a system administrator, I want database indexes on high-traffic query paths, so that the system maintains fast response times with large events involving many judges and contestants.
+
+#### Acceptance Criteria
+
+1. THE database SHALL have an index on competition_sessions(event_id, status) to optimize active session lookups
+2. THE database SHALL have a composite index on competition_session_judge_scores(session_id, judge_id, round_id, contestant_id) to optimize score retrieval queries
+3. THE database SHALL have a composite index on competition_contestants(event_id, division_id, contestant_number) to optimize contestant ordering and filtering
+4. THE database SHALL have a composite index on competition_judge_assignments(event_id, judge_id, scope, scope_id) to optimize judge assignment validation
+5. THE database SHALL have a composite index on competition_criteria(event_id, division_id) to optimize criteria loading for divisions
+6. THE database SHALL have a composite index on competition_rounds(event_id, category_id, display_order) to optimize round ordering and category filtering
+
+### Requirement 17: Rate Limiting on Score Submissions
+
+**User Story:** As a system administrator, I want rate limiting on score submission endpoints, so that malicious judges cannot spam the API and cause denial-of-service or database overload.
+
+#### Acceptance Criteria
+
+1. THE backend SHALL implement rate limiting middleware on the score submission endpoint limited to 30 submissions per minute per judge
+2. WHEN a judge exceeds the rate limit, THE backend SHALL return a 429 status code with the message "Too many score submissions, please slow down"
+3. THE rate limiting SHALL apply to both auto-save and manual submit endpoints for consistency
+4. THE rate limiting SHALL track submissions per judge_id to prevent one judge from affecting others
+5. THE rate limiting window SHALL reset every 60 seconds to allow judges to continue scoring after the limit resets
+
+### Requirement 18: CSRF Protection on Session Control
+
+**User Story:** As a system administrator, I want CSRF token validation on session control endpoints, so that organizer sessions cannot be hijacked through cross-site request forgery attacks.
+
+#### Acceptance Criteria
+
+1. THE backend SHALL validate CSRF tokens on POST /api/organizer/competition/events/:eventId/session/start
+2. THE backend SHALL validate CSRF tokens on POST /api/organizer/competition/events/:eventId/session/pause
+3. THE backend SHALL validate CSRF tokens on POST /api/organizer/competition/events/:eventId/session/resume
+4. THE backend SHALL validate CSRF tokens on POST /api/organizer/competition/events/:eventId/session/complete
+5. WHEN a CSRF token is missing or invalid, THE backend SHALL return a 403 status code with a descriptive error message
+6. THE frontend SHALL include the CSRF token from cookies in all session control requests
+
+### Requirement 19: Division Selector Auto-Hide Logic
+
+**User Story:** As a judge assigned to only one division, I want the division selector to be automatically hidden and my division auto-selected, so that I don't see unnecessary UI clutter for a choice I don't have.
+
+#### Acceptance Criteria
+
+1. WHEN THE judge is assigned to 2 or more divisions, THE Judge_Scoring_Page SHALL display the division selector dropdown
+2. WHEN THE judge is assigned to exactly 1 division, THE Judge_Scoring_Page SHALL auto-select that division and display only the division name as static text (no selector dropdown)
+3. WHEN THE judge is assigned to 0 divisions, THE Judge_Scoring_Page SHALL display an error message "You are not assigned to any divisions"
+4. THE division selector visibility logic SHALL be computed after loading the Scoring_Sheet to ensure allowed divisions are known
+5. FOR ALL cases where the selector is hidden due to single-division assignment, THE Judge_Scoring_Page SHALL still load the Scoring_Sheet filtered by that single division
+
+### Requirement 20: Organizer Dashboard Session Recovery
+
+**User Story:** As an organizer, I want to see a resume banner on my dashboard when an active session exists, so that I don't lose track of ongoing sessions if I close my browser or navigate away.
+
+#### Acceptance Criteria
+
+1. WHEN THE organizer dashboard mounts, THE frontend SHALL check for active sessions for all events owned by the organizer
+2. WHEN at least one active session is found, THE dashboard SHALL display a prominent "Resume Active Session" banner at the top of the page
+3. THE resume banner SHALL display the event name of the active session
+4. THE resume banner SHALL display the current contestant name or number being presented
+5. THE resume banner SHALL display the elapsed time since the session started
+6. THE resume banner SHALL include a direct link to the /live control page for the event with the active session
+7. WHEN the organizer clicks the resume link, THE browser SHALL navigate directly to /organizer/competition/events/:eventId/live
+

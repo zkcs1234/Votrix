@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Zap, CheckCircle2, Users, Vote, Trophy, BarChart2, BarChart3, ArrowRight } from 'lucide-react'
+import { CalendarDays, Zap, CheckCircle2, Users, Vote, Trophy, BarChart2, BarChart3, ArrowRight, Clock, Play } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import StatCard from '@/components/ui/StatCard'
 import Card from '@/components/ui/Card'
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/Skeleton'
 import { AreaChartView, PieChartView } from '@/components/charts'
 import { organizerService } from '@/services/organizer.service'
+import { pageantService } from '@/services/pageant.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
@@ -25,6 +26,7 @@ export default function OrganizerDashboardPage() {
   const { user } = useAuth()
   const [dashboard, setDashboard] = useState(null)
   const [analytics, setAnalytics] = useState(null)
+  const [activeSessions, setActiveSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -43,12 +45,54 @@ export default function OrganizerDashboardPage() {
         if (!alive) return
         setDashboard(dashboardRes.data)
         setAnalytics(analyticsRes.data)
+        
+        // Check for active sessions across all competition events
+        await checkForActiveSessions()
+        
         setError(null)
       } catch (err) {
         if (!alive) return
         setError(err.response?.data?.message || 'Failed to load organizer dashboard')
       } finally {
         if (alive) setLoading(false)
+      }
+    }
+
+    const checkForActiveSessions = async () => {
+      try {
+        // Get all competition events owned by organizer
+        const eventsRes = await pageantService.listEvents()
+        const events = eventsRes.data.events || []
+
+        // Check each event for active sessions
+        const activeSessionPromises = events.map(async (event) => {
+          try {
+            const sessionRes = await pageantService.getActiveSession(event.id)
+            if (sessionRes.data.session && sessionRes.data.session.status === 'active') {
+              return {
+                eventId: event.id,
+                eventTitle: event.title,
+                session: sessionRes.data.session
+              }
+            }
+          } catch (err) {
+            // 404 means no active session, which is fine
+            if (err.response?.status === 404) {
+              return null
+            }
+            console.error(`Failed to check session for event ${event.id}:`, err)
+            return null
+          }
+          return null
+        })
+
+        const results = await Promise.all(activeSessionPromises)
+        const activeSessions = results.filter(result => result !== null)
+        
+        if (!alive) return
+        setActiveSessions(activeSessions)
+      } catch (err) {
+        console.error('Failed to check for active sessions:', err)
       }
     }
 
@@ -62,6 +106,27 @@ export default function OrganizerDashboardPage() {
   useSocketEvent('organizer:stats-updated', () => {
     organizerService.getDashboard().then(({ data }) => setDashboard(data))
   })
+
+  // Helper function to format elapsed time
+  const formatElapsedTime = (startedAt) => {
+    const start = new Date(startedAt)
+    const now = new Date()
+    const diffMs = now - start
+    const diffMins = Math.floor(diffMs / (1000 * 60))
+    
+    if (diffMins < 60) {
+      return `${diffMins} minutes ago`
+    }
+    
+    const diffHours = Math.floor(diffMins / 60)
+    const remainingMins = diffMins % 60
+    
+    if (remainingMins === 0) {
+      return `${diffHours}h ago`
+    }
+    
+    return `${diffHours}h ${remainingMins}m ago`
+  }
 
   // Show nothing under 300ms
   if (loading && !showLoader) {
@@ -117,6 +182,50 @@ export default function OrganizerDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Session Recovery Banner */}
+      {activeSessions.length > 0 && (
+        <div className="rounded-xl border border-amber-500/50 bg-amber-950/30 p-4">
+          <div className="flex items-start gap-3">
+            <Clock className="mt-0.5 h-5 w-5 text-amber-400" strokeWidth={1.5} />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-amber-300">Resume Active Session</h3>
+              <p className="mt-1 text-sm text-amber-200">
+                You have {activeSessions.length} active competition session{activeSessions.length > 1 ? 's' : ''} that can be resumed.
+              </p>
+              
+              <div className="mt-3 space-y-2">
+                {activeSessions.map((activeSession) => (
+                  <div key={activeSession.eventId} className="rounded-lg border border-amber-600/30 bg-amber-900/20 p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-amber-100">{activeSession.eventTitle}</p>
+                        <div className="mt-1 flex items-center gap-4 text-sm text-amber-200">
+                          {activeSession.session.activeContestantName && (
+                            <span>Current: {activeSession.session.activeContestantName}</span>
+                          )}
+                          {activeSession.session.activeContestantNumber && !activeSession.session.activeContestantName && (
+                            <span>Current: Contestant #{activeSession.session.activeContestantNumber}</span>
+                          )}
+                          <span>Started {formatElapsedTime(activeSession.session.startedAt)}</span>
+                        </div>
+                      </div>
+                      
+                      <Link
+                        to={`/organizer/competition/events/${activeSession.eventId}/live`}
+                        className="flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-amber-500"
+                      >
+                        <Play className="h-4 w-4" strokeWidth={1.5} />
+                        Resume Session
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="v-card-md">
         <h2 className="v-page-title">Organizer dashboard</h2>
         <p className="v-caption mt-2">

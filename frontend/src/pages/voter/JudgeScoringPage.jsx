@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { CheckCircle, AlertTriangle, RotateCcw, AlertCircle } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
@@ -20,14 +21,56 @@ export default function JudgeScoringPage() {
   const [connectionError, setConnectionError] = useState(null)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
   const [autoSaving, setAutoSaving] = useState(false)
+  const [socketConnected, setSocketConnected] = useState(false)
   
   // Division selector state
   const [selectedDivisionId, setSelectedDivisionId] = useState(null)
 
+  // Retry queue state management (Requirement 15.1, 15.2)
+  const [submissionQueue, setSubmissionQueue] = useState([])
+  const [showRetryBanner, setShowRetryBanner] = useState(false)
+  
+  // Confirmation toast state
+  const [showConfirmation, setShowConfirmation] = useState(false)
+
   // Check if session is active
   const isSessionActive = sessionState?.status === 'active'
 
-  // Division selector visibility logic
+  // Helper functions for retry queue localStorage persistence (Requirement 15.2)
+  const getRetryQueueKey = useCallback(() => {
+    return `competition_retry_queue_${eventId}`
+  }, [eventId])
+
+  const loadRetryQueueFromStorage = useCallback(() => {
+    try {
+      const key = getRetryQueueKey()
+      const stored = localStorage.getItem(key)
+      return stored ? JSON.parse(stored) : []
+    } catch (err) {
+      console.error('[Retry Queue] Failed to load from localStorage:', err)
+      return []
+    }
+  }, [getRetryQueueKey])
+
+  const saveRetryQueueToStorage = useCallback((queue) => {
+    try {
+      const key = getRetryQueueKey()
+      localStorage.setItem(key, JSON.stringify(queue))
+    } catch (err) {
+      console.error('[Retry Queue] Failed to save to localStorage:', err)
+    }
+  }, [getRetryQueueKey])
+
+  const addToRetryQueue = useCallback((submission) => {
+    setSubmissionQueue(prevQueue => {
+      const newQueue = [...prevQueue, submission]
+      saveRetryQueueToStorage(newQueue)
+      setShowRetryBanner(true) // Requirement 15.3
+      return newQueue
+    })
+  }, [saveRetryQueueToStorage])
+
+  // Division selector visibility logic (Requirements 19.1, 19.2, 19.3, 19.4, 19.5)
   const shouldShowDivisionSelector = useMemo(() => {
     if (!sheet?.divisionsEnabled) return false
     if (!sheet?.allowedDivisions || sheet.allowedDivisions.length === 0) return false
@@ -37,6 +80,11 @@ export default function JudgeScoringPage() {
   const shouldShowSingleDivision = useMemo(() => {
     if (!sheet?.divisionsEnabled) return false
     return sheet?.allowedDivisions?.length === 1
+  }, [sheet])
+
+  const shouldShowNoDivisionsError = useMemo(() => {
+    if (!sheet?.divisionsEnabled) return false
+    return sheet?.allowedDivisions?.length === 0
   }, [sheet])
 
   // Load session view (live-session-only API)
@@ -56,6 +104,27 @@ export default function JudgeScoringPage() {
       })
       .finally(() => setLoading(false))
   }, [eventId])
+
+  // Load retry queue from localStorage on mount (Requirement 15.2)
+  useEffect(() => {
+    const storedQueue = loadRetryQueueFromStorage()
+    if (storedQueue.length > 0) {
+      setSubmissionQueue(storedQueue)
+      setShowRetryBanner(true)
+    }
+  }, [loadRetryQueueFromStorage])
+
+  // Auto-select single division when divisions are enabled and only one is allowed (Requirement 19.2, 19.5)
+  useEffect(() => {
+    if (shouldShowSingleDivision && sheet?.allowedDivisions?.length === 1) {
+      const singleDivisionId = sheet.allowedDivisions[0].id
+      if (!selectedDivisionId || selectedDivisionId !== singleDivisionId) {
+        // Auto-select the single division and load filtered scoring sheet
+        setSelectedDivisionId(singleDivisionId)
+        handleDivisionChange(singleDivisionId)
+      }
+    }
+  }, [shouldShowSingleDivision, sheet?.allowedDivisions, selectedDivisionId, handleDivisionChange])
 
   // Update session state from activeSession field
   useEffect(() => {
@@ -145,6 +214,7 @@ export default function JudgeScoringPage() {
     // Disconnect handler
     const handleDisconnect = (reason) => {
       console.warn('[WS] Disconnected:', reason)
+      setSocketConnected(false)
       
       if (reason === 'io server disconnect') {
         setConnectionError('Disconnected by server - please refresh')
@@ -158,6 +228,7 @@ export default function JudgeScoringPage() {
       console.log('[WS] Reconnected successfully')
       setConnectionError(null)
       setReconnectAttempts(0)
+      setSocketConnected(true)
       
       // Fetch current session state to sync UI
       pageantService.getSessionView(eventId)
@@ -173,7 +244,15 @@ export default function JudgeScoringPage() {
         .catch((err) => console.error('[WS] Failed to sync session:', err))
     }
 
+    // Connect handler
+    const handleConnect = () => {
+      console.log('[WS] Connected')
+      setSocketConnected(true)
+      setConnectionError(null)
+    }
+
     // Subscribe to events
+    socket.on('connect', handleConnect)
     socket.on('session:status-changed', handleStatusChange)
     socket.on('session:contestant-changed', handleContestantChange)
     socket.on('session:division-changed', handleDivisionChange)
@@ -181,8 +260,12 @@ export default function JudgeScoringPage() {
     socket.on('disconnect', handleDisconnect)
     socket.on('reconnect', handleReconnect)
 
+    // Set initial connection status
+    setSocketConnected(socket.connected)
+
     // Cleanup on unmount
     return () => {
+      socket.off('connect', handleConnect)
       socket.off('session:status-changed', handleStatusChange)
       socket.off('session:contestant-changed', handleContestantChange)
       socket.off('session:division-changed', handleDivisionChange)
@@ -213,40 +296,60 @@ export default function JudgeScoringPage() {
     
     // Debounce the auto-save to avoid too many API calls
     autoSaveTimeouts.current[contestantTimeoutKey] = setTimeout(async () => {
+      // Build scores object for current contestant
+      let contestantScores = {}
+      let allScored = true
+      
+      for (const criteria of sheet.criteria) {
+        const scoreKey = `${contestantId}:${criteria.id}`
+        const score = scores[scoreKey]
+        
+        if (score === undefined || score === '' || score === null) {
+          allScored = false
+          break
+        }
+        
+        const numValue = Number(score)
+        if (isNaN(numValue) || numValue < criteria.minScore || numValue > criteria.maxScore) {
+          allScored = false
+          break
+        }
+        
+        contestantScores[criteria.id] = numValue
+      }
+      
       try {
         setAutoSaving(true)
-        
-        // Build scores object for current contestant
-        const contestantScores = {}
-        let allScored = true
-        
-        for (const criteria of sheet.criteria) {
-          const scoreKey = `${contestantId}:${criteria.id}`
-          const score = scores[scoreKey]
-          
-          if (score === undefined || score === '' || score === null) {
-            allScored = false
-            break
-          }
-          
-          const numValue = Number(score)
-          if (isNaN(numValue) || numValue < criteria.minScore || numValue > criteria.maxScore) {
-            allScored = false
-            break
-          }
-          
-          contestantScores[criteria.id] = numValue
-        }
         
         // Only submit if all criteria are scored for this contestant
         if (allScored) {
           await pageantService.submitSessionScore(eventId, contestantScores)
           console.log(`[Auto-save] Submitted scores for contestant ${contestantId}`)
+          
+          // Show confirmation toast
+          setShowConfirmation(true)
+          
+          // Auto-dismiss after 3 seconds
+          setTimeout(() => {
+            setShowConfirmation(false)
+          }, 3000)
         }
         
       } catch (err) {
         console.error('[Auto-save] Failed:', err)
-        setError(err.response?.data?.message || 'Auto-save failed')
+        
+        // For network errors (no response), add to retry queue (Requirement 15.1)
+        if (!err.response && allScored) {
+          const submission = {
+            contestantId,
+            scores: contestantScores,
+            timestamp: Date.now()
+          }
+          addToRetryQueue(submission)
+        } else {
+          // For validation errors or other server errors, just show error message
+          setError(err.response?.data?.message || 'Auto-save failed')
+        }
       } finally {
         setAutoSaving(false)
       }
@@ -262,6 +365,93 @@ export default function JudgeScoringPage() {
       Object.values(autoSaveTimeouts.current).forEach(clearTimeout)
     }
   }, [])
+
+  // Automatic retry on reconnection (Requirement 15.5, 15.6, 15.7)
+  // Task 13.2: Add useEffect watching [socket.connected, submissionQueue]
+  useEffect(() => {
+    const socket = window.socketClient
+    if (!socket) return
+
+    // Check if we should retry submissions (Task 13.2: socket.connected AND submissionQueue.length > 0)
+    const shouldRetry = socketConnected && submissionQueue.length > 0
+
+    if (!shouldRetry) return
+
+    // Iterate through queue and retry each submission
+    const retrySubmissions = async () => {
+      console.log(`[Retry Queue] Processing ${submissionQueue.length} queued submissions`)
+
+      for (const submission of submissionQueue) {
+        try {
+          // Retry the submission
+          await pageantService.submitSessionScore(eventId, submission.scores)
+          
+          console.log(`[Retry Queue] Successfully submitted scores for contestant ${submission.contestantId}`)
+          
+          // On success, remove from queue (both state and localStorage) - Task 13.2
+          setSubmissionQueue(prevQueue => {
+            const updatedQueue = prevQueue.filter(s => s.contestantId !== submission.contestantId)
+            saveRetryQueueToStorage(updatedQueue)
+            
+            // When queue is empty, hide retry banner - Task 13.2
+            if (updatedQueue.length === 0) {
+              setShowRetryBanner(false)
+            }
+            
+            return updatedQueue
+          })
+          
+          // Show success confirmation
+          setShowConfirmation(true)
+          setTimeout(() => setShowConfirmation(false), 3000)
+          
+        } catch (err) {
+          console.error(`[Retry Queue] Failed to submit scores for contestant ${submission.contestantId}:`, err)
+          // On failure, keep submission in queue for manual retry - Task 13.2
+          // Queue remains unchanged
+        }
+      }
+    }
+
+    retrySubmissions()
+  }, [socketConnected, submissionQueue, eventId, saveRetryQueueToStorage, sheet?.contestants])
+
+  // Manual retry function for retry banner button (Task 13.3)
+  const handleManualRetry = useCallback(async () => {
+    if (submissionQueue.length === 0) return
+
+    console.log(`[Manual Retry] Processing ${submissionQueue.length} queued submissions`)
+
+    for (const submission of submissionQueue) {
+      try {
+        // Retry the submission
+        await pageantService.submitSessionScore(eventId, submission.scores)
+        
+        console.log(`[Manual Retry] Successfully submitted scores for contestant ${submission.contestantId}`)
+        
+        // On success, remove from queue (both state and localStorage)
+        setSubmissionQueue(prevQueue => {
+          const updatedQueue = prevQueue.filter(s => s.contestantId !== submission.contestantId)
+          saveRetryQueueToStorage(updatedQueue)
+          
+          // When queue is empty, hide retry banner
+          if (updatedQueue.length === 0) {
+            setShowRetryBanner(false)
+          }
+          
+          return updatedQueue
+        })
+        
+        // Show success confirmation
+        setShowConfirmation(true)
+        setTimeout(() => setShowConfirmation(false), 3000)
+        
+      } catch (err) {
+        console.error(`[Manual Retry] Failed to submit scores for contestant ${submission.contestantId}:`, err)
+        // On failure, keep submission in queue - user can try again
+      }
+    }
+  }, [submissionQueue, eventId, saveRetryQueueToStorage])
 
   // Handle division change with scoring sheet reload  
   const handleDivisionChange = useCallback(async (divisionId) => {
@@ -329,6 +519,33 @@ export default function JudgeScoringPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-24">
+      {/* Retry error banner (Requirement 15.3, 15.4) - Task 13.3 */}
+      {showRetryBanner && (
+        <div className="border border-red-500/50 bg-red-950/30 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-red-300">
+                Failed to submit scores. Will retry automatically when connection is restored.
+              </p>
+              <p className="mt-1 text-xs text-red-400/80">
+                {submissionQueue.length} score{submissionQueue.length !== 1 ? 's' : ''} pending submission
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleManualRetry}
+              className="flex-shrink-0 border-red-500/50 text-red-300 hover:bg-red-950/50"
+              disabled={submissionQueue.length === 0}
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Retry Now
+            </Button>
+          </div>
+        </div>
+      )}
+
       <VoterEventHeader event={sheet?.event} eyebrow="Judge scoring">
         <p className="text-sm font-medium text-white/75">Live session scoring</p>
       </VoterEventHeader>
@@ -377,6 +594,15 @@ export default function JudgeScoringPage() {
       </div>
 
       {/* Division Selector */}
+      {shouldShowNoDivisionsError && (
+        <div className="v-card px-4 py-3">
+          <div className="flex items-center gap-2 text-red-300">
+            <AlertTriangle className="h-5 w-5" />
+            <p className="text-sm font-medium">You are not assigned to any divisions</p>
+          </div>
+        </div>
+      )}
+
       {shouldShowSingleDivision && (
         <div className="v-card px-4 py-3">
           <p className="text-sm text-v-text-muted">
@@ -461,6 +687,22 @@ export default function JudgeScoringPage() {
           Complete all criteria for the active contestant - scores auto-save when finished
         </p>
       </div>
+      
+      {/* Success confirmation toast (Requirement 14) */}
+      {showConfirmation && (
+        <div className="fixed bottom-4 right-4 z-50 bg-emerald-500 text-white shadow-2xl rounded-xl px-6 py-4 animate-slide-up">
+          <div className="flex items-start gap-3">
+            <CheckCircle className="h-6 w-6 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-bold text-white">Scores Submitted!</p>
+              <p className="mt-1 text-sm text-white">
+                {sheet?.contestants?.find(c => c.id === activeContestantId)?.name}
+              </p>
+              <p className="mt-1 text-xs text-white/80">Your scores are locked</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
