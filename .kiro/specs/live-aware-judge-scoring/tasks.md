@@ -207,7 +207,7 @@ This implementation converts the judge scoring page from a static, offline-only 
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6_
 
 - [ ] 12. Implement Judge Score Submission Confirmation Toast (Requirement 14)
-  - [-] 12.1 Add confirmation toast component to JudgeScoringPage
+  - [ ] 12.1 Add confirmation toast component to JudgeScoringPage
     - Modify `frontend/src/pages/voter/JudgeScoringPage.jsx`
     - Add state variable: `showConfirmation` (boolean)
     - After successful auto-save in the score input handler, set `showConfirmation = true`
@@ -226,7 +226,7 @@ This implementation converts the judge scoring page from a static, offline-only 
     - _Requirements: 14.2, 14.3, 14.4_
 
 - [ ] 13. Implement Failed Submission Retry Queue (Requirement 15)
-  - [-] 13.1 Add retry queue state management
+  - [ ] 13.1 Add retry queue state management
     - In `JudgeScoringPage.jsx`, add state variables: `submissionQueue` (array), `showRetryBanner` (boolean)
     - When auto-save fails (network error: `!err.response`), add the failed submission payload to `submissionQueue`
     - Persist failed submissions to localStorage with key: `competition_retry_queue_${eventId}` (JSON array)
@@ -317,15 +317,15 @@ This implementation converts the judge scoring page from a static, offline-only 
 
 - [ ] 19. Final Checkpoint: Production Readiness Testing
   - [ ] 19.1 Test pre-flight validation: attempt to start session with 0 contestants, 0 judges, criteria ≠ 100%, verify appropriate error messages
-  - [~] 19.2 Test judge confirmation toast: submit scores as judge, verify toast appears with contestant name and auto-dismisses after 3 seconds
-  - [~] 19.3 Test retry queue: disconnect network while scoring, verify error banner appears, reconnect network, verify auto-retry succeeds
-  - [~] 19.4 Test manual retry button: disconnect network, score contestant, click "Retry Now", verify submission succeeds when network available
-  - [~] 19.5 Test database indexes: run `\d+ competition_sessions` in PostgreSQL, verify all 6 new indexes exist
-  - [~] 19.6 Test rate limiting: submit 31 scores in 1 minute as same judge, verify 429 error on 31st submission
-  - [~] 19.7 Test CSRF protection: attempt session control request without CSRF token, verify 403 error
-  - [~] 19.8 Test division selector auto-hide: log in as judge with 1 division, verify selector is hidden and division name is displayed
-  - [~] 19.9 Test session recovery banner: start session, navigate away from live page, return to dashboard, verify banner shows with event name and elapsed time
-  - [~] 19.10 Ensure all tests pass, ask the user if questions arise.
+  - [ ] 19.2 Test judge confirmation toast: submit scores as judge, verify toast appears with contestant name and auto-dismisses after 3 seconds
+  - [ ] 19.3 Test retry queue: disconnect network while scoring, verify error banner appears, reconnect network, verify auto-retry succeeds
+  - [ ] 19.4 Test manual retry button: disconnect network, score contestant, click "Retry Now", verify submission succeeds when network available
+  - [ ] 19.5 Test database indexes: run `\d+ competition_sessions` in PostgreSQL, verify all 6 new indexes exist
+  - [ ] 19.6 Test rate limiting: submit 31 scores in 1 minute as same judge, verify 429 error on 31st submission
+  - [ ] 19.7 Test CSRF protection: attempt session control request without CSRF token, verify 403 error
+  - [ ] 19.8 Test division selector auto-hide: log in as judge with 1 division, verify selector is hidden and division name is displayed
+  - [ ] 19.9 Test session recovery banner: start session, navigate away from live page, return to dashboard, verify banner shows with event name and elapsed time
+  - [ ] 19.10 Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
 

@@ -727,11 +727,11 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
   await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
 
-  // judgeId may be competition_judges.id OR users.id — try user_id first, fall back to row id
+  // judgeId is competition_judges.id from the listJudges response
   const { data: judgeRow, error: judgeRowErr } = await getClient()
     .from(DB_TABLES.COMPETITION_JUDGES)
     .select('user_id, users (id, email, must_change_password)')
-    .eq('user_id', judgeId)
+    .eq('id', judgeId)
     .eq('event_id', eventId)
     .maybeSingle()
 
