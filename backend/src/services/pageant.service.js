@@ -727,7 +727,14 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
   await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
 
-  // judgeId passed from frontend is the user_id
+  console.log(`[sendJudgeInvitation] eventId=${eventId}, judgeId=${judgeId}`)
+
+  // judgeId passed from frontend is the user_id.
+  // Try competition_judges first, then fall back to event_participants.
+  let userId = null
+  let judgeEmail = null
+  let mustChangePassword = true
+
   const { data: judgeRow, error: judgeRowErr } = await getClient()
     .from(DB_TABLES.COMPETITION_JUDGES)
     .select('user_id, users (id, email, must_change_password)')
@@ -736,13 +743,41 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
     .maybeSingle()
 
   if (judgeRowErr) throw new ApiError(500, judgeRowErr.message)
-  if (!judgeRow) throw new ApiError(404, 'Judge is not enrolled in this event')
 
-  const enrollment = { users: judgeRow.users, user_id: judgeRow.user_id }
+  if (judgeRow) {
+    userId = judgeRow.user_id
+    judgeEmail = judgeRow.users?.email
+    mustChangePassword = judgeRow.users?.must_change_password ?? true
+    console.log(`[sendJudgeInvitation] found in competition_judges: userId=${userId}, email=${judgeEmail}`)
+  } else {
+    // Fallback: look in event_participants
+    console.log(`[sendJudgeInvitation] NOT in competition_judges, checking event_participants...`)
+    const { data: epRow, error: epErr } = await getClient()
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .select('user_id, users (id, email, must_change_password)')
+      .eq('user_id', judgeId)
+      .eq('event_id', eventId)
+      .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+      .maybeSingle()
 
-  const judgeEmail = enrollment.users?.email
+    if (epErr) throw new ApiError(500, epErr.message)
+
+    if (epRow) {
+      userId = epRow.user_id
+      judgeEmail = epRow.users?.email
+      mustChangePassword = epRow.users?.must_change_password ?? true
+      console.log(`[sendJudgeInvitation] found in event_participants: userId=${userId}, email=${judgeEmail}`)
+
+      // Sync: also create the competition_judges row that was missing
+      await syncCompetitionJudgeRow(eventId, userId, { role: 'judge' })
+    } else {
+      console.error(`[sendJudgeInvitation] NOT found in either table for judgeId=${judgeId}, eventId=${eventId}`)
+      throw new ApiError(404, 'Judge is not enrolled in this event')
+    }
+  }
+
   // A judge who has already set their own password is an existing account.
-  const isExistingAccount = !enrollment.users?.must_change_password
+  const isExistingAccount = !mustChangePassword
 
   let tempPassword = null
   let emailResult = null
@@ -763,7 +798,7 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
       tempPassword = generateTemporaryPassword()
       const passwordHash = await hashPassword(tempPassword)
 
-      await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', enrollment.user_id)
+      await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', userId)
 
       emailResult = await sendJudgeInvitationEmail({
         email: judgeEmail,
@@ -786,7 +821,7 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
       await getClient()
         .from(DB_TABLES.INVITATIONS)
         .upsert(
-          { event_id: eventId, voter_id: enrollment.user_id, invitation_sent: true, is_new_account: !isExistingAccount },
+          { event_id: eventId, voter_id: userId, invitation_sent: true, is_new_account: !isExistingAccount },
           { onConflict: 'event_id,voter_id' },
         )
     } catch (dbErr) {
@@ -813,24 +848,34 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
 
-  const { data: pending, error } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .select('voter_id, users (id, email, must_change_password)')
-    .eq('event_id', eventId)
-    .eq('invitation_sent', false)
-
-  if (error) throw new ApiError(500, error.message)
-  if (!pending?.length) return { total: 0, sent: 0, failed: 0, results: [] }
-
-  // Only send to judges
-  const { data: judgeRows } = await getClient()
+  // Start from event_participants — the source of truth for enrolled judges.
+  const { data: judgeParticipants, error: jpErr } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('user_id')
+    .select('user_id, users (id, email, must_change_password)')
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
 
-  const judgeIds = new Set((judgeRows ?? []).map((r) => r.user_id))
-  const pendingJudges = pending.filter((p) => judgeIds.has(p.voter_id))
+  if (jpErr) throw new ApiError(500, jpErr.message)
+  if (!judgeParticipants?.length) return { total: 0, sent: 0, failed: 0, results: [] }
+
+  // Check which judges already had their invitation sent
+  const judgeUserIds = judgeParticipants.map((j) => j.user_id)
+  const { data: existingInvitations } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .select('voter_id, invitation_sent')
+    .eq('event_id', eventId)
+    .in('voter_id', judgeUserIds)
+
+  const sentSet = new Set(
+    (existingInvitations ?? []).filter((inv) => inv.invitation_sent).map((inv) => inv.voter_id),
+  )
+
+  // Only process judges whose invitation hasn't been sent yet
+  const pendingJudges = judgeParticipants.filter((j) => !sentSet.has(j.user_id))
+
+  console.log(`[sendAllPendingJudgeInvitations] total=${judgeParticipants.length}, alreadySent=${sentSet.size}, pending=${pendingJudges.length}`)
+
+  if (!pendingJudges.length) return { total: 0, sent: 0, failed: 0, results: [] }
 
   let sent = 0, failed = 0
   const results = []
@@ -857,7 +902,7 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
         tempPassword = generateTemporaryPassword()
         const passwordHash = await hashPassword(tempPassword)
 
-        await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', p.voter_id)
+        await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', p.user_id)
 
         emailResult = await sendJudgeInvitationEmail({
           email: judgeEmail,
@@ -870,15 +915,13 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
       if (emailResult?.sent) {
         await getClient()
           .from(DB_TABLES.INVITATIONS)
-          .update({
-            invitation_sent: true,
-            is_new_account: !isExistingAccount,
-          })
-          .eq('event_id', eventId)
-          .eq('voter_id', p.voter_id)
+          .upsert(
+            { event_id: eventId, voter_id: p.user_id, invitation_sent: true, is_new_account: !isExistingAccount },
+            { onConflict: 'event_id,voter_id' },
+          )
         sent++
         results.push({
-          judgeId: p.voter_id,
+          judgeId: p.user_id,
           email: judgeEmail,
           success: true,
           invitationType,
@@ -887,7 +930,7 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
       } else {
         failed++
         results.push({
-          judgeId: p.voter_id,
+          judgeId: p.user_id,
           email: judgeEmail,
           success: false,
           invitationType,
@@ -897,7 +940,7 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
     } catch (err) {
       failed++
       results.push({
-        judgeId: p.voter_id,
+        judgeId: p.user_id,
         email: judgeEmail,
         success: false,
         invitationType,
