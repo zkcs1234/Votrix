@@ -17,8 +17,6 @@ import {
   passwordResetUrl,
 } from '../utils/urls.js'
 
-import { isEmailConfigured } from '../config/resend.js'
-
 /**
  * Send email without failing the parent operation.
  * Returns { sent, error? } for logging and API responses.
