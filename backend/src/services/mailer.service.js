@@ -1,4 +1,4 @@
-import { getResend } from '../config/resend.js'
+import { isEmailConfigured } from '../config/resend.js'
 import { env } from '../config/env.js'
 import { sendEmail } from './email.service.js'
 import { organizerInvitationTemplate } from '../templates/email/organizerInvitation.js'
@@ -17,9 +17,7 @@ import {
   passwordResetUrl,
 } from '../utils/urls.js'
 
-function isEmailConfigured() {
-  return Boolean(getResend() && env.resend.apiKey)
-}
+import { isEmailConfigured } from '../config/resend.js'
 
 /**
  * Send email without failing the parent operation.
@@ -33,9 +31,16 @@ export async function sendWorkflowEmail({ to, subject, html }) {
 
   try {
     const data = await sendEmail({ to, subject, html })
+    console.log(`[mailer] Successfully sent email to ${to} (ID: ${data?.id})`)
     return { sent: true, id: data?.id }
   } catch (error) {
     console.error(`[mailer] Failed to send to ${to}:`, error.message)
+    
+    // For network connectivity issues, suggest retry
+    if (error.message?.includes('Network connectivity') || error.message?.includes('Unable to reach')) {
+      return { sent: false, error: error.message, retryable: true }
+    }
+    
     return { sent: false, error: error.message }
   }
 }

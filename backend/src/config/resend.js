@@ -1,16 +1,6 @@
-import { Resend } from 'resend'
 import { env } from './env.js'
 
-let resendClient = null
-
-export function getResend() {
-  if (resendClient) return resendClient
-
-  if (!env.resend.apiKey) {
-    console.warn('[resend] RESEND_API_KEY not set — email disabled')
-    return null
-  }
-
-  resendClient = new Resend(env.resend.apiKey)
-  return resendClient
+// Simple helper to check if email service is configured
+export function isEmailConfigured() {
+  return Boolean(env.resend.apiKey)
 }

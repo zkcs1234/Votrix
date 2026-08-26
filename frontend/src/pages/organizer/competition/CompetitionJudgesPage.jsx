@@ -182,15 +182,24 @@ const handleCsvPreview = async (e) => {
   const handleSendInvitation = async (judgeId) => {
     setSendingId(judgeId)
     try {
-      const { data } = await pageantService.sendJudgeInvitation(eventId, judgeId)
+      const response = await pageantService.sendJudgeInvitation(eventId, judgeId)
+      const { data } = response
+      
       if (data.invitationSent) {
         success('Invitation sent successfully')
         load()
       } else {
-        showError('Failed to send invitation')
+        // Show specific error message from backend
+        const errorMsg = data.message || data.email?.error || 'Failed to send invitation'
+        if (data.email?.retryable) {
+          showError(`${errorMsg}. Please check your internet connection and try again.`)
+        } else {
+          showError(errorMsg)
+        }
       }
     } catch (err) {
-      showError(err.response?.data?.message || 'Failed to send invitation')
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to send invitation'
+      showError(`Network error: ${errorMsg}`)
     } finally {
       setSendingId(null)
     }

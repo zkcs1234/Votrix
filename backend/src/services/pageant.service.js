@@ -748,28 +748,37 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
   let emailResult = null
   let invitationType = isExistingAccount ? 'existing' : 'new'
 
-  if (isExistingAccount) {
-    // Existing account - send registered email without password reset
-    console.log(`[sendJudgeInvitation] existing account detected for ${judgeEmail}, sending registered email`)
+  try {
+    if (isExistingAccount) {
+      // Existing account - send registered email without password reset
+      console.log(`[sendJudgeInvitation] existing account detected for ${judgeEmail}, sending registered email`)
 
-    emailResult = await sendJudgeInvitationEmailRegistered({
-      email: judgeEmail,
-      eventId: event.id,
-      eventTitle: event.title,
-    })
-  } else {
-    // New account - generate temp password
-    tempPassword = generateTemporaryPassword()
-    const passwordHash = await hashPassword(tempPassword)
+      emailResult = await sendJudgeInvitationEmailRegistered({
+        email: judgeEmail,
+        eventId: event.id,
+        eventTitle: event.title,
+      })
+    } else {
+      // New account - generate temp password
+      tempPassword = generateTemporaryPassword()
+      const passwordHash = await hashPassword(tempPassword)
 
-    await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', enrollment.user_id)
+      await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', enrollment.user_id)
 
-    emailResult = await sendJudgeInvitationEmail({
-      email: judgeEmail,
-      temporaryPassword: tempPassword,
-      eventId: event.id,
-      eventTitle: event.title,
-    })
+      emailResult = await sendJudgeInvitationEmail({
+        email: judgeEmail,
+        temporaryPassword: tempPassword,
+        eventId: event.id,
+        eventTitle: event.title,
+      })
+    }
+  } catch (emailError) {
+    console.error(`[sendJudgeInvitation] email sending failed for ${judgeEmail}:`, emailError.message)
+    emailResult = { 
+      sent: false, 
+      error: emailError.message || 'Failed to send invitation email',
+      retryable: emailError.message?.includes('Network connectivity') || emailError.message?.includes('Unable to reach')
+    }
   }
 
   if (emailResult?.sent) {
@@ -787,9 +796,12 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
 
   return {
     email: emailResult,
-    invitationSent: emailResult?.sent,
+    invitationSent: emailResult?.sent || false,
     invitationType,
     temporaryPassword: tempPassword,
+    message: emailResult?.sent 
+      ? `Invitation sent successfully to ${judgeEmail}` 
+      : `Invitation failed: ${emailResult?.error || 'Unknown error'}`
   }
 }
 

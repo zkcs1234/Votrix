@@ -204,11 +204,19 @@ export const sendJudgeInvitation = asyncHandler(async (req, res) => {
     req.user.id,
     req.params.judgeId,
   )
-  res.json({
-    success: true,
-    message: result.invitationSent ? 'Invitation sent' : 'Failed to send invitation',
+  
+  const success = result.invitationSent
+  const statusCode = success ? 200 : 502
+  
+  res.status(statusCode).json({
+    success,
+    message: result.message || (success ? 'Invitation sent successfully' : 'Failed to send invitation'),
     invitationSent: result.invitationSent,
-    email: result.email,
+    email: {
+      sent: result.email?.sent || false,
+      error: result.email?.error,
+      retryable: result.email?.retryable || false
+    },
   })
 })
 
