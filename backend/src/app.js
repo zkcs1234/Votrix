@@ -4,7 +4,6 @@ import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 import { env } from './config/env.js'
 import { configureCloudinary } from './config/cloudinary.js'
-import { getResend } from './config/resend.js'
 import { getSupabase } from './config/database.js'
 import { globalLimiter } from './middleware/rateLimiter.js'
 import { csrfProtection } from './middleware/csrf.js'
@@ -84,7 +83,6 @@ export function createApp() {
   app.use('/api', csrfProtection)
 
   configureCloudinary()
-  getResend()
   getSupabase()
 
   app.use('/api', apiRoutes)

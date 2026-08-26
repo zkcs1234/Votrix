@@ -1,12 +1,12 @@
 import { checkDatabaseConnection } from '../config/database.js'
 import { getCloudinary } from '../config/cloudinary.js'
-import { getResend } from '../config/resend.js'
+import { isEmailConfigured } from '../config/resend.js'
 
 export async function checkSystemHealth() {
   const [dbResult, cloudinaryResult, resendResult] = await Promise.allSettled([
     checkDatabaseConnection(),
     Promise.resolve(getCloudinary() ? { connected: true } : { connected: false }),
-    Promise.resolve(getResend() ? { connected: true } : { connected: false }),
+    Promise.resolve(isEmailConfigured() ? { connected: true } : { connected: false }),
   ])
 
   const services = [
