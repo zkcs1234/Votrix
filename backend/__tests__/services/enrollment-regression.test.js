@@ -119,6 +119,9 @@ describe('enrollment regression coverage', () => {
       participantType: 'COMPETITION_JUDGE',
       firstName: null,
       lastName: null,
+      judgeRole: 'judge',
+      displayName: 'judge@example.com',
+      isActive: true,
     })
   })
 
@@ -132,6 +135,9 @@ describe('enrollment regression coverage', () => {
       participantType: 'COMPETITION_JUDGE',
       firstName: null,
       lastName: null,
+      judgeRole: 'judge',
+      displayName: 'judge@example.com',
+      isActive: true,
     })
   })
 
@@ -145,7 +151,7 @@ describe('enrollment regression coverage', () => {
     })
   })
 
-  test('listJudges merges legacy participant records and first-class competition_judges rows', async () => {
+  test('listJudges reads canonical judge participants only', async () => {
     mocks.db.mockImplementation(() => ({
       from(table) {
         if (table === 'event_participants') {
@@ -154,22 +160,14 @@ describe('enrollment regression coverage', () => {
             eq: vi.fn().mockReturnThis(),
             order: vi.fn().mockResolvedValue({
               data: [{
-                id: 'ep-1', user_id: 'u-1', participant_type: 'COMPETITION_JUDGE', first_name: 'Legacy', last_name: 'Judge', has_scored: false, metadata: {}, users: { id: 'u-1', email: 'legacy@example.com' }, created_at: '2024-01-01' }],
+                id: 'ep-1', user_id: 'u-1', participant_type: 'COMPETITION_JUDGE', first_name: 'Canonical', last_name: 'Judge', display_name: 'Canonical Judge', judge_role: 'judge', is_active: true, has_scored: false, metadata: {}, users: { id: 'u-1', email: 'canonical@example.com' }, created_at: '2024-01-01' }],
               error: null,
             }),
           }
         }
 
         if (table === 'competition_judges') {
-          return {
-            select: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            order: vi.fn().mockResolvedValue({
-              data: [{
-                id: 'cj-1', user_id: 'u-2', role: 'judge', display_name: 'First Class Judge', is_active: true, has_submitted: false, created_at: '2024-01-02', users: { id: 'u-2', email: 'firstclass@example.com' } }],
-              error: null,
-            }),
-          }
+          throw new Error('listJudges should not query competition_judges')
         }
 
         if (table === 'invitations') {
@@ -199,8 +197,13 @@ describe('enrollment regression coverage', () => {
 
     const result = await listJudges('event-1', 'organizer-1')
 
-    expect(result.judges).toHaveLength(2)
-    expect(result.judges.map((j) => j.email)).toEqual(expect.arrayContaining(['legacy@example.com', 'firstclass@example.com']))
+    expect(result.judges).toHaveLength(1)
+    expect(result.judges[0]).toMatchObject({
+      id: 'ep-1',
+      judgeId: 'u-1',
+      email: 'canonical@example.com',
+      displayName: 'Canonical Judge',
+    })
   })
 
   test('polling service exposes respondent enrollment helpers', () => {

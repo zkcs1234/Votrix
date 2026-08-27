@@ -5,7 +5,7 @@ import { canJudgeScore, mergeJudgeRows } from '../../src/services/pageant.servic
 // Phase 6 assignment-scope logic without standing up a Supabase client.
 
 describe('Phase 6: canJudgeScore', () => {
-  test('mergeJudgeRows prefers the competition_judges record id for assignment FK integrity', () => {
+  test('mergeJudgeRows prefers the canonical event_participants id for assignment FK integrity', () => {
     const merged = mergeJudgeRows(
       {
         id: 'participant-row-id',
@@ -33,7 +33,7 @@ describe('Phase 6: canJudgeScore', () => {
       },
     )
 
-    expect(merged.id).toBe('competition-judge-id')
+    expect(merged.id).toBe('participant-row-id')
     expect(merged.judgeId).toBe('user-1')
     expect(merged.eventId).toBe('evt-1')
     expect(merged.displayName).toBe('Judge One')

@@ -186,7 +186,7 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
             { count: 3, error: null } // 3 contestants exist
           ])
         }
-        if (table === 'competition_judges') {
+        if (table === 'event_participants') {
           return createMockQueryChain([
             { count: 0, error: null } // Zero judges
           ])
@@ -222,7 +222,7 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
             { count: 3, error: null }
           ])
         }
-        if (table === 'competition_judges') {
+        if (table === 'event_participants') {
           return createMockQueryChain([
             { count: 0, error: null } // Zero active judges
           ])
@@ -255,7 +255,7 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
             { count: 3, error: null }
           ])
         }
-        if (table === 'competition_judges') {
+        if (table === 'event_participants') {
           return createMockQueryChain([
             { count: 2, error: null } // 2 active judges exist
           ])
@@ -295,7 +295,7 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
             { count: 3, error: null }
           ])
         }
-        if (table === 'competition_judges') {
+        if (table === 'event_participants') {
           return createMockQueryChain([
             { count: 2, error: null }
           ])
@@ -333,7 +333,7 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
             { count: 3, error: null }
           ])
         }
-        if (table === 'competition_judges') {
+        if (table === 'event_participants') {
           return createMockQueryChain([
             { count: 2, error: null }
           ])
@@ -378,7 +378,7 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
             { count: 3, error: null }
           ])
         }
-        if (table === 'competition_judges') {
+        if (table === 'event_participants') {
           return createMockQueryChain([
             { count: 2, error: null }
           ])
@@ -425,7 +425,7 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
             { data: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }], error: null }
           ])
         }
-        if (table === 'competition_judges') {
+        if (table === 'event_participants') {
           return createMockQueryChain([
             { count: 2, error: null }
           ])
@@ -519,7 +519,7 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
             if (table === 'competition_contestants') {
               return createMockQueryChain([{ count: 1, error: null }])
             }
-            if (table === 'competition_judges') {
+            if (table === 'event_participants') {
               return createMockQueryChain([{ count: 0, error: null }])
             }
             return createMockQueryChain([])
@@ -540,7 +540,7 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
             if (table === 'competition_contestants') {
               return createMockQueryChain([{ count: 1, error: null }])
             }
-            if (table === 'competition_judges') {
+            if (table === 'event_participants') {
               return createMockQueryChain([{ count: 1, error: null }])
             }
             if (table === 'competition_criteria') {

@@ -70,7 +70,7 @@ vi.mock('../../src/utils/crypto.js', () => ({
 import { sendJudgeInvitation } from '../../src/services/pageant.service.js'
 import { db } from '../../src/foundation/db.js'
 
-describe('Judge Invitation Database Fix - Judge Record Retrieval', () => {
+describe('Judge Invitation Database Fix - Judge Participant Retrieval', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     
@@ -82,13 +82,13 @@ describe('Judge Invitation Database Fix - Judge Record Retrieval', () => {
     })
   })
 
-  test('Successfully retrieves judge records when given valid competition_judges.id', async () => {
+  test('Successfully retrieves judge participant when given valid users.id', async () => {
     // **Validates: Requirements 1.1, 1.2, 1.4**
     
     // Setup test data - valid judge record
     const eventId = 'test-event-123'
     const organizerId = 'organizer-456'
-    const validJudgeId = 'judge-primary-key-789' // This represents competition_judges.id
+    const validJudgeId = 'user-foreign-key-999'
     
     const mockJudgeData = {
       user_id: 'user-foreign-key-999', 
@@ -104,7 +104,7 @@ describe('Judge Invitation Database Fix - Judge Record Retrieval', () => {
     vi.mocked(db).mockImplementation(() => ({
       from: vi.fn().mockImplementation((table) => {
         callCount++
-        if (table === 'competition_judges' && callCount === 1) {
+        if (table === 'event_participants' && callCount === 1) {
           // First call: judge lookup
           return createQueryChain(mockJudgeData, null)
         } else {
@@ -139,11 +139,12 @@ describe('Judge Invitation Database Fix - Judge Record Retrieval', () => {
       .rejects
       .toThrow('Judge is not enrolled in this event')
 
-    // Verify query used correct primary key field
-    expect(queryChain.eq).toHaveBeenCalledWith('id', nonExistentJudgeId)
+    // Verify invitation lookup uses users.id while assignment endpoints use event_participants.id.
+    expect(queryChain.eq).toHaveBeenCalledWith('user_id', nonExistentJudgeId)
+    expect(queryChain.eq).toHaveBeenCalledWith('participant_type', 'COMPETITION_JUDGE')
   })
 
-  test('Uses primary key field (id) instead of foreign key field (user_id)', async () => {
+  test('Uses user_id field for invitation lookup', async () => {
     // **Validates: Requirements 1.1, 1.3** 
     
     const eventId = 'test-event-123'
@@ -164,11 +165,8 @@ describe('Judge Invitation Database Fix - Judge Record Retrieval', () => {
 
     await sendJudgeInvitation(eventId, organizerId, judgeId)
 
-    // Verify the query uses 'id' field (PRIMARY KEY) not 'user_id' field (FOREIGN KEY)
-    expect(queryChain.eq).toHaveBeenCalledWith('id', judgeId)
-    
-    // Ensure it's NOT querying by user_id (the bug that was fixed)
-    expect(queryChain.eq).not.toHaveBeenCalledWith('user_id', judgeId)
+    expect(queryChain.eq).toHaveBeenCalledWith('user_id', judgeId)
+    expect(queryChain.eq).not.toHaveBeenCalledWith('id', judgeId)
   })
 
   test('Maintains foreign key relationships and data integrity', async () => {
@@ -216,7 +214,7 @@ describe('Judge Invitation Database Fix - Judge Record Retrieval', () => {
       .toThrow('Database connection failed')
 
     // Verify query was attempted with correct parameters
-    expect(queryChain.eq).toHaveBeenCalledWith('id', judgeId)
+    expect(queryChain.eq).toHaveBeenCalledWith('user_id', judgeId)
     expect(queryChain.eq).toHaveBeenCalledWith('event_id', eventId)
   })
 
@@ -243,7 +241,7 @@ describe('Judge Invitation Database Fix - Judge Record Retrieval', () => {
     const result = await sendJudgeInvitation(eventId, organizerId, judgeId)
 
     // Verify correct database lookup happened
-    expect(queryChain.eq).toHaveBeenCalledWith('id', judgeId)
+    expect(queryChain.eq).toHaveBeenCalledWith('user_id', judgeId)
     
     // Verify result format is consistent
     expect(result).toHaveProperty('email')

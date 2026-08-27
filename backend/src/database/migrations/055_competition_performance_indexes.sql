@@ -49,10 +49,10 @@ CREATE INDEX IF NOT EXISTS idx_contestants_event_division
 -- 4. competition_judge_assignments — optimize assignment validation (Req 16.4)
 -- ---------------------------------------------------------------------------
 -- The resolveAllowedDivisions service method queries:
---   .eq('judge_id', jid).eq('scope', 'division').eq('scope_id', sid)
+--   .eq('participant_id', pid).eq('scope', 'division').eq('scope_id', sid)
 -- This composite index provides instant assignment verification.
 CREATE INDEX IF NOT EXISTS idx_judge_assignments_lookup
-  ON competition_judge_assignments (judge_id, scope, scope_id);
+  ON competition_judge_assignments (participant_id, scope, scope_id);
 
 -- ---------------------------------------------------------------------------
 -- 5. competition_criteria — optimize division criteria loading (Req 16.5)

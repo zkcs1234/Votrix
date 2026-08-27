@@ -111,7 +111,7 @@ export function resolveParticipantType(eventType) {
  * If the user is already enrolled, updates the participant type (if changed).
  */
 export async function registerParticipant(eventId, userId, options = {}) {
-  const { participantType, firstName, lastName, metadata } = options
+  const { participantType, firstName, lastName, metadata, judgeRole, displayName, isActive } = options
 
   // If participantType not explicitly provided, resolve from event type
   let resolvedType = participantType
@@ -128,16 +128,22 @@ export async function registerParticipant(eventId, userId, options = {}) {
     resolvedType = resolveParticipantType(event.event_type)
   }
 
+  const payload = {
+    event_id: eventId,
+    user_id: userId,
+    participant_type: resolvedType,
+    first_name: firstName ?? null,
+    last_name: lastName ?? null,
+    metadata: metadata ?? {},
+  }
+
+  if (judgeRole !== undefined) payload.judge_role = judgeRole
+  if (displayName !== undefined) payload.display_name = displayName
+  if (isActive !== undefined) payload.is_active = isActive
+
   const { data, error } = await db()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .upsert({
-      event_id: eventId,
-      user_id: userId,
-      participant_type: resolvedType,
-      first_name: firstName ?? null,
-      last_name: lastName ?? null,
-      metadata: metadata ?? {},
-    }, {
+    .upsert(payload, {
       onConflict: 'event_id,user_id',
       ignoreDuplicates: false,
     })
@@ -281,6 +287,9 @@ export async function listEventParticipants(eventId, options = {}) {
     participantType: row.participant_type,
     firstName: row.first_name,
     lastName: row.last_name,
+    displayName: row.display_name,
+    judgeRole: row.judge_role,
+    isActive: row.is_active,
     hasVoted: row.has_voted,
     hasScored: row.has_scored,
     hasResponded: row.has_responded,

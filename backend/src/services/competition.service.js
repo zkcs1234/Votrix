@@ -423,9 +423,9 @@ function mapJudge(row) {
     judgeId: row.user_id,
     email: row.users?.email ?? row.email ?? null,
     displayName: row.display_name,
-    role: row.role,
+    role: row.judge_role ?? row.role ?? JUDGE_ROLES.JUDGE,
     isActive: row.is_active,
-    hasSubmitted: row.has_submitted,
+    hasSubmitted: row.has_scored ?? row.has_submitted ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -434,92 +434,19 @@ function mapJudge(row) {
 export async function listCompetitionJudges(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
 
-  const [participantsRes, judgesRes] = await Promise.all([
-    getClient()
-      .from(DB_TABLES.EVENT_PARTICIPANTS)
-      .select('id, event_id, user_id, first_name, last_name, has_scored, metadata, created_at, users!inner (id, email)')
-      .eq('event_id', eventId)
-      .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
-      .order('created_at', { ascending: false }),
-    getClient()
-      .from(DB_TABLES.COMPETITION_JUDGES)
-      .select('*, users (id, email)')
-      .eq('event_id', eventId)
-      .order('created_at', { ascending: false }),
-  ])
+  const { data, error } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id, event_id, user_id, first_name, last_name, has_scored, judge_role, display_name, is_active, created_at, updated_at, users!inner (id, email)')
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .order('created_at', { ascending: false })
 
-  if (participantsRes.error) throw new ApiError(500, participantsRes.error.message)
-  if (judgesRes.error) throw new ApiError(500, judgesRes.error.message)
+  if (error) throw new ApiError(500, error.message)
 
-  const merged = new Map()
-
-  // Index competition_judges rows by user_id for fast lookup
-  const judgeRowByUserId = new Map()
-  for (const row of judgesRes.data ?? []) {
-    judgeRowByUserId.set(row.user_id, row)
-  }
-
-  // Auto-create missing competition_judges rows for participants that don't have one yet
-  const missingUserIds = (participantsRes.data ?? [])
-    .filter((p) => !judgeRowByUserId.has(p.user_id))
-    .map((p) => p.user_id)
-
-  if (missingUserIds.length > 0) {
-    const inserts = missingUserIds.map((userId) => {
-      const p = participantsRes.data.find((r) => r.user_id === userId)
-      return {
-        event_id: eventId,
-        user_id: userId,
-        role: 'judge',
-        display_name: [p.first_name, p.last_name].filter(Boolean).join(' ') || p.users?.email || null,
-        is_active: true,
-      }
-    })
-    const { data: newRows } = await getClient()
-      .from(DB_TABLES.COMPETITION_JUDGES)
-      .upsert(inserts, { onConflict: 'event_id,user_id', ignoreDuplicates: false })
-      .select('*, users (id, email)')
-    for (const row of newRows ?? []) {
-      judgeRowByUserId.set(row.user_id, row)
-    }
-  }
-
-  for (const row of participantsRes.data ?? []) {
-    const judgeRow = judgeRowByUserId.get(row.user_id)
-    merged.set(row.user_id, {
-      // Always use competition_judges.id so assignment endpoints work
-      id: judgeRow?.id ?? row.id,
-      eventId: eventId,
-      judgeId: row.user_id,
-      email: judgeRow?.users?.email ?? row.users?.email ?? null,
-      displayName: judgeRow?.display_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || row.users?.email || null,
-      role: judgeRow?.role ?? 'judge',
-      isActive: judgeRow?.is_active ?? true,
-      hasSubmitted: Boolean(row.has_scored) || Boolean(judgeRow?.has_submitted),
-      createdAt: row.created_at,
-      updatedAt: judgeRow?.updated_at ?? row.updated_at ?? row.created_at,
-    })
-  }
-
-  // Include any competition_judges rows not in event_participants (edge case)
-  for (const row of judgesRes.data ?? []) {
-    if (!merged.has(row.user_id)) {
-      merged.set(row.user_id, {
-        id: row.id,
-        eventId: row.event_id,
-        judgeId: row.user_id,
-        email: row.users?.email ?? null,
-        displayName: row.display_name ?? row.users?.email ?? null,
-        role: row.role ?? 'judge',
-        isActive: row.is_active ?? true,
-        hasSubmitted: Boolean(row.has_submitted),
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      })
-    }
-  }
-
-  return Array.from(merged.values()).map(mapJudge)
+  return (data ?? []).map((row) => mapJudge({
+    ...row,
+    display_name: row.display_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || row.users?.email || null,
+  }))
 }
 
 export async function inviteCompetitionJudge(eventId, organizerId, payload) {
@@ -532,21 +459,18 @@ export async function inviteCompetitionJudge(eventId, organizerId, payload) {
     lastName: payload.lastName,
   })
 
-  // Promote to first-class judge row.
   const role = isValidJudgeRole(payload.role) ? payload.role : JUDGE_ROLES.JUDGE
   const { data, error } = await getClient()
-    .from(DB_TABLES.COMPETITION_JUDGES)
-    .upsert(
-      {
-        event_id: eventId,
-        user_id: user.id,
-        role,
-        display_name: [payload.firstName, payload.lastName].filter(Boolean).join(' ') || user.email,
-        is_active: true,
-      },
-      { onConflict: 'event_id,user_id' },
-    )
-    .select('*, users (id, email)')
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .update({
+      judge_role: role,
+      display_name: [payload.firstName, payload.lastName].filter(Boolean).join(' ') || user.email,
+      is_active: true,
+    })
+    .eq('event_id', eventId)
+    .eq('user_id', user.id)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .select('id, event_id, user_id, has_scored, judge_role, display_name, is_active, created_at, updated_at, users (id, email)')
     .single()
   if (error) throw new ApiError(500, error.message)
   return mapJudge(data)
@@ -559,17 +483,18 @@ export async function updateCompetitionJudge(eventId, organizerId, judgeId, payl
     if (!isValidJudgeRole(payload.role)) {
       throw new ApiError(400, `Invalid role. Must be one of: ${Object.values(JUDGE_ROLES).join(', ')}`)
     }
-    updates.role = payload.role
+    updates.judge_role = payload.role
   }
   if (payload.displayName !== undefined) updates.display_name = payload.displayName
   if (payload.isActive !== undefined) updates.is_active = payload.isActive
 
   const { data, error } = await getClient()
-    .from(DB_TABLES.COMPETITION_JUDGES)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .update(updates)
     .eq('id', judgeId)
     .eq('event_id', eventId)
-    .select('*, users (id, email)')
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .select('id, event_id, user_id, has_scored, judge_role, display_name, is_active, created_at, updated_at, users (id, email)')
     .single()
   if (error) throw new ApiError(500, error.message)
   if (!data) throw new ApiError(404, 'Judge not found')
@@ -579,10 +504,11 @@ export async function updateCompetitionJudge(eventId, organizerId, judgeId, payl
 export async function deleteCompetitionJudge(eventId, organizerId, judgeId) {
   await assertCompetitionEvent(eventId, organizerId)
   const { error } = await getClient()
-    .from(DB_TABLES.COMPETITION_JUDGES)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .delete()
     .eq('id', judgeId)
     .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
   if (error) throw new ApiError(500, error.message)
 }
 
@@ -592,20 +518,35 @@ export async function deleteCompetitionJudge(eventId, organizerId, judgeId) {
 function mapAssignment(row) {
   return {
     id: row.id,
-    judgeId: row.judge_id,
+    judgeId: row.participant_id,
     scope: row.scope,
     scopeId: row.scope_id,
     createdAt: row.created_at,
   }
 }
 
+async function assertJudgeParticipant(eventId, judgeId) {
+  const { data, error } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id, event_id')
+    .eq('id', judgeId)
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .maybeSingle()
+
+  if (error) throw new ApiError(500, error.message)
+  if (!data) throw new ApiError(404, 'Judge not found for this event')
+  return data
+}
+
 export async function listJudgeAssignments(eventId, organizerId, judgeId) {
   await assertCompetitionEvent(eventId, organizerId)
+  await assertJudgeParticipant(eventId, judgeId)
+
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
-    .select('*, competition_judges!inner(event_id)')
-    .eq('judge_id', judgeId)
-    .eq('competition_judges.event_id', eventId)
+    .select('*')
+    .eq('participant_id', judgeId)
   if (error) throw new ApiError(500, error.message)
   return (data ?? []).map(mapAssignment)
 }
@@ -617,15 +558,7 @@ export async function createJudgeAssignment(eventId, organizerId, judgeId, paylo
     throw new ApiError(400, `Invalid scope. Must be one of: ${Object.values(ASSIGNMENT_SCOPES).join(', ')}`)
   }
 
-  const { data: judgeRow, error: judgeErr } = await getClient()
-    .from(DB_TABLES.COMPETITION_JUDGES)
-    .select('id, event_id')
-    .eq('id', judgeId)
-    .eq('event_id', eventId)
-    .maybeSingle()
-
-  if (judgeErr) throw new ApiError(500, judgeErr.message)
-  if (!judgeRow) throw new ApiError(404, 'Judge not found for this event')
+  await assertJudgeParticipant(eventId, judgeId)
 
   // Validate scope_id belongs to the right table + event.
   const scopeId = payload.scopeId
@@ -636,7 +569,8 @@ export async function createJudgeAssignment(eventId, organizerId, judgeId, paylo
   } else {
     let table
     if (payload.scope === ASSIGNMENT_SCOPES.CATEGORY) table = DB_TABLES.COMPETITION_CATEGORIES
-    else table = DB_TABLES.COMPETITION_ROUNDS
+    else if (payload.scope === ASSIGNMENT_SCOPES.ROUND) table = DB_TABLES.COMPETITION_ROUNDS
+    else table = DB_TABLES.COMPETITION_DIVISIONS
 
     const { data: scopeRow, error: scopeErr } = await getClient()
       .from(table)
@@ -652,7 +586,7 @@ export async function createJudgeAssignment(eventId, organizerId, judgeId, paylo
 
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
-    .insert({ judge_id: judgeId, scope: payload.scope, scope_id: scopeId })
+    .insert({ participant_id: judgeId, scope: payload.scope, scope_id: scopeId })
     .select('*')
     .single()
   if (error) {
@@ -664,11 +598,13 @@ export async function createJudgeAssignment(eventId, organizerId, judgeId, paylo
 
 export async function deleteJudgeAssignment(eventId, organizerId, judgeId, assignmentId) {
   await assertCompetitionEvent(eventId, organizerId)
+  await assertJudgeParticipant(eventId, judgeId)
+
   const { error } = await getClient()
     .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
     .delete()
     .eq('id', assignmentId)
-    .eq('judge_id', judgeId)
+    .eq('participant_id', judgeId)
   if (error) throw new ApiError(500, error.message)
   return { success: true }
 }
@@ -713,7 +649,7 @@ export async function setScoringConfig(eventId, organizerId, partialConfig) {
 export async function getCompetitionFoundation(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
 
-  const [eventRes, cats, rounds, criteria, contestants, judges, assignments, roundLinks, divisions] =
+  const [eventRes, cats, rounds, criteria, contestants, judges, roundLinks, divisions] =
     await Promise.all([
       getClient()
         .from(DB_TABLES.EVENTS)
@@ -734,10 +670,6 @@ export async function getCompetitionFoundation(eventId, organizerId) {
         .eq('event_id', eventId)
         .order('contestant_number', { ascending: true }),
       listCompetitionJudges(eventId, organizerId),
-      getClient()
-        .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
-        .select('id, judge_id, scope, scope_id, competition_judges!inner(event_id)')
-        .eq('competition_judges.event_id', eventId),
       Promise.all([
         getClient().from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS).select('round_id, contestant_id'),
         getClient().from(DB_TABLES.COMPETITION_ROUND_CRITERIA).select('round_id, criteria_id'),
@@ -748,7 +680,19 @@ export async function getCompetitionFoundation(eventId, organizerId) {
   if (eventRes.error) throw new ApiError(500, eventRes.error.message)
   if (criteria.error) throw new ApiError(500, criteria.error.message)
   if (contestants.error) throw new ApiError(500, contestants.error.message)
-  if (assignments.error) throw new ApiError(500, assignments.error.message)
+
+  const judgeParticipantIds = judges.map((j) => j.id).filter(Boolean)
+  let assignmentRows = []
+
+  if (judgeParticipantIds.length) {
+    const { data: assignments, error: assignmentError } = await getClient()
+      .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
+      .select('id, participant_id, scope, scope_id')
+      .in('participant_id', judgeParticipantIds)
+
+    if (assignmentError) throw new ApiError(500, assignmentError.message)
+    assignmentRows = assignments ?? []
+  }
 
   return {
     event: eventRes.data,
@@ -763,9 +707,9 @@ export async function getCompetitionFoundation(eventId, organizerId) {
     criteria: criteria.data ?? [],
     contestants: contestants.data ?? [],
     judges,
-    assignments: (assignments.data ?? []).map((a) => ({
+    assignments: assignmentRows.map((a) => ({
       id: a.id,
-      judgeId: a.judge_id,
+      judgeId: a.participant_id,
       scope: a.scope,
       scopeId: a.scope_id,
     })),

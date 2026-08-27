@@ -4,7 +4,7 @@
 
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
+import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { assertJudgeEnrolled, canJudgeScore } from './pageant.service.js'
 import { emitToEvent, emitToEventOrganizer, emitToEventVoters, emitToUser } from '../websocket/ws-emitter.js'
@@ -191,9 +191,10 @@ export async function startSession(eventId, organizerId) {
 
   // 13.2: Validate at least one active judge is enrolled
   const { count: judgeCount, error: judgeError } = await getClient()
-    .from(DB_TABLES.COMPETITION_JUDGES)
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .eq('is_active', true)
 
   if (judgeError) throw new ApiError(500, judgeError.message)
@@ -837,18 +838,37 @@ export async function getJudgeSessionView(eventId, judgeId) {
 export async function getJudgeProgress(eventId, organizerId) {
   const session = await assertActiveSession(eventId, organizerId)
 
-  // Get all judges for this event and their assignments
-  const { data: judges } = await getClient()
-    .from(DB_TABLES.COMPETITION_JUDGES)
-    .select('id, user_id, display_name, role, competition_judge_assignments (scope, scope_id)')
+  const { data: judges, error: judgeError } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id, user_id, display_name, judge_role')
     .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .eq('is_active', true)
+
+  if (judgeError) throw new ApiError(500, judgeError.message)
+
+  const judgeParticipantIds = (judges ?? []).map((j) => j.id)
+  let assignmentsByJudgeId = new Map()
+
+  if (judgeParticipantIds.length) {
+    const { data: assignments, error: assignmentError } = await getClient()
+      .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
+      .select('participant_id, scope, scope_id')
+      .in('participant_id', judgeParticipantIds)
+
+    if (assignmentError) throw new ApiError(500, assignmentError.message)
+
+    assignmentsByJudgeId = new Map(judgeParticipantIds.map((id) => [id, []]))
+    for (const assignment of assignments ?? []) {
+      assignmentsByJudgeId.get(assignment.participant_id)?.push(assignment)
+    }
+  }
 
   const eligibleJudges = (judges ?? []).filter(j => {
     const ctx = {
       isFirstClass: true,
-      role: j.role,
-      assignments: j.competition_judge_assignments || []
+      role: j.judge_role ?? 'judge',
+      assignments: assignmentsByJudgeId.get(j.id) || []
     }
     return canJudgeScore(ctx, {
       divisionId: session.currentDivisionId,
@@ -879,7 +899,7 @@ export async function getJudgeProgress(eventId, organizerId) {
       judgeId: j.user_id,
       judgeRowId: j.id,
       displayName: j.display_name,
-      role: j.role,
+      role: j.judge_role ?? 'judge',
       hasSubmitted: submittedJudgeIds.has(j.user_id),
     })),
     totalJudges: eligibleJudges.length,
