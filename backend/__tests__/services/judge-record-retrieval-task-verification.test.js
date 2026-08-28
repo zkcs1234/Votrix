@@ -14,6 +14,8 @@ const mockSupabaseClient = {
 const createQueryChain = (returnData, returnError = null) => ({
   select: vi.fn().mockReturnThis(),
   eq: vi.fn().mockReturnThis(), 
+  update: vi.fn().mockReturnThis(),
+  upsert: vi.fn().mockReturnThis(),
   maybeSingle: vi.fn().mockResolvedValue({ data: returnData, error: returnError }),
 })
 
@@ -91,18 +93,16 @@ describe('Task Verification: Judge Participant Retrieval with Valid users.id', (
       users: {
         id: 'user-foreign-key-123',
         email: 'judge@example.com',
-        must_change_password: true
+        must_change_password: false
       }
     }
 
     // Setup successful database query mock
-    let queryCallCount = 0
+    const queryChain = createQueryChain(expectedJudgeData, null)
     vi.mocked(db).mockImplementation(() => ({
       from: vi.fn().mockImplementation((tableName) => {
-        queryCallCount++
-        if (tableName === 'event_participants' && queryCallCount === 1) {
+        if (tableName === 'event_participants') {
           // First call: judge lookup query (the one we're testing)
-          const queryChain = createQueryChain(expectedJudgeData, null)
           return queryChain
         } else {
           // Subsequent calls: user updates, etc.
@@ -122,8 +122,10 @@ describe('Task Verification: Judge Participant Retrieval with Valid users.id', (
 
     // Verify the database was called with correct parameters
     expect(db).toHaveBeenCalled()
-    
-    expect(db).toHaveBeenCalled()
+    expect(queryChain.select).toHaveBeenCalledWith('user_id, users (id, email, must_change_password)')
+    expect(queryChain.eq).toHaveBeenCalledWith('user_id', validJudgeId)
+    expect(queryChain.eq).toHaveBeenCalledWith('event_id', eventId)
+    expect(queryChain.eq).toHaveBeenCalledWith('participant_type', 'COMPETITION_JUDGE')
   })
 
   test('Maintains data integrity in retrieved judge records', async () => {
@@ -147,8 +149,9 @@ describe('Task Verification: Judge Participant Retrieval with Valid users.id', (
     }
 
     // Setup successful query
+    const queryChain = createQueryChain(consistentJudgeData, null)
     vi.mocked(db).mockImplementation(() => ({
-      from: vi.fn().mockImplementation(() => createQueryChain(consistentJudgeData, null))
+      from: vi.fn().mockReturnValue(queryChain)
     }))
 
     // Execute function
@@ -158,10 +161,9 @@ describe('Task Verification: Judge Participant Retrieval with Valid users.id', (
     expect(result.invitationSent).toBe(true)
     
     // Verify the query structure that enables data integrity
-    const dbCall = vi.mocked(db).mock.results[0].value
-    expect(dbCall.select).toHaveBeenCalledWith('user_id, users (id, email, must_change_password)')
-    expect(dbCall.eq).toHaveBeenCalledWith('user_id', judgeId)
-    expect(dbCall.eq).toHaveBeenCalledWith('event_id', eventId) // Event constraint
+    expect(queryChain.select).toHaveBeenCalledWith('user_id, users (id, email, must_change_password)')
+    expect(queryChain.eq).toHaveBeenCalledWith('user_id', judgeId)
+    expect(queryChain.eq).toHaveBeenCalledWith('event_id', eventId) // Event constraint
   })
 
   test('Handles non-existent judge ID appropriately', async () => {
@@ -175,8 +177,9 @@ describe('Task Verification: Judge Participant Retrieval with Valid users.id', (
     const nonExistentJudgeId = 'non-existent-judge-id'
 
     // Setup query returning null (judge not found)
+    const queryChain = createQueryChain(null, null)
     vi.mocked(db).mockImplementation(() => ({
-      from: vi.fn().mockImplementation(() => createQueryChain(null, null))
+      from: vi.fn().mockReturnValue(queryChain)
     }))
 
     // Expect appropriate error to be thrown
@@ -185,9 +188,8 @@ describe('Task Verification: Judge Participant Retrieval with Valid users.id', (
       .toThrow('Judge is not enrolled in this event')
 
     // Verify the query used users.id for invitation lookup.
-    const dbCall = vi.mocked(db).mock.results[0].value
-    expect(dbCall.eq).toHaveBeenCalledWith('user_id', nonExistentJudgeId)
-    expect(dbCall.eq).not.toHaveBeenCalledWith('id', nonExistentJudgeId)
+    expect(queryChain.eq).toHaveBeenCalledWith('user_id', nonExistentJudgeId)
+    expect(queryChain.eq).not.toHaveBeenCalledWith('id', nonExistentJudgeId)
   })
 
   test('Query implementation verification - uses correct database fields', () => {

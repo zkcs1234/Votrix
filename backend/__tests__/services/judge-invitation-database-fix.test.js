@@ -20,6 +20,12 @@ const createQueryChain = (returnData, returnError = null) => ({
   maybeSingle: vi.fn().mockResolvedValue({ data: returnData, error: returnError }),
 })
 
+const mockDbWithChain = (queryChain) => {
+  vi.mocked(db).mockImplementation(() => ({
+    from: vi.fn().mockReturnValue(queryChain),
+  }))
+}
+
 // Mock the database connection
 vi.mock('../../src/foundation/db.js', () => ({
   db: vi.fn(() => mockSupabaseClient),
@@ -132,7 +138,7 @@ describe('Judge Invitation Database Fix - Judge Participant Retrieval', () => {
 
     // Mock query returning null (judge not found)
     const queryChain = createQueryChain(null, null)
-    mockSupabaseClient.from.mockReturnValue(queryChain)
+    mockDbWithChain(queryChain)
 
     // Expect the function to throw an error
     await expect(sendJudgeInvitation(eventId, organizerId, nonExistentJudgeId))
@@ -161,7 +167,7 @@ describe('Judge Invitation Database Fix - Judge Participant Retrieval', () => {
     }
 
     const queryChain = createQueryChain(mockJudgeData, null)
-    mockSupabaseClient.from.mockReturnValue(queryChain)
+    mockDbWithChain(queryChain)
 
     await sendJudgeInvitation(eventId, organizerId, judgeId)
 
@@ -206,7 +212,7 @@ describe('Judge Invitation Database Fix - Judge Participant Retrieval', () => {
     // Mock database error
     const databaseError = { message: 'Database connection failed' }
     const queryChain = createQueryChain(null, databaseError)
-    mockSupabaseClient.from.mockReturnValue(queryChain)
+    mockDbWithChain(queryChain)
 
     // Expect function to throw database error
     await expect(sendJudgeInvitation(eventId, organizerId, judgeId))
@@ -236,7 +242,7 @@ describe('Judge Invitation Database Fix - Judge Participant Retrieval', () => {
     }
 
     const queryChain = createQueryChain(existingAccountData, null)
-    mockSupabaseClient.from.mockReturnValue(queryChain)
+    mockDbWithChain(queryChain)
 
     const result = await sendJudgeInvitation(eventId, organizerId, judgeId)
 

@@ -99,8 +99,9 @@ const [csvPreview, setCsvPreview] = useState(null)
       const normalized = Array.isArray(data?.judges)
         ? data.judges.map((judge) => ({
             ...judge,
-            id: judge.id ?? judge.judgeId ?? judge.userId ?? judge.email,
-            judgeId: judge.judgeId ?? judge.userId ?? judge.id,
+            id: judge.id ?? judge.email,
+            participantId: judge.id ?? null,
+            judgeId: judge.judgeId ?? judge.userId ?? null,
             email: judge.email ?? null,
             firstName: judge.firstName ?? null,
             lastName: judge.lastName ?? null,
@@ -216,7 +217,7 @@ const handleCsvPreview = async (e) => {
     }
 
 // Row-level action
-    if (!participant.invitationSent) {
+    if (!participant.invitationSent && participant.judgeId) {
       const isSending = sendingId === participant.judgeId
       return (
         <Button
@@ -341,4 +342,3 @@ const handleCsvPreview = async (e) => {
     </div>
   )
 }
-

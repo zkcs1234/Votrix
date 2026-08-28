@@ -117,7 +117,7 @@ function createMockQueryChain(responses) {
         return (resolve) => {
           const response = responses[callIndex] || { data: [], error: null, count: 0 }
           callIndex++
-          resolve(response)
+          return Promise.resolve(response).then(resolve)
         }
       }
       if (prop === 'catch') {
@@ -131,8 +131,20 @@ function createMockQueryChain(responses) {
   return chain
 }
 
+function createCompleteProfileChain() {
+  return createMockQueryChain([{
+    data: {
+      organization_name: 'Test Organization',
+      organization_type_display: 'Nonprofit',
+      organizer_name: 'Test Organizer',
+      position: 'Director',
+    },
+    error: null,
+  }])
+}
+
 describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
-  const eventId = 'test-event-id'
+  const eventId = '11111111-1111-4111-8111-111111111111'
 
   afterEach(() => {
     vi.clearAllMocks()
@@ -142,9 +154,12 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
     test('should reject session start when no contestants exist', async () => {
       // Setup: mock an event that exists but has no contestants
       mockFrom.mockImplementation((table) => {
+        if (table === 'users') {
+          return createCompleteProfileChain()
+        }
         if (table === 'events') {
           return createMockQueryChain([
-            { data: { id: eventId, event_type: 'pageant', organizer_id: 'organizer-id' }, error: null }
+            { data: { id: eventId, event_type: 'pageant', organizations: { organizer_id: 'organizer-id' } }, error: null }
           ])
         }
         if (table === 'v_competition_active_session') {
@@ -171,9 +186,12 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
     test('should continue validation when contestants exist', async () => {
       // Setup: mock contestants exist but no judges
       mockFrom.mockImplementation((table) => {
+        if (table === 'users') {
+          return createCompleteProfileChain()
+        }
         if (table === 'events') {
           return createMockQueryChain([
-            { data: { id: eventId, event_type: 'pageant', organizer_id: 'organizer-id' }, error: null }
+            { data: { id: eventId, event_type: 'pageant', organizations: { organizer_id: 'organizer-id' } }, error: null }
           ])
         }
         if (table === 'v_competition_active_session') {
@@ -207,9 +225,12 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
     test('should reject session start when no active judges exist', async () => {
       // Setup: mock contestants exist but no active judges
       mockFrom.mockImplementation((table) => {
+        if (table === 'users') {
+          return createCompleteProfileChain()
+        }
         if (table === 'events') {
           return createMockQueryChain([
-            { data: { id: eventId, event_type: 'pageant', organizer_id: 'organizer-id' }, error: null }
+            { data: { id: eventId, event_type: 'pageant', organizations: { organizer_id: 'organizer-id' } }, error: null }
           ])
         }
         if (table === 'v_competition_active_session') {
@@ -240,9 +261,12 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
     test('should continue validation when active judges exist', async () => {
       // Setup: mock contestants and judges exist but no criteria
       mockFrom.mockImplementation((table) => {
+        if (table === 'users') {
+          return createCompleteProfileChain()
+        }
         if (table === 'events') {
           return createMockQueryChain([
-            { data: { id: eventId, event_type: 'pageant', organizer_id: 'organizer-id' }, error: null }
+            { data: { id: eventId, event_type: 'pageant', organizations: { organizer_id: 'organizer-id' } }, error: null }
           ])
         }
         if (table === 'v_competition_active_session') {
@@ -280,9 +304,12 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
     test('should reject session start when no criteria exist', async () => {
       // Setup: mock contestants, judges exist but no criteria
       mockFrom.mockImplementation((table) => {
+        if (table === 'users') {
+          return createCompleteProfileChain()
+        }
         if (table === 'events') {
           return createMockQueryChain([
-            { data: { id: eventId, event_type: 'pageant', organizer_id: 'organizer-id' }, error: null }
+            { data: { id: eventId, event_type: 'pageant', organizations: { organizer_id: 'organizer-id' } }, error: null }
           ])
         }
         if (table === 'v_competition_active_session') {
@@ -318,9 +345,12 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
     test('should reject session start when criteria percentages do not sum to 100%', async () => {
       // Setup: mock valid data but criteria sum to 85%
       mockFrom.mockImplementation((table) => {
+        if (table === 'users') {
+          return createCompleteProfileChain()
+        }
         if (table === 'events') {
           return createMockQueryChain([
-            { data: { id: eventId, event_type: 'pageant', organizer_id: 'organizer-id' }, error: null }
+            { data: { id: eventId, event_type: 'pageant', organizations: { organizer_id: 'organizer-id' } }, error: null }
           ])
         }
         if (table === 'v_competition_active_session') {
@@ -363,9 +393,12 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
     test('should reject session start when criteria percentages exceed 100%', async () => {
       // Setup: mock valid data but criteria sum to 110%
       mockFrom.mockImplementation((table) => {
+        if (table === 'users') {
+          return createCompleteProfileChain()
+        }
         if (table === 'events') {
           return createMockQueryChain([
-            { data: { id: eventId, event_type: 'pageant', organizer_id: 'organizer-id' }, error: null }
+            { data: { id: eventId, event_type: 'pageant', organizations: { organizer_id: 'organizer-id' } }, error: null }
           ])
         }
         if (table === 'v_competition_active_session') {
@@ -408,9 +441,12 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
     test('should accept criteria percentages that sum to exactly 100%', async () => {
       // Setup: mock all valid data
       mockFrom.mockImplementation((table) => {
+        if (table === 'users') {
+          return createCompleteProfileChain()
+        }
         if (table === 'events') {
           return createMockQueryChain([
-            { data: { id: eventId, event_type: 'pageant', organizer_id: 'organizer-id' }, error: null },
+            { data: { id: eventId, event_type: 'pageant', organizations: { organizer_id: 'organizer-id' } }, error: null },
             { error: null } // Auto-enable scoring update
           ])
         }
@@ -490,9 +526,12 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
         {
           name: 'zero contestants',
           setup: (table) => {
+            if (table === 'users') {
+              return createCompleteProfileChain()
+            }
             if (table === 'events') {
               return createMockQueryChain([
-                { data: { id: eventId, event_type: 'pageant', organizer_id: 'organizer-id' }, error: null }
+                { data: { id: eventId, event_type: 'pageant', organizations: { organizer_id: 'organizer-id' } }, error: null }
               ])
             }
             if (table === 'v_competition_active_session') {
@@ -508,9 +547,12 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
         {
           name: 'zero judges',
           setup: (table) => {
+            if (table === 'users') {
+              return createCompleteProfileChain()
+            }
             if (table === 'events') {
               return createMockQueryChain([
-                { data: { id: eventId, event_type: 'pageant', organizer_id: 'organizer-id' }, error: null }
+                { data: { id: eventId, event_type: 'pageant', organizations: { organizer_id: 'organizer-id' } }, error: null }
               ])
             }
             if (table === 'v_competition_active_session') {
@@ -529,9 +571,12 @@ describe('Competition Session Pre-Flight Validation (Task 19.1)', () => {
         {
           name: 'zero criteria',
           setup: (table) => {
+            if (table === 'users') {
+              return createCompleteProfileChain()
+            }
             if (table === 'events') {
               return createMockQueryChain([
-                { data: { id: eventId, event_type: 'pageant', organizer_id: 'organizer-id' }, error: null }
+                { data: { id: eventId, event_type: 'pageant', organizations: { organizer_id: 'organizer-id' } }, error: null }
               ])
             }
             if (table === 'v_competition_active_session') {
