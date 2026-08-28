@@ -149,6 +149,8 @@ $$;
 CREATE INDEX IF NOT EXISTS idx_competition_judge_assignments_participant_id
   ON competition_judge_assignments (participant_id);
 
+DROP INDEX IF EXISTS idx_judge_assignments_lookup;
+
 CREATE INDEX IF NOT EXISTS idx_judge_assignments_lookup
   ON competition_judge_assignments (participant_id, scope, scope_id);
 
@@ -165,6 +167,15 @@ BEGIN
     WHERE relname = 'competition_judges_legacy'
   ) THEN
     ALTER TABLE competition_judges RENAME TO competition_judges_legacy;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class
+    WHERE relname = 'competition_judges'
+      AND relkind IN ('r', 'p')
+  ) THEN
+    RAISE EXCEPTION 'Cannot create competition_judges compatibility view while a table with that name still exists';
   END IF;
 END
 $$;

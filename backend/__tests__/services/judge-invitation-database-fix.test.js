@@ -17,6 +17,7 @@ const createQueryChain = (returnData, returnError = null) => ({
   select: vi.fn().mockReturnThis(),
   eq: vi.fn().mockReturnThis(), 
   update: vi.fn().mockReturnThis(),
+  upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
   maybeSingle: vi.fn().mockResolvedValue({ data: returnData, error: returnError }),
 })
 

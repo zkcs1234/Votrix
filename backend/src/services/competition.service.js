@@ -13,7 +13,7 @@ import { listDivisions } from './competition-division.service.js'
 
 // ---------------------------------------------------------------------------
 // Phase 4 — Competition Scoring Foundation service.
-// Adds dynamic Categories, Rounds, and a first-class judge model on top of
+// Adds dynamic Categories, Rounds, and judge participants on top of
 // the existing contestant / criteria / scores tables.
 // ---------------------------------------------------------------------------
 
@@ -426,6 +426,7 @@ function mapJudge(row) {
     role: row.judge_role ?? row.role ?? JUDGE_ROLES.JUDGE,
     isActive: row.is_active,
     hasSubmitted: row.has_scored ?? row.has_submitted ?? false,
+    invitationSent: row.invitation_sent ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -443,9 +444,27 @@ export async function listCompetitionJudges(eventId, organizerId) {
 
   if (error) throw new ApiError(500, error.message)
 
+  const judgeUserIds = (data ?? []).map((row) => row.user_id).filter(Boolean)
+  let invitationMap = {}
+
+  if (judgeUserIds.length) {
+    const { data: invitations, error: invError } = await getClient()
+      .from(DB_TABLES.INVITATIONS)
+      .select('voter_id, invitation_sent')
+      .eq('event_id', eventId)
+      .in('voter_id', judgeUserIds)
+
+    if (invError) throw new ApiError(500, invError.message)
+
+    for (const inv of invitations ?? []) {
+      invitationMap[inv.voter_id] = inv.invitation_sent
+    }
+  }
+
   return (data ?? []).map((row) => mapJudge({
     ...row,
     display_name: row.display_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || row.users?.email || null,
+    invitation_sent: invitationMap[row.user_id] ?? false,
   }))
 }
 

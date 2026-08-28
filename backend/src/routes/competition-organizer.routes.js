@@ -43,7 +43,7 @@ router.patch('/scoring-config', ctrl.setScoringConfig)
 // Foundation snapshot (used by the workspace UI)
 router.get('/foundation', ctrl.getFoundation)
 
-// First-class judges (Phase 6) — co-located with the legacy /judges endpoints
+// Judge participants (Phase 6) — canonical event_participants-backed model.
 router.get('/judges-v2', ctrl.listJudgesV2)
 router.post('/judges-v2/invite', emailLimiter, ctrl.inviteJudgeV2)
 router.patch('/judges-v2/:judgeId', ctrl.updateJudgeV2)

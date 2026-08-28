@@ -39,13 +39,13 @@ describe('Phase 6: canJudgeScore', () => {
     expect(merged.displayName).toBe('Judge One')
   })
 
-  test('non-first-class judges are always allowed (legacy path)', () => {
+  test('judges without assignment metadata are always allowed', () => {
     const ctx = { isFirstClass: false, role: 'judge', assignments: [] }
     expect(canJudgeScore(ctx, { roundId: 'r1' })).toBe(true)
     expect(canJudgeScore(ctx, { categoryId: 'c1' })).toBe(true)
   })
 
-  test('first-class judge with no assignments is event-wide by default', () => {
+  test('judge participant with no assignments is event-wide by default', () => {
     const ctx = { isFirstClass: true, role: 'judge', assignments: [] }
     expect(canJudgeScore(ctx, { roundId: 'r1' })).toBe(true)
     expect(canJudgeScore(ctx, { categoryId: 'c1' })).toBe(true)

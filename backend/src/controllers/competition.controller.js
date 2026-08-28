@@ -130,7 +130,7 @@ export const setScoringConfig = asyncHandler(async (req, res) => {
 })
 
 // ---------------------------------------------------------------------------
-// First-class judges + assignments (Phase 6 API surface lives here too).
+// Judge participants + assignments (Phase 6 API surface lives here too).
 // ---------------------------------------------------------------------------
 export const listJudgesV2 = asyncHandler(async (req, res) => {
   const judges = await competitionService.listCompetitionJudges(req.params.eventId, req.user.id)

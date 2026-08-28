@@ -52,7 +52,7 @@ router.get('/events/:eventId/information-form', ctrl.getInformationForm)
 router.patch('/events/:eventId/information-form', ctrl.updateInformationForm)
 
 // Phase 4-6 dynamic scoring engine: categories, rounds, scoring config,
-// first-class judges, and flexible assignments live under
+// judge participants, and flexible assignments live under
 // `/events/:eventId/...` and share the auth middleware on the parent router.
 router.use('/events/:eventId', competitionRoutes)
 

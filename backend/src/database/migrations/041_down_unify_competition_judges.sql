@@ -130,6 +130,8 @@ $$;
 CREATE INDEX IF NOT EXISTS idx_competition_judge_assignments_judge_id
   ON competition_judge_assignments (judge_id);
 
+DROP INDEX IF EXISTS idx_judge_assignments_lookup;
+
 CREATE INDEX IF NOT EXISTS idx_judge_assignments_lookup
   ON competition_judge_assignments (judge_id, scope, scope_id);
 

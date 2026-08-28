@@ -619,6 +619,17 @@ function resolveDisplayName(firstName, lastName, fallback = null) {
   return [firstName, lastName].filter(Boolean).join(' ') || fallback
 }
 
+async function upsertJudgeInvitationStatus(eventId, userId, values) {
+  const { error } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .upsert(
+      { event_id: eventId, voter_id: userId, ...values },
+      { onConflict: 'event_id,voter_id', ignoreDuplicates: false },
+    )
+
+  if (error) throw new ApiError(500, error.message)
+}
+
 export async function inviteJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName }) {
   await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
@@ -669,8 +680,6 @@ export async function registerJudge(eventId, organizerId, { email, temporaryPass
   const tempPassword = temporaryPassword || generateTemporaryPassword()
   const { user, isNew } = await ensureJudgeAccount(email, tempPassword, resetPasswordForExisting)
 
-  console.log('[DEBUG registerJudge] eventId=', eventId, 'userId=', user.id, 'email=', email)
-
   await registerParticipant(eventId, user.id, {
     participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE,
     firstName: firstName || null,
@@ -680,13 +689,8 @@ export async function registerJudge(eventId, organizerId, { email, temporaryPass
     isActive: true,
   })
 
-  console.log('[DEBUG registerJudge] registerParticipant completed for userId=', user.id)
-
   try {
-    await getClient().from(DB_TABLES.INVITATIONS).upsert(
-      { event_id: eventId, voter_id: user.id, invitation_sent: false },
-      { onConflict: 'event_id,voter_id', ignoreDuplicates: false },
-    )
+    await upsertJudgeInvitationStatus(eventId, user.id, { invitation_sent: false })
   } catch (dbErr) {
     console.error('[registerJudge] invitations upsert failed:', dbErr.message)
   }
@@ -702,8 +706,6 @@ export async function registerJudge(eventId, organizerId, { email, temporaryPass
 export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
   await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
-
-  console.log(`[sendJudgeInvitation] eventId=${eventId}, judgeId=${judgeId}`)
 
   const { data: judgeRow, error: judgeRowErr } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
@@ -765,14 +767,13 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
 
   if (emailResult?.sent) {
     try {
-      await getClient()
-        .from(DB_TABLES.INVITATIONS)
-        .upsert(
-          { event_id: eventId, voter_id: userId, invitation_sent: true, is_new_account: !isExistingAccount },
-          { onConflict: 'event_id,voter_id' },
-        )
+      await upsertJudgeInvitationStatus(eventId, userId, {
+        invitation_sent: true,
+        is_new_account: !isExistingAccount,
+      })
     } catch (dbErr) {
       console.error('[sendJudgeInvitation] failed to mark invitation_sent=true:', dbErr.message)
+      throw new ApiError(500, 'Invitation email was sent, but the system could not mark it as sent. Please refresh and try again if it still shows pending.')
     }
   }
 
@@ -860,12 +861,10 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
       }
 
       if (emailResult?.sent) {
-        await getClient()
-          .from(DB_TABLES.INVITATIONS)
-          .upsert(
-            { event_id: eventId, voter_id: p.user_id, invitation_sent: true, is_new_account: !isExistingAccount },
-            { onConflict: 'event_id,voter_id' },
-          )
+        await upsertJudgeInvitationStatus(eventId, p.user_id, {
+          invitation_sent: true,
+          is_new_account: !isExistingAccount,
+        })
         sent++
         results.push({
           judgeId: p.user_id,
@@ -899,37 +898,37 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
   return { total: pendingJudges.length, sent, failed, results }
 }
 
-export function mergeJudgeRows(participantRow = null, firstClassRow = null) {
+export function mergeJudgeRows(participantRow = null, compatibilityRow = null) {
   const fromParticipant = participantRow ?? {}
-  const fromCompetition = firstClassRow ?? {}
+  const fromCompatibility = compatibilityRow ?? {}
 
   const participantDisplayName = [fromParticipant.first_name, fromParticipant.last_name]
     .filter(Boolean)
     .join(' ') || fromParticipant.users?.email || null
 
-  const competitionDisplayName = typeof fromCompetition.display_name === 'string' && fromCompetition.display_name.trim()
-    ? fromCompetition.display_name.trim()
+  const compatibilityDisplayName = typeof fromCompatibility.display_name === 'string' && fromCompatibility.display_name.trim()
+    ? fromCompatibility.display_name.trim()
     : null
 
-  const competitionNameParts = competitionDisplayName ? competitionDisplayName.split(/\s+/) : []
+  const compatibilityNameParts = compatibilityDisplayName ? compatibilityDisplayName.split(/\s+/) : []
 
-  const displayName = competitionDisplayName ?? participantDisplayName
+  const displayName = compatibilityDisplayName ?? participantDisplayName
 
   return {
-    id: fromParticipant.id ?? fromCompetition.id ?? null,
-    eventId: fromCompetition.event_id ?? fromParticipant.event_id ?? null,
-    judgeId: fromCompetition.user_id ?? fromParticipant.user_id ?? fromParticipant.users?.id ?? null,
-    email: fromCompetition.users?.email ?? fromParticipant.users?.email ?? fromParticipant.email ?? null,
-    firstName: fromParticipant.first_name ?? (competitionNameParts[0] ?? null),
-    lastName: fromParticipant.last_name ?? (competitionNameParts.slice(1).join(' ') || null),
+    id: fromParticipant.id ?? fromCompatibility.id ?? null,
+    eventId: fromCompatibility.event_id ?? fromParticipant.event_id ?? null,
+    judgeId: fromCompatibility.user_id ?? fromParticipant.user_id ?? fromParticipant.users?.id ?? null,
+    email: fromCompatibility.users?.email ?? fromParticipant.users?.email ?? fromParticipant.email ?? null,
+    firstName: fromParticipant.first_name ?? (compatibilityNameParts[0] ?? null),
+    lastName: fromParticipant.last_name ?? (compatibilityNameParts.slice(1).join(' ') || null),
     displayName,
-    hasScored: Boolean(fromParticipant.has_scored || fromCompetition.has_submitted),
+    hasScored: Boolean(fromParticipant.has_scored || fromCompatibility.has_submitted),
     metadata: fromParticipant.metadata ?? {},
     invitationSent: false,
-    source: fromParticipant.id ? 'event_participants' : 'competition_judges',
-    role: fromParticipant.judge_role ?? fromCompetition.role ?? 'judge',
-    isActive: fromParticipant.is_active ?? fromCompetition.is_active ?? true,
-    hasSubmitted: Boolean(fromParticipant.has_scored || fromCompetition.has_submitted),
+    source: fromParticipant.id ? 'event_participants' : 'competition_judges_view',
+    role: fromParticipant.judge_role ?? fromCompatibility.role ?? 'judge',
+    isActive: fromParticipant.is_active ?? fromCompatibility.is_active ?? true,
+    hasSubmitted: Boolean(fromParticipant.has_scored || fromCompatibility.has_submitted),
   }
 }
 

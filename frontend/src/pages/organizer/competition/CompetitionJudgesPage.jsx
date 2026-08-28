@@ -84,7 +84,7 @@ export default function CompetitionJudgesPage() {
   const [registering, setRegistering] = useState(false)
   const [sendingAll, setSendingAll] = useState(false)
   const [sendingId, setSendingId] = useState(null)
-const [csvPreview, setCsvPreview] = useState(null)
+  const [csvPreview, setCsvPreview] = useState(null)
   const [importResult, setImportResult] = useState(null)
   const [search, setSearch] = useState('')
   const [error, setError] = useState(null)
@@ -124,7 +124,7 @@ const [csvPreview, setCsvPreview] = useState(null)
 
   useEffect(() => { load() }, [load])
 
-const pendingCount = judges.filter((j) => !j.invitationSent).length
+  const pendingCount = judges.filter((j) => !j.invitationSent && j.judgeId).length
 
   const handleRegister = async (e) => {
     e.preventDefault()
@@ -144,7 +144,7 @@ const pendingCount = judges.filter((j) => !j.invitationSent).length
     }
   }
 
-const handleCsvPreview = async (e) => {
+  const handleCsvPreview = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     setError(null)
@@ -188,6 +188,11 @@ const handleCsvPreview = async (e) => {
       
       if (data.invitationSent) {
         success('Invitation sent successfully')
+        setJudges((current) =>
+          current.map((judge) =>
+            judge.judgeId === judgeId ? { ...judge, invitationSent: true } : judge,
+          ),
+        )
         load()
       } else {
         // Show specific error message from backend
@@ -216,7 +221,7 @@ const handleCsvPreview = async (e) => {
       ) : null
     }
 
-// Row-level action
+    // Row-level action
     if (!participant.invitationSent && participant.judgeId) {
       const isSending = sendingId === participant.judgeId
       return (

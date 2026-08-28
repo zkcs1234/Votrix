@@ -81,8 +81,7 @@ export const pageantService = {
     return api.delete(`${org}/events/${eventId}/criteria/${criteriaId}`)
   },
 
-  // Canonical read path uses the first-class judge model.
-  // The legacy /judges endpoint remains only for compatibility during migration.
+  // Canonical read path uses event_participants-backed judge enrollment.
   listJudges(eventId) {
     return api.get(`${org}/events/${eventId}/judges-v2`)
   },
@@ -101,8 +100,8 @@ export const pageantService = {
     return api.post(`${org}/events/${eventId}/judges/register`, payload)
   },
 
-  sendJudgeInvitation(eventId, judgeId) {
-    return api.post(`${org}/events/${eventId}/judges/${judgeId}/send-invitation`)
+  sendJudgeInvitation(eventId, userId) {
+    return api.post(`${org}/events/${eventId}/judges/${userId}/send-invitation`)
   },
 
   sendAllJudgeInvitations(eventId) {
@@ -197,27 +196,28 @@ export const pageantService = {
     return api.patch(`${org}/events/${eventId}/scoring-config`, payload)
   },
 
-  // Phase 6 — First-class judges
+  // Phase 6 — Judge participants.
+  // Updates, deletes, and assignments use event_participants.id.
   listJudgesV2(eventId) {
     return api.get(`${org}/events/${eventId}/judges-v2`)
   },
   inviteJudgeV2(eventId, payload) {
     return api.post(`${org}/events/${eventId}/judges-v2/invite`, payload)
   },
-  updateJudgeV2(eventId, judgeId, payload) {
-    return api.patch(`${org}/events/${eventId}/judges-v2/${judgeId}`, payload)
+  updateJudgeV2(eventId, participantId, payload) {
+    return api.patch(`${org}/events/${eventId}/judges-v2/${participantId}`, payload)
   },
-  deleteJudgeV2(eventId, judgeId) {
-    return api.delete(`${org}/events/${eventId}/judges-v2/${judgeId}`)
+  deleteJudgeV2(eventId, participantId) {
+    return api.delete(`${org}/events/${eventId}/judges-v2/${participantId}`)
   },
-  listJudgeAssignments(eventId, judgeId) {
-    return api.get(`${org}/events/${eventId}/judges-v2/${judgeId}/assignments`)
+  listJudgeAssignments(eventId, participantId) {
+    return api.get(`${org}/events/${eventId}/judges-v2/${participantId}/assignments`)
   },
-  createJudgeAssignment(eventId, judgeId, payload) {
-    return api.post(`${org}/events/${eventId}/judges-v2/${judgeId}/assignments`, payload)
+  createJudgeAssignment(eventId, participantId, payload) {
+    return api.post(`${org}/events/${eventId}/judges-v2/${participantId}/assignments`, payload)
   },
-  deleteJudgeAssignment(eventId, judgeId, assignmentId) {
-    return api.delete(`${org}/events/${eventId}/judges-v2/${judgeId}/assignments/${assignmentId}`)
+  deleteJudgeAssignment(eventId, participantId, assignmentId) {
+    return api.delete(`${org}/events/${eventId}/judges-v2/${participantId}/assignments/${assignmentId}`)
   },
 
   // ——— Participant Information Form ———
