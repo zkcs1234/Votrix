@@ -1,4 +1,5 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
+import { ApiError } from '../utils/ApiError.js'
 import * as sessionService from '../services/competition-session.service.js'
 
 // ---------------------------------------------------------------------------
@@ -105,6 +106,40 @@ export const resumeSession = asyncHandler(async (req, res) => {
 export const completeSession = asyncHandler(async (req, res) => {
   const session = await sessionService.completeSession(req.params.eventId, req.user.id)
   res.json({ success: true, session, message: 'Competition session completed' })
+})
+
+// ---------------------------------------------------------------------------
+// Round finalize & advancement (organizer) — Phase 6
+// ---------------------------------------------------------------------------
+
+/** GET /api/organizer/competition/events/:eventId/rounds/:roundId/advancement-preview */
+export const previewRoundAdvancement = asyncHandler(async (req, res) => {
+  const preview = await sessionService.previewRoundAdvancement(
+    req.params.eventId,
+    req.user.id,
+    req.params.roundId,
+  )
+  res.json({ success: true, ...preview })
+})
+
+/** POST /api/organizer/competition/events/:eventId/session/finalize-round */
+export const finalizeRound = asyncHandler(async (req, res) => {
+  const { roundId, overrides } = req.body ?? {}
+  if (!roundId) throw new ApiError(400, 'roundId is required')
+  const result = await sessionService.finalizeRound(req.params.eventId, req.user.id, roundId, {
+    overrides: overrides ?? null,
+  })
+  res.json({ success: true, ...result })
+})
+
+/** GET /api/organizer/competition/events/:eventId/rounds/:roundId/results */
+export const getRoundResults = asyncHandler(async (req, res) => {
+  const results = await sessionService.getRoundResults(
+    req.params.eventId,
+    req.user.id,
+    req.params.roundId,
+  )
+  res.json({ success: true, results })
 })
 
 // ---------------------------------------------------------------------------

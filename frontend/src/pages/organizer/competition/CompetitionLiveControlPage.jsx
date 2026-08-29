@@ -27,6 +27,13 @@ export default function CompetitionLiveControlPage() {
   const [event, setEvent] = useState(null)
   const [foundation, setFoundation] = useState(null)
 
+  // Phase 6 — round finalize & advancement review modal.
+  const [finalizeRoundId, setFinalizeRoundId] = useState(null)
+  const [finalizePreview, setFinalizePreview] = useState(null)
+  const [finalizeChecked, setFinalizeChecked] = useState(() => new Set())
+  const [finalizeLoading, setFinalizeLoading] = useState(false)
+  const [finalizeSubmitting, setFinalizeSubmitting] = useState(false)
+
   const showLoader = useDelayedLoading(loading, 300)
 
   const loadSession = useCallback(async () => {
@@ -55,24 +62,25 @@ export default function CompetitionLiveControlPage() {
     loadSession()
   }, [loadSession])
 
-  // Real-time WebSocket subscriptions
-  useSocketEvent('session:state-changed', (payload) => {
-    if (payload.eventId === eventId) {
-      loadSession()
+  const refreshJudgeProgress = useCallback(async () => {
+    try {
+      const { data } = await competitionSessionService.getJudgeProgress(eventId)
+      setJudgeProgress(data.judges ?? [])
+    } catch {
+      /* progress refresh is best-effort */
     }
-  })
+  }, [eventId])
 
-  useSocketEvent('session:judge-submitted', (payload) => {
-    if (payload.eventId === eventId) {
-      setJudgeProgress((prev) =>
-        prev.map((j) =>
-          j.judgeId === payload.judgeId
-            ? { ...j, hasSubmittedCurrent: true, submittedAt: new Date().toISOString() }
-            : j,
-        ),
-      )
-    }
-  })
+  // Real-time WebSocket subscriptions. Event names MUST match what the backend
+  // emits (previously these listened for 'session:state-changed' /
+  // 'session:judge-submitted', which the backend never sends, so live updates
+  // silently never fired and the page relied on manual refresh). The organizer
+  // is auto-joined to the event rooms on socket connect (see ws-server setupRooms).
+  useSocketEvent('session:status-changed', () => loadSession(), [loadSession])
+  useSocketEvent('session:contestant-changed', () => loadSession(), [loadSession])
+  useSocketEvent('session:round-changed', () => loadSession(), [loadSession])
+  useSocketEvent('session:division-changed', () => loadSession(), [loadSession])
+  useSocketEvent('session:judge-score-submitted', () => refreshJudgeProgress(), [refreshJudgeProgress])
 
   // Actions
   const performAction = async (action, actionName) => {
@@ -116,6 +124,64 @@ export default function CompetitionLiveControlPage() {
       alert(err.response?.data?.message || 'Failed to set active division')
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  // Phase 6 — open the finalize review modal for a round.
+  const openFinalize = async (roundId) => {
+    setFinalizeRoundId(roundId)
+    setFinalizePreview(null)
+    setFinalizeLoading(true)
+    try {
+      const { data } = await competitionSessionService.previewRoundAdvancement(eventId, roundId)
+      setFinalizePreview(data)
+      setFinalizeChecked(new Set(data.standing.filter((s) => s.qualified).map((s) => s.contestantId)))
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to load advancement preview')
+      setFinalizeRoundId(null)
+    } finally {
+      setFinalizeLoading(false)
+    }
+  }
+
+  const toggleFinalizeChecked = (contestantId) => {
+    setFinalizeChecked((prev) => {
+      const next = new Set(prev)
+      if (next.has(contestantId)) next.delete(contestantId)
+      else next.add(contestantId)
+      return next
+    })
+  }
+
+  const closeFinalize = () => {
+    setFinalizeRoundId(null)
+    setFinalizePreview(null)
+    setFinalizeChecked(new Set())
+  }
+
+  const confirmFinalize = async () => {
+    if (!finalizePreview) return
+    // Compute overrides relative to the auto-selected qualifiers.
+    const add = []
+    const remove = []
+    for (const s of finalizePreview.standing) {
+      const checked = finalizeChecked.has(s.contestantId)
+      if (checked && !s.qualified) add.push(s.contestantId)
+      if (!checked && s.qualified) remove.push(s.contestantId)
+    }
+    setFinalizeSubmitting(true)
+    try {
+      const { data } = await competitionSessionService.finalizeRound(eventId, finalizeRoundId, { add, remove })
+      closeFinalize()
+      await loadSession()
+      alert(
+        `Round "${data.roundName}" finalized. ${data.qualifiers.length} qualifier(s)` +
+          (data.nextRoundName ? ` seeded into "${data.nextRoundName}".` : '.'),
+      )
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to finalize round')
+    } finally {
+      setFinalizeSubmitting(false)
     }
   }
 
@@ -273,6 +339,23 @@ export default function CompetitionLiveControlPage() {
                 </div>
               </div>
             )}
+
+            {/* Phase 6 — finalize the active round & advance qualifiers */}
+            {session.activeRound?.id && (
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => openFinalize(session.activeRound.id)}
+                  disabled={finalizeLoading}
+                  className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 transition hover:bg-amber-500/20 disabled:opacity-50"
+                >
+                  {finalizeLoading ? 'Loading…' : 'Finalize round & advance'}
+                </button>
+                <p className="text-[11px] text-v-text-subtle">
+                  Snapshots this round's standing and seeds qualifiers into the next round. Review before confirming.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -360,6 +443,78 @@ export default function CompetitionLiveControlPage() {
           </div>
         )}
       </div>
+
+      {/* Phase 6 — finalize round & advancement review modal */}
+      {finalizeRoundId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg rounded-xl border border-v-border bg-v-surface shadow-2xl">
+            <div className="flex items-center justify-between border-b border-v-border px-5 py-3">
+              <h3 className="text-sm font-semibold text-v-text">
+                Finalize {finalizePreview?.roundName ?? 'round'}
+              </h3>
+              <button
+                type="button"
+                onClick={closeFinalize}
+                className="text-v-text-muted hover:text-v-text"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
+              {finalizeLoading || !finalizePreview ? (
+                <p className="text-sm text-v-text-muted">Loading standing…</p>
+              ) : (
+                <>
+                  <p className="mb-3 text-xs text-v-text-subtle">
+                    Advancement: <span className="text-v-text">{finalizePreview.advancementType}</span>
+                    {finalizePreview.advancementValue != null && ` (${finalizePreview.advancementValue})`}
+                    {' · '}Policy: <span className="text-v-text">{finalizePreview.scorePolicy}</span>
+                    {finalizePreview.nextRoundName
+                      ? ` · Next: ${finalizePreview.nextRoundName}`
+                      : ' · No next round'}
+                  </p>
+                  <p className="mb-2 text-xs text-v-text-muted">
+                    Check who advances ({finalizeChecked.size} selected). Auto-selected can be overridden.
+                  </p>
+                  <ul className="space-y-1">
+                    {finalizePreview.standing.map((s) => (
+                      <li
+                        key={s.contestantId}
+                        className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2 text-sm"
+                      >
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={finalizeChecked.has(s.contestantId)}
+                            onChange={() => toggleFinalizeChecked(s.contestantId)}
+                          />
+                          <span className="text-v-text">
+                            #{s.rank} {s.contestantName}
+                          </span>
+                        </label>
+                        <span className="text-xs text-v-text-subtle">{Number(s.score).toFixed(2)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-v-border px-5 py-3">
+              <Button variant="outline" onClick={closeFinalize} disabled={finalizeSubmitting}>
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmFinalize}
+                disabled={finalizeSubmitting || finalizeLoading || !finalizePreview}
+              >
+                {finalizeSubmitting ? 'Finalizing…' : 'Finalize & advance'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

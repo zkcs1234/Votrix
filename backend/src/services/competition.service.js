@@ -215,6 +215,11 @@ function mapRound(row) {
     isOpen: row.is_open,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
+    // Phase 6: advancement/elimination config + finalize state.
+    advancementType: row.advancement_type ?? 'none',
+    advancementValue: row.advancement_value ?? null,
+    scorePolicy: row.score_policy ?? 'independent',
+    finalizedAt: row.finalized_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -309,6 +314,10 @@ export async function updateRound(eventId, organizerId, roundId, payload) {
   if (payload.startsAt !== undefined) updates.starts_at = payload.startsAt
   if (payload.endsAt !== undefined) updates.ends_at = payload.endsAt
   if (payload.divisionId !== undefined) updates.division_id = payload.divisionId
+  // Phase 6: per-round advancement/elimination config.
+  if (payload.advancementType !== undefined) updates.advancement_type = payload.advancementType
+  if (payload.advancementValue !== undefined) updates.advancement_value = payload.advancementValue
+  if (payload.scorePolicy !== undefined) updates.score_policy = payload.scorePolicy
 
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_ROUNDS)
@@ -384,8 +393,8 @@ export async function assertScoringWeightsValid(eventId, organizerId) {
   const [{ data: cats, error: catErr }, { data: rounds, error: rErr }, { data: crits, error: cErr }] =
     await Promise.all([
       getClient().from(DB_TABLES.COMPETITION_CATEGORIES).select('weight').eq('event_id', eventId),
-      getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('weight').eq('event_id', eventId),
-      getClient().from(DB_TABLES.CRITERIA).select('percentage').eq('event_id', eventId),
+      getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('id, name, weight').eq('event_id', eventId),
+      getClient().from(DB_TABLES.CRITERIA).select('id, name, percentage').eq('event_id', eventId),
     ])
 
   if (catErr) throw new ApiError(500, catErr.message)
@@ -404,7 +413,44 @@ export async function assertScoringWeightsValid(eventId, organizerId) {
       throw new ApiError(400, `Round weights must total 100% (currently ${total}%)`)
     }
   }
-  if ((crits ?? []).length) {
+
+  // Criteria weights (§8A). Feature-guarded on round↔criteria membership:
+  //   - If the event uses per-round criteria, each round's assigned criteria
+  //     must total 100% WITHIN that round (the flat event-wide sum would be
+  //     N×100% and is meaningless).
+  //   - Otherwise fall back to the legacy flat event-wide 100% rule, so simple
+  //     and existing flat-model competitions are unaffected.
+  const roundIds = (rounds ?? []).map((r) => r.id)
+  let membership = []
+  if (roundIds.length) {
+    const { data: rcRows, error: rcErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
+      .select('round_id, criteria_id')
+      .in('round_id', roundIds)
+    if (rcErr) throw new ApiError(500, rcErr.message)
+    membership = rcRows ?? []
+  }
+
+  if (membership.length) {
+    // Scope-aware: validate each round that has assigned criteria.
+    const pctById = new Map((crits ?? []).map((c) => [c.id, Number(c.percentage)]))
+    const nameById = new Map((rounds ?? []).map((r) => [r.id, r.name]))
+    const byRound = new Map()
+    for (const m of membership) {
+      if (!byRound.has(m.round_id)) byRound.set(m.round_id, [])
+      byRound.get(m.round_id).push(m.criteria_id)
+    }
+    for (const [roundId, critIds] of byRound) {
+      const total = critIds.reduce((s, id) => s + (pctById.get(id) ?? 0), 0)
+      if (Math.abs(total - 100) > 0.01) {
+        const label = nameById.get(roundId) ?? 'round'
+        throw new ApiError(
+          400,
+          `Criteria weights for "${label}" must total 100% (currently ${total}%)`,
+        )
+      }
+    }
+  } else if ((crits ?? []).length) {
     const total = (crits ?? []).reduce((s, c) => s + Number(c.percentage), 0)
     if (Math.abs(total - 100) > 0.01) {
       throw new ApiError(400, `Criteria weights must total 100% (currently ${total}%)`)
@@ -672,7 +718,7 @@ export async function getCompetitionFoundation(eventId, organizerId) {
     await Promise.all([
       getClient()
         .from(DB_TABLES.EVENTS)
-        .select('id, title, scoring_config, scoring_enabled, event_type, divisions_enabled')
+        .select('id, title, scoring_config, scoring_enabled, event_type, divisions_enabled, competition_type')
         .eq('id', eventId)
         .single(),
       listCategories(eventId, organizerId),
@@ -723,8 +769,22 @@ export async function getCompetitionFoundation(eventId, organizerId) {
       contestantIds: roundLinks.contestants.filter((x) => x.round_id === r.id).map((x) => x.contestant_id),
       criteriaIds: roundLinks.criteria.filter((x) => x.round_id === r.id).map((x) => x.criteria_id),
     })),
-    criteria: criteria.data ?? [],
-    contestants: contestants.data ?? [],
+    // 7.5: normalize contestants/criteria to a consistent camelCase shape
+    // (snake_case kept via spread so existing readers don't break). Rounds,
+    // categories, and divisions are already mapped to camelCase upstream.
+    criteria: (criteria.data ?? []).map((c) => ({
+      ...c,
+      criteriaId: c.id,
+      percentage: Number(c.percentage),
+      minScore: c.min_score,
+      maxScore: c.max_score,
+      divisionId: c.division_id ?? null,
+    })),
+    contestants: (contestants.data ?? []).map((c) => ({
+      ...c,
+      contestantNumber: c.contestant_number,
+      divisionId: c.division_id ?? null,
+    })),
     judges,
     assignments: assignmentRows.map((a) => ({
       id: a.id,

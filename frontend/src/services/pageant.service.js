@@ -16,6 +16,10 @@ export const pageantService = {
     return api.get(`${org}/events`)
   },
 
+  getTemplates() {
+    return api.get(`${org}/templates`)
+  },
+
   createEvent(payload) {
     return api.post(`${org}/events`, payload)
   },
@@ -120,6 +124,10 @@ export const pageantService = {
 
   getRankings(eventId, params = {}) {
     return api.get(`${org}/events/${eventId}/rankings`, { params })
+  },
+
+  getResults(eventId) {
+    return api.get(`${org}/events/${eventId}/results`)
   },
 
   getAnalytics(eventId, params = {}) {

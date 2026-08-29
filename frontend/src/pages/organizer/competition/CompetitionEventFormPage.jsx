@@ -45,6 +45,12 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
+  // Phase 1–2: optional competition type + starter template (create only). Kept
+  // as local state (not part of the RHF schema) and threaded through the draft
+  // payload so it survives step navigation and draft restore.
+  const [templates, setTemplates] = useState([])
+  const [competitionType, setCompetitionType] = useState(null)
+  const [templateKey, setTemplateKey] = useState(null)
 
 const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'competition',
@@ -99,8 +105,10 @@ const {
       startDate: data.startDate,
       endDate: data.endDate,
       infoFormSchema: schema,
+      competitionType,
+      templateKey,
     },
-  }), [banner, getValues, infoFormSchema, step])
+  }), [banner, getValues, infoFormSchema, step, competitionType, templateKey])
 
   const markDraftTouched = useCallback(() => {
     setDraftRestored(true)
@@ -110,6 +118,15 @@ useEffect(() => {
     setStep(inferStepFromPath(location.pathname))
   }, [location.pathname])
 
+  // Load the starter-template catalog for the create wizard.
+  useEffect(() => {
+    if (!isNew) return
+    pageantService
+      .getTemplates()
+      .then(({ data }) => setTemplates(data.templates ?? []))
+      .catch(() => setTemplates([]))
+  }, [isNew])
+
   // Session-boundary cleanup: reset all transient form state whenever the
   // session identity changes so no stale values/errors/step/uploads leak.
   useEffect(() => {
@@ -118,6 +135,8 @@ useEffect(() => {
     setInfoFormSchema(null)
     setError(null)
     setDraftRestored(false)
+    setCompetitionType(null)
+    setTemplateKey(null)
     reset({
       title: '',
       description: '',
@@ -143,6 +162,8 @@ useEffect(() => {
       endDate: payload.endDate ?? '',
     })
     setBanner(draft.banner ?? null)
+    setCompetitionType(payload.competitionType ?? null)
+    setTemplateKey(payload.templateKey ?? null)
     if (draft.banner) {
       markComplete('branding')
     }
@@ -277,6 +298,8 @@ try {
         description: data.description,
         startDate: localInputToIso(data.startDate),
         endDate: localInputToIso(data.endDate),
+        competitionType,
+        templateKey,
       }
       const { data: res } = await draftService.publishDraft('competition', payload)
       navigate(`/organizer/competition/events/${res.event.id}/contestants`, { replace: true })
@@ -355,6 +378,52 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             <Card padding="md">
             {step === 'details' && (
           <form className="space-y-4" onSubmit={handleSubmitDetails}>
+            {isNew && (
+              <div className="v-form-field">
+                <label className={LABEL_CLASS} htmlFor="competition-template">
+                  Competition type <span className="text-v-text-subtle">(optional)</span>
+                </label>
+                <select
+                  id="competition-template"
+                  className={INPUT_CLASS}
+                  value={templateKey ?? ''}
+                  onChange={(e) => {
+                    const key = e.target.value || null
+                    setTemplateKey(key)
+                    setCompetitionType(key)
+                  }}
+                >
+                  <option value="">Start blank</option>
+                  {templates.map((t) => (
+                    <option key={t.key} value={t.key}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+                {(() => {
+                  const t = templates.find((x) => x.key === templateKey)
+                  if (!t) {
+                    return (
+                      <p className={HELPER_TEXT}>
+                        Pick a type to pre-fill categories, rounds, and criteria — all fully editable
+                        afterward. "Start blank" seeds nothing.
+                      </p>
+                    )
+                  }
+                  const parts = []
+                  if (t.categories?.length) parts.push(`${t.categories.length} categories`)
+                  if (t.rounds?.length) parts.push(`${t.rounds.length} rounds`)
+                  if (t.criteria?.length) parts.push(`${t.criteria.length} criteria`)
+                  return (
+                    <p className={HELPER_TEXT}>
+                      {t.description}
+                      {parts.length ? ` Seeds ${parts.join(', ')} (editable).` : ' Seeds nothing.'}
+                    </p>
+                  )
+                })()}
+              </div>
+            )}
+
             <div className="v-form-field">
               <label className={LABEL_CLASS} htmlFor="title">
                 Title <span className="text-v-danger">*</span>

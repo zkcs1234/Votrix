@@ -78,4 +78,9 @@ router.post('/session/set-division', sessionCtrl.setActiveDivision)
 // Judge progress (organizer view)
 router.get('/session/judge-progress', sessionCtrl.getJudgeProgress)
 
+// Round finalize & advancement (Phase 6)
+router.get('/rounds/:roundId/advancement-preview', sessionCtrl.previewRoundAdvancement)
+router.post('/session/finalize-round', sessionCtrl.finalizeRound)
+router.get('/rounds/:roundId/results', sessionCtrl.getRoundResults)
+
 export default router

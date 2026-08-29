@@ -81,6 +81,8 @@ export default function CompetitionWorkspacePage() {
         ))}
       </div>
 
+      <TypeHint type={foundation?.event?.competition_type} />
+
       {activeTab === 'structure' && <StructureTab foundation={foundation} reload={load} />}
       {activeTab === 'divisions' && <DivisionsTab foundation={foundation} reload={load} />}
       {activeTab === 'rounds' && <RoundsTab foundation={foundation} reload={load} />}
@@ -525,6 +527,47 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
   const assignedCriteriaIds = new Set(round.criteriaIds ?? [])
   const [busy, setBusy] = useState(null) // tracks which id is loading
 
+  // §8A: when criteria are assigned per round, each round's criteria must total
+  // 100% WITHIN that round (not event-wide). Surface the per-round total here so
+  // the organizer sees what the backend now validates.
+  const assignedCritTotal = allCriteria
+    .filter((cr) => assignedCriteriaIds.has(cr.id))
+    .reduce((s, cr) => s + Number(cr.percentage ?? 0), 0)
+  const hasAssignedCrit = assignedCriteriaIds.size > 0
+  const critComplete = Math.abs(assignedCritTotal - 100) < 0.1
+
+  // Phase 6 — per-round advancement/elimination + score policy.
+  const [advType, setAdvType] = useState(round.advancementType ?? 'none')
+  const [advValue, setAdvValue] = useState(round.advancementValue ?? '')
+  const [scorePolicy, setScorePolicy] = useState(round.scorePolicy ?? 'independent')
+  const [savingAdv, setSavingAdv] = useState(false)
+  const isFinalized = Boolean(round.finalizedAt)
+  const needsValue = advType === 'top_n' || advType === 'top_percent' || advType === 'threshold'
+
+  const saveAdvancement = async () => {
+    setSavingAdv(true)
+    try {
+      // Send the full round (the update validator resets unspecified fields).
+      await pageantService.updateRound(eventId, round.id, {
+        name: round.name,
+        description: round.description ?? null,
+        weight: round.weight,
+        displayOrder: round.displayOrder,
+        categoryId: round.categoryId ?? null,
+        divisionId: round.divisionId ?? null,
+        isOpen: round.isOpen,
+        advancementType: advType,
+        advancementValue: needsValue && advValue !== '' ? Number(advValue) : null,
+        scorePolicy,
+      })
+      reload()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to save advancement settings')
+    } finally {
+      setSavingAdv(false)
+    }
+  }
+
   const toggleContestant = async (contestantId) => {
     setBusy(`c-${contestantId}`)
     try {
@@ -558,7 +601,8 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
   }
 
   return (
-    <div className="border-t border-v-border px-4 pb-4 pt-3 grid gap-4 sm:grid-cols-2">
+    <div className="border-t border-v-border px-4 pb-4 pt-3 space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
       {/* Contestants */}
       <div>
         <p className="mb-2 text-xs font-medium uppercase tracking-wider text-v-text-muted">
@@ -600,9 +644,23 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
 
       {/* Criteria */}
       <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-v-text-muted">
-          Criteria in this round
-        </p>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-v-text-muted">
+            Criteria in this round
+          </p>
+          {hasAssignedCrit && (
+            <span
+              className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                critComplete
+                  ? 'bg-v-success/10 text-v-success'
+                  : 'bg-amber-400/10 text-amber-400'
+              }`}
+              title="Each round's criteria must total 100%"
+            >
+              {assignedCritTotal.toFixed(1)}% {critComplete ? '✓' : '/ 100%'}
+            </span>
+          )}
+        </div>
         {allCriteria.length === 0 ? (
           <p className="text-xs text-v-text-subtle">No criteria added to the event yet.</p>
         ) : (
@@ -636,6 +694,95 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
           </ul>
         )}
       </div>
+      </div>
+
+      {/* Phase 6 — advancement / elimination + score policy */}
+      <div className="rounded-lg border border-v-border bg-v-surface-elevated/40 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-medium uppercase tracking-wider text-v-text-muted">
+            Advancement & scoring
+          </p>
+          {isFinalized && (
+            <span className="rounded bg-v-success/10 px-1.5 py-0.5 text-[10px] font-medium text-v-success">
+              Finalized
+            </span>
+          )}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-[11px] text-v-text-muted" title="Applies when deciding who advances. The final event ranking always combines rounds by their weights.">
+              Score policy (advancement)
+            </label>
+            <select
+              className="w-full rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text disabled:opacity-50"
+              value={scorePolicy}
+              disabled={isFinalized}
+              onChange={(e) => setScorePolicy(e.target.value)}
+            >
+              <option value="independent">Independent — this round only</option>
+              <option value="cumulative">Cumulative — carry prior rounds</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-v-text-muted">Advancement</label>
+            <select
+              className="w-full rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text disabled:opacity-50"
+              value={advType}
+              disabled={isFinalized}
+              onChange={(e) => setAdvType(e.target.value)}
+            >
+              <option value="none">None (no elimination)</option>
+              <option value="top_n">Top N advance</option>
+              <option value="top_percent">Top % advance</option>
+              <option value="threshold">Score threshold</option>
+              <option value="manual">Manual pick</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-v-text-muted">
+              {advType === 'top_n' ? 'N' : advType === 'top_percent' ? 'Percent' : advType === 'threshold' ? 'Min score' : 'Value'}
+            </label>
+            <input
+              type="number"
+              className="w-full rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text disabled:opacity-50"
+              value={advValue}
+              disabled={isFinalized || !needsValue}
+              onChange={(e) => setAdvValue(e.target.value)}
+              placeholder={needsValue ? '' : '—'}
+            />
+          </div>
+        </div>
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            disabled={savingAdv || isFinalized}
+            onClick={saveAdvancement}
+            className="rounded-lg bg-v-primary px-3 py-1.5 text-xs font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
+          >
+            {savingAdv ? 'Saving...' : 'Save settings'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// L3 — soft signposting: a read-only hint about which optional layers a given
+// competition type usually needs. Every tab stays available; nothing is hidden.
+const TYPE_HINTS = {
+  pageant: 'Pageant — typically uses Categories + Rounds (prelim → final). All tabs stay available.',
+  dance: 'Dance — typically uses Rounds and Divisions (solo / team). Categories optional.',
+  singing: 'Singing — usually just Criteria; add Rounds only if you run heats and a final.',
+  talent: 'Talent — usually flat Criteria; Categories, Divisions, and Rounds are optional.',
+  simple: 'Simple — you can skip Categories, Divisions, and Rounds; Criteria alone is enough.',
+}
+
+function TypeHint({ type }) {
+  const hint = type && TYPE_HINTS[type]
+  if (!hint) return null
+  return (
+    <div className="rounded-lg border border-v-border bg-v-surface-elevated/50 px-4 py-2.5 text-xs text-v-text-muted">
+      {hint}
     </div>
   )
 }
@@ -644,6 +791,14 @@ function JudgesTab({ foundation, reload }) {
   const { eventId } = useParams()
   const [scope, setScope] = useState('event')
   const [scopeId, setScopeId] = useState(eventId || '')
+
+  // Declared before the effect that uses it (was hoisted-after, which ESLint flags).
+  const getScopeItems = (currentScope, currentFoundation) => {
+    if (currentScope === 'event') return null
+    if (currentScope === 'division') return currentFoundation?.divisions ?? []
+    if (currentScope === 'category') return currentFoundation?.categories ?? []
+    return currentFoundation?.rounds ?? []
+  }
 
   useEffect(() => {
     if (scope === 'event') {
@@ -662,13 +817,6 @@ function JudgesTab({ foundation, reload }) {
       return items[0].id
     })
   }, [scope, eventId, foundation])
-
-  const getScopeItems = (currentScope, currentFoundation) => {
-    if (currentScope === 'event') return null
-    if (currentScope === 'division') return currentFoundation?.divisions ?? []
-    if (currentScope === 'category') return currentFoundation?.categories ?? []
-    return currentFoundation?.rounds ?? []
-  }
 
   const addAssignment = async (judge) => {
     const targetScopeId = scope === 'event' ? eventId : scopeId

@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { CheckCircle, AlertTriangle, RotateCcw, AlertCircle } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
+import { isConnected } from '@/services/socket.service'
+import { useSocketEvent } from '@/hooks/useSocketEvent'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
@@ -21,7 +23,9 @@ export default function JudgeScoringPage() {
   const [connectionError, setConnectionError] = useState(null)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
   const [autoSaving, setAutoSaving] = useState(false)
-  const [socketConnected, setSocketConnected] = useState(false)
+  // The shared WS client (socket.service) may already be open before this page
+  // mounts (Bootstrap connects on auth), so seed from its live state.
+  const [socketConnected, setSocketConnected] = useState(() => isConnected())
   
   // Division selector state
   const [selectedDivisionId, setSelectedDivisionId] = useState(null)
@@ -162,142 +166,82 @@ export default function JudgeScoringPage() {
     }
   }, [sheet?.activeSession])
 
-  // Websocket connection and event subscriptions
-  useEffect(() => {
-    if (!eventId) return
-    
-    const socket = window.socketClient
-    if (!socket) {
-      console.warn('[Judge Scoring] Socket client not available')
-      return
-    }
-
-    // Handle session status changes
-    const handleStatusChange = (payload) => {
-      const { session } = payload.data
-      setSessionState(session)
-      
-      if (session.status === 'active') {
-        if (session.activeContestantId) {
-          setActiveContestantId(session.activeContestantId)
-        }
-      } else {
-        setActiveContestantId(null)
-      }
-    }
-
-    // Handle active contestant changes
-    const handleContestantChange = (payload) => {
-      const { session } = payload.data
-      setSessionState(session)
-      
-      if (session.activeContestantId) {
-        setActiveContestantId(session.activeContestantId)
-        // Clear scores for new contestant
-        setScores({})
-      } else {
-        setActiveContestantId(null)
-      }
-    }
-
-    // Handle websocket division changes
-    const handleWebsocketDivisionChange = (payload) => {
-      const { session } = payload.data
-      setSessionState(session)
-      
-      // Reload scoring sheet if division changes and judge is assigned
-      if (session.currentDivisionId && sheet?.divisionsEnabled) {
-        const isAssigned = sheet?.allowedDivisions?.some(
-          (div) => div.id === session.currentDivisionId
-        )
-        
-        if (isAssigned) {
-          // Reload scoring sheet for new division
-          pageantService
-            .getSessionView(eventId, { divisionId: session.currentDivisionId })
-            .then(({ data }) => {
-              setSheet(data)
-              setScores(data.existingScores || {})
-            })
-            .catch((err) => {
-              console.error('[Division change] Failed to reload scoring sheet:', err)
-              setConnectionError('Failed to update division')
-            })
-        } else {
-          setConnectionError('You are not assigned to this division')
-        }
-      }
-    }
-
-    // Connection error handler
-    const handleConnectError = (error) => {
-      console.error('[WS] Connection error:', error)
-      setConnectionError('Connection failed - real-time updates unavailable')
-    }
-
-    // Disconnect handler
-    const handleDisconnect = (reason) => {
-      console.warn('[WS] Disconnected:', reason)
-      setSocketConnected(false)
-      
-      if (reason === 'io server disconnect') {
-        setConnectionError('Disconnected by server - please refresh')
-      } else {
-        setReconnectAttempts((prev) => prev + 1)
-      }
-    }
-
-    // Reconnect handler
-    const handleReconnect = () => {
-      console.log('[WS] Reconnected successfully')
-      setConnectionError(null)
-      setReconnectAttempts(0)
-      setSocketConnected(true)
-      
-      // Fetch current session state to sync UI
-      pageantService.getSessionView(eventId)
-        .then(({ data }) => {
-          setSheet(data)
-          if (data.activeSession) {
-            setSessionState(data.activeSession)
-            if (data.activeSession.status === 'active' && data.activeSession.activeContestantId) {
-              setActiveContestantId(data.activeSession.activeContestantId)
-            }
+  // Re-sync the whole session view from the server (used on (re)connect).
+  const syncSessionView = useCallback(() => {
+    pageantService
+      .getSessionView(eventId)
+      .then(({ data }) => {
+        setSheet(data)
+        if (data.activeSession) {
+          setSessionState(data.activeSession)
+          if (data.activeSession.status === 'active' && data.activeSession.activeContestantId) {
+            setActiveContestantId(data.activeSession.activeContestantId)
           }
-        })
-        .catch((err) => console.error('[WS] Failed to sync session:', err))
+        }
+      })
+      .catch((err) => console.error('[WS] Failed to sync session:', err))
+  }, [eventId])
+
+  // Real-time updates via the shared WS client (socket.service). The voter is
+  // auto-joined to the event room on connect (ws-server setupRooms), and
+  // useSocketEvent handlers receive the emitted `data` object directly. This
+  // replaces the previous `window.socketClient` (socket.io-style) client, which
+  // this app never defined — so live updates never fired and the judge relied on
+  // manual refresh.
+  useSocketEvent('session:status-changed', ({ session }) => {
+    if (!session) return
+    setSessionState(session)
+    if (session.status === 'active' && session.activeContestantId) {
+      setActiveContestantId(session.activeContestantId)
+    } else {
+      setActiveContestantId(null)
     }
+  }, [])
 
-    // Connect handler
-    const handleConnect = () => {
-      console.log('[WS] Connected')
-      setSocketConnected(true)
-      setConnectionError(null)
+  useSocketEvent('session:contestant-changed', ({ session }) => {
+    if (!session) return
+    setSessionState(session)
+    if (session.activeContestantId) {
+      setActiveContestantId(session.activeContestantId)
+      setScores({}) // clear scores for the new contestant
+    } else {
+      setActiveContestantId(null)
     }
+  }, [])
 
-    // Subscribe to events
-    socket.on('connect', handleConnect)
-    socket.on('session:status-changed', handleStatusChange)
-    socket.on('session:contestant-changed', handleContestantChange)
-    socket.on('session:division-changed', handleWebsocketDivisionChange)
-    socket.on('connect_error', handleConnectError)
-    socket.on('disconnect', handleDisconnect)
-    socket.on('reconnect', handleReconnect)
-
-    // Set initial connection status
-    setSocketConnected(socket.connected)
-
-    // Cleanup on unmount
-    return () => {
-      socket.off('connect', handleConnect)
-      socket.off('session:status-changed', handleStatusChange)
-      socket.off('session:contestant-changed', handleContestantChange)
-      socket.off('session:division-changed', handleWebsocketDivisionChange)
-      socket.off('connect_error', handleConnectError)
-      socket.off('disconnect', handleDisconnect)
-      socket.off('reconnect', handleReconnect)
+  useSocketEvent('session:division-changed', ({ session }) => {
+    if (!session) return
+    setSessionState(session)
+    if (session.currentDivisionId && sheet?.divisionsEnabled) {
+      const isAssigned = sheet?.allowedDivisions?.some((div) => div.id === session.currentDivisionId)
+      if (isAssigned) {
+        pageantService
+          .getSessionView(eventId, { divisionId: session.currentDivisionId })
+          .then(({ data }) => {
+            setSheet(data)
+            setScores(data.existingScores || {})
+          })
+          .catch((err) => {
+            console.error('[Division change] Failed to reload scoring sheet:', err)
+            setConnectionError('Failed to update division')
+          })
+      } else {
+        setConnectionError('You are not assigned to this division')
+      }
     }
   }, [eventId, sheet?.divisionsEnabled, sheet?.allowedDivisions])
+
+  useSocketEvent('ws:connected', () => {
+    setSocketConnected(true)
+    setConnectionError(null)
+    setReconnectAttempts(0)
+    syncSessionView()
+  }, [syncSessionView])
+
+  useSocketEvent('ws:disconnected', () => {
+    setSocketConnected(false)
+    setReconnectAttempts((prev) => prev + 1)
+  }, [])
 
   // Auto-save score when changed in live session
   const autoSaveTimeouts = useRef({})
@@ -393,10 +337,7 @@ export default function JudgeScoringPage() {
   // Automatic retry on reconnection (Requirement 15.5, 15.6, 15.7)
   // Task 13.2: Add useEffect watching [socket.connected, submissionQueue]
   useEffect(() => {
-    const socket = window.socketClient
-    if (!socket) return
-
-    // Check if we should retry submissions (Task 13.2: socket.connected AND submissionQueue.length > 0)
+    // Retry when the shared WS client is connected AND there are queued submissions.
     const shouldRetry = socketConnected && submissionQueue.length > 0
 
     if (!shouldRetry) return

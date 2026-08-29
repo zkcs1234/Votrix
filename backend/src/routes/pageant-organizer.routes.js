@@ -10,6 +10,7 @@ const router = Router()
 router.use(validateRouteUUIDParams)
 
 router.get('/dashboard', ctrl.getDashboard)
+router.get('/templates', ctrl.listTemplates)
 router.get('/events', ctrl.listEvents)
 router.post('/events', ctrl.createEvent)
 router.get('/events/:eventId', ctrl.getEvent)
@@ -45,6 +46,7 @@ router.post('/events/:eventId/judges/import-preview', csvImportLimiter, uploadSi
 router.post('/events/:eventId/judges/import-register', csvImportLimiter, ctrl.registerImportJudgesCsv)
 
 router.get('/events/:eventId/rankings', ctrl.getRankings)
+router.get('/events/:eventId/results', ctrl.getResults)
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
 
 // ——— Participant Information Form ———

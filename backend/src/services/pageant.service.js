@@ -23,6 +23,7 @@ import {
   mergeScoringConfig,
   isScoreInBounds,
 } from '../modules/scoring-engine.js'
+import { getTemplate } from '../modules/competition-templates.js'
 import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
 import { emitToEvent } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
@@ -213,12 +214,26 @@ export async function createCompetitionEvent(organizerId, payload) {
       end_date: payload.endDate ?? null,
       status: payload.status ?? 'draft',
       event_type: 'competition_scoring',
+      // Phase 1: optional sub-type label (display/template only). Nullable.
+      competition_type: payload.competitionType ?? null,
       scoring_enabled: false,
     })
     .select('*')
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  // Phase 2: if a template was chosen, seed editable structure. Best-effort —
+  // a partial seed leaves fully editable rows, so we never fail event creation
+  // over seeding (the organizer can adjust anything afterward).
+  if (payload.templateKey) {
+    try {
+      await seedFromTemplate(data.id, payload.templateKey)
+    } catch (err) {
+      console.error('[competition] template seeding failed:', err.message)
+    }
+  }
+
   await syncEventSchedules().catch((err) => {
     console.error('[competition] schedule sync failed after create:', err.message)
   })
@@ -226,6 +241,65 @@ export async function createCompetitionEvent(organizerId, payload) {
     console.error('[competition] failed to clear draft after create:', err.message)
   })
   return mapEvent(data)
+}
+
+// Phase 2 — seed editable categories/rounds/criteria/scoring_config from a
+// starter template. All rows are normal, editable records; the template is not
+// referenced again after creation.
+async function seedFromTemplate(eventId, templateKey) {
+  const template = getTemplate(templateKey)
+  if (!template) return
+
+  if (template.scoringConfig) {
+    await getClient()
+      .from(DB_TABLES.EVENTS)
+      .update({ scoring_config: template.scoringConfig })
+      .eq('id', eventId)
+  }
+
+  if (template.categories?.length) {
+    await getClient()
+      .from(DB_TABLES.COMPETITION_CATEGORIES)
+      .insert(
+        template.categories.map((c, i) => ({
+          event_id: eventId,
+          name: c.name,
+          weight: c.weight ?? 0,
+          display_order: i,
+          is_active: true,
+        })),
+      )
+  }
+
+  if (template.rounds?.length) {
+    await getClient()
+      .from(DB_TABLES.COMPETITION_ROUNDS)
+      .insert(
+        template.rounds.map((r, i) => ({
+          event_id: eventId,
+          name: r.name,
+          weight: r.weight ?? 0,
+          display_order: i,
+          is_open: false,
+        })),
+      )
+  }
+
+  if (template.criteria?.length) {
+    // §8C: criterion bounds inherit the event scale; store the scale's range.
+    const bounds = resolveScoreBounds(template.scoringConfig)
+    await getClient()
+      .from(DB_TABLES.CRITERIA)
+      .insert(
+        template.criteria.map((cr) => ({
+          event_id: eventId,
+          name: cr.name,
+          percentage: cr.percentage ?? 0,
+          min_score: bounds.min,
+          max_score: bounds.max,
+        })),
+      )
+  }
 }
 
 export async function updatePageantEvent(eventId, organizerId, payload) {
@@ -248,6 +322,7 @@ export async function updateCompetitionEvent(eventId, organizerId, payload) {
   if (payload.startDate !== undefined) updates.start_date = payload.startDate
   if (payload.endDate !== undefined) updates.end_date = payload.endDate
   if (payload.status !== undefined) updates.status = payload.status
+  if (payload.competitionType !== undefined) updates.competition_type = payload.competitionType
 
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
@@ -1481,13 +1556,37 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
   }
 
   const { count: totalJudges } = judgesRes
-  const { count: submittedJudges } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('*', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
-    .eq('has_scored', true)
+  // H3: derive "judges submitted" from judges who actually have scores in the
+  // ranking store. Since Phase 3 writes live-session scores through to
+  // competition_scores, this is accurate for BOTH the live and batch paths —
+  // unlike the old event_participants.has_scored flag, which the live path never
+  // set (so live-session events wrongly showed 0 submitted here).
+  const submittedJudges = new Set((scores ?? []).map((s) => s.judge_id)).size
 
+  // Phase 4 (§8A): supply round→criteria membership so the engine scores each
+  // round with only its own criteria. Feature-guarded: when an event has NO
+  // round_criteria rows this stays null and the engine runs the legacy path,
+  // leaving pre-existing flat-model events' numbers unchanged.
+  const roundIds = (roundsRes.data ?? []).map((r) => r.id)
+  let roundCriteria = null
+  if (roundIds.length) {
+    const { data: rcRows } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
+      .select('round_id, criteria_id')
+      .in('round_id', roundIds)
+    if (rcRows && rcRows.length) {
+      roundCriteria = {}
+      for (const rc of rcRows) {
+        ;(roundCriteria[rc.round_id] ??= []).push(rc.criteria_id)
+      }
+    }
+  }
+
+  // H2 note: the FINAL event ranking is the weighted combination of rounds
+  // (Σ round.value × round.weight) — the standard model. A round's `score_policy`
+  // (independent/cumulative) governs how that round's standing is computed for
+  // ADVANCEMENT decisions (see computeRoundStanding), not the weighted final;
+  // applying cumulative here as well would double-count across the round weights.
   const { rankings, debug } = computeRankings({
     scores,
     contestants: contestantsRes.data ?? [],
@@ -1495,6 +1594,7 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
     rounds: roundsRes.data ?? [],
     categories: categoriesRes.data ?? [],
     config: eventRes.data?.scoring_config,
+    roundCriteria,
   })
 
   // Map the engine's nested shape to the public shape the UI already uses.
@@ -1530,6 +1630,109 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
       total: totalJudges ?? 0,
       submitted: submittedJudges ?? 0,
     },
+  }
+}
+
+// ——— Phase 7: Results & awards ———
+
+// "Best in {category}" — the top per-category sub-score across the field.
+function computeCategoryAwards(rankings) {
+  const byCategory = new Map()
+  for (const row of rankings) {
+    for (const cat of row.perCategory ?? []) {
+      const cur = byCategory.get(cat.categoryId)
+      if (!cur || cat.value > cur.value) {
+        byCategory.set(cat.categoryId, {
+          categoryId: cat.categoryId,
+          categoryName: cat.categoryName,
+          value: cat.value,
+          contestantId: row.contestantId,
+          contestantName: row.contestantName,
+          contestantNumber: row.contestantNumber,
+        })
+      }
+    }
+  }
+  return [...byCategory.values()]
+}
+
+// Assemble the full results view real competitions announce: overall standings +
+// champion, per-division winners, per-category ("Best in …") awards, and the
+// finalized per-round standings (from the Phase 6 snapshots). Read-only — builds
+// on getLiveRankings and competition_round_results; changes no scoring behavior.
+export async function getCompetitionResults(eventId, organizerId) {
+  await assertCompetitionEvent(eventId, organizerId)
+
+  const overall = await getLiveRankings(eventId, organizerId)
+  const categoryAwards = computeCategoryAwards(overall.rankings)
+  const champion = overall.rankings[0] ?? null
+
+  // Per-division standings + winners.
+  const divisions = []
+  if (overall.divisionsEnabled) {
+    const { data: divList } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id, name')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: true })
+    for (const d of divList ?? []) {
+      const dr = await getLiveRankings(eventId, organizerId, { divisionId: d.id })
+      divisions.push({
+        divisionId: d.id,
+        name: d.name,
+        winner: dr.rankings[0] ?? null,
+        rankings: dr.rankings,
+      })
+    }
+  }
+
+  // Finalized per-round standings (Phase 6 snapshots).
+  const { data: rounds } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUNDS)
+    .select('id, name, display_order, finalized_at')
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+  const finalizedRounds = (rounds ?? []).filter((r) => r.finalized_at)
+
+  let roundStandings = []
+  if (finalizedRounds.length) {
+    const roundIds = finalizedRounds.map((r) => r.id)
+    const [{ data: results }, { data: contestants }] = await Promise.all([
+      getClient()
+        .from(DB_TABLES.COMPETITION_ROUND_RESULTS)
+        .select('round_id, contestant_id, rank, score, qualified')
+        .in('round_id', roundIds),
+      getClient()
+        .from(DB_TABLES.CONTESTANTS)
+        .select('id, name, contestant_number')
+        .eq('event_id', eventId),
+    ])
+    const nameById = new Map((contestants ?? []).map((c) => [c.id, c]))
+    roundStandings = finalizedRounds.map((r) => ({
+      roundId: r.id,
+      roundName: r.name,
+      finalizedAt: r.finalized_at,
+      standings: (results ?? [])
+        .filter((x) => x.round_id === r.id)
+        .sort((a, b) => a.rank - b.rank)
+        .map((x) => ({
+          contestantId: x.contestant_id,
+          contestantName: nameById.get(x.contestant_id)?.name ?? 'Unknown',
+          contestantNumber: nameById.get(x.contestant_id)?.contestant_number ?? null,
+          rank: x.rank,
+          score: Number(x.score),
+          qualified: x.qualified,
+        })),
+    }))
+  }
+
+  return {
+    divisionsEnabled: overall.divisionsEnabled,
+    champion,
+    overall: overall.rankings,
+    categoryAwards,
+    divisions,
+    rounds: roundStandings,
   }
 }
 

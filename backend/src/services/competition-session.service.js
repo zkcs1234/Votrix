@@ -4,9 +4,12 @@
 
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
+import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES, SCORE_POLICIES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { assertJudgeEnrolled, canJudgeScore } from './pageant.service.js'
+import { mergeScoringConfig, resolveScoreBounds, isScoreInBounds, computeRankings } from '../modules/scoring-engine.js'
+import { selectQualifiers, applyQualifierOverride } from '../modules/advancement.js'
+import { recordAudit } from '../foundation/audit.js'
 import { emitToEvent, emitToEventOrganizer, emitToEventVoters, emitToUser } from '../websocket/ws-emitter.js'
 
 // ---------------------------------------------------------------------------
@@ -209,28 +212,15 @@ export async function startSession(eventId, organizerId) {
   // 13.3: Validate at least one criterion exists
   const { data: criteriaData, error: criteriaError } = await getClient()
     .from(DB_TABLES.CRITERIA)
-    .select('percentage')
+    .select('id, percentage')
     .eq('event_id', eventId)
 
   if (criteriaError) throw new ApiError(500, criteriaError.message)
-  
+
   if (!criteriaData || criteriaData.length === 0) {
     throw new ApiError(
       400,
       'Cannot start session: No criteria added. Add criteria first.'
-    )
-  }
-
-  // 13.4: Validate criteria percentages sum to 100%
-  const totalPercentage = criteriaData.reduce(
-    (sum, criterion) => sum + Number(criterion.percentage),
-    0
-  )
-
-  if (Math.abs(totalPercentage - 100) > 0.1) {
-    throw new ApiError(
-      400,
-      `Cannot start session: Criteria percentages total ${totalPercentage.toFixed(1)}% (must equal 100%)`
     )
   }
 
@@ -243,6 +233,52 @@ export async function startSession(eventId, organizerId) {
     .order('created_at', { ascending: true })
 
   if (roundsError) throw new ApiError(500, roundsError.message)
+
+  // 13.4: Validate criteria percentages sum to 100% (§8A, scope-aware).
+  // If the event uses per-round criteria, each round's assigned criteria must
+  // total 100% within that round; otherwise the legacy flat event-wide rule
+  // applies. Feature-guarded so flat/existing events keep the same message.
+  const roundIdList = (rounds ?? []).map((r) => r.id)
+  let critMembership = []
+  if (roundIdList.length) {
+    const { data: rcRows, error: rcErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
+      .select('round_id, criteria_id')
+      .in('round_id', roundIdList)
+    if (rcErr) throw new ApiError(500, rcErr.message)
+    critMembership = rcRows ?? []
+  }
+
+  if (critMembership.length) {
+    const pctById = new Map(criteriaData.map((c) => [c.id, Number(c.percentage)]))
+    const nameById = new Map((rounds ?? []).map((r) => [r.id, r.name]))
+    const byRound = new Map()
+    for (const m of critMembership) {
+      if (!byRound.has(m.round_id)) byRound.set(m.round_id, [])
+      byRound.get(m.round_id).push(m.criteria_id)
+    }
+    for (const [roundId, critIds] of byRound) {
+      const total = critIds.reduce((s, id) => s + (pctById.get(id) ?? 0), 0)
+      if (Math.abs(total - 100) > 0.1) {
+        const label = nameById.get(roundId) ?? 'round'
+        throw new ApiError(
+          400,
+          `Cannot start session: Criteria for "${label}" total ${total.toFixed(1)}% (must equal 100%)`
+        )
+      }
+    }
+  } else {
+    const totalPercentage = criteriaData.reduce(
+      (sum, criterion) => sum + Number(criterion.percentage),
+      0
+    )
+    if (Math.abs(totalPercentage - 100) > 0.1) {
+      throw new ApiError(
+        400,
+        `Cannot start session: Criteria percentages total ${totalPercentage.toFixed(1)}% (must equal 100%)`
+      )
+    }
+  }
 
   // 13.5 & 13.6: Validate rounds if they exist
   if (rounds && rounds.length > 0) {
@@ -582,6 +618,15 @@ export async function completeSession(eventId, organizerId) {
 
   emitToEvent(eventId, 'session:status-changed', { session: updated })
 
+  // Phase 3 (§7.1) safety net: bridge any live-session scores for this event
+  // that predate the write-through (or that failed to mirror) into the ranking
+  // store before we recompute rankings. Best-effort — never block completion.
+  try {
+    await backfillLiveScoresToRankingStore(eventId)
+  } catch (e) {
+    console.error('[session] Live-score backfill failed on complete:', e.message)
+  }
+
   // Also trigger rankings update
   const { getLiveRankings } = await import('./pageant.service.js')
   try {
@@ -592,6 +637,86 @@ export async function completeSession(eventId, organizerId) {
   }
 
   return updated
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 (§7.1) — bridge live-session scores into the ranking store.
+//
+// The live scoring flow persists a judge's scores as a JSONB blob in
+// `competition_session_judge_scores`, but rankings/analytics read ONLY from
+// `competition_scores` (DB_TABLES.JUDGE_SCORES). Without this bridge, scores
+// entered live never reach the rankings. We flatten the per-criterion values
+// and write them through to `competition_scores` so it stays the single source
+// of truth for the ranking engine.
+//
+// Idempotency: we delete any prior rows for these exact cells (null-aware on
+// round_id — a NULL round would otherwise never match a UNIQUE upsert) and
+// re-insert, so a judge editing then re-locking never double-counts. The score
+// values written here were already validated against criteria bounds and the
+// judge's scope on the session path above.
+// ---------------------------------------------------------------------------
+async function bridgeSessionScoresToRankingStore(session, judgeId, scoreMap) {
+  const criteriaIds = Object.keys(scoreMap ?? {})
+  if (!criteriaIds.length) return
+
+  const roundId = session.currentRoundId ?? null
+  const divisionId = session.currentDivisionId ?? null
+  const contestantId = session.activeContestantId
+
+  let del = getClient()
+    .from(DB_TABLES.JUDGE_SCORES)
+    .delete()
+    .eq('judge_id', judgeId)
+    .eq('contestant_id', contestantId)
+    .in('criteria_id', criteriaIds)
+  del = roundId ? del.eq('round_id', roundId) : del.is('round_id', null)
+  const { error: delErr } = await del
+  if (delErr) throw new ApiError(500, `Failed to sync live scores: ${delErr.message}`)
+
+  const rows = criteriaIds.map((criteriaId) => ({
+    judge_id: judgeId,
+    contestant_id: contestantId,
+    criteria_id: criteriaId,
+    round_id: roundId,
+    division_id: divisionId,
+    category_id: null,
+    score: Number(scoreMap[criteriaId]),
+  }))
+
+  const { error: insErr } = await getClient().from(DB_TABLES.JUDGE_SCORES).insert(rows)
+  if (insErr) throw new ApiError(500, `Failed to sync live scores: ${insErr.message}`)
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 (§7.1) safety net — bridge ALL locked live-session scores for an
+// event into the ranking store. Used on session completion to catch rows that
+// predate the write-through above. Division is not stored per session-score
+// row, so backfilled rows carry division_id = NULL (still ranked in the
+// default/unfiltered pool). Best-effort: raises only on a hard DB error.
+// ---------------------------------------------------------------------------
+async function backfillLiveScoresToRankingStore(eventId) {
+  const { data: rows, error } = await getClient()
+    .from('competition_session_judge_scores')
+    .select('round_id, contestant_id, judge_id, scores')
+    .eq('event_id', eventId)
+    .eq('is_locked', true)
+
+  if (error) throw new ApiError(500, error.message)
+  if (!rows?.length) return
+
+  for (const row of rows) {
+    const scoreMap = row.scores ?? {}
+    if (!Object.keys(scoreMap).length) continue
+    await bridgeSessionScoresToRankingStore(
+      {
+        currentRoundId: row.round_id ?? null,
+        currentDivisionId: null,
+        activeContestantId: row.contestant_id,
+      },
+      row.judge_id,
+      scoreMap,
+    )
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -616,6 +741,18 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
   // Validate that this contestant is in the current round's order
   if (!session.contestantOrder.includes(session.activeContestantId)) {
     throw new ApiError(400, 'Active contestant is not in the current round')
+  }
+
+  // Phase 6: a finalized round is locked — no further score edits allowed.
+  if (session.currentRoundId) {
+    const { data: roundRow } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUNDS)
+      .select('finalized_at')
+      .eq('id', session.currentRoundId)
+      .maybeSingle()
+    if (roundRow?.finalized_at) {
+      throw new ApiError(409, 'This round has been finalized and can no longer be scored')
+    }
   }
 
   // Check if judge already submitted for this contestant in this round
@@ -661,7 +798,15 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
     criteria = (crits ?? []).map(mapCriteria)
   }
 
-  // Validate scores
+  // Validate scores. §8C: the event scale (scoring_config.scoreType) is the
+  // source of truth for the range; the live path now enforces it too (it used to
+  // check only the per-criterion min/max, so a scale of 1–10 was silently
+  // ignored here while the batch path rejected out-of-scale scores). The
+  // per-criterion min/max remains an optional override that must fit inside the
+  // scale — matching submitJudgeScores.
+  const scoringConfig = mergeScoringConfig(event.scoring_config)
+  const eventBounds = resolveScoreBounds(scoringConfig)
+
   const scoreMap = {}
   for (const crit of criteria) {
     const value = scores[crit.id]
@@ -672,10 +817,18 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
     if (Number.isNaN(num)) {
       throw new ApiError(400, `Score for "${crit.name}" must be a number`)
     }
-    if (num < crit.minScore || num > crit.maxScore) {
+    const min = crit.minScore ?? eventBounds.min
+    const max = crit.maxScore ?? eventBounds.max
+    if (num < min || num > max) {
       throw new ApiError(
         400,
-        `Score for "${crit.name}" must be between ${crit.minScore} and ${crit.maxScore}`,
+        `Score for "${crit.name}" must be between ${min} and ${max}`,
+      )
+    }
+    if (!isScoreInBounds(num, scoringConfig)) {
+      throw new ApiError(
+        400,
+        `Score for "${crit.name}" is outside the configured score type (${eventBounds.min}–${eventBounds.max})`,
       )
     }
     scoreMap[crit.id] = num
@@ -697,6 +850,18 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
       .single()
 
     if (error) throw new ApiError(500, error.message)
+
+    // Phase 3 (§7.1): mirror into the ranking store so live scores rank.
+    await bridgeSessionScoresToRankingStore(session, judgeId, scoreMap)
+
+    // M3: audit the score submission (fire-and-forget; recordAudit never throws).
+    recordAudit({
+      userId: judgeId,
+      action: 'competition.score.submitted',
+      entity: 'competition_session',
+      entityId: session.id,
+      details: { eventId, roundId: session.currentRoundId, contestantId: session.activeContestantId },
+    })
 
     // Notify organizer that a judge submitted
     emitToEventOrganizer(eventId, 'session:judge-score-submitted', {
@@ -727,6 +892,9 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+
+  // Phase 3 (§7.1): mirror into the ranking store so live scores rank.
+  await bridgeSessionScoresToRankingStore(session, judgeId, scoreMap)
 
   // Notify organizer
   emitToEventOrganizer(eventId, 'session:judge-score-submitted', {
@@ -820,11 +988,25 @@ export async function getJudgeSessionView(eventId, judgeId) {
   const hasSubmitted = !!(existingScore && existingScore.is_locked)
   const existingScores = existingScore?.scores ?? {}
 
+  // §8C: the event scale is the single source of truth for the score range.
+  // Resolve every criterion's bounds from the scale so the judge UI shows and
+  // enforces the same range the backend validates against (previously each
+  // criterion carried its own min/max, which could disagree with the scale).
+  const scoringConfig = mergeScoringConfig(event.scoring_config)
+  const eventBounds = resolveScoreBounds(scoringConfig)
+  const criteriaWithBounds = criteria.map((c) => ({
+    ...c,
+    minScore: eventBounds.min,
+    maxScore: eventBounds.max,
+  }))
+
   return {
     session,
     event: { id: eventId, title: event.title, eventType: event.event_type },
     contestant: contestant ? mapContestant(contestant) : null,
-    criteria,
+    criteria: criteriaWithBounds,
+    scoringConfig,
+    scoreBounds: eventBounds,
     existingScores,
     hasSubmitted,
     totalContestants: session.contestantOrder.length,
@@ -918,4 +1100,326 @@ async function assertActiveSession(eventId, organizerId) {
     throw new ApiError(404, 'No active live session for this event')
   }
   return session
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 — Round finalize & advancement (§8B)
+// ---------------------------------------------------------------------------
+
+// Standard-competition ("1224") ranking over a scored list, desc by score.
+function rankByScore(entries) {
+  const sorted = [...entries].sort((a, b) => b.score - a.score)
+  sorted.forEach((row, i) => {
+    row.rank = i > 0 && row.score === sorted[i - 1].score ? sorted[i - 1].rank : i + 1
+  })
+  return sorted
+}
+
+// Compute a round's official standing. Honors round↔criteria membership and the
+// round's score_policy (independent = this round only; cumulative = adds the
+// scores from prior FINALIZED rounds, §8B). When `divisionId` is given (H1), the
+// standing is scoped to that division so each division ranks and advances on its
+// own — how real competitions with divisions actually run.
+async function computeRoundStanding(eventId, round, scoringConfig, { divisionId = null } = {}) {
+  const roundId = round.id
+
+  // Contestants: the round's assigned set, else the whole event.
+  const { data: rc } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS)
+    .select('contestant_id')
+    .eq('round_id', roundId)
+  let contestantIds = (rc ?? []).map((r) => r.contestant_id)
+
+  let contestantsQuery = getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .select('id, name, contestant_number, photo, division_id')
+    .eq('event_id', eventId)
+  if (contestantIds.length) contestantsQuery = contestantsQuery.in('id', contestantIds)
+  if (divisionId) contestantsQuery = contestantsQuery.eq('division_id', divisionId)
+  const { data: contestants } = await contestantsQuery
+  contestantIds = (contestants ?? []).map((c) => c.id)
+  if (!contestantIds.length) return []
+
+  // Criteria: the round's assigned set, else all event criteria.
+  const { data: rcrit } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
+    .select('criteria_id')
+    .eq('round_id', roundId)
+  const critIds = (rcrit ?? []).map((r) => r.criteria_id)
+
+  let criteriaQuery = getClient()
+    .from(DB_TABLES.CRITERIA)
+    .select('id, name, percentage')
+    .eq('event_id', eventId)
+  if (critIds.length) criteriaQuery = criteriaQuery.in('id', critIds)
+  const { data: criteria } = await criteriaQuery
+
+  // Scores for THIS round only.
+  const { data: scores } = await getClient()
+    .from(DB_TABLES.JUDGE_SCORES)
+    .select('contestant_id, criteria_id, round_id, score, judge_id')
+    .eq('round_id', roundId)
+
+  const { rankings } = computeRankings({
+    scores: (scores ?? []).filter((s) => contestantIds.includes(s.contestant_id)),
+    contestants: contestants ?? [],
+    criteria: criteria ?? [],
+    rounds: [{ id: roundId, name: round.name, weight: 100 }],
+    roundCriteria: critIds.length ? { [roundId]: critIds } : null,
+    config: scoringConfig,
+  })
+
+  const divisionById = new Map((contestants ?? []).map((c) => [c.id, c.division_id ?? null]))
+  let standing = rankings.map((r) => ({
+    contestantId: r.contestantId,
+    contestantName: r.contestantName,
+    contestantNumber: r.contestantNumber,
+    divisionId: divisionById.get(r.contestantId) ?? null,
+    score: r.finalScore,
+  }))
+
+  // Cumulative policy: add the sum of prior finalized rounds' snapshot scores.
+  if (round.score_policy === SCORE_POLICIES.CUMULATIVE) {
+    const { data: priorRounds } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUNDS)
+      .select('id, display_order, finalized_at')
+      .eq('event_id', eventId)
+      .not('finalized_at', 'is', null)
+      .lt('display_order', round.display_order)
+    const priorRoundIds = (priorRounds ?? []).map((r) => r.id)
+
+    if (priorRoundIds.length) {
+      const { data: priorResults } = await getClient()
+        .from(DB_TABLES.COMPETITION_ROUND_RESULTS)
+        .select('contestant_id, score')
+        .in('round_id', priorRoundIds)
+      const priorByContestant = new Map()
+      for (const pr of priorResults ?? []) {
+        priorByContestant.set(pr.contestant_id, (priorByContestant.get(pr.contestant_id) ?? 0) + Number(pr.score))
+      }
+      standing = standing.map((s) => ({
+        ...s,
+        score: s.score + (priorByContestant.get(s.contestantId) ?? 0),
+      }))
+    }
+  }
+
+  return rankByScore(standing)
+}
+
+// H1 — division-aware advancement. When the event uses divisions, compute the
+// standing and select qualifiers PER division (top-N per division, etc.), then
+// merge. Otherwise fall back to a single event-wide standing. Returns the merged
+// standing (each row keeps its divisionId) + the auto-qualified set.
+async function computeRoundAdvancement(eventId, round, scoringConfig, event) {
+  const auto = new Set()
+
+  if (event?.divisions_enabled) {
+    const { data: divs } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('event_id', eventId)
+    if (divs?.length) {
+      const standing = []
+      for (const d of divs) {
+        const s = await computeRoundStanding(eventId, round, scoringConfig, { divisionId: d.id })
+        for (const id of selectQualifiers(s, round.advancement_type, round.advancement_value)) {
+          auto.add(id)
+        }
+        standing.push(...s)
+      }
+      return { standing, auto }
+    }
+  }
+
+  const standing = await computeRoundStanding(eventId, round, scoringConfig, {})
+  for (const id of selectQualifiers(standing, round.advancement_type, round.advancement_value)) {
+    auto.add(id)
+  }
+  return { standing, auto }
+}
+
+async function getNextRound(eventId, round) {
+  const { data } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUNDS)
+    .select('id, name, display_order')
+    .eq('event_id', eventId)
+    .gt('display_order', round.display_order)
+    .order('display_order', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return data ?? null
+}
+
+// Preview a round's standing + auto-selected qualifiers WITHOUT committing, so
+// the organizer can review and adjust before finalizing (real head-judge
+// discretion). No writes, no locking.
+export async function previewRoundAdvancement(eventId, organizerId, roundId) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const event = await getEventById(eventId)
+  const scoringConfig = mergeScoringConfig(event.scoring_config)
+
+  const { data: round, error: rErr } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUNDS)
+    .select('*')
+    .eq('id', roundId)
+    .eq('event_id', eventId)
+    .maybeSingle()
+  if (rErr) throw new ApiError(500, rErr.message)
+  if (!round) throw new ApiError(404, 'Round not found')
+
+  const { standing, auto } = await computeRoundAdvancement(eventId, round, scoringConfig, event)
+
+  const nextRound = await getNextRound(eventId, round)
+
+  return {
+    roundId,
+    roundName: round.name,
+    isOpen: round.is_open,
+    finalized: Boolean(round.finalized_at),
+    advancementType: round.advancement_type,
+    advancementValue: round.advancement_value,
+    scorePolicy: round.score_policy,
+    divisionsEnabled: Boolean(event.divisions_enabled),
+    nextRoundId: nextRound?.id ?? null,
+    nextRoundName: nextRound?.name ?? null,
+    standing: standing.map((s) => ({ ...s, qualified: auto.has(s.contestantId) })),
+  }
+}
+
+// Finalize a round: compute its standing, snapshot it, choose qualifiers (auto +
+// organizer override), lock the round, and seed the next round with qualifiers.
+// Nothing is ever auto-deleted; the organizer confirms via `overrides`.
+export async function finalizeRound(eventId, organizerId, roundId, { overrides = null } = {}) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const event = await getEventById(eventId)
+  const scoringConfig = mergeScoringConfig(event.scoring_config)
+
+  const { data: round, error: rErr } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUNDS)
+    .select('*')
+    .eq('id', roundId)
+    .eq('event_id', eventId)
+    .maybeSingle()
+  if (rErr) throw new ApiError(500, rErr.message)
+  if (!round) throw new ApiError(404, 'Round not found')
+  if (round.finalized_at) throw new ApiError(409, 'This round has already been finalized')
+  if (round.is_open) throw new ApiError(400, 'Close the round before finalizing it')
+
+  // H1: division-aware standing + qualifiers (per division when enabled).
+  const { standing, auto } = await computeRoundAdvancement(eventId, round, scoringConfig, event)
+  if (!standing.length) {
+    throw new ApiError(400, 'No scored contestants to finalize in this round')
+  }
+
+  const qualifiedSet = applyQualifierOverride(auto, overrides)
+  const now = new Date().toISOString()
+
+  // M2: atomically CLAIM the finalize — only the first caller flips finalized_at
+  // from NULL, so concurrent/double-clicked finalizes can't both proceed.
+  const { data: claimed, error: claimErr } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUNDS)
+    .update({ finalized_at: now })
+    .eq('id', roundId)
+    .is('finalized_at', null)
+    .select('id')
+  if (claimErr) throw new ApiError(500, claimErr.message)
+  if (!claimed?.length) throw new ApiError(409, 'This round has already been finalized')
+
+  const nextRound = await getNextRound(eventId, round)
+  const qualifiers = [...qualifiedSet]
+  let seededCount = 0
+
+  try {
+    // M1: after claiming, write the snapshot + seed the next round. If any of
+    // this fails, the catch RELEASES the claim so the operation can be retried
+    // cleanly (compensating action — the JS client has no multi-statement txn).
+    await getClient().from(DB_TABLES.COMPETITION_ROUND_RESULTS).delete().eq('round_id', roundId)
+    const resultRows = standing.map((s) => ({
+      round_id: roundId,
+      contestant_id: s.contestantId,
+      division_id: s.divisionId ?? null,
+      rank: s.rank,
+      score: s.score,
+      qualified: qualifiedSet.has(s.contestantId),
+    }))
+    const { error: insErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUND_RESULTS)
+      .insert(resultRows)
+    if (insErr) throw new ApiError(500, insErr.message)
+
+    if (nextRound && qualifiers.length) {
+      const rows = qualifiers.map((cid) => ({ round_id: nextRound.id, contestant_id: cid }))
+      const { error: seedErr } = await getClient()
+        .from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS)
+        .upsert(rows, { onConflict: 'round_id,contestant_id', ignoreDuplicates: true })
+      if (seedErr) throw new ApiError(500, seedErr.message)
+      seededCount = qualifiers.length
+    }
+  } catch (err) {
+    await getClient()
+      .from(DB_TABLES.COMPETITION_ROUNDS)
+      .update({ finalized_at: null })
+      .eq('id', roundId)
+    throw err
+  }
+
+  // M3: audit the elimination decision (fire-and-forget; recordAudit never throws).
+  recordAudit({
+    userId: organizerId,
+    action: 'competition.round.finalized',
+    entity: 'competition_round',
+    entityId: roundId,
+    details: {
+      eventId,
+      qualifiers,
+      seededCount,
+      nextRoundId: nextRound?.id ?? null,
+      overrideApplied: Boolean(overrides && ((overrides.add?.length ?? 0) || (overrides.remove?.length ?? 0))),
+    },
+  })
+
+  emitToEvent(eventId, 'session:round-finalized', {
+    roundId,
+    nextRoundId: nextRound?.id ?? null,
+    qualifiedCount: qualifiers.length,
+  })
+
+  // Refresh live rankings so results surfaces reflect the finalized round.
+  try {
+    const { getLiveRankings } = await import('./pageant.service.js')
+    const rankings = await getLiveRankings(eventId, organizerId)
+    emitToEvent(eventId, 'rankings:updated', { eventId, rankings })
+  } catch (e) {
+    console.error('[finalize] rankings refresh failed:', e.message)
+  }
+
+  return {
+    roundId,
+    roundName: round.name,
+    finalizedAt: now,
+    standing: standing.map((s) => ({ ...s, qualified: qualifiedSet.has(s.contestantId) })),
+    qualifiers,
+    nextRoundId: nextRound?.id ?? null,
+    nextRoundName: nextRound?.name ?? null,
+    seededCount,
+  }
+}
+
+// Read a finalized round's snapshot (for the review/results UI).
+export async function getRoundResults(eventId, organizerId, roundId) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const { data, error } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUND_RESULTS)
+    .select('contestant_id, division_id, rank, score, qualified')
+    .eq('round_id', roundId)
+    .order('rank', { ascending: true })
+  if (error) throw new ApiError(500, error.message)
+  return (data ?? []).map((r) => ({
+    contestantId: r.contestant_id,
+    divisionId: r.division_id,
+    rank: r.rank,
+    score: Number(r.score),
+    qualified: r.qualified,
+  }))
 }

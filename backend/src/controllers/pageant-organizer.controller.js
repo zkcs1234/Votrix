@@ -11,6 +11,7 @@ import {
   validateScoringToggle,
 } from '../validators/competition.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
+import { listTemplates as listCompetitionTemplates } from '../modules/competition-templates.js'
 import { sanitizeEmail } from '../utils/sanitize.js'
 import { getEventInformationForm, setEventInformationForm } from '../services/event.service.js'
 
@@ -22,6 +23,11 @@ export const getDashboard = asyncHandler(async (req, res) => {
 export const listEvents = asyncHandler(async (req, res) => {
   const events = await pageantService.listCompetitionEvents(req.user.id)
   res.json({ success: true, events })
+})
+
+export const listTemplates = asyncHandler(async (_req, res) => {
+  const templates = listCompetitionTemplates()
+  res.json({ success: true, templates })
 })
 
 export const createEvent = asyncHandler(async (req, res) => {
@@ -181,6 +187,11 @@ export const getRankings = asyncHandler(async (req, res) => {
 export const getAnalytics = asyncHandler(async (req, res) => {
   const analytics = await pageantService.getCompetitionAnalytics(req.params.eventId, req.user.id)
   res.json({ success: true, analytics })
+})
+
+export const getResults = asyncHandler(async (req, res) => {
+  const results = await pageantService.getCompetitionResults(req.params.eventId, req.user.id)
+  res.json({ success: true, results })
 })
 
 // ============================================================================

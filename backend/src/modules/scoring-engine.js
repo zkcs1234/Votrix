@@ -17,6 +17,11 @@ export const DEFAULT_SCORING_CONFIG = Object.freeze({
   customMax: null,
   dropHighest: 0,
   dropLowest: 0,
+  // Phase 7: optional deterministic tie-break. null = equal ranks on ties
+  // (standard-competition "1224", unchanged). 'highest_criterion' = among tied
+  // final scores, the contestant with the higher single best per-criterion
+  // average ranks first.
+  tieBreaker: null,
 })
 
 export function mergeScoringConfig(raw) {
@@ -142,11 +147,40 @@ export function reduceScores(scores, config) {
 //
 //   * A criterion belongs to ONE category (or to the event if no category).
 //   * A round belongs to ONE category (or to the event if no category).
+//
+//   * Phase 4 (§8A) SCOPED mode: when `roundCriteria` ({ [roundId]: [criteriaId] })
+//     is supplied and non-empty AND rounds exist, each round is scored using ONLY
+//     its own criteria (normalized within that round), and scores are attributed
+//     to their `round_id` (no cross-round merge). This is feature-guarded: with no
+//     `roundCriteria` the engine runs the LEGACY path and produces identical
+//     numbers to before, so pre-existing flat-model events are unaffected.
 // ---------------------------------------------------------------------------
 function round2(value, places) {
   if (!Number.isFinite(value)) return 0
   const factor = 10 ** places
   return Math.round(value * factor) / factor
+}
+
+// Standard competition ranking ("1224"): equal finalScores share a rank; the
+// next distinct score resumes at its ordinal position. §7.3 — replaces the old
+// always-sequential (1,2,3…) assignment so genuine ties are shown as ties.
+//
+// Phase 7: when a tie-breaker is active, two rows share a rank only if they are
+// equal on BOTH the final score and the tie-break key, so a decisive tie-break
+// produces distinct ranks.
+function assignRanks(sorted, tieBreakActive = false) {
+  sorted.forEach((row, i) => {
+    if (i > 0) {
+      const prev = sorted[i - 1]
+      const sameFinal = row.finalScore === prev.finalScore
+      const sameTie = !tieBreakActive || (row._tieKey ?? 0) === (prev._tieKey ?? 0)
+      if (sameFinal && sameTie) {
+        row.rank = prev.rank
+        return
+      }
+    }
+    row.rank = i + 1
+  })
 }
 
 export function computeRankings({
@@ -156,18 +190,11 @@ export function computeRankings({
   rounds = [],
   categories = [],
   config = {},
+  roundCriteria = null,
 }) {
   const cfg = mergeScoringConfig(config)
   const method = cfg.calculationMethod
   const dp = Math.max(0, Math.min(6, cfg.decimalPlaces))
-
-  // Group scores by (contestant, criteria) for per-criterion reductions.
-  const byCell = new Map()
-  for (const s of scores) {
-    const key = `${s.contestant_id ?? s.contestantId}|${s.criteria_id ?? s.criteriaId}`
-    if (!byCell.has(key)) byCell.set(key, [])
-    byCell.get(key).push(Number(s.score))
-  }
 
   // Build contestant result skeletons.
   const results = contestants.map((c) => ({
@@ -181,6 +208,90 @@ export function computeRankings({
     finalScore: 0,
   }))
   const byContestant = new Map(results.map((r) => [r.contestantId, r]))
+
+  // Feature guard (§8A): only take the scoped path when a round→criteria map is
+  // supplied AND rounds exist. Otherwise fall through to the untouched legacy
+  // math so existing events keep identical numbers.
+  const hasRoundCriteria =
+    roundCriteria &&
+    typeof roundCriteria === 'object' &&
+    Object.keys(roundCriteria).length > 0
+  const scoped = hasRoundCriteria && rounds.length > 0
+
+  if (scoped) {
+    computeScopedPerRound({
+      scores,
+      contestants,
+      criteria,
+      rounds,
+      roundCriteria,
+      byContestant,
+      cfg,
+      dp,
+    })
+  } else {
+    computeLegacyPerRound({
+      scores,
+      contestants,
+      criteria,
+      rounds,
+      byContestant,
+      cfg,
+      method,
+      dp,
+    })
+  }
+
+  const effectiveRounds = rounds.length
+    ? rounds
+    : [{ id: null, name: 'Overall', weight: 100 }]
+
+  // 3. Combine rounds → categories (SHARED by both paths; reads row.perRound).
+  combineRoundsToFinal({ contestants, categories, effectiveRounds, byContestant, dp })
+
+  // Phase 7: optional deterministic tie-break key.
+  const tieBreakActive = cfg.tieBreaker === 'highest_criterion'
+  if (tieBreakActive) {
+    for (const row of results) {
+      const avgs = Object.values(row.perCriterion).map((c) => c.average ?? 0)
+      row._tieKey = avgs.length ? Math.max(...avgs) : 0
+    }
+  }
+
+  // Sort by final score desc (then tie-break key desc when active); assign ranks.
+  const sorted = [...results].sort(
+    (a, b) =>
+      b.finalScore - a.finalScore ||
+      (tieBreakActive ? (b._tieKey ?? 0) - (a._tieKey ?? 0) : 0),
+  )
+  assignRanks(sorted, tieBreakActive)
+  if (tieBreakActive) for (const row of sorted) delete row._tieKey
+
+  // Weight totals for organizer feedback.
+  const criterionTotals = criteria.reduce((s, c) => s + Number(c.percentage ?? 0), 0)
+  const roundTotals = rounds.reduce((s, r) => s + Number(r.weight ?? 0), 0)
+  const categoryTotals = categories.reduce((s, c) => s + Number(c.weight ?? 0), 0)
+
+  return {
+    rankings: sorted,
+    debug: {
+      criterionTotals: round2(criterionTotals, dp),
+      roundTotals: round2(roundTotals, dp),
+      categoryTotals: round2(categoryTotals, dp),
+    },
+  }
+}
+
+// LEGACY per-round population (unchanged behavior): criteria are one flat pool,
+// every round is computed over ALL criteria (so rounds do not differentiate).
+function computeLegacyPerRound({ scores, contestants, criteria, rounds, byContestant, cfg, method, dp }) {
+  // Group scores by (contestant, criteria) — round_id intentionally ignored.
+  const byCell = new Map()
+  for (const s of scores) {
+    const key = `${s.contestant_id ?? s.contestantId}|${s.criteria_id ?? s.criteriaId}`
+    if (!byCell.has(key)) byCell.set(key, [])
+    byCell.get(key).push(Number(s.score))
+  }
 
   // 1. Per-criterion reduction.
   // The "weighted_average" method is the only one whose final value depends
@@ -248,11 +359,82 @@ export function computeRankings({
     }
   }
 
-  // 3. Combine rounds → categories.
-  //    categories: empty ⇒ no category layer; final = Σ(round.value * round.weight%)
+}
+
+// SCOPED per-round population (§8A): each round scored using ONLY its own
+// criteria (normalized within the round); scores attributed to their round_id so
+// the same criterion scored in two rounds does NOT merge. Also fills
+// row.perCriterion with an event-level aggregate (across rounds) for the UI.
+function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCriteria, byContestant, cfg, dp }) {
+  const critById = new Map(criteria.map((c) => [c.id, c]))
+
+  // Group scores by (contestant, criteria, round) — round_id kept this time.
+  const byCellRound = new Map()
+  for (const s of scores) {
+    const cid = s.contestant_id ?? s.contestantId
+    const critId = s.criteria_id ?? s.criteriaId
+    const rid = s.round_id ?? s.roundId ?? null
+    const key = `${cid}|${critId}|${rid}`
+    if (!byCellRound.has(key)) byCellRound.set(key, [])
+    byCellRound.get(key).push(Number(s.score))
+  }
+
+  // For the UI breakdown, aggregate each criterion's cells across the rounds
+  // that use it, so row.perCriterion still carries one entry per criterion.
+  const aggByCrit = new Map() // `${contestantId}|${critId}` -> number[]
+
+  for (const round of rounds) {
+    const critIds = Array.isArray(roundCriteria[round.id]) ? roundCriteria[round.id] : []
+    const roundCrits = critIds.map((id) => critById.get(id)).filter(Boolean)
+    const totalPct = roundCrits.reduce((s, c) => s + Number(c.percentage ?? 0), 0) || 100
+
+    for (const contestant of contestants) {
+      const row = byContestant.get(contestant.id)
+      if (!row) continue
+      let roundValue = 0
+      for (const crit of roundCrits) {
+        const cell = byCellRound.get(`${contestant.id}|${crit.id}|${round.id}`) ?? []
+        const reduced = reduceScores(cell, cfg)
+        // Criterion normalized WITHIN this round.
+        roundValue += reduced * (Number(crit.percentage ?? 0) / totalPct)
+
+        const aggKey = `${contestant.id}|${crit.id}`
+        if (!aggByCrit.has(aggKey)) aggByCrit.set(aggKey, [])
+        for (const v of cell) aggByCrit.get(aggKey).push(v)
+      }
+      row.perRound[round.id] = {
+        roundId: round.id,
+        roundName: round.name,
+        weight: Number(round.weight ?? 100),
+        value: round2(roundValue, dp),
+      }
+    }
+  }
+
+  // Event-level per-criterion aggregate (for the breakdown UI only).
+  for (const crit of criteria) {
+    for (const contestant of contestants) {
+      const row = byContestant.get(contestant.id)
+      if (!row) continue
+      const cell = aggByCrit.get(`${contestant.id}|${crit.id}`) ?? []
+      row.perCriterion[crit.id] = {
+        criteriaId: crit.id,
+        criteriaName: crit.name,
+        percentage: Number(crit.percentage ?? 0),
+        average: round2(reduceScores(cell, cfg), dp),
+        judgeCount: cell.length,
+      }
+    }
+  }
+}
+
+// SHARED: combine per-round values → per-category → final. Reads row.perRound
+// (populated by whichever path ran) so both legacy and scoped modes reuse it.
+function combineRoundsToFinal({ contestants, categories, effectiveRounds, byContestant, dp }) {
   if (categories.length === 0) {
     for (const contestant of contestants) {
       const row = byContestant.get(contestant.id)
+      if (!row) continue
       let final = 0
       for (const round of effectiveRounds) {
         const v = row.perRound[round.id ?? 'overall']?.value ?? 0
@@ -260,65 +442,44 @@ export function computeRankings({
       }
       row.finalScore = round2(final, dp)
     }
-  } else {
-    // For each category, sum rounds that belong to it; rounds with
-    // categoryId=null are event-wide and count toward every category.
-    for (const category of categories) {
-      const catRounds = effectiveRounds.filter(
-        (r) => r.category_id === category.id || r.categoryId === category.id,
-      )
-      const catWeight = Number(category.weight ?? 0) / 100
-      for (const contestant of contestants) {
-        const row = byContestant.get(contestant.id)
-        let catValue = 0
-        for (const round of catRounds) {
-          const v = row.perRound[round.id ?? 'overall']?.value ?? 0
-          catValue += v * (Number(round.weight ?? 100) / 100)
-        }
-        row.perCategory[category.id] = {
-          categoryId: category.id,
-          categoryName: category.name,
-          weight: Number(category.weight ?? 0),
-          value: round2(catValue, dp),
-        }
-      }
-    }
-    // Event-wide rounds: contribute to final without going through any category
-    const eventWideRounds = effectiveRounds.filter(
-      (r) => !(r.category_id || r.categoryId),
+    return
+  }
+
+  // For each category, sum rounds that belong to it; rounds with
+  // categoryId=null are event-wide and count toward the final directly.
+  for (const category of categories) {
+    const catRounds = effectiveRounds.filter(
+      (r) => r.category_id === category.id || r.categoryId === category.id,
     )
     for (const contestant of contestants) {
       const row = byContestant.get(contestant.id)
-      let final = 0
-      for (const cat of categories) {
-        const c = row.perCategory[cat.id]?.value ?? 0
-        final += c * (Number(cat.weight ?? 0) / 100)
-      }
-      for (const round of eventWideRounds) {
+      if (!row) continue
+      let catValue = 0
+      for (const round of catRounds) {
         const v = row.perRound[round.id ?? 'overall']?.value ?? 0
-        final += v * (Number(round.weight ?? 100) / 100)
+        catValue += v * (Number(round.weight ?? 100) / 100)
       }
-      row.finalScore = round2(final, dp)
+      row.perCategory[category.id] = {
+        categoryId: category.id,
+        categoryName: category.name,
+        weight: Number(category.weight ?? 0),
+        value: round2(catValue, dp),
+      }
     }
   }
-
-  // Sort by final score desc; assign ranks.
-  const sorted = [...results].sort((a, b) => b.finalScore - a.finalScore)
-  sorted.forEach((row, i) => {
-    row.rank = i + 1
-  })
-
-  // Weight totals for organizer feedback.
-  const criterionTotals = criteria.reduce((s, c) => s + Number(c.percentage ?? 0), 0)
-  const roundTotals = rounds.reduce((s, r) => s + Number(r.weight ?? 0), 0)
-  const categoryTotals = categories.reduce((s, c) => s + Number(c.weight ?? 0), 0)
-
-  return {
-    rankings: sorted,
-    debug: {
-      criterionTotals: round2(criterionTotals, dp),
-      roundTotals: round2(roundTotals, dp),
-      categoryTotals: round2(categoryTotals, dp),
-    },
+  const eventWideRounds = effectiveRounds.filter((r) => !(r.category_id || r.categoryId))
+  for (const contestant of contestants) {
+    const row = byContestant.get(contestant.id)
+    if (!row) continue
+    let final = 0
+    for (const cat of categories) {
+      const c = row.perCategory[cat.id]?.value ?? 0
+      final += c * (Number(cat.weight ?? 0) / 100)
+    }
+    for (const round of eventWideRounds) {
+      const v = row.perRound[round.id ?? 'overall']?.value ?? 0
+      final += v * (Number(round.weight ?? 100) / 100)
+    }
+    row.finalScore = round2(final, dp)
   }
 }

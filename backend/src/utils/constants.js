@@ -83,6 +83,20 @@ export const CALCULATION_METHODS = {
   LOWEST_REMOVAL: 'lowest_removal',
 }
 
+// Phase 6 — round progression.
+export const ADVANCEMENT_TYPES = {
+  NONE: 'none',
+  TOP_N: 'top_n',
+  TOP_PERCENT: 'top_percent',
+  THRESHOLD: 'threshold',
+  MANUAL: 'manual',
+}
+
+export const SCORE_POLICIES = {
+  INDEPENDENT: 'independent',
+  CUMULATIVE: 'cumulative',
+}
+
 // Judge permission roles (Phase 6).
 export const JUDGE_ROLES = {
   JUDGE: 'judge',
@@ -126,6 +140,7 @@ export const DB_TABLES = {
   COMPETITION_ROUNDS: 'competition_rounds',
   COMPETITION_ROUND_CONTESTANTS: 'competition_round_contestants',
   COMPETITION_ROUND_CRITERIA: 'competition_round_criteria',
+  COMPETITION_ROUND_RESULTS: 'competition_round_results',
   COMPETITION_JUDGES: 'competition_judges',
   COMPETITION_JUDGE_ASSIGNMENTS: 'competition_judge_assignments',
   COMPETITION_DIVISIONS: 'competition_divisions',

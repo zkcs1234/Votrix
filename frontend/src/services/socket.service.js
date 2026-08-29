@@ -73,9 +73,13 @@ export function subscribeRoom(room) {
   }
 }
 
+export function isConnected() {
+  return socket?.readyState === WebSocket.OPEN
+}
+
 window.addEventListener('votrix-token-refreshed', () => {
   socket?.close()
 })
 
 export { connect, disconnect }
-export default { connect, disconnect, subscribe, subscribeRoom }
+export default { connect, disconnect, subscribe, subscribeRoom, isConnected }

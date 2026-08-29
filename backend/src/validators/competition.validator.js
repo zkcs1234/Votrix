@@ -5,8 +5,11 @@ import {
   JUDGE_ROLES,
   ASSIGNMENT_SCOPES,
   EVENT_STATUS,
+  ADVANCEMENT_TYPES,
+  SCORE_POLICIES,
 } from '../utils/constants.js'
 import { validateUUID } from '../utils/sanitize.js'
+import { isValidCompetitionType, getTemplate } from '../modules/competition-templates.js'
 
 const ALLOWED_EVENT_STATUSES = new Set(Object.values(EVENT_STATUS))
 
@@ -41,6 +44,19 @@ export function validateCompetitionEvent(body, isCreate = false) {
   if (body.startDate !== undefined) payload.startDate = body.startDate
   if (body.endDate !== undefined) payload.endDate = body.endDate
   if (body.status !== undefined) payload.status = normalizeEventStatus(body.status)
+
+  // Phase 1: optional competition sub-type (nullable, validated against catalog).
+  if (body.competitionType !== undefined) {
+    const ct = body.competitionType || null
+    if (!isValidCompetitionType(ct)) throw new ApiError(400, 'Invalid competition type')
+    payload.competitionType = ct
+  }
+
+  // Phase 2: optional starter template key (create only; ignored on update).
+  if (body.templateKey !== undefined && body.templateKey !== null && body.templateKey !== '') {
+    if (!getTemplate(body.templateKey)) throw new ApiError(400, 'Invalid template')
+    payload.templateKey = body.templateKey
+  }
 
   return payload
 }
@@ -138,7 +154,7 @@ export function validateRound(body) {
     throw new ApiError(400, 'Round weight must be between 0 and 100')
   }
   const displayOrder = body.displayOrder !== undefined ? Number(body.displayOrder) : 0
-  return {
+  const payload = {
     name: body.name.trim(),
     description: body.description?.trim() || null,
     categoryId: body.categoryId || null,
@@ -149,6 +165,35 @@ export function validateRound(body) {
     startsAt: body.startsAt || null,
     endsAt: body.endsAt || null,
   }
+
+  // Phase 6 — advancement/elimination config (only when explicitly provided, so
+  // an ordinary name/weight edit never resets it).
+  if (body.advancementType !== undefined) {
+    if (!Object.values(ADVANCEMENT_TYPES).includes(body.advancementType)) {
+      throw new ApiError(
+        400,
+        `advancementType must be one of: ${Object.values(ADVANCEMENT_TYPES).join(', ')}`,
+      )
+    }
+    payload.advancementType = body.advancementType
+  }
+  if (body.advancementValue !== undefined) {
+    payload.advancementValue =
+      body.advancementValue === null || body.advancementValue === ''
+        ? null
+        : Number(body.advancementValue)
+  }
+  if (body.scorePolicy !== undefined) {
+    if (!Object.values(SCORE_POLICIES).includes(body.scorePolicy)) {
+      throw new ApiError(
+        400,
+        `scorePolicy must be one of: ${Object.values(SCORE_POLICIES).join(', ')}`,
+      )
+    }
+    payload.scorePolicy = body.scorePolicy
+  }
+
+  return payload
 }
 
 // ---------------------------------------------------------------------------
@@ -218,6 +263,15 @@ export function validateScoringConfig(body) {
   // Division support: includeOverallRanking flag
   if (body.includeOverallRanking !== undefined) {
     config.includeOverallRanking = Boolean(body.includeOverallRanking)
+  }
+
+  // Phase 7: optional tie-breaker.
+  if (body.tieBreaker !== undefined) {
+    const allowed = [null, 'none', 'highest_criterion']
+    if (!allowed.includes(body.tieBreaker)) {
+      throw new ApiError(400, 'tieBreaker must be one of: none, highest_criterion')
+    }
+    config.tieBreaker = body.tieBreaker === 'none' ? null : body.tieBreaker
   }
 
   return config

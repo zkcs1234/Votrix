@@ -71,6 +71,23 @@ export const competitionSessionService = {
     return api.get(`${BASE}/events/${eventId}/session/judge-progress`)
   },
 
+  // --- Round finalize & advancement (Phase 6) ---
+
+  /** GET /api/organizer/competition/events/:eventId/rounds/:roundId/advancement-preview */
+  previewRoundAdvancement(eventId, roundId) {
+    return api.get(`${BASE}/events/${eventId}/rounds/${roundId}/advancement-preview`)
+  },
+
+  /** POST /api/organizer/competition/events/:eventId/session/finalize-round */
+  finalizeRound(eventId, roundId, overrides = null) {
+    return api.post(`${BASE}/events/${eventId}/session/finalize-round`, { roundId, overrides })
+  },
+
+  /** GET /api/organizer/competition/events/:eventId/rounds/:roundId/results */
+  getRoundResults(eventId, roundId) {
+    return api.get(`${BASE}/events/${eventId}/rounds/${roundId}/results`)
+  },
+
   // --- Judge/voter session scoring ---
 
   /** GET /api/voter/competition/events/:eventId/session-view */
