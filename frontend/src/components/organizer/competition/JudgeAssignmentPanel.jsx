@@ -54,6 +54,30 @@ export default function JudgeAssignmentPanel({ foundation, reload }) {
     reload()
   }
 
+  // Bulk: assign EVERY judge to the currently selected scope. Manual per-judge
+  // assignment still works below.
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const bulkAssignAll = async () => {
+    const targetScopeId = scope === 'event' ? eventId : scopeId
+    if (!targetScopeId) {
+      alert('Pick a division, category, or round first')
+      return
+    }
+    const judges = foundation?.judges ?? []
+    if (!judges.length) return
+    setBulkBusy(true)
+    try {
+      await Promise.allSettled(
+        judges.map((j) => pageantService.createJudgeAssignment(eventId, j.id, { scope, scopeId: targetScopeId })),
+      )
+      reload()
+    } catch {
+      alert('Bulk assignment failed — some judges may not have been assigned.')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   const assignmentsByJudge = (judgeId) =>
     (foundation?.assignments ?? []).filter((a) => a.judgeId === judgeId)
 
@@ -80,6 +104,42 @@ export default function JudgeAssignmentPanel({ foundation, reload }) {
           event-wide scoring.
         </p>
       </div>
+
+      {/* Bulk: assign all judges to one scope at once. */}
+      {(foundation?.judges ?? []).length > 0 && (
+        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-v-border bg-v-surface px-3 py-2.5 text-sm">
+          <span className="text-xs uppercase tracking-wider text-v-text-muted">Assign all judges to</span>
+          <select className={INPUT_CLASS} value={scope} onChange={(e) => setScope(e.target.value)}>
+            <option value="event">Event</option>
+            {divisionsEnabled && <option value="division">Division</option>}
+            <option value="category">Category</option>
+            <option value="round">Round</option>
+          </select>
+          {!isEventScope && (
+            <select
+              className={INPUT_CLASS}
+              value={scopeId}
+              onChange={(e) => setScopeId(e.target.value)}
+              disabled={!scopeItems?.length}
+            >
+              <option value="">Select {scopeOptions[scope]}</option>
+              {(scopeItems ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            onClick={bulkAssignAll}
+            disabled={bulkBusy || (!isEventScope && !scopeId)}
+            className="rounded-lg bg-v-primary px-3 py-1.5 text-xs font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
+          >
+            {bulkBusy ? 'Assigning…' : 'Assign all'}
+          </button>
+        </div>
+      )}
 
       <ul className="space-y-2">
         {(foundation?.judges ?? []).map((judge) => {

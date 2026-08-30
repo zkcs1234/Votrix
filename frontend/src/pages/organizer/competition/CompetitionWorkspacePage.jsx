@@ -705,11 +705,16 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
 // L3 — soft signposting: a read-only hint about which optional layers a given
 // competition type usually needs. Every tab stays available; nothing is hidden.
 const TYPE_HINTS = {
-  pageant: 'Pageant — typically uses Categories + Rounds (prelim → final). All tabs stay available.',
-  dance: 'Dance — typically uses Rounds and Divisions (solo / team). Categories optional.',
-  singing: 'Singing — usually just Criteria; add Rounds only if you run heats and a final.',
-  talent: 'Talent — usually flat Criteria; Categories, Divisions, and Rounds are optional.',
-  simple: 'Simple — you can skip Categories, Divisions, and Rounds; Criteria alone is enough.',
+  pageant:
+    'Pageant setup: create rounds like Talent, Evening Gown, and Q&A — then give each round its own criteria (on the Criteria page).',
+  dance:
+    'Dance setup: create rounds (e.g. Preliminary → Final) with dance criteria; use Divisions for solo vs team.',
+  singing:
+    'Singing setup: add your criteria (Pitch, Tone, Performance). Add rounds only if you run heats and a final.',
+  talent:
+    'Talent setup: add flat criteria (Skill, Creativity, Presentation). Rounds are optional.',
+  simple:
+    'Simple setup: just add contestants and criteria — no rounds, divisions, or categories needed.',
 }
 
 function TypeHint({ type }) {

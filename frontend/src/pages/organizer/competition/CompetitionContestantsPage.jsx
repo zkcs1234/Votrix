@@ -73,6 +73,33 @@ export default function CompetitionContestantsPage() {
     }
   }
 
+  // Bulk assign/remove for the selected round. Operates on the currently VISIBLE
+  // contestants, so a division filter scopes the bulk action (e.g. "add all
+  // Senior contestants to the Final"). Manual per-contestant toggles still work.
+  const bulkRound = async (mode) => {
+    if (!selectedRoundId) return
+    const targets =
+      mode === 'add'
+        ? visibleList.filter((c) => !roundContestantIds.has(c.id))
+        : visibleList.filter((c) => roundContestantIds.has(c.id))
+    if (!targets.length) return
+    setRoundBusy('bulk')
+    try {
+      await Promise.allSettled(
+        targets.map((c) =>
+          mode === 'add'
+            ? pageantService.addRoundContestant(eventId, selectedRoundId, c.id)
+            : pageantService.removeRoundContestant(eventId, selectedRoundId, c.id),
+        ),
+      )
+      await load()
+    } catch {
+      alert('Bulk update failed — some contestants may not have been updated.')
+    } finally {
+      setRoundBusy(null)
+    }
+  }
+
   const refreshNextNumber = useCallback(
     async (divId) => {
       try {
@@ -253,9 +280,27 @@ export default function CompetitionContestantsPage() {
                 )
               })}
             </div>
-            <p className="mt-1.5 text-xs text-v-text-subtle">
-              Use the “In {selectedRound?.name ?? 'round'}” button on each contestant below.
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={roundBusy === 'bulk'}
+                onClick={() => bulkRound('add')}
+                className="rounded-lg border border-v-border px-2.5 py-1 text-xs font-medium text-v-text-muted hover:bg-v-primary/10 hover:text-v-primary disabled:opacity-50"
+              >
+                {roundBusy === 'bulk' ? 'Working…' : `Add all ${filterDivisionId ? 'shown' : ''} to ${selectedRound?.name ?? 'round'}`}
+              </button>
+              <button
+                type="button"
+                disabled={roundBusy === 'bulk'}
+                onClick={() => bulkRound('remove')}
+                className="rounded-lg border border-v-border px-2.5 py-1 text-xs font-medium text-v-text-muted hover:bg-v-danger/10 hover:text-v-danger disabled:opacity-50"
+              >
+                Remove all from {selectedRound?.name ?? 'round'}
+              </button>
+              <span className="text-xs text-v-text-subtle">
+                or use the “In {selectedRound?.name ?? 'round'}” button per contestant.
+              </span>
+            </div>
           </div>
         )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-8">

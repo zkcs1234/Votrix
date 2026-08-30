@@ -23,7 +23,6 @@ import {
   mergeScoringConfig,
   isScoreInBounds,
 } from '../modules/scoring-engine.js'
-import { getTemplate } from '../modules/competition-templates.js'
 import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
 import { emitToEvent } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
@@ -223,16 +222,9 @@ export async function createCompetitionEvent(organizerId, payload) {
 
   if (error) throw new ApiError(500, error.message)
 
-  // Phase 2: if a template was chosen, seed editable structure. Best-effort —
-  // a partial seed leaves fully editable rows, so we never fail event creation
-  // over seeding (the organizer can adjust anything afterward).
-  if (payload.templateKey) {
-    try {
-      await seedFromTemplate(data.id, payload.templateKey)
-    } catch (err) {
-      console.error('[competition] template seeding failed:', err.message)
-    }
-  }
+  // Competition type is stored as a LABEL only (see competition_type). We do not
+  // auto-seed any structure — the organizer configures rounds, criteria, etc.
+  // themselves in Structure & Scoring (the per-type hint guides them).
 
   await syncEventSchedules().catch((err) => {
     console.error('[competition] schedule sync failed after create:', err.message)
@@ -241,91 +233,6 @@ export async function createCompetitionEvent(organizerId, payload) {
     console.error('[competition] failed to clear draft after create:', err.message)
   })
   return mapEvent(data)
-}
-
-// Phase 2 — seed editable categories/rounds/criteria/scoring_config from a
-// starter template. All rows are normal, editable records; the template is not
-// referenced again after creation.
-async function seedFromTemplate(eventId, templateKey) {
-  const template = getTemplate(templateKey)
-  if (!template) return
-
-  if (template.scoringConfig) {
-    await getClient()
-      .from(DB_TABLES.EVENTS)
-      .update({ scoring_config: template.scoringConfig })
-      .eq('id', eventId)
-  }
-
-  if (template.categories?.length) {
-    await getClient()
-      .from(DB_TABLES.COMPETITION_CATEGORIES)
-      .insert(
-        template.categories.map((c, i) => ({
-          event_id: eventId,
-          name: c.name,
-          weight: c.weight ?? 0,
-          display_order: i,
-          is_active: true,
-        })),
-      )
-  }
-
-  // §8C: criterion bounds inherit the event scale; store the scale's range.
-  const bounds = resolveScoreBounds(template.scoringConfig)
-
-  if (template.rounds?.length) {
-    for (const [i, r] of template.rounds.entries()) {
-      const { data: roundRow } = await getClient()
-        .from(DB_TABLES.COMPETITION_ROUNDS)
-        .insert({
-          event_id: eventId,
-          name: r.name,
-          weight: r.weight ?? 0,
-          display_order: i,
-          is_open: false,
-        })
-        .select('id')
-        .single()
-
-      // Round-first: seed this round's own criteria + membership links.
-      if (roundRow?.id && r.criteria?.length) {
-        const { data: critRows } = await getClient()
-          .from(DB_TABLES.CRITERIA)
-          .insert(
-            r.criteria.map((cr) => ({
-              event_id: eventId,
-              name: cr.name,
-              percentage: cr.percentage ?? 0,
-              min_score: bounds.min,
-              max_score: bounds.max,
-            })),
-          )
-          .select('id')
-
-        if (critRows?.length) {
-          await getClient()
-            .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
-            .insert(critRows.map((cr) => ({ round_id: roundRow.id, criteria_id: cr.id })))
-        }
-      }
-    }
-  }
-
-  // Flat criteria (templates without per-round criteria — e.g. singing/talent).
-  if (template.criteria?.length) {
-    await getClient()
-      .from(DB_TABLES.CRITERIA)
-      .insert(
-        template.criteria.map((cr) => ({
-          event_id: eventId,
-          name: cr.name,
-          percentage: cr.percentage ?? 0,
-          min_score: bounds.min,
-          max_score: bounds.max,
-        })),
-      )
-  }
 }
 
 export async function updatePageantEvent(eventId, organizerId, payload) {

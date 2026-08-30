@@ -45,12 +45,12 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
-  // Phase 1–2: optional competition type + starter template (create only). Kept
-  // as local state (not part of the RHF schema) and threaded through the draft
-  // payload so it survives step navigation and draft restore.
+  // Competition type is an optional LABEL (create only) — it does not seed any
+  // structure; the organizer configures Structure & Scoring themselves. Kept as
+  // local state and threaded through the draft payload so it survives step
+  // navigation and draft restore.
   const [templates, setTemplates] = useState([])
   const [competitionType, setCompetitionType] = useState(null)
-  const [templateKey, setTemplateKey] = useState(null)
 
 const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'competition',
@@ -106,9 +106,8 @@ const {
       endDate: data.endDate,
       infoFormSchema: schema,
       competitionType,
-      templateKey,
     },
-  }), [banner, getValues, infoFormSchema, step, competitionType, templateKey])
+  }), [banner, getValues, infoFormSchema, step, competitionType])
 
   const markDraftTouched = useCallback(() => {
     setDraftRestored(true)
@@ -136,7 +135,6 @@ useEffect(() => {
     setError(null)
     setDraftRestored(false)
     setCompetitionType(null)
-    setTemplateKey(null)
     reset({
       title: '',
       description: '',
@@ -163,7 +161,6 @@ useEffect(() => {
     })
     setBanner(draft.banner ?? null)
     setCompetitionType(payload.competitionType ?? null)
-    setTemplateKey(payload.templateKey ?? null)
     if (draft.banner) {
       markComplete('branding')
     }
@@ -299,7 +296,6 @@ try {
         startDate: localInputToIso(data.startDate),
         endDate: localInputToIso(data.endDate),
         competitionType,
-        templateKey,
       }
       const { data: res } = await draftService.publishDraft('competition', payload)
       navigate(`/organizer/competition/events/${res.event.id}/contestants`, { replace: true })
@@ -386,41 +382,20 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                 <select
                   id="competition-template"
                   className={INPUT_CLASS}
-                  value={templateKey ?? ''}
-                  onChange={(e) => {
-                    const key = e.target.value || null
-                    setTemplateKey(key)
-                    setCompetitionType(key)
-                  }}
+                  value={competitionType ?? ''}
+                  onChange={(e) => setCompetitionType(e.target.value || null)}
                 >
-                  <option value="">Start blank</option>
+                  <option value="">Unspecified</option>
                   {templates.map((t) => (
                     <option key={t.key} value={t.key}>
                       {t.label}
                     </option>
                   ))}
                 </select>
-                {(() => {
-                  const t = templates.find((x) => x.key === templateKey)
-                  if (!t) {
-                    return (
-                      <p className={HELPER_TEXT}>
-                        Pick a type to pre-fill categories, rounds, and criteria — all fully editable
-                        afterward. "Start blank" seeds nothing.
-                      </p>
-                    )
-                  }
-                  const parts = []
-                  if (t.categories?.length) parts.push(`${t.categories.length} categories`)
-                  if (t.rounds?.length) parts.push(`${t.rounds.length} rounds`)
-                  if (t.criteria?.length) parts.push(`${t.criteria.length} criteria`)
-                  return (
-                    <p className={HELPER_TEXT}>
-                      {t.description}
-                      {parts.length ? ` Seeds ${parts.join(', ')} (editable).` : ' Seeds nothing.'}
-                    </p>
-                  )
-                })()}
+                <p className={HELPER_TEXT}>
+                  Just a label — it tailors the setup hints for your event. You&apos;ll configure the
+                  rounds, criteria, and scoring yourself in Structure &amp; Scoring.
+                </p>
               </div>
             )}
 
