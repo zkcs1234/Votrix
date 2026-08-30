@@ -12,7 +12,8 @@ import {
 } from '../validators/election.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
 import { registerVoterToEvent, registerExistingVoter as registerExistingVoterService, sendVoterInvitation, sendAllPendingInvitations } from '../services/invitation.service.js'
-import { sanitizeEmail, validateUUID } from '../utils/sanitize.js'
+import { sanitizeEmail } from '../utils/sanitize.js'
+import { validateEmailField } from '../validators/email.validator.js'
 import { getEventInformationForm, setEventInformationForm } from '../services/event.service.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
@@ -184,9 +185,7 @@ export const registerExistingVoter = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Email is required')
   }
   const email = sanitizeEmail(rawEmail)
-  if (!EMAIL_RE.test(email)) {
-    throw new ApiError(400, 'Invalid email format')
-  }
+  validateEmailField(email)
 
   const result = await registerExistingVoterService({
     eventId: req.params.eventId,

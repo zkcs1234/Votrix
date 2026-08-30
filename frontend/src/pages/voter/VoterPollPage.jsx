@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button'
 import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
 import PollQuestionField from '@/components/voter/polling/PollQuestionField'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
+import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
 
 export default function VoterPollPage() {
   const { eventId } = useParams()
@@ -173,9 +174,13 @@ export default function VoterPollPage() {
       Full-viewport shell using dynamic viewport height (dvh) so mobile
       browser toolbars showing/hiding never shift the fixed footer.
       Layout: [fixed progress bar] · [scrollable middle] · [fixed footer]
-      Mirrors the VoterEventPage (ballot) shell structure.
+      Mirrors the VoterEventPage (ballot) shell structure. Portaled to <body>
+      via FullscreenVotingShell so `position: fixed` pins to the viewport rather
+      than the animated <main>, keeping the progress bar and submit footer both
+      visible on mobile.
     */
-    <form onSubmit={handleSubmit} className="fixed inset-0 flex flex-col h-[100dvh] bg-v-surface">
+    <FullscreenVotingShell>
+    <form onSubmit={handleSubmit} className="fixed inset-0 z-50 flex flex-col h-[100dvh] bg-v-surface">
       {/* ===== FIXED TOP: Progress bar only (does not scroll) ===== */}
       <div className="shrink-0 border-b border-v-border bg-v-surface">
         <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
@@ -249,5 +254,6 @@ export default function VoterPollPage() {
         </div>
       </div>
     </form>
+    </FullscreenVotingShell>
   )
 }

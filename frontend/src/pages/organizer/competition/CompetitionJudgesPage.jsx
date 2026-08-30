@@ -194,14 +194,14 @@ export default function CompetitionJudgesPage() {
     }
   }
 
-  const handleSendInvitation = async (judgeId) => {
+  const handleSendInvitation = async (judgeId, isResend = false) => {
     setSendingId(judgeId)
     try {
       const response = await pageantService.sendJudgeInvitation(eventId, judgeId)
       const { data } = response
-      
+
       if (data.invitationSent) {
-        success('Invitation sent successfully')
+        success(isResend ? 'Invitation resent successfully' : 'Invitation sent successfully')
         setJudges((current) =>
           current.map((judge) =>
             judge.judgeId === judgeId ? { ...judge, invitationSent: true } : judge,
@@ -210,7 +210,7 @@ export default function CompetitionJudgesPage() {
         load()
       } else {
         // Show specific error message from backend
-        const errorMsg = data.message || data.email?.error || 'Failed to send invitation'
+        const errorMsg = data.message || data.email?.error || (isResend ? 'Failed to resend invitation' : 'Failed to send invitation')
         if (data.email?.retryable) {
           showError(`${errorMsg}. Please check your internet connection and try again.`)
         } else {
@@ -218,7 +218,7 @@ export default function CompetitionJudgesPage() {
         }
       }
     } catch (err) {
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to send invitation'
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || (isResend ? 'Failed to resend invitation' : 'Failed to send invitation')
       showError(`Network error: ${errorMsg}`)
     } finally {
       setSendingId(null)
@@ -235,9 +235,10 @@ export default function CompetitionJudgesPage() {
       ) : null
     }
 
-    // Row-level action
-    if (!participant.invitationSent && participant.judgeId) {
-      const isSending = sendingId === participant.judgeId
+    // Row-level action — needs a resolved judge account (judgeId) to email.
+    if (!participant.judgeId) return null
+    const isSending = sendingId === participant.judgeId
+    if (!participant.invitationSent) {
       return (
         <Button
           size="sm"
@@ -250,7 +251,18 @@ export default function CompetitionJudgesPage() {
         </Button>
       )
     }
-    return null
+    // Already invited — allow resending the invitation email
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => handleSendInvitation(participant.judgeId, true)}
+        loading={isSending}
+        disabled={isSending}
+      >
+        Resend
+      </Button>
+    )
   }
 
   const handleSendAll = async () => {

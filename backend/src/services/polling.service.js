@@ -20,7 +20,7 @@ import {
   buildAnalytics,
 } from '../modules/poll-question-types.js'
 import { isPollOpen as isPollOpenForEvent } from '../utils/eventSchedule.js'
-import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
+import { emitToEvent, emitToEventOrganizer, emitToUser, emitToRole } from '../websocket/ws-emitter.js'
 import { registerParticipant } from './participant.service.js'
 import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
@@ -114,6 +114,13 @@ async function getPollingOrgId(organizerId) {
 
 function isPollOpen(event) {
   return isPollOpenForEvent(event)
+}
+
+// Single source of truth for the participation-rate percentage so the dashboard
+// and the live websocket payload always agree (2-dp number, e.g. 66.67).
+function computeParticipationRate(responded, total) {
+  if (!total || total <= 0) return 0
+  return Math.round((responded / total) * 10000) / 100
 }
 
 async function ensureRespondentAccount(email, plainPassword, resetPasswordForExisting = true) {
@@ -505,8 +512,7 @@ export async function getOrganizerDashboard(organizerId) {
     responsesSubmitted = answersRes.count ?? 0
   }
 
-  const participationRate =
-    assignedUsers > 0 ? Math.round((respondedUsers / assignedUsers) * 10000) / 100 : 0
+  const participationRate = computeParticipationRate(respondedUsers, assignedUsers)
 
   return {
     organization: mapOrganization(org),
@@ -964,12 +970,6 @@ export async function reorderQuestions(eventId, organizerId, orders) {
   return listQuestions(eventId, organizerId)
 }
 
-// Legacy alias used in some admin code paths. The registry is the source of
-// truth; this returns the key as-is if it is known.
-function normalizeQuestionType(type) {
-  return type
-}
-
 async function upsertQuestionOptions(questionId, typeDef, typeConfig, optionsInput) {
   if (!typeDef) return []
   const fmt = typeDef.answerFormat ?? {}
@@ -1091,109 +1091,54 @@ export async function submitPollResponse(eventId, voterId, answers, startedAt) {
   const registry = await loadQuestionTypeRegistry(orgId)
   const questions = await listQuestionsPublic(eventId, registry)
 
-  // Run the registry-driven validator on every answer.
+  // Validate every answer once (registry-driven) and collect the serialized
+  // rows to persist. Required-checking and value normalization happen in a
+  // single pass — no second validation loop.
+  const rows = []
   for (const q of questions) {
     const typeDef = registry.find((r) => r.key === q.type) ?? null
     if (!typeDef) {
       throw new ApiError(500, `Question ${q.id} uses unknown type: ${q.type}`)
     }
+    let validated
     try {
-      validateAnswerV2(typeDef, q.typeConfig ?? {}, q.options, answers[q.id], {
+      validated = validateAnswerV2(typeDef, q.typeConfig ?? {}, q.options, answers[q.id], {
         required: q.required,
       })
     } catch (err) {
       throw new ApiError(400, `${q.question}: ${err.message}`)
     }
+    if (validated === null || validated === undefined) continue
+    rows.push({ question_id: q.id, answer: serializeAnswerV2(validated) })
   }
 
-  if (!event.poll_allow_multiple_submissions) {
-    const { data: locked, error: lockErr } = await getClient()
-      .from(DB_TABLES.EVENT_PARTICIPANTS)
-      .update({ has_responded: true })
-      .eq('event_id', eventId)
-      .eq('user_id', voterId)
-      .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
-      .eq('has_responded', false)
-      .select('id')
+  // Atomic write: the RPC claims the single-submission slot (or marks the
+  // respondent responded for multi-submission polls), inserts the submission
+  // row, and inserts every answer row inside ONE Postgres transaction. Either
+  // the whole response commits or nothing does — no orphan submissions, no
+  // "responded with zero answers" window, and no reopened single-submission
+  // poll. See migration 060_poll_cast_response_rpc.sql. A NULL result means the
+  // respondent had already responded (single-submission poll).
+  const { data: submissionId, error: castErr } = await getClient().rpc('cast_poll_response', {
+    p_event_id: eventId,
+    p_voter_id: voterId,
+    p_started_at: startedAt || null,
+    p_allow_multiple: Boolean(event.poll_allow_multiple_submissions),
+    p_answers: rows,
+  })
 
-    if (lockErr) throw new ApiError(500, lockErr.message)
-    if (!locked?.length) {
+  if (castErr) {
+    if (castErr.code === '23505') {
       throw new ApiError(409, 'You have already submitted this poll')
     }
+    throw new ApiError(500, castErr.message)
   }
 
-  const submissionInsert = {
-    event_id: eventId,
-    voter_id: voterId,
-    completed_at: new Date().toISOString(),
-  }
-  if (startedAt) {
-    submissionInsert.started_at = startedAt
+  if (!submissionId) {
+    throw new ApiError(409, 'You have already submitted this poll')
   }
 
-  const { data: submission, error: subErr } = await getClient()
-    .from(DB_TABLES.POLL_SUBMISSIONS)
-    .insert(submissionInsert)
-    .select('*')
-    .single()
-
-  if (subErr) {
-    if (!event.poll_allow_multiple_submissions) {
-      await getClient()
-        .from(DB_TABLES.EVENT_PARTICIPANTS)
-        .update({ has_responded: false })
-        .eq('event_id', eventId)
-        .eq('user_id', voterId)
-        .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
-    }
-    throw new ApiError(500, subErr.message)
-  }
-
-  const rows = []
-
-  for (const q of questions) {
-    const typeDef = registry.find((r) => r.key === q.type)
-    const raw = answers[q.id]
-    if (raw === undefined || raw === null || raw === '') continue
-
-    const validated = validateAnswerV2(typeDef, q.typeConfig ?? {}, q.options, raw, {
-      required: false, // already checked above
-    })
-    if (validated === null) continue
-
-    rows.push({
-      question_id: q.id,
-      voter_id: voterId,
-      submission_id: submission.id,
-      answer: serializeAnswerV2(validated),
-    })
-  }
-
-  try {
-    if (rows.length) {
-      const { error: ansErr } = await getClient().from(DB_TABLES.POLL_ANSWERS).insert(rows)
-      if (ansErr) throw new ApiError(500, ansErr.message)
-    }
-  } catch (err) {
-    if (!event.poll_allow_multiple_submissions) {
-      await getClient()
-        .from(DB_TABLES.EVENT_PARTICIPANTS)
-        .update({ has_responded: false })
-        .eq('event_id', eventId)
-        .eq('user_id', voterId)
-        .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
-    }
-    throw err
-  }
-
-  if (event.poll_allow_multiple_submissions) {
-    await getClient()
-      .from(DB_TABLES.EVENT_PARTICIPANTS)
-      .update({ has_responded: true })
-      .eq('event_id', eventId)
-      .eq('user_id', voterId)
-      .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
-  }
+  const submission = { id: submissionId }
 
   // A voter who has cast a vote has clearly received/accessed their
   // invitation, so keep the invitation status consistent: a voted voter
@@ -1228,39 +1173,26 @@ export async function submitPollResponse(eventId, voterId, answers, startedAt) {
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
 
-  const participationRate = totalVoters > 0 ? ((respondedCount / totalVoters) * 100).toFixed(1) : '0.0'
+  const participationRate = computeParticipationRate(respondedCount ?? 0, totalVoters ?? 0)
 
   emitToEventOrganizer(eventId, 'poll:response-submitted', {
     eventId,
     responsesSubmitted: responsesSubmitted ?? 0,
     respondedCount: respondedCount ?? 0,
     totalVoters: totalVoters ?? 0,
-    participationRate: parseFloat(participationRate),
+    participationRate,
   })
 
   // Trigger organizer dashboard stats refresh
   const organizerId = event.organizations?.organizer_id
   if (organizerId) {
-    const { emitToUser } = await import('../websocket/ws-emitter.js')
     emitToUser(organizerId, 'organizer:stats-updated', { eventId })
   }
 
   // Trigger admin platform stats refresh
-  const { emitToRole } = await import('../websocket/ws-emitter.js')
   emitToRole('admin', 'platform:stats-updated', {})
 
   return { success: true, submissionId: submission.id, message: 'Response submitted' }
-}
-
-function validateAnswers(questions, answers) {
-  // Legacy path retained for backward compatibility — new code paths go
-  // through submitPollResponse which validates per question.
-  for (const q of questions) {
-    const val = answers[q.id]
-    if (q.required && (val === undefined || val === null || val === '' || (Array.isArray(val) && !val.length))) {
-      throw new ApiError(400, `Answer required: ${q.question}`)
-    }
-  }
 }
 
 export async function listVoterPollEvents(voterId) {

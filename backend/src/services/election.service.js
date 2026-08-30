@@ -1,16 +1,25 @@
+import { randomUUID } from 'node:crypto'
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
 import { isElectionVotingOpen, canVoterViewElectionResults } from '../utils/eventSchedule.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { getOrCreateElectionOrganization, mapOrganization } from './organization.service.js'
-import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
+import { emitToEvent, emitToEventOrganizer, emitToUser, emitToRole } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
 import { recordAudit } from '../foundation/audit.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
 import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
 import { deleteDraft } from './draft.service.js'
 import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
+
+// Single source of truth for turnout so dashboard, results, and websocket
+// payloads always agree (previously three call sites used two rounding
+// conventions). Returns a number rounded to 2 decimal places (e.g. 42.86).
+function computeTurnoutRate(voted, total) {
+  if (!total || total <= 0) return 0
+  return Math.round((voted / total) * 10000) / 100
+}
 
 function mapPosition(row) {
   return {
@@ -45,6 +54,14 @@ function mapCandidate(row) {
 
 const dashboardCache = new Map()
 const DASHBOARD_CACHE_TTL = 30_000
+
+// Bust an organizer's cached dashboard after any write that changes its stats,
+// so the 30s TTL never serves stale event counts / turnout. NOTE: this cache is
+// process-local — under horizontal scaling it must move to a shared store
+// (Redis) or be removed. See remediation plan Phase 5.
+function invalidateDashboardCache(organizerId) {
+  if (organizerId) dashboardCache.delete(organizerId)
+}
 
 export async function getOrganizerDashboard(organizerId) {
     try {
@@ -106,8 +123,7 @@ export async function getOrganizerDashboard(organizerId) {
       votesCast = votesRes.count ?? 0
     }
 
-    const turnoutRate =
-      registeredVoters > 0 ? Math.round((votedCount / registeredVoters) * 10000) / 100 : 0
+    const turnoutRate = computeTurnoutRate(votedCount, registeredVoters)
 
     const result = {
       organization: mapOrganization(org),
@@ -186,6 +202,7 @@ export async function createElectionEvent(organizerId, payload) {
     details: { title: data.title, resultsVisibility: payload.resultsVisibility },
   })
 
+  invalidateDashboardCache(organizerId)
   return mapEvent(data)
 }
 
@@ -243,6 +260,7 @@ export async function updateElectionEvent(eventId, organizerId, payload) {
     details: { updates: Object.keys(updates) },
   })
 
+  invalidateDashboardCache(organizerId)
   return mapEvent(data)
 }
 
@@ -304,7 +322,8 @@ export async function setEventVoting(eventId, organizerId, votingEnabled) {
     entityId: eventId,
     details: { title: data.title, votingEnabled: Boolean(votingEnabled) },
   })
-  
+
+  invalidateDashboardCache(organizerId)
   return mapEvent(data)
 }
 
@@ -721,7 +740,7 @@ export async function getVoterBallot(eventId, voterId) {
 
   // Generate voting_nonce if not present
   if (!enrollment.voting_nonce && !enrollment.has_voted) {
-    const nonce = crypto.randomUUID()
+    const nonce = randomUUID()
     const { data: updated } = await getClient()
       .from(DB_TABLES.EVENT_PARTICIPANTS)
       .update({ voting_nonce: nonce })
@@ -876,36 +895,25 @@ export async function submitBallot(eventId, voterId, payload) {
     throw new ApiError(400, 'Your ballot must include at least one selection')
   }
 
-  const { data: locked, error: lockErr } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .update({ has_voted: true, voting_nonce: null })
-    .eq('event_id', eventId)
-    .eq('user_id', voterId)
-    .eq('has_voted', false)
-    .select('id')
+  // Atomic write: the RPC flips has_voted (FALSE→TRUE) and inserts every ballot
+  // row inside a single Postgres transaction. Either the whole ballot commits or
+  // nothing does — no more "locked out with zero votes" window. See migration
+  // 059_election_cast_ballot_rpc.sql. `committed === false` means the voter had
+  // already voted (or is not enrolled) so nothing was claimed or recorded.
+  const { data: committed, error: castErr } = await getClient().rpc('cast_election_ballot', {
+    p_event_id: eventId,
+    p_voter_id: voterId,
+    p_votes: voteRows,
+  })
 
-  if (lockErr) throw new ApiError(500, lockErr.message)
-  if (!locked?.length) {
-    throw new ApiError(409, 'You have already submitted your vote for this event')
-  }
-
-  try {
-    if (voteRows.length) {
-      const { error: voteErr } = await getClient().from(DB_TABLES.ELECTION_VOTES).insert(voteRows)
-      if (voteErr) {
-        if (voteErr.code === '23505') {
-          throw new ApiError(409, 'You have already submitted your vote for this event')
-        }
-        throw new ApiError(500, voteErr.message)
-      }
+  if (castErr) {
+    if (castErr.code === '23505') {
+      throw new ApiError(409, 'You have already submitted your vote for this event')
     }
-  } catch (err) {
-    await getClient()
-      .from(DB_TABLES.EVENT_PARTICIPANTS)
-      .update({ has_voted: false })
-      .eq('event_id', eventId)
-      .eq('user_id', voterId)
-    throw err
+    throw new ApiError(500, castErr.message)
+  }
+  if (committed === false) {
+    throw new ApiError(409, 'You have already submitted your vote for this event')
   }
 
   // A voter who has cast a vote has clearly received/accessed their
@@ -941,25 +949,24 @@ export async function submitBallot(eventId, voterId, payload) {
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
 
-  const turnoutRate = totalVoters > 0 ? ((votedCount / totalVoters) * 100).toFixed(1) : '0.0'
+  const turnoutRate = computeTurnoutRate(votedCount, totalVoters)
 
   emitToEventOrganizer(eventId, 'election:vote-submitted', {
     eventId,
     votesCast: votesCast ?? 0,
     votedCount: votedCount ?? 0,
     totalVoters: totalVoters ?? 0,
-    turnoutRate: parseFloat(turnoutRate),
+    turnoutRate,
   })
 
   // Trigger organizer dashboard stats refresh
   const organizerId = event.organizations?.organizer_id
   if (organizerId) {
-    const { emitToUser } = await import('../websocket/ws-emitter.js')
+    invalidateDashboardCache(organizerId)
     emitToUser(organizerId, 'organizer:stats-updated', { eventId })
   }
 
   // Trigger admin platform stats refresh
-  const { emitToRole } = await import('../websocket/ws-emitter.js')
   emitToRole('admin', 'platform:stats-updated', {})
 
   return { success: true, message: 'Ballot submitted successfully', locked: true }
@@ -1039,7 +1046,7 @@ async function fetchElectionResultsData(eventId) {
 
   const total = totalVoters ?? 0
   const voted = votedCount ?? 0
-  const turnoutPercentage = total > 0 ? Math.round((voted / total) * 10000) / 100 : 0
+  const turnoutPercentage = computeTurnoutRate(voted, total)
 
   const candidateResults = (candidates ?? []).map((c) => ({
     candidateId: c.id,
@@ -1202,7 +1209,6 @@ export async function duplicateElectionEvent(eventId, organizerId) {
     const newPos = await createPosition(newEvent.id, organizerId, {
       name: pos.name,
       description: pos.description,
-      minVote: pos.minVote,
       maxVote: pos.maxVote,
       numberOfWinners: pos.numberOfWinners,
       displayOrder: pos.displayOrder,
@@ -1264,6 +1270,7 @@ export async function finalizeElectionEvent(eventId, organizerId) {
     details: { title: data.title, finalizedAt: new Date().toISOString() },
   })
 
+  invalidateDashboardCache(organizerId)
   emitToEvent(eventId, 'election:finalized', { eventId })
 
   return mapEvent(data)

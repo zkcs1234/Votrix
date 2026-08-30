@@ -74,8 +74,10 @@ export const electionService = {
     return api.post(`${base}/events/${eventId}/candidates/${candidateId}/photo`, form)
   },
 
-  listVoters(eventId) {
-    return api.get(`${base}/events/${eventId}/voters`)
+  listVoters(eventId, { page = 1, limit = 500 } = {}) {
+    // Backend paginates (default 50). Until a pagination UI lands (Phase 7),
+    // request a full page so large voter lists are not silently truncated.
+    return api.get(`${base}/events/${eventId}/voters`, { params: { page, limit } })
   },
 
   registerVoter(eventId, payload) {

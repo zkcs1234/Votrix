@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
 import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
+import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
 
 function validateSelections(positions, selections) {
   let hasAtLeastOneVote = false
@@ -231,8 +232,12 @@ export default function VoterEventPage() {
       Full-viewport shell using dynamic viewport height (dvh) so mobile
       browser toolbars showing/hiding never shift the fixed footer.
       Layout: [fixed progress bar] · [scrollable middle] · [fixed footer]
+      Portaled to <body> so `position: fixed` pins to the viewport (see
+      FullscreenVotingShell) — otherwise the animated <main> traps it and the
+      progress bar and submit footer cannot both stay on screen on mobile.
     */
-    <div className="fixed inset-0 flex flex-col h-[100dvh] bg-v-surface">
+    <FullscreenVotingShell>
+    <div className="fixed inset-0 z-50 flex flex-col h-[100dvh] bg-v-surface">
       {/* ===== FIXED TOP: Progress bar only (does not scroll) ===== */}
       {!isReviewing && (
         <div className="shrink-0 border-b border-v-border bg-v-surface">
@@ -358,5 +363,6 @@ export default function VoterEventPage() {
         </div>
       </div>
     </div>
+    </FullscreenVotingShell>
   )
 }

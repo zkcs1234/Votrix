@@ -128,7 +128,10 @@ export function validateBallot(body) {
     }
     normalized[positionId] = candidateIds
   }
-  return normalized
+  // Preserve the one-time voting nonce so replay protection in submitBallot can
+  // actually run. Previously this value was dropped here, which silently
+  // disabled the nonce check. `null` when the client sends no nonce (legacy).
+  return { selections: normalized, votingNonce: body?.votingNonce ?? null }
 }
 
 export function validateVotingToggle(body) {

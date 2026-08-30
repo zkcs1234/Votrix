@@ -281,9 +281,14 @@ export function buildAnalytics({ question, answers, options, typeDef, typeConfig
 
   if (fmt.kind === 'numeric') {
     const dist = {}
-    const min = typeConfig?.min ?? fmt.min ?? 1
-    const max = typeConfig?.max ?? fmt.max ?? 5
-    for (let n = min; n <= max; n += typeConfig?.step ?? fmt.step ?? 1) {
+    const min = Number(typeConfig?.min ?? fmt.min ?? 1)
+    const max = Number(typeConfig?.max ?? fmt.max ?? 5)
+    // Guard the loop against a non-positive or non-finite step — a step of 0
+    // (which a malformed custom type can carry) would loop forever and hang the
+    // event loop. Fall back to 1 and cap the bucket count defensively.
+    let step = Number(typeConfig?.step ?? fmt.step ?? 1)
+    if (!Number.isFinite(step) || step <= 0) step = 1
+    for (let n = min, i = 0; n <= max && i < 10000; n += step, i++) {
       dist[n] = 0
     }
     for (const a of answers) {

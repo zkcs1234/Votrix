@@ -1,6 +1,4 @@
 import { ApiError } from '../utils/ApiError.js'
-import { requireQuestionType } from '../services/polling-registry.service.js'
-import { validateTypeConfig } from '../modules/poll-question-types.js'
 
 export function validatePollEvent(body, isCreate = false) {
   if (isCreate && !body?.title?.trim()) {
@@ -26,44 +24,6 @@ export function validatePollEvent(body, isCreate = false) {
 
 
   return payload
-}
-
-// Phase 7 — question validation is registry-driven. The list of valid
-// types is no longer hardcoded here; instead we ask the registry.
-export async function validateQuestion(body, organizationId) {
-  if (!body?.question?.trim()) throw new ApiError(400, 'Question text is required')
-  if (!body?.type) throw new ApiError(400, 'Question type is required')
-
-  const typeDef = await requireQuestionType(organizationId, body.type)
-  let typeConfig
-  try {
-    typeConfig = validateTypeConfig(typeDef, body.typeConfig)
-  } catch (err) {
-    throw new ApiError(400, err.message)
-  }
-
-  return {
-    question: body.question.trim(),
-    type: typeDef.key,
-    sortOrder: Number(body.sortOrder ?? 0),
-    required: body.required !== false,
-    typeConfig,
-    options: body.options,
-    imageUrl: body.imageUrl?.trim() || null,
-    imageAssetId: body.imageAssetId ?? null,
-  }
-}
-
-export function validateReorder(body) {
-  if (!body?.orders || !Array.isArray(body.orders)) {
-    throw new ApiError(400, 'orders array is required')
-  }
-  for (const item of body.orders) {
-    if (!item.id || typeof item.sortOrder !== 'number') {
-      throw new ApiError(400, 'Each order item must have an id and a numeric sortOrder')
-    }
-  }
-  return body.orders
 }
 
 export function validatePollAnswers(body) {
@@ -95,14 +55,8 @@ export function validatePollAnswers(body) {
   return answers
 }
 
-export function validatePollToggle(body) {
-  if (typeof body?.pollingEnabled !== 'boolean') {
-    throw new ApiError(400, 'pollingEnabled must be a boolean')
-  }
-  return body.pollingEnabled
-}
-
-// Basic question validation for sync operations
+// Basic question validation. Type/typeConfig are re-validated against the
+// registry in the service layer (requireQuestionType + validateTypeConfig).
 export function validatePollQuestion(body) {
   if (!body?.question?.trim()) {
     throw new ApiError(400, 'Question text is required')
@@ -124,12 +78,30 @@ export function validatePollQuestion(body) {
 }
 
 // Phase 7 — custom type validators
+const VALID_ANSWER_KINDS = new Set(['choice', 'numeric', 'text', 'ranking'])
+
+// Validate an answerFormat object. A malformed kind here poisons the voter
+// submit path (validateAnswer throws "Unsupported question kind") and the
+// analytics path, so reject it at creation time rather than at a distance.
+function assertValidAnswerFormat(answerFormat) {
+  if (!answerFormat || typeof answerFormat !== 'object' || Array.isArray(answerFormat)) {
+    throw new ApiError(400, 'answerFormat is required')
+  }
+  if (!VALID_ANSWER_KINDS.has(answerFormat.kind)) {
+    throw new ApiError(
+      400,
+      `answerFormat.kind must be one of: ${[...VALID_ANSWER_KINDS].join(', ')}`,
+    )
+  }
+  if (answerFormat.kind === 'choice' && !['one', 'many'].includes(answerFormat.cardinality)) {
+    throw new ApiError(400, "A 'choice' answerFormat requires cardinality 'one' or 'many'")
+  }
+}
+
 export function validateCustomType(body) {
   if (!body?.key?.trim()) throw new ApiError(400, 'key is required')
   if (!body?.label?.trim()) throw new ApiError(400, 'label is required')
-  if (!body?.answerFormat || typeof body.answerFormat !== 'object') {
-    throw new ApiError(400, 'answerFormat is required')
-  }
+  assertValidAnswerFormat(body.answerFormat)
   return {
     key: body.key.trim(),
     label: body.label.trim(),
@@ -140,4 +112,24 @@ export function validateCustomType(body) {
     sortOrder: Number(body.sortOrder ?? 100),
     isActive: body.isActive !== false,
   }
+}
+
+// Partial validator for updates — only the provided fields are checked and
+// returned, so callers can PATCH a single attribute.
+export function validateCustomTypeUpdate(body) {
+  const out = {}
+  if (body?.label !== undefined) {
+    if (!body.label?.trim()) throw new ApiError(400, 'label cannot be empty')
+    out.label = body.label.trim()
+  }
+  if (body?.description !== undefined) out.description = body.description?.trim() || null
+  if (body?.answerFormat !== undefined) {
+    assertValidAnswerFormat(body.answerFormat)
+    out.answerFormat = body.answerFormat
+  }
+  if (body?.configSchema !== undefined) out.configSchema = body.configSchema
+  if (body?.ui !== undefined) out.ui = body.ui
+  if (body?.sortOrder !== undefined) out.sortOrder = Number(body.sortOrder)
+  if (body?.isActive !== undefined) out.isActive = Boolean(body.isActive)
+  return out
 }

@@ -4,7 +4,12 @@ import * as pollingService from '../services/polling.service.js'
 import * as electionService from '../services/election.service.js'
 import { importVotersFromCsv, previewCsv, registerVotersFromCsv } from '../services/csv-import.service.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
-import { validatePollEvent, validatePollQuestion } from '../validators/polling.validator.js'
+import {
+  validatePollEvent,
+  validatePollQuestion,
+  validateCustomType,
+  validateCustomTypeUpdate,
+} from '../validators/polling.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
 import { getEventInformationForm, setEventInformationForm } from '../services/event.service.js'
 
@@ -144,15 +149,17 @@ export const listCustomQuestionTypes = asyncHandler(async (req, res) => {
 })
 
 export const createCustomQuestionType = asyncHandler(async (req, res) => {
-  const type = await pollingService.createCustomQuestionType(req.user.id, req.body)
+  const payload = validateCustomType(req.body)
+  const type = await pollingService.createCustomQuestionType(req.user.id, payload)
   res.status(201).json({ success: true, type })
 })
 
 export const updateCustomQuestionType = asyncHandler(async (req, res) => {
+  const payload = validateCustomTypeUpdate(req.body)
   const type = await pollingService.updateCustomQuestionType(
     req.params.typeId,
     req.user.id,
-    req.body,
+    payload,
   )
   res.json({ success: true, type })
 })

@@ -337,4 +337,31 @@ describe('buildAnalytics', () => {
     })
     expect(stats.responses[0].respondent).toBe('v1')
   })
+
+  // Regression guard for POLLING_MODULE_ANALYSIS §4.2 — a numeric type with a
+  // step of 0 (which a malformed custom type can carry) previously spun the
+  // distribution loop forever and hung the event loop. buildAnalytics must
+  // terminate and fall back to a step of 1.
+  test('numeric: a step of 0 does not hang the analytics loop', () => {
+    const ratingType = mapTypeRow({
+      key: 'rating',
+      label: 'Rating',
+      description: '',
+      answer_format: { kind: 'numeric', min: 1, max: 5, step: 1 },
+      config_schema: {},
+      ui: { input: 'rating' },
+      sort_order: 50,
+    })
+    const stats = buildAnalytics({
+      question: {},
+      answers: [{ answer: '3' }, { answer: '5' }],
+      options: [],
+      typeDef: ratingType,
+      typeConfig: { min: 1, max: 5, step: 0 }, // poison
+      anonymous: false,
+    })
+    expect(stats.kind).toBe('numeric')
+    // Fell back to step 1 → 5 buckets (1..5).
+    expect(stats.distribution).toHaveLength(5)
+  })
 })

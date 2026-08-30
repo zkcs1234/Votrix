@@ -18,11 +18,13 @@ export const getResults = asyncHandler(async (req, res) => {
 })
 
 export const submitVote = asyncHandler(async (req, res) => {
-  const selections = validateBallot(req.body)
+  // Returns { selections, votingNonce } — pass the whole object so submitBallot
+  // can enforce the replay-protection nonce.
+  const ballot = validateBallot(req.body)
   const result = await electionService.submitBallot(
     req.params.eventId,
     req.user.id,
-    selections,
+    ballot,
   )
   res.json(result)
 })

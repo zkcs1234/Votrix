@@ -196,19 +196,19 @@ export default function ElectionVotersPage() {
     }
   }
 
-  // Send invitation for single voter
-  const handleSendInvitation = async (voterId) => {
+  // Send (or resend) invitation for single voter
+  const handleSendInvitation = async (voterId, isResend = false) => {
     setSendingId(voterId)
     try {
       const { data } = await electionService.sendInvitation(eventId, voterId)
       if (data.invitationSent) {
-        success('Invitation sent successfully')
+        success(isResend ? 'Invitation resent successfully' : 'Invitation sent successfully')
       } else {
-        showError('Failed to send invitation')
+        showError(isResend ? 'Failed to resend invitation' : 'Failed to send invitation')
       }
       await reload()
     } catch (err) {
-      showError(err.response?.data?.message || 'Failed to send invitation')
+      showError(err.response?.data?.message || (isResend ? 'Failed to resend invitation' : 'Failed to send invitation'))
     } finally {
       setSendingId(null)
     }
@@ -244,8 +244,8 @@ export default function ElectionVotersPage() {
     }
 
     // Row-level action
+    const isSending = sendingId === participant.voterId
     if (!participant.invitationSent) {
-      const isSending = sendingId === participant.voterId
       return (
         <Button
           size="sm"
@@ -258,7 +258,18 @@ export default function ElectionVotersPage() {
         </Button>
       )
     }
-    return null
+    // Already invited — allow resending the invitation email
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => handleSendInvitation(participant.voterId, true)}
+        loading={isSending}
+        disabled={isSending}
+      >
+        Resend
+      </Button>
+    )
   }
 
   // Show nothing under 300ms
