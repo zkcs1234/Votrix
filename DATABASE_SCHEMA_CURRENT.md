@@ -1,0 +1,408 @@
+# Votrix — Current Database Schema (Live Tables Only)
+
+> **Scope:** This document maps **only the tables the running application actually reads/writes today**, verified against `backend/src` code (`.from(...)`, the `DB_TABLES` registry in `utils/constants.js`, and the two `.rpc(...)` calls).
+>
+> **Deliberately excluded** (dead / legacy / superseded — see [§7](#7-legacy-not-in-the-diagrams)):
+> `event_voters`, the `competition_judges` **table** (now a view), and the backward‑compat views `contestants`, `criteria`, `judge_scores`, `v_event_voters`, `v_legacy_competition_judges`.
+>
+> Source of truth: migrations `001` → `060`. Diagrams render on GitHub / any Mermaid viewer.
+
+---
+
+## 1. Module map (high level)
+
+```mermaid
+flowchart TB
+    subgraph IDENTITY["Core / Identity"]
+        U[users]
+        O[organizations]
+        E[events]
+        EP[event_participants]
+        INV[invitations]
+    end
+
+    subgraph ELECTION["Election module"]
+        POS[positions]
+        CAND[candidates]
+        EV[election_votes]
+    end
+
+    subgraph COMPETITION["Competition scoring module"]
+        CC[competition_contestants]
+        CCR[competition_criteria]
+        CCAT[competition_categories]
+        CRND[competition_rounds]
+        CDIV[competition_divisions]
+        CSC[competition_scores]
+        CJA[competition_judge_assignments]
+        CSESS[competition_sessions]
+        CSJS[competition_session_judge_scores]
+    end
+
+    subgraph POLLING["Polling module"]
+        PQ[poll_questions]
+        POPT[poll_options]
+        PSUB[poll_submissions]
+        PANS[poll_answers]
+        SPT[system_poll_question_types]
+        PQT[poll_question_types]
+    end
+
+    subgraph PLATFORM["Platform / infra"]
+        IA[image_assets]
+        IDQ[image_deletion_queue]
+        ED[event_drafts]
+        NOTIF[notifications]
+        US[user_sessions]
+        PRT[password_reset_tokens]
+        AL[audit_logs]
+        SS[system_settings]
+    end
+
+    O --> U
+    E --> O
+    EP --> E & U
+    INV --> E & U
+    ELECTION --> E
+    COMPETITION --> E
+    POLLING --> E
+```
+
+**One `events` table backs all three modules.** Each module hangs its own tables off `events.id`, and enrollment for every module funnels through the single `event_participants` table (distinguished by `participant_type`).
+
+---
+
+## 2. Core / Identity
+
+```mermaid
+erDiagram
+    users ||--o{ organizations : "organizer_id"
+    organizations ||--o{ events : "organization_id"
+    events ||--o{ event_participants : "event_id"
+    users ||--o{ event_participants : "user_id"
+    events ||--o{ invitations : "event_id"
+    users ||--o{ invitations : "voter_id"
+
+    users {
+        uuid id PK
+        varchar username "admin only"
+        varchar email "organizer/voter"
+        text password "bcrypt"
+        user_role role "admin|organizer|voter"
+        uuid image_asset_id FK "-> image_assets"
+    }
+    organizations {
+        uuid id PK
+        uuid organizer_id FK "-> users"
+        organization_type organization_type
+        organization_status status
+    }
+    events {
+        uuid id PK
+        uuid organization_id FK "-> organizations"
+        event_type event_type "election|pageant|competition_scoring|polling"
+        varchar competition_type "optional label"
+        jsonb scoring_config
+        jsonb information_form_schema
+        bool voting_enabled
+        bool polling_enabled
+        bool divisions_enabled
+        uuid image_asset_id FK "-> image_assets"
+        timestamptz archived_at
+    }
+    event_participants {
+        uuid id PK
+        uuid event_id FK "-> events"
+        uuid user_id FK "-> users"
+        participant_type participant_type "ELECTION_VOTER|COMPETITION_JUDGE|POLLING_RESPONDENT"
+        bool has_voted
+        bool has_scored
+        bool has_responded
+        competition_judge_role judge_role "judges only"
+        varchar display_name "judges only"
+        bool is_active
+        uuid voting_nonce
+        jsonb metadata
+    }
+    invitations {
+        uuid id PK
+        uuid event_id FK "-> events"
+        uuid voter_id FK "-> users"
+        text temp_password
+        bool invitation_sent
+        bool is_new_account
+    }
+```
+
+`event_participants` is the **canonical enrollment table** — it replaced `event_voters` (migration 029) and absorbed the old `competition_judges` table (migration 041). Voter, judge, and respondent are all the same row shape, keyed by `participant_type`.
+
+---
+
+## 3. Election module
+
+```mermaid
+erDiagram
+    events ||--o{ positions : "event_id"
+    positions ||--o{ candidates : "position_id"
+    events ||--o{ election_votes : "event_id"
+    users ||--o{ election_votes : "voter_id"
+    positions ||--o{ election_votes : "position_id"
+    candidates ||--o{ election_votes : "candidate_id"
+
+    positions {
+        uuid id PK
+        uuid event_id FK "-> events"
+        int min_vote
+        int max_vote
+        int number_of_winners
+        int display_order
+    }
+    candidates {
+        uuid id PK
+        uuid position_id FK "-> positions"
+        varchar partylist "= 'party'"
+        text biography
+        text platform
+        uuid image_asset_id FK "-> image_assets"
+    }
+    election_votes {
+        uuid id PK
+        uuid event_id FK "-> events"
+        uuid voter_id FK "-> users"
+        uuid position_id FK "-> positions"
+        uuid candidate_id FK "-> candidates"
+    }
+```
+
+**Write path:** the `cast_election_ballot(event_id, voter_id, votes)` RPC (migration 059) flips `event_participants.has_voted` **and** inserts `election_votes` rows atomically in one transaction.
+
+> ⚠️ `election_votes.voter_id` points at **`users`**, not `event_participants` — see [§6, issue D](#issue-d--judge--voter-identity-is-not-anchored-to-event_participants).
+
+---
+
+## 4. Competition scoring module
+
+```mermaid
+erDiagram
+    events ||--o{ competition_divisions : "event_id"
+    events ||--o{ competition_contestants : "event_id"
+    events ||--o{ competition_criteria : "event_id"
+    events ||--o{ competition_categories : "event_id"
+    events ||--o{ competition_rounds : "event_id"
+
+    competition_divisions ||--o{ competition_contestants : "division_id (opt)"
+    competition_categories ||--o{ competition_criteria : "category_id (opt)"
+    competition_categories ||--o{ competition_rounds : "category_id (opt)"
+
+    competition_rounds ||--o{ competition_round_contestants : "round_id"
+    competition_contestants ||--o{ competition_round_contestants : "contestant_id"
+    competition_rounds ||--o{ competition_round_criteria : "round_id"
+    competition_criteria ||--o{ competition_round_criteria : "criteria_id"
+    competition_rounds ||--o{ competition_round_results : "round_id"
+    competition_contestants ||--o{ competition_round_results : "contestant_id"
+
+    users ||--o{ competition_scores : "judge_id"
+    competition_contestants ||--o{ competition_scores : "contestant_id"
+    competition_criteria ||--o{ competition_scores : "criteria_id"
+
+    event_participants ||--o{ competition_judge_assignments : "participant_id"
+
+    events ||--o{ competition_sessions : "event_id"
+    competition_rounds ||--o{ competition_sessions : "current_round_id"
+    competition_sessions ||--o{ competition_session_judge_scores : "session_id"
+    users ||--o{ competition_session_judge_scores : "judge_id"
+    competition_contestants ||--o{ competition_session_judge_scores : "contestant_id"
+
+    competition_contestants {
+        uuid id PK
+        uuid event_id FK
+        uuid division_id FK "opt"
+        int contestant_number
+        uuid image_asset_id FK
+    }
+    competition_criteria {
+        uuid id PK
+        uuid event_id FK
+        uuid category_id FK "opt"
+        uuid division_id FK "opt"
+        numeric percentage
+        int display_order
+    }
+    competition_categories {
+        uuid id PK
+        uuid event_id FK
+        uuid division_id FK "opt"
+        numeric weight
+    }
+    competition_rounds {
+        uuid id PK
+        uuid event_id FK
+        uuid category_id FK "opt"
+        uuid division_id FK "opt"
+        varchar advancement_type
+        varchar score_policy
+        timestamptz finalized_at
+    }
+    competition_scores {
+        uuid id PK
+        uuid judge_id FK "-> users"
+        uuid contestant_id FK
+        uuid criteria_id FK
+        uuid event_id FK
+        uuid round_id FK "opt"
+        uuid category_id FK "opt"
+        uuid division_id FK "opt"
+        numeric score
+    }
+    competition_judge_assignments {
+        uuid id PK
+        uuid participant_id FK "-> event_participants"
+        competition_assignment_scope scope "event|category|round|division"
+        uuid scope_id "polymorphic, NO FK"
+    }
+    competition_sessions {
+        uuid id PK
+        uuid event_id FK
+        uuid current_round_id FK "opt"
+        uuid active_contestant_id FK "opt"
+        uuid current_division_id FK "opt"
+        uuid_array contestant_order
+        competition_session_status status
+    }
+    competition_session_judge_scores {
+        uuid id PK
+        uuid session_id FK
+        uuid event_id FK
+        uuid round_id FK "opt"
+        uuid contestant_id FK
+        uuid judge_id FK "-> users"
+        uuid division_id FK "opt"
+        jsonb scores "criteriaId -> score"
+        bool is_locked
+    }
+```
+
+Notes:
+- **Divisions are optional** (`events.divisions_enabled`). Every `division_id` is nullable; `NULL` = event‑wide. A DB trigger enforces that a division belongs to the same event.
+- **Junction tables** `competition_round_contestants` and `competition_round_criteria` wire many‑to‑many contestant↔round and criteria↔round.
+- **`v_competition_active_session`** (a used view) joins `competition_sessions` → round + contestant for the live judge screen.
+- Two score stores coexist (`competition_scores` and `competition_session_judge_scores`) — see [§6, issue A](#issue-a--two-parallel-score-stores).
+
+---
+
+## 5. Polling module
+
+```mermaid
+erDiagram
+    events ||--o{ poll_questions : "event_id"
+    poll_questions ||--o{ poll_options : "question_id"
+    events ||--o{ poll_submissions : "event_id"
+    users ||--o{ poll_submissions : "voter_id"
+    poll_questions ||--o{ poll_answers : "question_id"
+    poll_submissions ||--o{ poll_answers : "submission_id"
+    users ||--o{ poll_answers : "voter_id"
+    organizations ||--o{ poll_question_types : "organization_id (opt)"
+
+    poll_questions {
+        uuid id PK
+        uuid event_id FK
+        poll_question_type type "enum (legacy, non-authoritative)"
+        jsonb type_config
+        int sort_order
+        bool required
+        uuid image_asset_id FK
+    }
+    poll_options {
+        uuid id PK
+        uuid question_id FK
+        varchar label
+        uuid image_asset_id FK
+    }
+    poll_submissions {
+        uuid id PK
+        uuid event_id FK
+        uuid voter_id FK "-> users"
+        timestamptz started_at
+        timestamptz completed_at
+    }
+    poll_answers {
+        uuid id PK
+        uuid question_id FK
+        uuid submission_id FK "-> poll_submissions"
+        uuid voter_id FK "-> users (redundant)"
+        text answer
+    }
+    system_poll_question_types {
+        varchar key PK
+        jsonb answer_format
+        jsonb config_schema
+        bool is_active
+    }
+    poll_question_types {
+        uuid id PK
+        uuid organization_id FK "-> organizations, NULL=global"
+        varchar key
+        jsonb answer_format
+    }
+```
+
+**Write path:** the `cast_poll_response(...)` RPC (migration 060) flips `event_participants.has_responded`, inserts one `poll_submissions` row, and inserts all `poll_answers` rows — atomically.
+
+**Question types:** `system_poll_question_types` (built‑ins) + `poll_question_types` (per‑org overrides) are unioned by view **`v_poll_question_types`**, which the engine reads. The old `poll_questions.type` **enum is kept but is no longer authoritative** — see [§6, issue C](#issue-c--question-type-defined-in-two-competing-places).
+
+---
+
+## 6. Problems, duplication & connection risks
+
+These are the issues visible in the *current* schema — the reason you asked for this map.
+
+### Issue A — Two parallel score stores
+`competition_scores` (one relational row per **judge × contestant × criteria**, with `score`) and `competition_session_judge_scores` (one **JSONB blob** per session × round × contestant, `scores = {criteriaId: value}`) hold the *same* scoring data in two different shapes. Live sessions write the JSONB table; reports/rankings read `competition_scores`. Any path that doesn't sync both leaves rankings and the live board disagreeing. **Decide which is canonical and derive the other.**
+
+### Issue B — `invitations` overlaps `event_participants`
+Both `(event_id, voter_id/user_id)` describe "this user belongs to this event." Migration 040 has to *reconcile* invitations back into `event_participants`, which is a symptom: enrollment truth is split across two tables. `invitations` should be strictly about the invite email/temp password, not a second membership record.
+
+### Issue C — Question type defined in two competing places
+`poll_questions.type` is a Postgres **enum**, but migration 017 declares the enum "no longer authoritative" and moves truth to `system_poll_question_types` / `poll_question_types` (via `v_poll_question_types`). Enum values can't be dropped, so the two definitions will drift. **Treat the enum as a legacy display hint only, or migrate `type` to a plain `varchar key` referencing the registry.**
+
+### Issue D — Judge / voter identity is not anchored to `event_participants`
+Enrollment and assignment use `event_participants.id` (`competition_judge_assignments.participant_id`), but **both** score tables and `election_votes`/`poll_submissions` reference `users.id` directly (`judge_id`, `voter_id`). Nothing at the DB level guarantees a score/vote's user is actually an enrolled participant of that event. A judge is currently representable three ways: an `event_participants` row, the `competition_judges` **view**, and a raw `users` FK in the score tables. **Consider FKs to `event_participants` (or a composite `(event_id, user_id)` check) on the scoring/vote tables.**
+
+### Issue E — `competition_judge_assignments.scope_id` is a polymorphic UUID with no FK
+`scope_id` points at an event, category, round, **or** division depending on `scope`, so it can't have a foreign key. Referential integrity is app‑enforced only; an orphaned `scope_id` won't be caught by the database.
+
+### Issue F — `poll_answers.voter_id` is redundant (and an anonymity leak)
+`poll_answers` already reaches the respondent through `submission_id → poll_submissions.voter_id`. The extra `voter_id` column duplicates that and **defeats `events.poll_anonymous`**, since each answer row still carries the user id. Drop it, or null it for anonymous polls.
+
+### Issue G — `events` is a very wide single-table-inheritance blob
+One `events` row carries election flags (`voting_enabled`, `results_visibility`), polling flags (`polling_enabled`, `poll_anonymous`, `poll_allow_multiple_submissions`, `poll_expires_at`), and competition config (`scoring_config`, `divisions_enabled`, `competition_type`) — most of them irrelevant/NULL for any given event type. Not a bug, but the main source of "columns that don't apply here." Watch for it when adding module fields.
+
+---
+
+## 7. Legacy (NOT in the diagrams)
+
+Kept in the database for backward compatibility but **not used by current application code** — safe candidates for cleanup once you confirm no external reporting depends on them:
+
+| Object | Kind | Replaced by | Evidence it's dead |
+|---|---|---|---|
+| `event_voters` | table | `event_participants` | Only a code *comment* references it; all reads/writes go to `event_participants`. |
+| `competition_judges` | **view** (table renamed to `competition_judges_legacy` in 041) | `event_participants` (`participant_type = COMPETITION_JUDGE`) | Read‑only compat view; app writes to `event_participants`. |
+| `competition_judges_legacy` | table | — | Renamed‑away original; retained only so the view name was free. |
+| `contestants`, `criteria`, `judge_scores` | views | `competition_contestants`, `competition_criteria`, `competition_scores` | No `.from()` in code hits these bare names. |
+| `v_event_voters`, `v_legacy_competition_judges` | views | `event_participants` | Compatibility shims from migrations 011/015/029/040. |
+| `DB_TABLES.COMPETITION_JUDGES` | constant | — | Declared in `utils/constants.js` but never used — stale registry entry. |
+
+> **Also note the rename churn:** the competition tables were renamed pageant → `competition_*` (011), and judges went first‑class‑table → unified‑into‑`event_participants` (041), and voters went `event_voters` → `event_participants` (029). Each step left a compatibility view behind. The *live* model is clean; the *leftover* views are the clutter.
+
+---
+
+## 8. Quick reference — the 30 live tables
+
+**Core (5):** `users`, `organizations`, `events`, `event_participants`, `invitations`
+**Election (3):** `positions`, `candidates`, `election_votes`
+**Competition (12):** `competition_contestants`, `competition_criteria`, `competition_categories`, `competition_rounds`, `competition_divisions`, `competition_round_contestants`, `competition_round_criteria`, `competition_round_results`, `competition_scores`, `competition_judge_assignments`, `competition_sessions`, `competition_session_judge_scores`
+**Polling (6):** `poll_questions`, `poll_options`, `poll_submissions`, `poll_answers`, `system_poll_question_types`, `poll_question_types`
+**Platform (8):** `image_assets`, `image_deletion_queue`, `event_drafts`, `notifications`, `user_sessions`, `password_reset_tokens`, `audit_logs`, `system_settings`
+
+**Used views:** `v_competition_active_session`, `v_poll_question_types`
+**RPC (write) functions:** `cast_election_ballot`, `cast_poll_response`
