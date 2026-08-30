@@ -175,7 +175,7 @@ export const routeConfig = [
     path: '/organizer',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.ORGANIZER]}>
-        <DashboardLayout title="Organizer" showSidebar={false} />
+        <DashboardLayout title="Organizer" />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <OrganizerDashboardPage /> }],

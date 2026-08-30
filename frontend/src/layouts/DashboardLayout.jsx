@@ -25,6 +25,9 @@ export default function DashboardLayout({
 
     ...(role === USER_ROLES.ADMIN
       ? [
+          // Grouped into Manage → System → Monitoring so the sidebar reads as
+          // clean sections, matching the Competition module's grouped layout.
+          { section: 'Manage' },
           {
             label: 'Organizer Management',
             path: '/admin/organizers',
@@ -37,6 +40,8 @@ export default function DashboardLayout({
             icon: CalendarDays,
             isActive: (loc) => loc.pathname.startsWith('/admin/events'),
           },
+
+          { section: 'System' },
           {
             label: 'System Settings',
             path: '/admin/settings',
@@ -44,11 +49,19 @@ export default function DashboardLayout({
             isActive: (loc) => loc.pathname.startsWith('/admin/settings'),
           },
           {
-            label: 'Audit Logs',
-            path: '/admin/audit-logs',
-            icon: ClipboardList,
-            isActive: (loc) => loc.pathname.startsWith('/admin/audit-logs'),
+            label: 'Sessions',
+            path: '/admin/sessions',
+            icon: ShieldOff,
+            isActive: (loc) => loc.pathname.startsWith('/admin/sessions'),
           },
+          {
+            label: 'Archival Policy',
+            path: '/admin/archival',
+            icon: Archive,
+            isActive: (loc) => loc.pathname.startsWith('/admin/archival'),
+          },
+
+          { section: 'Monitoring' },
           {
             label: 'System Health',
             path: '/admin/health',
@@ -62,16 +75,10 @@ export default function DashboardLayout({
             isActive: (loc) => loc.pathname.startsWith('/admin/alerts'),
           },
           {
-            label: 'Sessions',
-            path: '/admin/sessions',
-            icon: ShieldOff,
-            isActive: (loc) => loc.pathname.startsWith('/admin/sessions'),
-          },
-          {
-            label: 'Archival Policy',
-            path: '/admin/archival',
-            icon: Archive,
-            isActive: (loc) => loc.pathname.startsWith('/admin/archival'),
+            label: 'Audit Logs',
+            path: '/admin/audit-logs',
+            icon: ClipboardList,
+            isActive: (loc) => loc.pathname.startsWith('/admin/audit-logs'),
           },
         ]
       : []),

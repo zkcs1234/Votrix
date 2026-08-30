@@ -5,37 +5,20 @@ import {
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
 
+// Grouped into Setup → Results so the sidebar follows the workflow order,
+// matching the Competition module's grouped layout. Routes are unchanged.
+const BASE = '/organizer/election/events'
 const navItems = [
   { label: 'Dashboard', path: '/organizer/election', icon: LayoutDashboard },
   { label: 'Events', path: '/organizer/election/events', icon: CalendarDays },
-  {
-    label: 'Positions',
-    path: 'positions',
-    icon: MapPin,
-    scoped: true,
-    basePath: '/organizer/election/events',
-  },
-  {
-    label: 'Candidates',
-    path: 'candidates',
-    icon: Users,
-    scoped: true,
-    basePath: '/organizer/election/events',
-  },
-  {
-    label: 'Voters',
-    path: 'voters',
-    icon: Users,
-    scoped: true,
-    basePath: '/organizer/election/events',
-  },
-  {
-    label: 'Analytics',
-    path: 'analytics',
-    icon: BarChart3,
-    scoped: true,
-    basePath: '/organizer/election/events',
-  },
+
+  { section: 'Setup' },
+  { label: 'Positions', path: 'positions', icon: MapPin, scoped: true, basePath: BASE },
+  { label: 'Candidates', path: 'candidates', icon: Users, scoped: true, basePath: BASE },
+  { label: 'Voters', path: 'voters', icon: Users, scoped: true, basePath: BASE },
+
+  { section: 'Results' },
+  { label: 'Analytics', path: 'analytics', icon: BarChart3, scoped: true, basePath: BASE },
 ]
 
 export default function ElectionLayout() {
