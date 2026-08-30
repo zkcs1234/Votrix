@@ -82,6 +82,7 @@ export default function CompetitionWorkspacePage() {
       </div>
 
       <TypeHint type={foundation?.event?.competition_type} />
+      <SetupReadiness foundation={foundation} />
 
       {activeTab === 'structure' && <StructureTab foundation={foundation} reload={load} />}
       {activeTab === 'divisions' && <DivisionsTab foundation={foundation} reload={load} />}
@@ -527,6 +528,11 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
   const assignedCriteriaIds = new Set(round.criteriaIds ?? [])
   const [busy, setBusy] = useState(null) // tracks which id is loading
 
+  // Phase 1 (round-first): create a criterion directly inside this round.
+  const [newCritName, setNewCritName] = useState('')
+  const [newCritWeight, setNewCritWeight] = useState('')
+  const [addingCrit, setAddingCrit] = useState(false)
+
   // §8A: when criteria are assigned per round, each round's criteria must total
   // 100% WITHIN that round (not event-wide). Surface the per-round total here so
   // the organizer sees what the backend now validates.
@@ -600,6 +606,36 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
     }
   }
 
+  // Phase 1 (round-first): create a criterion AND attach it to this round in one
+  // step — the natural "define criteria inside the round" flow. Reuses the
+  // existing createCriteria + addRoundCriteria APIs (bounds come from the scale).
+  const createCriteriaInRound = async (e) => {
+    e.preventDefault()
+    const name = newCritName.trim()
+    const weight = Number(newCritWeight)
+    if (!name) return
+    if (!Number.isFinite(weight) || weight <= 0) {
+      alert('Enter a weight greater than 0')
+      return
+    }
+    setAddingCrit(true)
+    try {
+      const { data } = await pageantService.createCriteria(eventId, { name, percentage: weight })
+      const created = data?.criteria ?? data
+      const criteriaId = created?.id
+      if (criteriaId) {
+        await pageantService.addRoundCriteria(eventId, round.id, criteriaId)
+      }
+      setNewCritName('')
+      setNewCritWeight('')
+      reload()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to add criteria to this round')
+    } finally {
+      setAddingCrit(false)
+    }
+  }
+
   return (
     <div className="border-t border-v-border px-4 pb-4 pt-3 space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -661,8 +697,47 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
             </span>
           )}
         </div>
+
+        {/* Phase 2 (S2): make the fallback explicit instead of a silent surprise. */}
+        {!hasAssignedCrit && (
+          <p className="mb-2 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-[11px] text-amber-300/90">
+            No criteria for this round yet. Add or create criteria below — until you do, this round
+            falls back to <strong>all event criteria</strong>.
+          </p>
+        )}
+
+        {/* Phase 1 (round-first): define a criterion directly inside this round. */}
+        <form onSubmit={createCriteriaInRound} className="mb-2 flex items-center gap-2">
+          <input
+            className="min-w-0 flex-1 rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text"
+            placeholder="New criterion (e.g. Technique)"
+            value={newCritName}
+            onChange={(e) => setNewCritName(e.target.value)}
+          />
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step="0.01"
+            className="w-16 rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text"
+            placeholder="%"
+            aria-label="Weight percentage"
+            value={newCritWeight}
+            onChange={(e) => setNewCritWeight(e.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={addingCrit}
+            className="rounded-lg bg-v-primary px-2.5 py-1.5 text-xs font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
+          >
+            {addingCrit ? '...' : 'Add'}
+          </button>
+        </form>
+
         {allCriteria.length === 0 ? (
-          <p className="text-xs text-v-text-subtle">No criteria added to the event yet.</p>
+          <p className="text-xs text-v-text-subtle">
+            No criteria in the event yet — create the first one for this round above.
+          </p>
         ) : (
           <ul className="space-y-1">
             {allCriteria.map((cr) => {
@@ -752,6 +827,17 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
             />
           </div>
         </div>
+        {/* Phase 4 (W5): explain what advancement does and where it runs. */}
+        <p className="mt-2 text-[11px] leading-relaxed text-v-text-subtle">
+          {advType === 'none' && 'No elimination — every contestant stays for the next round.'}
+          {advType === 'top_n' && 'The top N by score advance to the next round (per division when divisions are on).'}
+          {advType === 'top_percent' && 'The top N% by score advance to the next round.'}
+          {advType === 'threshold' && 'Contestants scoring at or above this value advance.'}
+          {advType === 'manual' && 'You pick who advances by hand when finalizing.'}
+          {' '}You set the rule here; you <strong>run</strong> it later from{' '}
+          <strong>Live Control → “Finalize round &amp; advance”</strong>, where you can review and override
+          the qualifiers before confirming.
+        </p>
         <div className="mt-2 flex justify-end">
           <button
             type="button"
@@ -783,6 +869,64 @@ function TypeHint({ type }) {
   return (
     <div className="rounded-lg border border-v-border bg-v-surface-elevated/50 px-4 py-2.5 text-xs text-v-text-muted">
       {hint}
+    </div>
+  )
+}
+
+// Phase 4 (W1/W3/W4) — progressive readiness so the organizer sees what's
+// missing DURING setup, not only when they hit Start. Mirrors the backend
+// pre-flight (contestants ≥1, active judges ≥1, criteria total 100% — per round
+// when rounds carry their own criteria, else event-wide).
+function SetupReadiness({ foundation }) {
+  if (!foundation) return null
+  const contestants = foundation.contestants ?? []
+  const judges = (foundation.judges ?? []).filter((j) => j.isActive !== false)
+  const criteria = foundation.criteria ?? []
+  const rounds = foundation.rounds ?? []
+  const usesRoundCriteria = rounds.some((r) => (r.criteriaIds ?? []).length > 0)
+
+  let criteriaOk
+  if (usesRoundCriteria) {
+    criteriaOk = rounds.every((r) => {
+      const ids = r.criteriaIds ?? []
+      if (!ids.length) return true
+      const total = criteria
+        .filter((c) => ids.includes(c.id))
+        .reduce((s, c) => s + Number(c.percentage ?? 0), 0)
+      return Math.abs(total - 100) < 0.1
+    })
+  } else {
+    const total = criteria.reduce((s, c) => s + Number(c.percentage ?? 0), 0)
+    criteriaOk = criteria.length > 0 && Math.abs(total - 100) < 0.1
+  }
+
+  const checks = [
+    { label: 'At least one contestant', ok: contestants.length > 0 },
+    { label: 'At least one active judge', ok: judges.length > 0 },
+    {
+      label: usesRoundCriteria ? "Each round's criteria total 100%" : 'Criteria total 100%',
+      ok: criteriaOk,
+    },
+  ]
+  const allOk = checks.every((c) => c.ok)
+
+  return (
+    <div
+      className={`rounded-lg border px-4 py-3 ${
+        allOk ? 'border-v-success/30 bg-v-success-bg' : 'border-v-border bg-v-surface'
+      }`}
+    >
+      <p className={`mb-2 text-xs font-semibold ${allOk ? 'text-v-success' : 'text-v-text-muted'}`}>
+        {allOk ? '✓ Ready to open scoring' : 'Setup checklist'}
+      </p>
+      <ul className="grid gap-1 sm:grid-cols-3">
+        {checks.map((c) => (
+          <li key={c.label} className="flex items-center gap-1.5 text-xs">
+            <span className={c.ok ? 'text-v-success' : 'text-amber-400'}>{c.ok ? '✓' : '○'}</span>
+            <span className={c.ok ? 'text-v-text-muted' : 'text-v-text'}>{c.label}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -953,6 +1097,13 @@ function JudgesTab({ foundation, reload }) {
                       </option>
                     ))}
                   </select>
+                )}
+
+                {/* W1: scopes-before-assignment dependency, surfaced (not blocked). */}
+                {!isEventScope && !scopeItems?.length && (
+                  <span className="text-[11px] text-amber-300/90">
+                    No {scopeOptions[scope]}s yet — create one first to assign by {scopeOptions[scope]}.
+                  </span>
                 )}
 
                 <button

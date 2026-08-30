@@ -26,6 +26,19 @@ function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
       {items.map((item) => {
         const Icon = item.icon ?? null
 
+        // Section header (non-clickable grouping label). Hidden when collapsed.
+        if (item.section) {
+          if (isCollapsed) return <div key={`section-${item.section}`} className="my-1 h-px w-6 bg-white/10" aria-hidden />
+          return (
+            <div
+              key={`section-${item.section}`}
+              className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wider text-v-sidebar-text/40 select-none"
+            >
+              {item.section}
+            </div>
+          )
+        }
+
         if (item.scoped && !eventId) {
           return (
             <span

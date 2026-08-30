@@ -124,6 +124,16 @@ export default function CompetitionCriteriaPage() {
         )
       }
       formPanel={
+        <>
+        {/* W1: scale-before-criteria dependency, surfaced (not blocked). */}
+        {list.length === 0 && (
+          <div className="mb-3 rounded-lg border border-v-border bg-v-surface px-4 py-2.5 text-xs text-v-text-muted">
+            Every criterion inherits the event <strong>score scale</strong> (currently{' '}
+            <strong>{scoreBounds.min}–{scoreBounds.max}</strong>). If you want a different scale
+            (e.g. 1–10), set it in <strong>Structure &amp; Scoring → Scoring config</strong> before adding
+            criteria.
+          </div>
+        )}
         <form onSubmit={handleCreate} className={`grid gap-5 v-card p-6 mb-4 ${divisionsEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <div className={divisionsEnabled ? 'sm:col-span-3' : 'sm:col-span-2'}>
           <label htmlFor="criteria-name" className={LABEL_CLASS}>
@@ -198,6 +208,7 @@ export default function CompetitionCriteriaPage() {
           {saving ? 'Adding...' : 'Add criteria'}
         </button>
       </form>
+        </>
       }
       recordsPanel={
         <ul className="space-y-2 pb-8">

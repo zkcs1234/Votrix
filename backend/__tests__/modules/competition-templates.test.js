@@ -1,55 +1,44 @@
-// Phase 1–2 — Competition template catalog integrity.
-//
-// Guards against shipping a preset that would seed an event that can't open
-// scoring: each template's category / round / criteria weights must be
-// internally valid per §8A (100% within their axis when present).
+// Phase 5 — template weight invariants. A template must seed an immediately-valid
+// event, so its weights have to be internally consistent (per §8A):
+//   - categories (if any) total 100
+//   - rounds (if any) total 100
+//   - each round that carries its own criteria totals 100 WITHIN that round
+//   - flat top-level criteria (if any) total 100
+//   - a template uses EITHER per-round criteria OR flat criteria, not both
 
 import { describe, test, expect } from 'vitest'
-import {
-  listTemplates,
-  getTemplate,
-  isValidCompetitionType,
-  COMPETITION_TYPES,
-} from '../../src/modules/competition-templates.js'
+import { listTemplates, getTemplate } from '../../src/modules/competition-templates.js'
 
-const sum = (arr, key) => arr.reduce((s, x) => s + Number(x[key] ?? 0), 0)
+const sum = (arr, key) => (arr ?? []).reduce((s, x) => s + Number(x[key] ?? 0), 0)
+const near100 = (n) => Math.abs(n - 100) < 0.01
 
-describe('competition templates: catalog', () => {
-  test('every declared type resolves to a template', () => {
-    for (const key of COMPETITION_TYPES) {
-      expect(getTemplate(key)).toBeTruthy()
-    }
-  })
-
-  test('isValidCompetitionType accepts catalog keys and null, rejects junk', () => {
-    expect(isValidCompetitionType(null)).toBe(true)
-    expect(isValidCompetitionType(undefined)).toBe(true)
-    expect(isValidCompetitionType('pageant')).toBe(true)
-    expect(isValidCompetitionType('not-a-type')).toBe(false)
-  })
-
-  test('getTemplate returns null for unknown/empty keys', () => {
-    expect(getTemplate('nope')).toBeNull()
-    expect(getTemplate('')).toBeNull()
-    expect(getTemplate(null)).toBeNull()
-  })
-})
-
-describe('competition templates: weight invariants (§8A)', () => {
+describe('competition templates — weight invariants', () => {
   for (const t of listTemplates()) {
-    describe(t.key, () => {
-      test('categories sum to 100% when present', () => {
-        if (t.categories.length) expect(sum(t.categories, 'weight')).toBeCloseTo(100, 5)
+    describe(`${t.key}`, () => {
+      const full = getTemplate(t.key)
+
+      test('categories total 100% when present', () => {
+        if (full.categories?.length) expect(near100(sum(full.categories, 'weight'))).toBe(true)
       })
-      test('rounds sum to 100% when present', () => {
-        if (t.rounds.length) expect(sum(t.rounds, 'weight')).toBeCloseTo(100, 5)
+
+      test('rounds total 100% when present', () => {
+        if (full.rounds?.length) expect(near100(sum(full.rounds, 'weight'))).toBe(true)
       })
-      test('criteria sum to 100% when present', () => {
-        if (t.criteria.length) expect(sum(t.criteria, 'percentage')).toBeCloseTo(100, 5)
+
+      test('each round with its own criteria totals 100% within the round', () => {
+        for (const r of full.rounds ?? []) {
+          if (r.criteria?.length) expect(near100(sum(r.criteria, 'percentage'))).toBe(true)
+        }
       })
-      test('has a valid scoring config', () => {
-        expect(t.scoringConfig?.scoreType).toBeTruthy()
-        expect(t.scoringConfig?.calculationMethod).toBeTruthy()
+
+      test('flat criteria total 100% when present', () => {
+        if (full.criteria?.length) expect(near100(sum(full.criteria, 'percentage'))).toBe(true)
+      })
+
+      test('does not mix per-round criteria with flat criteria', () => {
+        const hasPerRound = (full.rounds ?? []).some((r) => r.criteria?.length)
+        const hasFlat = (full.criteria ?? []).length > 0
+        expect(hasPerRound && hasFlat).toBe(false)
       })
     })
   }

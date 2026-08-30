@@ -271,23 +271,49 @@ async function seedFromTemplate(eventId, templateKey) {
       )
   }
 
+  // §8C: criterion bounds inherit the event scale; store the scale's range.
+  const bounds = resolveScoreBounds(template.scoringConfig)
+
   if (template.rounds?.length) {
-    await getClient()
-      .from(DB_TABLES.COMPETITION_ROUNDS)
-      .insert(
-        template.rounds.map((r, i) => ({
+    for (const [i, r] of template.rounds.entries()) {
+      const { data: roundRow } = await getClient()
+        .from(DB_TABLES.COMPETITION_ROUNDS)
+        .insert({
           event_id: eventId,
           name: r.name,
           weight: r.weight ?? 0,
           display_order: i,
           is_open: false,
-        })),
-      )
+        })
+        .select('id')
+        .single()
+
+      // Round-first: seed this round's own criteria + membership links.
+      if (roundRow?.id && r.criteria?.length) {
+        const { data: critRows } = await getClient()
+          .from(DB_TABLES.CRITERIA)
+          .insert(
+            r.criteria.map((cr) => ({
+              event_id: eventId,
+              name: cr.name,
+              percentage: cr.percentage ?? 0,
+              min_score: bounds.min,
+              max_score: bounds.max,
+            })),
+          )
+          .select('id')
+
+        if (critRows?.length) {
+          await getClient()
+            .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
+            .insert(critRows.map((cr) => ({ round_id: roundRow.id, criteria_id: cr.id })))
+        }
+      }
+    }
   }
 
+  // Flat criteria (templates without per-round criteria — e.g. singing/talent).
   if (template.criteria?.length) {
-    // §8C: criterion bounds inherit the event scale; store the scale's range.
-    const bounds = resolveScoreBounds(template.scoringConfig)
     await getClient()
       .from(DB_TABLES.CRITERIA)
       .insert(

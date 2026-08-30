@@ -132,6 +132,15 @@ export default function CompetitionContestantsPage() {
         )
       }
       formPanel={
+        <>
+        {/* W1: divisions-before-contestants dependency, surfaced (not blocked). */}
+        {divisionsEnabled && divisions.length === 0 && (
+          <div className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/5 px-4 py-2.5 text-xs text-amber-300/90">
+            Divisions are enabled but none exist yet. Create your divisions in{' '}
+            <strong>Structure &amp; Scoring → Divisions</strong> first, so you can assign each contestant
+            to one as you add them.
+          </div>
+        )}
         <form onSubmit={handleCreate} className="space-y-4 v-card p-6 mb-4">
         <div className={`grid gap-4 ${divisionsEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           <input className={inputClass} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -178,6 +187,7 @@ export default function CompetitionContestantsPage() {
           </button>
         )}
       </form>
+        </>
       }
       recordsPanel={
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-8">

@@ -9,8 +9,11 @@
 // Weight invariants (so a seeded event is immediately valid, per §8A):
 //   - categories[].weight sum to 100 (when present)
 //   - rounds[].weight sum to 100 (when present)
-//   - criteria[].percentage sum to 100 (event-wide flat rule; templates do NOT
-//     seed round↔criteria membership, so the flat criteria rule applies)
+//   - A round may carry its own `criteria[]` (round-first model): those seed the
+//     criterion rows AND their round↔criteria membership, and must sum to 100
+//     WITHIN that round. Templates that use per-round criteria leave the
+//     top-level `criteria` empty.
+//   - Otherwise top-level `criteria[].percentage` sum to 100 (flat event-wide).
 
 const DEFAULT_SCORING = {
   scoreType: 'range_1_100',
@@ -22,39 +25,66 @@ const TEMPLATES = {
   pageant: {
     key: 'pageant',
     label: 'Pageant',
-    description: 'Multi-round pageant with weighted categories and prelim → final rounds.',
+    description: 'Weighted segments (Talent / Evening Gown / Q&A), each with its own criteria.',
     scoringConfig: { ...DEFAULT_SCORING },
-    categories: [
-      { name: 'Talent', weight: 40 },
-      { name: 'Evening Gown', weight: 30 },
-      { name: 'Q&A', weight: 30 },
-    ],
+    categories: [],
+    // Round-first: each segment is a weighted round carrying its own criteria
+    // (each set totals 100% within the round).
     rounds: [
-      { name: 'Preliminary', weight: 50 },
-      { name: 'Final', weight: 50 },
+      {
+        name: 'Talent',
+        weight: 40,
+        criteria: [
+          { name: 'Skill', percentage: 60 },
+          { name: 'Stage Presence', percentage: 40 },
+        ],
+      },
+      {
+        name: 'Evening Gown',
+        weight: 30,
+        criteria: [
+          { name: 'Poise & Bearing', percentage: 50 },
+          { name: 'Elegance', percentage: 50 },
+        ],
+      },
+      {
+        name: 'Q&A',
+        weight: 30,
+        criteria: [
+          { name: 'Content', percentage: 50 },
+          { name: 'Delivery', percentage: 50 },
+        ],
+      },
     ],
-    criteria: [
-      { name: 'Poise & Bearing', percentage: 25 },
-      { name: 'Stage Presence', percentage: 25 },
-      { name: 'Beauty', percentage: 25 },
-      { name: 'Intelligence', percentage: 25 },
-    ],
+    criteria: [],
   },
   dance: {
     key: 'dance',
     label: 'Dance Competition',
-    description: 'Prelim → final rounds with dance-specific criteria. Use Divisions for solo/team.',
+    description: 'Prelim → final rounds, each with its own criteria. Use Divisions for solo/team.',
     scoringConfig: { ...DEFAULT_SCORING },
     categories: [],
     rounds: [
-      { name: 'Preliminary', weight: 40 },
-      { name: 'Final', weight: 60 },
+      {
+        name: 'Preliminary',
+        weight: 40,
+        criteria: [
+          { name: 'Technique', percentage: 40 },
+          { name: 'Choreography', percentage: 30 },
+          { name: 'Musicality', percentage: 30 },
+        ],
+      },
+      {
+        name: 'Final',
+        weight: 60,
+        criteria: [
+          { name: 'Technique', percentage: 40 },
+          { name: 'Choreography', percentage: 30 },
+          { name: 'Showmanship', percentage: 30 },
+        ],
+      },
     ],
-    criteria: [
-      { name: 'Technique', percentage: 40 },
-      { name: 'Choreography', percentage: 30 },
-      { name: 'Musicality', percentage: 30 },
-    ],
+    criteria: [],
   },
   singing: {
     key: 'singing',

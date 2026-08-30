@@ -5,51 +5,26 @@ import {
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
 
+// Regrouped into Setup → Run → Results so the sidebar follows the actual
+// workflow order. "Structure & Scoring" (rounds + nested criteria) leads Setup;
+// "Criteria" remains for simple/no-round events. Routes are unchanged — only the
+// grouping and the Workspace label changed — so no bookmark breaks.
+const BASE = '/organizer/competition/events'
 const navItems = [
   { label: 'Competition Scoring Dashboard', path: '/organizer/competition', icon: LayoutDashboard },
   { label: 'Competition Scoring Events', path: '/organizer/competition/events', icon: CalendarDays },
-  {
-    label: 'Contestants',
-    path: 'contestants',
-    icon: Users,
-    scoped: true,
-    basePath: '/organizer/competition/events',
-  },
-  {
-    label: 'Criteria',
-    path: 'criteria',
-    icon: ListChecks,
-    scoped: true,
-    basePath: '/organizer/competition/events',
-  },
-  {
-    label: 'Judges',
-    path: 'judges',
-    icon: Star,
-    scoped: true,
-    basePath: '/organizer/competition/events',
-  },
-  {
-    label: 'Workspace',
-    path: 'workspace',
-    icon: Settings2,
-    scoped: true,
-    basePath: '/organizer/competition/events',
-  },
-  {
-    label: 'Rankings',
-    path: 'rankings',
-    icon: Award,
-    scoped: true,
-    basePath: '/organizer/competition/events',
-  },
-  {
-    label: 'Live Control',
-    path: 'live',
-    icon: Play,
-    scoped: true,
-    basePath: '/organizer/competition/events',
-  },
+
+  { section: 'Setup' },
+  { label: 'Structure & Scoring', path: 'workspace', icon: Settings2, scoped: true, basePath: BASE },
+  { label: 'Criteria', path: 'criteria', icon: ListChecks, scoped: true, basePath: BASE },
+  { label: 'Contestants', path: 'contestants', icon: Users, scoped: true, basePath: BASE },
+  { label: 'Judges', path: 'judges', icon: Star, scoped: true, basePath: BASE },
+
+  { section: 'Run' },
+  { label: 'Live Control', path: 'live', icon: Play, scoped: true, basePath: BASE },
+
+  { section: 'Results' },
+  { label: 'Rankings', path: 'rankings', icon: Award, scoped: true, basePath: BASE },
 ]
 
 export default function PageantLayout() {
