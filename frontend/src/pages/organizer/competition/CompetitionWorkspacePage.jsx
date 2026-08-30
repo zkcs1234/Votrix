@@ -38,10 +38,11 @@ export default function CompetitionWorkspacePage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-v-text">
-            {foundation?.event?.title ?? 'Competition workspace'}
+            {foundation?.event?.title ?? 'Structure & Scoring'}
           </h2>
           <p className="mt-1 text-sm text-v-text-subtle">
-            Dynamic scoring engine: unlimited categories, rounds, criteria, and judges.
+            Structure &amp; Scoring — rounds and their criteria, divisions, categories, judge
+            assignments, and scoring rules.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-sm">

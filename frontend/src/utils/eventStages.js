@@ -9,16 +9,22 @@ export const EVENT_STAGES = {
     { key: 'analytics', label: 'Analytics', path: 'analytics' },
     { key: 'report', label: 'Report', path: null },
   ],
+  // Order mirrors the regrouped sidebar (Setup → Run → Results) so the stepper
+  // and its footer next/prev walk the same round-first workflow.
   competition: [
+    // Create
     { key: 'details', label: 'Details', path: 'edit' },
     { key: 'branding', label: 'Branding', path: 'branding' },
     { key: 'information-form', label: 'Information Form', path: 'form' },
-    { key: 'contestants', label: 'Contestants', path: 'contestants' },
+    // Setup
+    { key: 'workspace', label: 'Structure & Scoring', path: 'workspace' },
     { key: 'criteria', label: 'Criteria', path: 'criteria' },
+    { key: 'contestants', label: 'Contestants', path: 'contestants' },
     { key: 'judges', label: 'Judges', path: 'judges' },
-    { key: 'workspace', label: 'Workspace', path: 'workspace' },
-    { key: 'rankings', label: 'Rankings', path: 'rankings' },
+    // Run
     { key: 'live', label: 'Live Control', path: 'live' },
+    // Results
+    { key: 'rankings', label: 'Rankings', path: 'rankings' },
     { key: 'analytics', label: 'Analytics', path: 'analytics' },
     { key: 'report', label: 'Report', path: null },
   ],

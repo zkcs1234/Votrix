@@ -166,11 +166,11 @@ export const searchIndex = [
   },
   {
     id: 'org-comp-workspace',
-    title: 'Competition Workspace',
+    title: 'Structure & Scoring',
     path: 'workspace',
     scoped: true,
     basePath: '/organizer/competition/events',
-    keywords: ['workspace', 'competition', 'live', 'scoring'],
+    keywords: ['workspace', 'structure', 'scoring', 'rounds', 'criteria', 'divisions', 'categories', 'competition'],
     category: 'Events',
     roles: [USER_ROLES.ORGANIZER],
     icon: LayoutDashboard,
