@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import Button from '@/components/ui/Button'
 import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
+import JudgeAssignmentPanel from '@/components/organizer/competition/JudgeAssignmentPanel'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 
@@ -88,6 +89,7 @@ export default function CompetitionJudgesPage() {
   const [importResult, setImportResult] = useState(null)
   const [search, setSearch] = useState('')
   const [error, setError] = useState(null)
+  const [foundation, setFoundation] = useState(null)
   const fileInputRef = useRef(null)
 
   const { success, error: showError } = useToast()
@@ -122,7 +124,19 @@ export default function CompetitionJudgesPage() {
     }
   }, [eventId])
 
-  useEffect(() => { load() }, [load])
+  const loadFoundation = useCallback(async () => {
+    try {
+      const { data } = await pageantService.getFoundation(eventId)
+      setFoundation(data.foundation)
+    } catch {
+      setFoundation(null)
+    }
+  }, [eventId])
+
+  useEffect(() => {
+    load()
+    loadFoundation()
+  }, [load, loadFoundation])
 
   const pendingCount = judges.filter((j) => !j.invitationSent && j.judgeId).length
 
@@ -344,6 +358,12 @@ export default function CompetitionJudgesPage() {
         onExportCsv
         exportLabel="Export CSV"
       />
+
+      {/* Judge assignment — moved here so you add judges then scope them, after
+          the rounds/divisions/categories exist. */}
+      <div className="border-t border-v-border pt-6">
+        <JudgeAssignmentPanel foundation={foundation} reload={loadFoundation} />
+      </div>
     </div>
   )
 }

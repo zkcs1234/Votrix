@@ -16,8 +16,8 @@ const navItems = [
 
   { section: 'Setup' },
   { label: 'Structure & Scoring', path: 'workspace', icon: Settings2, scoped: true, basePath: BASE },
-  { label: 'Criteria', path: 'criteria', icon: ListChecks, scoped: true, basePath: BASE },
   { label: 'Contestants', path: 'contestants', icon: Users, scoped: true, basePath: BASE },
+  { label: 'Criteria', path: 'criteria', icon: ListChecks, scoped: true, basePath: BASE },
   { label: 'Judges', path: 'judges', icon: Star, scoped: true, basePath: BASE },
 
   { section: 'Run' },

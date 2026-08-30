@@ -21,6 +21,9 @@ export default function CompetitionContestantsPage() {
   const [filterDivisionId, setFilterDivisionId] = useState('')
   const [editingContestant, setEditingContestant] = useState(null)
   const [photoFile, setPhotoFile] = useState(null)
+  // Round-aware assignment: pick a round, toggle which contestants are in it.
+  const [selectedRoundId, setSelectedRoundId] = useState(null)
+  const [roundBusy, setRoundBusy] = useState(null)
 
   const load = useCallback(() => {
     pageantService
@@ -38,6 +41,37 @@ export default function CompetitionContestantsPage() {
 
   const divisionsEnabled = foundation?.event?.divisions_enabled
   const divisions = foundation?.divisions ?? []
+  const rounds = foundation?.rounds ?? []
+  const hasRounds = rounds.length > 0
+
+  useEffect(() => {
+    const rs = foundation?.rounds ?? []
+    if (!rs.length) {
+      setSelectedRoundId(null)
+      return
+    }
+    setSelectedRoundId((cur) => (cur && rs.some((r) => r.id === cur) ? cur : rs[0].id))
+  }, [foundation])
+
+  const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? null
+  const roundContestantIds = new Set(selectedRound?.contestantIds ?? [])
+
+  const toggleInRound = async (contestantId) => {
+    if (!selectedRoundId) return
+    setRoundBusy(contestantId)
+    try {
+      if (roundContestantIds.has(contestantId)) {
+        await pageantService.removeRoundContestant(eventId, selectedRoundId, contestantId)
+      } else {
+        await pageantService.addRoundContestant(eventId, selectedRoundId, contestantId)
+      }
+      await load()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update round assignment')
+    } finally {
+      setRoundBusy(null)
+    }
+  }
 
   const refreshNextNumber = useCallback(
     async (divId) => {
@@ -190,6 +224,40 @@ export default function CompetitionContestantsPage() {
         </>
       }
       recordsPanel={
+        <>
+        {/* Round-aware assignment: rounds are created in Structure & Scoring;
+            here you assign which contestants compete in the selected round. */}
+        {hasRounds && (
+          <div className="mb-4 rounded-lg border border-v-border bg-v-surface px-4 py-3">
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-v-text-muted">
+              Assign contestants to round
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {rounds.map((r) => {
+                const count = (r.contestantIds ?? []).length
+                const active = r.id === selectedRoundId
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSelectedRoundId(r.id)}
+                    className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                      active
+                        ? 'border-v-primary bg-v-primary/10 text-v-text'
+                        : 'border-v-border text-v-text-muted hover:text-v-text'
+                    }`}
+                  >
+                    {r.name}
+                    <span className="ml-1.5 text-[10px] text-v-text-subtle">{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-1.5 text-xs text-v-text-subtle">
+              Use the “In {selectedRound?.name ?? 'round'}” button on each contestant below.
+            </p>
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-8">
           {visibleList.map((c) => {
           // Both DB raw rows (snake_case) or mapped could be present depending on endpoints.
@@ -212,6 +280,26 @@ export default function CompetitionContestantsPage() {
                   </span>
                 )}
               </div>
+              {hasRounds && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    disabled={roundBusy === c.id}
+                    onClick={() => toggleInRound(c.id)}
+                    className={`w-full rounded-lg px-2 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                      roundContestantIds.has(c.id)
+                        ? 'bg-v-success/10 text-v-success hover:bg-v-danger/10 hover:text-v-danger'
+                        : 'bg-v-surface-elevated text-v-text-muted hover:bg-v-primary/10 hover:text-v-primary'
+                    }`}
+                  >
+                    {roundBusy === c.id
+                      ? '...'
+                      : roundContestantIds.has(c.id)
+                        ? `✓ In ${selectedRound?.name ?? 'round'}`
+                        : `Add to ${selectedRound?.name ?? 'round'}`}
+                  </button>
+                </div>
+              )}
               <div className="mt-auto flex gap-3 pt-3 text-sm">
                 <button type="button" className="text-v-primary" onClick={() => startEditing(c)}>Edit</button>
                 <button
@@ -235,6 +323,7 @@ export default function CompetitionContestantsPage() {
         })}
         {!visibleList.length && <p className="text-sm text-v-text-subtle">No contestants match this division.</p>}
         </div>
+        </>
       }
     />
   )

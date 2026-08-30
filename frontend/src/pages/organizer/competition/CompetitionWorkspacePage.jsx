@@ -12,7 +12,8 @@ export default function CompetitionWorkspacePage() {
   const { eventId } = useParams()
   const [foundation, setFoundation] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('structure')
+  const [activeTab, setActiveTab] = useState('rounds')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const load = () => {
     pageantService
@@ -41,8 +42,8 @@ export default function CompetitionWorkspacePage() {
             {foundation?.event?.title ?? 'Structure & Scoring'}
           </h2>
           <p className="mt-1 text-sm text-v-text-subtle">
-            Structure &amp; Scoring — rounds and their criteria, divisions, categories, judge
-            assignments, and scoring rules.
+            Define the <strong>rounds</strong> (the weighted, judged segments), plus divisions and
+            scoring rules. Contestants and criteria are assigned to rounds on their own pages.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-sm">
@@ -59,27 +60,47 @@ export default function CompetitionWorkspacePage() {
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-v-border text-sm">
-        {[
-          { id: 'structure', label: 'Categories' },
-          { id: 'divisions', label: 'Divisions' },
-          { id: 'rounds', label: 'Rounds' },
-          { id: 'judges', label: 'Judge assignments' },
-          { id: 'scoring', label: 'Scoring config' },
-        ].map((tab) => (
+      <div className="flex items-center justify-between gap-2 border-b border-v-border text-sm">
+        <div className="flex gap-2">
+          {(() => {
+            const hasCategories = (foundation?.categories ?? []).length > 0
+            // Rounds lead. Categories is an advanced layer (group rounds into
+            // weighted buckets) — only shown when revealed or already in use.
+            const tabs = [
+              { id: 'rounds', label: 'Rounds' },
+              { id: 'divisions', label: 'Divisions' },
+              { id: 'scoring', label: 'Scoring config' },
+              ...(showAdvanced || hasCategories ? [{ id: 'structure', label: 'Categories' }] : []),
+            ]
+            return tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`-mb-px border-b-2 px-3 py-2 ${
+                  activeTab === tab.id
+                    ? 'border-v-primary text-v-text'
+                    : 'border-transparent text-v-text-subtle hover:text-v-text-muted'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))
+          })()}
+        </div>
+        {!showAdvanced && (foundation?.categories ?? []).length === 0 && (
           <button
-            key={tab.id}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={`-mb-px border-b-2 px-3 py-2 ${
-              activeTab === tab.id
-                ? 'border-v-primary text-v-text'
-                : 'border-transparent text-v-text-subtle hover:text-v-text-muted'
-            }`}
+            onClick={() => {
+              setShowAdvanced(true)
+              setActiveTab('structure')
+            }}
+            className="text-xs text-v-text-subtle hover:text-v-text-muted"
+            title="Categories group rounds into higher-level weighted buckets. Most competitions don't need this."
           >
-            {tab.label}
+            + Advanced (Categories)
           </button>
-        ))}
+        )}
       </div>
 
       <TypeHint type={foundation?.event?.competition_type} />
@@ -88,7 +109,6 @@ export default function CompetitionWorkspacePage() {
       {activeTab === 'structure' && <StructureTab foundation={foundation} reload={load} />}
       {activeTab === 'divisions' && <DivisionsTab foundation={foundation} reload={load} />}
       {activeTab === 'rounds' && <RoundsTab foundation={foundation} reload={load} />}
-      {activeTab === 'judges' && <JudgesTab foundation={foundation} reload={load} />}
       {activeTab === 'scoring' && <ScoringTab foundation={foundation} reload={load} />}
     </div>
   )
@@ -143,6 +163,11 @@ function StructureTab({ foundation, reload }) {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-lg border border-v-border bg-v-surface-elevated/50 px-4 py-2.5 text-xs text-v-text-muted">
+        <strong>Advanced.</strong> Categories group rounds into higher-level weighted buckets (e.g. a
+        “Talent” category holding a prelim and a final round). Most competitions don&apos;t need this —
+        rounds already carry their own weight. Assign a round to a category in the Rounds tab.
+      </div>
       <form
         onSubmit={submit}
         className={`grid gap-4 v-card p-6 ${divisionsEnabled ? 'sm:grid-cols-[1fr_120px_1fr_auto]' : 'sm:grid-cols-[1fr_120px_auto]'}`}
@@ -527,21 +552,14 @@ function RoundsTab({ foundation, reload }) {
 function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, reload }) {
   const assignedContestantIds = new Set(round.contestantIds ?? [])
   const assignedCriteriaIds = new Set(round.criteriaIds ?? [])
-  const [busy, setBusy] = useState(null) // tracks which id is loading
 
-  // Phase 1 (round-first): create a criterion directly inside this round.
-  const [newCritName, setNewCritName] = useState('')
-  const [newCritWeight, setNewCritWeight] = useState('')
-  const [addingCrit, setAddingCrit] = useState(false)
-
-  // §8A: when criteria are assigned per round, each round's criteria must total
-  // 100% WITHIN that round (not event-wide). Surface the per-round total here so
-  // the organizer sees what the backend now validates.
+  // Read-only per-round summary. The actual assignment now lives on the
+  // Contestants page (contestants → round) and the Criteria page (criteria →
+  // round), so a round only DEFINES itself here.
   const assignedCritTotal = allCriteria
     .filter((cr) => assignedCriteriaIds.has(cr.id))
     .reduce((s, cr) => s + Number(cr.percentage ?? 0), 0)
-  const hasAssignedCrit = assignedCriteriaIds.size > 0
-  const critComplete = Math.abs(assignedCritTotal - 100) < 0.1
+  const critComplete = assignedCriteriaIds.size > 0 && Math.abs(assignedCritTotal - 100) < 0.1
 
   // Phase 6 — per-round advancement/elimination + score policy.
   const [advType, setAdvType] = useState(round.advancementType ?? 'none')
@@ -575,201 +593,31 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
     }
   }
 
-  const toggleContestant = async (contestantId) => {
-    setBusy(`c-${contestantId}`)
-    try {
-      if (assignedContestantIds.has(contestantId)) {
-        await pageantService.removeRoundContestant(eventId, round.id, contestantId)
-      } else {
-        await pageantService.addRoundContestant(eventId, round.id, contestantId)
-      }
-      reload()
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update contestant')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  const toggleCriteria = async (criteriaId) => {
-    setBusy(`cr-${criteriaId}`)
-    try {
-      if (assignedCriteriaIds.has(criteriaId)) {
-        await pageantService.removeRoundCriteria(eventId, round.id, criteriaId)
-      } else {
-        await pageantService.addRoundCriteria(eventId, round.id, criteriaId)
-      }
-      reload()
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update criteria')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  // Phase 1 (round-first): create a criterion AND attach it to this round in one
-  // step — the natural "define criteria inside the round" flow. Reuses the
-  // existing createCriteria + addRoundCriteria APIs (bounds come from the scale).
-  const createCriteriaInRound = async (e) => {
-    e.preventDefault()
-    const name = newCritName.trim()
-    const weight = Number(newCritWeight)
-    if (!name) return
-    if (!Number.isFinite(weight) || weight <= 0) {
-      alert('Enter a weight greater than 0')
-      return
-    }
-    setAddingCrit(true)
-    try {
-      const { data } = await pageantService.createCriteria(eventId, { name, percentage: weight })
-      const created = data?.criteria ?? data
-      const criteriaId = created?.id
-      if (criteriaId) {
-        await pageantService.addRoundCriteria(eventId, round.id, criteriaId)
-      }
-      setNewCritName('')
-      setNewCritWeight('')
-      reload()
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to add criteria to this round')
-    } finally {
-      setAddingCrit(false)
-    }
-  }
-
   return (
     <div className="border-t border-v-border px-4 pb-4 pt-3 space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-      {/* Contestants */}
-      <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-v-text-muted">
-          Contestants in this round
-        </p>
-        {allContestants.length === 0 ? (
-          <p className="text-xs text-v-text-subtle">No contestants added to the event yet.</p>
-        ) : (
-          <ul className="space-y-1">
-            {allContestants.map((c) => {
-              const id = c.id
-              const assigned = assignedContestantIds.has(id)
-              const loading = busy === `c-${id}`
-              // foundation returns raw DB rows (snake_case) or mapped camelCase depending on path
-              const number = c.contestantNumber ?? c.contestant_number
-              return (
-                <li key={id} className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2 text-sm">
-                  <span className="text-v-text">
-                    #{number} {c.name}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => toggleContestant(id)}
-                    className={`rounded px-2 py-0.5 text-xs font-medium transition disabled:opacity-50 ${
-                      assigned
-                        ? 'bg-v-success/10 text-v-success hover:bg-v-danger/10 hover:text-v-danger'
-                        : 'bg-v-surface-elevated text-v-text-muted hover:bg-v-primary/10 hover:text-v-primary'
-                    }`}
-                  >
-                    {loading ? '...' : assigned ? 'Remove' : 'Add'}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </div>
-
-      {/* Criteria */}
-      <div>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-v-text-muted">
-            Criteria in this round
+      {/* Read-only summary — assignment moved to the Contestants & Criteria pages. */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-v-border bg-v-surface px-3 py-2">
+          <p className="text-[11px] uppercase tracking-wider text-v-text-muted">Contestants</p>
+          <p className="text-sm text-v-text">
+            {assignedContestantIds.size} assigned{' '}
+            <span className="text-xs text-v-text-subtle">/ {allContestants.length} total</span>
           </p>
-          {hasAssignedCrit && (
-            <span
-              className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                critComplete
-                  ? 'bg-v-success/10 text-v-success'
-                  : 'bg-amber-400/10 text-amber-400'
-              }`}
-              title="Each round's criteria must total 100%"
-            >
-              {assignedCritTotal.toFixed(1)}% {critComplete ? '✓' : '/ 100%'}
-            </span>
-          )}
+          <p className="mt-0.5 text-[11px] text-v-text-subtle">
+            Assign on the <strong>Contestants</strong> page.
+          </p>
         </div>
-
-        {/* Phase 2 (S2): make the fallback explicit instead of a silent surprise. */}
-        {!hasAssignedCrit && (
-          <p className="mb-2 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-[11px] text-amber-300/90">
-            No criteria for this round yet. Add or create criteria below — until you do, this round
-            falls back to <strong>all event criteria</strong>.
+        <div className="rounded-lg border border-v-border bg-v-surface px-3 py-2">
+          <p className="text-[11px] uppercase tracking-wider text-v-text-muted">Criteria</p>
+          <p className={`text-sm ${critComplete ? 'text-v-success' : 'text-v-text'}`}>
+            {assignedCriteriaIds.size
+              ? `${assignedCritTotal.toFixed(0)}% ${critComplete ? '✓' : '/ 100%'}`
+              : 'None yet'}
           </p>
-        )}
-
-        {/* Phase 1 (round-first): define a criterion directly inside this round. */}
-        <form onSubmit={createCriteriaInRound} className="mb-2 flex items-center gap-2">
-          <input
-            className="min-w-0 flex-1 rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text"
-            placeholder="New criterion (e.g. Technique)"
-            value={newCritName}
-            onChange={(e) => setNewCritName(e.target.value)}
-          />
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step="0.01"
-            className="w-16 rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text"
-            placeholder="%"
-            aria-label="Weight percentage"
-            value={newCritWeight}
-            onChange={(e) => setNewCritWeight(e.target.value)}
-          />
-          <button
-            type="submit"
-            disabled={addingCrit}
-            className="rounded-lg bg-v-primary px-2.5 py-1.5 text-xs font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
-          >
-            {addingCrit ? '...' : 'Add'}
-          </button>
-        </form>
-
-        {allCriteria.length === 0 ? (
-          <p className="text-xs text-v-text-subtle">
-            No criteria in the event yet — create the first one for this round above.
+          <p className="mt-0.5 text-[11px] text-v-text-subtle">
+            Configure on the <strong>Criteria</strong> page.
           </p>
-        ) : (
-          <ul className="space-y-1">
-            {allCriteria.map((cr) => {
-              const id = cr.id
-              const assigned = assignedCriteriaIds.has(id)
-              const loading = busy === `cr-${id}`
-              const pct = cr.percentage ?? cr.percentage
-              return (
-                <li key={id} className="flex items-center justify-between rounded-lg border border-v-border px-3 py-2 text-sm">
-                  <span className="text-v-text">
-                    {cr.name}{' '}
-                    <span className="text-xs text-v-text-subtle">{Number(pct).toFixed(1)}%</span>
-                  </span>
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => toggleCriteria(id)}
-                    className={`rounded px-2 py-0.5 text-xs font-medium transition disabled:opacity-50 ${
-                      assigned
-                        ? 'bg-v-success/10 text-v-success hover:bg-v-danger/10 hover:text-v-danger'
-                        : 'bg-v-surface-elevated text-v-text-muted hover:bg-v-primary/10 hover:text-v-primary'
-                    }`}
-                  >
-                    {loading ? '...' : assigned ? 'Remove' : 'Add'}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </div>
+        </div>
       </div>
 
       {/* Phase 6 — advancement / elimination + score policy */}
@@ -927,209 +775,6 @@ function SetupReadiness({ foundation }) {
             <span className={c.ok ? 'text-v-text-muted' : 'text-v-text'}>{c.label}</span>
           </li>
         ))}
-      </ul>
-    </div>
-  )
-}
-
-function JudgesTab({ foundation, reload }) {
-  const { eventId } = useParams()
-  const [scope, setScope] = useState('event')
-  const [scopeId, setScopeId] = useState(eventId || '')
-
-  // Declared before the effect that uses it (was hoisted-after, which ESLint flags).
-  const getScopeItems = (currentScope, currentFoundation) => {
-    if (currentScope === 'event') return null
-    if (currentScope === 'division') return currentFoundation?.divisions ?? []
-    if (currentScope === 'category') return currentFoundation?.categories ?? []
-    return currentFoundation?.rounds ?? []
-  }
-
-  useEffect(() => {
-    if (scope === 'event') {
-      setScopeId(eventId || '')
-      return
-    }
-
-    const items = getScopeItems(scope, foundation)
-    if (!items?.length) {
-      setScopeId('')
-      return
-    }
-
-    setScopeId((current) => {
-      if (current && items.some((item) => item.id === current)) return current
-      return items[0].id
-    })
-  }, [scope, eventId, foundation])
-
-  const addAssignment = async (judge) => {
-    const targetScopeId = scope === 'event' ? eventId : scopeId
-    if (!targetScopeId) {
-      alert('Pick a category, division, or round id')
-      return
-    }
-    try {
-      await pageantService.createJudgeAssignment(eventId, judge.id, {
-        scope,
-        scopeId: targetScopeId,
-      })
-      reload()
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to add assignment')
-    }
-  }
-
-  const removeAssignment = async (judge, assignment) => {
-    await pageantService.deleteJudgeAssignment(eventId, judge.id, assignment.id)
-    reload()
-  }
-
-  const assignmentsByJudge = (judgeId) =>
-    (foundation?.assignments ?? []).filter((a) => a.judgeId === judgeId)
-
-  const scopeLabel = (a) => {
-    if (a.scope === 'event') return 'Event-wide'
-    if (a.scope === 'division')
-      return `Division: ${
-        foundation?.divisions?.find((d) => d.id === a.scopeId)?.name ?? a.scopeId
-      }`
-    if (a.scope === 'category')
-      return `Category: ${
-        foundation?.categories?.find((c) => c.id === a.scopeId)?.name ?? a.scopeId
-      }`
-    return `Round: ${
-      foundation?.rounds?.find((r) => r.id === a.scopeId)?.name ?? a.scopeId
-    }`
-  }
-
-  const divisionsEnabled = foundation?.event?.divisions_enabled
-
-  const scopeItems = getScopeItems(scope, foundation)
-  const isEventScope = scope === 'event'
-  const scopeOptions = {
-    event: 'Event',
-    division: 'Division',
-    category: 'Category',
-    round: 'Round',
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="rounded-lg border border-v-border/50 bg-v-surface-elevated px-4 py-3 text-sm text-v-text-muted">
-        To register or invite judges, go to the{' '}
-        <Link
-          to={`/organizer/competition/events/${eventId}/judges`}
-          className="text-v-primary underline hover:text-v-primary-hover"
-        >
-          Judges page
-        </Link>
-        . This tab is only for scoping existing judges to specific rounds or categories.
-      </div>
-
-      <ul className="space-y-2">
-        {(foundation?.judges ?? []).map((judge) => {
-          const list = assignmentsByJudge(judge.id)
-          return (
-            <li
-              key={judge.id}
-              className="space-y-3 rounded-xl border border-v-border px-4 py-3"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="font-medium text-v-text">
-                    {judge.displayName || judge.email}
-                  </p>
-                  <p className="text-xs text-v-text-subtle">
-                    {judge.email} · {judge.role}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-1 rounded-lg bg-v-surface-elevated px-3 py-2 text-sm">
-                <p className="text-v-text-muted">Assignments</p>
-                {list.length === 0 && (
-                  <p className="text-xs text-v-text-subtle">
-                    No assignments yet — defaults to event-wide.
-                  </p>
-                )}
-                {list.map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between text-xs"
-                  >
-                    <span className="text-v-text-muted">{scopeLabel(a)}</span>
-                    <button
-                      type="button"
-                      className="text-v-danger"
-                      onClick={() => removeAssignment(judge, a)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex flex-wrap items-end gap-2 text-sm">
-                <select
-                  className={INPUT_CLASS}
-                  value={scope}
-                  onChange={(e) => {
-                    setScope(e.target.value)
-                  }}
-                >
-                  <option value="event">Event</option>
-                  {divisionsEnabled && <option value="division">Division</option>}
-                  <option value="category">Category</option>
-                  <option value="round">Round</option>
-                </select>
-
-                {!isEventScope && (
-                  <select
-                    className={INPUT_CLASS}
-                    value={scopeId}
-                    onChange={(e) => setScopeId(e.target.value)}
-                    disabled={!scopeItems?.length}
-                  >
-                    <option value="">Select {scopeOptions[scope]}</option>
-                    {(scopeItems ?? []).map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                {/* W1: scopes-before-assignment dependency, surfaced (not blocked). */}
-                {!isEventScope && !scopeItems?.length && (
-                  <span className="text-[11px] text-amber-300/90">
-                    No {scopeOptions[scope]}s yet — create one first to assign by {scopeOptions[scope]}.
-                  </span>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => addAssignment(judge)}
-                  className="rounded-lg border border-v-border px-3 py-1.5 text-v-text-muted"
-                >
-                  Add assignment
-                </button>
-              </div>
-            </li>
-          )
-        })}
-        {!foundation?.judges?.length && (
-          <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
-            No judges registered yet. Go to the{' '}
-            <Link
-              to={`/organizer/competition/events/${eventId}/judges`}
-              className="text-v-primary underline"
-            >
-              Judges page
-            </Link>{' '}
-            to add judges first.
-          </li>
-        )}
       </ul>
     </div>
   )
