@@ -1,6 +1,7 @@
 import { db as getClient } from '../foundation/db.js'
 import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
+import { recordEventActivity } from '../foundation/activity.js'
 
 /**
  * Competition Division Service
@@ -129,6 +130,14 @@ export async function createDivision(eventId, organizerId, payload) {
 
   if (error) throw new Error(error.message)
 
+  recordEventActivity({
+    eventId,
+    action: 'competition.division.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { divisionId: division.id, name: division.name },
+  })
+
   return division
 }
 
@@ -185,6 +194,14 @@ export async function updateDivision(eventId, divisionId, organizerId, payload) 
 
   if (error) throw new Error(error.message)
 
+  recordEventActivity({
+    eventId,
+    action: 'competition.division.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { divisionId, changedKeys: Object.keys(updates) },
+  })
+
   return updated
 }
 
@@ -237,6 +254,14 @@ export async function deleteDivision(eventId, divisionId, organizerId) {
 
   if (error) throw new Error(error.message)
 
+  recordEventActivity({
+    eventId,
+    action: 'competition.division.delete',
+    userId: organizerId,
+    module: 'competition',
+    details: { divisionId, name: existing.name },
+  })
+
   return { success: true, message: 'Division deleted successfully' }
 }
 
@@ -259,6 +284,13 @@ export async function setDivisionsEnabled(eventId, organizerId, enabled) {
     .single()
 
   if (error) throw new Error(error.message)
+
+  recordEventActivity({
+    eventId,
+    action: updated.divisions_enabled ? 'competition.divisions.enable' : 'competition.divisions.disable',
+    userId: organizerId,
+    module: 'competition',
+  })
 
   return updated
 }

@@ -19,6 +19,7 @@ const navItems = [
   { label: 'Contestants', path: 'contestants', icon: Users, scoped: true, basePath: BASE },
   { label: 'Criteria', path: 'criteria', icon: ListChecks, scoped: true, basePath: BASE },
   { label: 'Judges', path: 'judges', icon: Star, scoped: true, basePath: BASE },
+  { label: 'Awards', path: 'awards', icon: Award, scoped: true, basePath: BASE },
 
   { section: 'Run' },
   { label: 'Live Control', path: 'live', icon: Play, scoped: true, basePath: BASE },

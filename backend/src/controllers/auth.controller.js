@@ -164,6 +164,13 @@ export const changePassword = asyncHandler(async (req, res) => {
 
   const tokens = await authService.issueSessionForUser(user.id)
 
+  await writeAuthAudit({
+    action: 'auth.password.change',
+    userId: user.id,
+    entityId: user.id,
+    details: { role: user.role ?? null },
+  })
+
   setAuthCookies(res, tokens)
   const csrfToken = issueCsrfToken(res)
   res.json({
@@ -182,6 +189,13 @@ export const skipPasswordChange = asyncHandler(async (req, res) => {
 
   // Issue new session tokens since must_change_password changed
   const tokens = await authService.issueSessionForUser(user.id)
+
+  await writeAuthAudit({
+    action: 'auth.password.change_skipped',
+    userId: user.id,
+    entityId: user.id,
+    details: { role: user.role ?? null },
+  })
 
   setAuthCookies(res, tokens)
   const csrfToken = issueCsrfToken(res)

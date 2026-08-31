@@ -8,6 +8,7 @@ import { getOrCreateElectionOrganization, mapOrganization } from './organization
 import { emitToEvent, emitToEventOrganizer, emitToUser, emitToRole } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
 import { recordAudit } from '../foundation/audit.js'
+import { recordEventActivity } from '../foundation/activity.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
 import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
 import { deleteDraft } from './draft.service.js'
@@ -968,6 +969,17 @@ export async function submitBallot(eventId, voterId, payload) {
 
   // Trigger admin platform stats refresh
   emitToRole('admin', 'platform:stats-updated', {})
+
+  // Audit the vote cast (fire-and-forget; never throws). Record ONLY that a
+  // ballot was submitted and how many selections it held — never the vote
+  // choices themselves, to preserve secret-ballot confidentiality.
+  recordEventActivity({
+    eventId,
+    action: 'election.vote.cast',
+    userId: voterId,
+    module: 'election',
+    details: { selectionCount: voteRows.length },
+  })
 
   return { success: true, message: 'Ballot submitted successfully', locked: true }
 }

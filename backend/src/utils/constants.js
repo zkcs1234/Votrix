@@ -144,6 +144,8 @@ export const DB_TABLES = {
   COMPETITION_JUDGES: 'competition_judges',
   COMPETITION_JUDGE_ASSIGNMENTS: 'competition_judge_assignments',
   COMPETITION_DIVISIONS: 'competition_divisions',
+  COMPETITION_AWARDS: 'competition_awards',
+  COMPETITION_AWARD_SELECTIONS: 'competition_award_selections',
   SYSTEM_POLL_QUESTION_TYPES: 'system_poll_question_types',
   POLL_QUESTION_TYPES_REGISTRY: 'poll_question_types',
   POLL_QUESTION_TYPES_VIEW: 'v_poll_question_types',

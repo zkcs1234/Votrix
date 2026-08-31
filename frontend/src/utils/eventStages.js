@@ -22,6 +22,7 @@ export const EVENT_STAGES = {
     { key: 'contestants', label: 'Contestants', path: 'contestants' },
     { key: 'criteria', label: 'Criteria', path: 'criteria' },
     { key: 'judges', label: 'Judges', path: 'judges' },
+    { key: 'awards', label: 'Awards', path: 'awards' }, // optional — skippable
     // Run
     { key: 'live', label: 'Live Control', path: 'live' },
     // Results

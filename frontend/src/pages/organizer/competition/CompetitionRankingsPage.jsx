@@ -13,6 +13,7 @@ export default function CompetitionRankingsPage() {
   const [data, setData] = useState(null)
   const [foundation, setFoundation] = useState(null)
   const [results, setResults] = useState(null)
+  const [awards, setAwards] = useState([])
   const [loading, setLoading] = useState(true)
   const [divisionId, setDivisionId] = useState('')
 
@@ -22,10 +23,12 @@ export default function CompetitionRankingsPage() {
       pageantService.getRankings(eventId, { divisionId: divisionId || undefined }).catch(() => ({ data: {} })),
       pageantService.getFoundation(eventId).catch(() => ({ data: {} })),
       pageantService.getResults(eventId).catch(() => ({ data: {} })),
-    ]).then(([rankingsRes, foundationRes, resultsRes]) => {
+      pageantService.getAwardWinners(eventId).catch(() => ({ data: { awards: [] } })),
+    ]).then(([rankingsRes, foundationRes, resultsRes, awardsRes]) => {
       if (rankingsRes.data) setData(rankingsRes.data)
       if (foundationRes.data?.foundation) setFoundation(foundationRes.data.foundation)
       if (resultsRes.data?.results) setResults(resultsRes.data.results)
+      setAwards(awardsRes.data?.awards ?? [])
     }).finally(() => setLoading(false))
   }, [eventId, divisionId])
 
@@ -171,6 +174,32 @@ export default function CompetitionRankingsPage() {
       </div>
 
       <ResultsAndAwards results={results} />
+      <ConfiguredAwards awards={awards} />
+    </div>
+  )
+}
+
+function ConfiguredAwards({ awards }) {
+  if (!awards?.length) return null
+  return (
+    <div className="rounded-2xl border border-v-border bg-v-surface p-5">
+      <h3 className="mb-3 text-sm font-medium text-v-text-muted uppercase tracking-wider">Awards</h3>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {awards.map((a) => {
+          const interactive = a.method === 'vote' || a.method === 'selection'
+          return (
+            <li key={a.id} className="rounded-xl border border-v-border px-4 py-3">
+              <p className="text-sm font-medium text-v-text">{a.name}</p>
+              {a.description && <p className="text-xs text-v-text-subtle">{a.description}</p>}
+              <p className="mt-1 text-sm">
+                {a.winner
+                  ? <span className="font-medium text-v-success">#{a.winner.contestantNumber} {a.winner.contestantName}{interactive ? ` · ${a.votes} vote${a.votes !== 1 ? 's' : ''}` : ` · ${a.winner.value}`}{a.tie ? ' (tie)' : ''}</span>
+                  : <span className="text-v-text-subtle">{interactive ? 'No selections yet' : 'No scores yet'}</span>}
+              </p>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }

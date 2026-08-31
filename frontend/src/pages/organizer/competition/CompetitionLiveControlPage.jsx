@@ -104,6 +104,29 @@ export default function CompetitionLiveControlPage() {
   useSocketEvent('session:division-changed', () => loadSession(), [loadSession])
   useSocketEvent('session:judge-score-submitted', () => refreshJudgeProgress(), [refreshJudgeProgress])
 
+  // Awards panel (optional feature)
+  const [awards, setAwards] = useState([])
+  const loadAwards = useCallback(async () => {
+    try {
+      const { data } = await pageantService.getAwardWinners(eventId)
+      setAwards(data.awards ?? [])
+    } catch {
+      setAwards([])
+    }
+  }, [eventId])
+  useEffect(() => { loadAwards() }, [loadAwards])
+  useSocketEvent('award:status-changed', () => loadAwards(), [loadAwards])
+  useSocketEvent('award:selection-submitted', () => loadAwards(), [loadAwards])
+
+  const setAwardStatus = async (awardId, status) => {
+    try {
+      await pageantService.setAwardStatus(eventId, awardId, status)
+      await loadAwards()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update award')
+    }
+  }
+
   // Actions
   const performAction = async (action, actionName) => {
     setActionLoading(actionName)
@@ -571,6 +594,41 @@ export default function CompetitionLiveControlPage() {
           </div>
         )}
       </div>
+
+      {/* Awards panel (optional) */}
+      {awards.length > 0 && (
+        <div className="rounded-xl border border-v-border bg-v-surface p-6">
+          <h3 className="mb-4 text-sm font-medium text-v-text-muted uppercase tracking-wider">Awards</h3>
+          <ul className="space-y-2">
+            {awards.map((a) => {
+              const interactive = a.method === 'vote' || a.method === 'selection'
+              return (
+                <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-v-border px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-v-text">{a.name}</p>
+                    <p className="text-xs text-v-text-subtle">
+                      {interactive ? `${a.method === 'vote' ? 'Vote' : 'Judge Selection'} · ${a.status}` : (a.method === 'score' ? 'Score' : 'Criteria')}
+                      {interactive ? ` · ${a.submitted ?? 0}/${a.totalJudges ?? 0} submitted` : ''}
+                    </p>
+                    <p className="mt-0.5 text-sm">
+                      {a.winner
+                        ? <span className="font-medium text-v-success">{interactive ? 'Leading' : 'Winner'}: #{a.winner.contestantNumber} {a.winner.contestantName}{interactive ? ` (${a.votes})` : ` (${a.winner.value})`}{a.tie ? ' · tie' : ''}</span>
+                        : <span className="text-v-text-subtle">{interactive ? 'No selections yet' : 'No scores yet'}</span>}
+                    </p>
+                  </div>
+                  {interactive && (
+                    <div className="flex gap-2">
+                      {a.status === 'draft' && <Button size="sm" onClick={() => setAwardStatus(a.id, 'open')}>Open</Button>}
+                      {a.status === 'open' && <Button size="sm" variant="secondary" onClick={() => setAwardStatus(a.id, 'closed')}>Close</Button>}
+                      {a.status === 'closed' && <Button size="sm" variant="danger" onClick={() => setAwardStatus(a.id, 'finalized')}>Finalize</Button>}
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
 
       {/* Phase 6 — finalize round & advancement review modal */}
       {finalizeRoundId && (

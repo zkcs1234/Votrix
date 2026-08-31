@@ -151,6 +151,36 @@ export const pageantService = {
     return api.patch(`${org}/events/${eventId}/divisions-enabled`, { divisionsEnabled: enabled })
   },
 
+  // Awards (optional feature)
+  listAwards(eventId) {
+    return api.get(`${org}/events/${eventId}/awards`)
+  },
+  getAwardWinners(eventId) {
+    return api.get(`${org}/events/${eventId}/awards/winners`)
+  },
+  createAward(eventId, payload) {
+    return api.post(`${org}/events/${eventId}/awards`, payload)
+  },
+  updateAward(eventId, awardId, payload) {
+    return api.patch(`${org}/events/${eventId}/awards/${awardId}`, payload)
+  },
+  deleteAward(eventId, awardId) {
+    return api.delete(`${org}/events/${eventId}/awards/${awardId}`)
+  },
+  setAwardsEnabled(eventId, enabled) {
+    return api.patch(`${org}/events/${eventId}/awards-enabled`, { enabled })
+  },
+  setAwardStatus(eventId, awardId, status) {
+    return api.patch(`${org}/events/${eventId}/awards/${awardId}/status`, { status })
+  },
+  // Judge-side interactive award endpoints (voter base)
+  getAwardTasks(eventId) {
+    return api.get(`${judge}/events/${eventId}/award-tasks`)
+  },
+  submitAwardSelection(eventId, awardId, contestantId) {
+    return api.post(`${judge}/events/${eventId}/awards/${awardId}/select`, { contestantId })
+  },
+
   // Phase 4 — Foundation (single round-trip for the workspace UI)
   getFoundation(eventId) {
     return api.get(`${org}/events/${eventId}/foundation`)

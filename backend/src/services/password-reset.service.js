@@ -5,6 +5,7 @@ import { findUserByEmail } from './user.service.js'
 import { updateUserPassword, incrementTokenVersion } from './user.service.js'
 import { sendPasswordResetEmail } from './mailer.service.js'
 import { env } from '../config/env.js'
+import { recordAudit } from '../foundation/audit.js'
 
 const RESET_EXPIRY_MINUTES = Number(process.env.PASSWORD_RESET_EXPIRY_MINUTES) || 60
 const TABLE = 'password_reset_tokens'
@@ -21,6 +22,14 @@ export async function requestPasswordReset(email) {
   }
 
   if (!user || user.role === 'admin') {
+    // Audit the attempt even when no eligible account exists — useful for
+    // spotting reset-abuse. userId is null since no account is acted upon.
+    recordAudit({
+      userId: null,
+      action: 'auth.password_reset.request',
+      entity: 'users',
+      details: { email: normalizedEmail, accountFound: false },
+    })
     return { ...genericResponse, emailSent: false }
   }
 
@@ -42,6 +51,14 @@ export async function requestPasswordReset(email) {
     email: normalizedEmail,
     token: rawToken,
     expiresInMinutes: RESET_EXPIRY_MINUTES,
+  })
+
+  recordAudit({
+    userId: user.id,
+    action: 'auth.password_reset.request',
+    entity: 'users',
+    entityId: user.id,
+    details: { email: normalizedEmail, accountFound: true, emailSent: emailResult.sent },
   })
 
   return { ...genericResponse, emailSent: emailResult.sent }
@@ -70,6 +87,13 @@ export async function resetPasswordWithToken({ token, newPassword }) {
     .from(TABLE)
     .update({ used_at: new Date().toISOString() })
     .eq('id', row.id)
+
+  recordAudit({
+    userId: row.user_id,
+    action: 'auth.password_reset.complete',
+    entity: 'users',
+    entityId: row.user_id,
+  })
 
   return { success: true, message: 'Password has been reset. You can sign in now.' }
 }

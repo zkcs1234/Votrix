@@ -10,6 +10,7 @@ import { assertJudgeEnrolled, canJudgeScore } from './pageant.service.js'
 import { mergeScoringConfig, resolveScoreBounds, computeRankings } from '../modules/scoring-engine.js'
 import { selectQualifiers, applyQualifierOverride } from '../modules/advancement.js'
 import { recordAudit } from '../foundation/audit.js'
+import { recordEventActivity } from '../foundation/activity.js'
 import { emitToEvent, emitToEventOrganizer, emitToEventVoters, emitToUser } from '../websocket/ws-emitter.js'
 
 // ---------------------------------------------------------------------------
@@ -473,6 +474,14 @@ export async function startSession(eventId, organizerId) {
   emitToEvent(eventId, 'session:status-changed', { session })
   emitToEventOrganizer(eventId, 'session:status-changed', { session })
 
+  recordEventActivity({
+    eventId,
+    action: 'competition.session.start',
+    userId: organizerId,
+    module: 'competition',
+    details: { sessionId: session.id, roundId: firstRoundId },
+  })
+
   return session
 }
 
@@ -665,6 +674,14 @@ export async function setActiveRound(eventId, organizerId, roundId) {
     previousRoundId: session.currentRoundId,
   })
 
+  recordEventActivity({
+    eventId,
+    action: 'competition.session.set_round',
+    userId: organizerId,
+    module: 'competition',
+    details: { sessionId: session.id, roundId, previousRoundId: session.currentRoundId },
+  })
+
   return updated
 }
 
@@ -708,6 +725,14 @@ export async function setActiveDivision(eventId, organizerId, divisionId) {
     previousDivisionId: session.currentDivisionId,
   })
 
+  recordEventActivity({
+    eventId,
+    action: 'competition.session.set_division',
+    userId: organizerId,
+    module: 'competition',
+    details: { sessionId: session.id, divisionId: divisionId || null, previousDivisionId: session.currentDivisionId },
+  })
+
   return updated
 }
 
@@ -734,6 +759,14 @@ export async function pauseSession(eventId, organizerId) {
   const updated = mapSession(data)
 
   emitToEvent(eventId, 'session:status-changed', { session: updated })
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.session.pause',
+    userId: organizerId,
+    module: 'competition',
+    details: { sessionId: session.id },
+  })
 
   return updated
 }
@@ -764,6 +797,14 @@ export async function resumeSession(eventId, organizerId) {
   const updated = mapSession(data)
 
   emitToEvent(eventId, 'session:status-changed', { session: updated })
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.session.resume',
+    userId: organizerId,
+    module: 'competition',
+    details: { sessionId: session.id },
+  })
 
   return updated
 }
@@ -813,6 +854,14 @@ export async function completeSession(eventId, organizerId) {
   } catch (e) {
     console.error('[session] Failed to fetch rankings on complete:', e.message)
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.session.complete',
+    userId: organizerId,
+    module: 'competition',
+    details: { sessionId: session.id },
+  })
 
   return updated
 }
@@ -905,6 +954,12 @@ export async function resyncRankingStore(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
   await backfillLiveScoresToRankingStore(eventId)
   emitToEvent(eventId, 'rankings:updated', { eventId })
+  recordEventActivity({
+    eventId,
+    action: 'competition.session.resync_scores',
+    userId: organizerId,
+    module: 'competition',
+  })
   return { success: true }
 }
 

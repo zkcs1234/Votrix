@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/competition.controller.js'
 import * as sessionCtrl from '../controllers/competition-session.controller.js'
+import * as awardCtrl from '../controllers/competition-award.controller.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
 
 // All routes are mounted under /api/organizer/competition/events/:eventId
@@ -17,6 +18,15 @@ router.get('/divisions/:divisionId', ctrl.getDivision)
 router.patch('/divisions/:divisionId', ctrl.updateDivision)
 router.delete('/divisions/:divisionId', ctrl.deleteDivision)
 router.patch('/divisions-enabled', ctrl.setDivisionsEnabled)
+
+// Awards (optional feature)
+router.get('/awards', awardCtrl.listAwards)
+router.get('/awards/winners', awardCtrl.getAwardWinners)
+router.post('/awards', awardCtrl.createAward)
+router.patch('/awards-enabled', awardCtrl.setAwardsEnabled)
+router.patch('/awards/:awardId/status', awardCtrl.setAwardStatus)
+router.patch('/awards/:awardId', awardCtrl.updateAward)
+router.delete('/awards/:awardId', awardCtrl.deleteAward)
 
 // Categories
 router.get('/categories', ctrl.listCategories)

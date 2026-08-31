@@ -1,4 +1,5 @@
 import { db as getClient } from '../foundation/index.js'
+import { recordEventActivity } from '../foundation/activity.js'
 import { ApiError } from '../utils/ApiError.js'
 import {
   DB_TABLES,
@@ -150,6 +151,13 @@ export async function createCategory(eventId, organizerId, payload) {
     .select('*')
     .single()
   if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.category.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { categoryId: data.id, name: data.name },
+  })
   return mapCategory(data)
 }
 
@@ -185,6 +193,13 @@ export async function updateCategory(eventId, organizerId, categoryId, payload) 
     .single()
   if (error) throw new ApiError(500, error.message)
   if (!data) throw new ApiError(404, 'Category not found')
+  recordEventActivity({
+    eventId,
+    action: 'competition.category.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { categoryId: data.id, name: data.name },
+  })
   return mapCategory(data)
 }
 
@@ -196,6 +211,13 @@ export async function deleteCategory(eventId, organizerId, categoryId) {
     .eq('id', categoryId)
     .eq('event_id', eventId)
   if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.category.delete',
+    userId: organizerId,
+    module: 'competition',
+    details: { categoryId },
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -287,6 +309,13 @@ export async function createRound(eventId, organizerId, payload) {
     .select('*')
     .single()
   if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.round.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { roundId: data.id, name: data.name },
+  })
   return mapRound(data)
 }
 
@@ -328,6 +357,13 @@ export async function updateRound(eventId, organizerId, roundId, payload) {
     .single()
   if (error) throw new ApiError(500, error.message)
   if (!data) throw new ApiError(404, 'Round not found')
+  recordEventActivity({
+    eventId,
+    action: 'competition.round.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { roundId: data.id, name: data.name },
+  })
   return mapRound(data)
 }
 
@@ -339,6 +375,13 @@ export async function deleteRound(eventId, organizerId, roundId) {
     .eq('id', roundId)
     .eq('event_id', eventId)
   if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.round.delete',
+    userId: organizerId,
+    module: 'competition',
+    details: { roundId },
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -350,6 +393,13 @@ export async function addContestantToRound(eventId, organizerId, roundId, contes
     .from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS)
     .insert({ round_id: roundId, contestant_id: contestantId })
   if (error && error.code !== '23505') throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.round.contestant.add',
+    userId: organizerId,
+    module: 'competition',
+    details: { roundId, contestantId },
+  })
   return { success: true }
 }
 
@@ -361,6 +411,13 @@ export async function removeContestantFromRound(eventId, organizerId, roundId, c
     .eq('round_id', roundId)
     .eq('contestant_id', contestantId)
   if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.round.contestant.remove',
+    userId: organizerId,
+    module: 'competition',
+    details: { roundId, contestantId },
+  })
   return { success: true }
 }
 
@@ -370,6 +427,13 @@ export async function addCriteriaToRound(eventId, organizerId, roundId, criteria
     .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
     .insert({ round_id: roundId, criteria_id: criteriaId })
   if (error && error.code !== '23505') throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.round.criteria.add',
+    userId: organizerId,
+    module: 'competition',
+    details: { roundId, criteriaId },
+  })
   return { success: true }
 }
 
@@ -381,6 +445,13 @@ export async function removeCriteriaFromRound(eventId, organizerId, roundId, cri
     .eq('round_id', roundId)
     .eq('criteria_id', criteriaId)
   if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.round.criteria.remove',
+    userId: organizerId,
+    module: 'competition',
+    details: { roundId, criteriaId },
+  })
   return { success: true }
 }
 
@@ -563,6 +634,13 @@ export async function updateCompetitionJudge(eventId, organizerId, judgeId, payl
     .single()
   if (error) throw new ApiError(500, error.message)
   if (!data) throw new ApiError(404, 'Judge not found')
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { judgeId, role: data.judge_role ?? null, isActive: data.is_active },
+  })
   return mapJudge(data)
 }
 
@@ -575,6 +653,13 @@ export async function deleteCompetitionJudge(eventId, organizerId, judgeId) {
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
   if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.delete',
+    userId: organizerId,
+    module: 'competition',
+    details: { judgeId },
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -658,6 +743,13 @@ export async function createJudgeAssignment(eventId, organizerId, judgeId, paylo
     if (error.code === '23505') throw new ApiError(409, 'This assignment already exists')
     throw new ApiError(500, error.message)
   }
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.assignment.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { judgeId, assignmentId: data.id, scope: data.scope, scopeId: data.scope_id },
+  })
   return mapAssignment(data)
 }
 
@@ -671,6 +763,13 @@ export async function deleteJudgeAssignment(eventId, organizerId, judgeId, assig
     .eq('id', assignmentId)
     .eq('participant_id', judgeId)
   if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.assignment.delete',
+    userId: organizerId,
+    module: 'competition',
+    details: { judgeId, assignmentId },
+  })
   return { success: true }
 }
 
@@ -708,6 +807,13 @@ export async function setScoringConfig(eventId, organizerId, partialConfig) {
     .select('scoring_config')
     .single()
   if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.scoring_config.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { changedKeys: Object.keys(partialConfig ?? {}) },
+  })
   return merged
 }
 
@@ -718,7 +824,7 @@ export async function getCompetitionFoundation(eventId, organizerId) {
     await Promise.all([
       getClient()
         .from(DB_TABLES.EVENTS)
-        .select('id, title, scoring_config, scoring_enabled, event_type, divisions_enabled, competition_type')
+        .select('id, title, scoring_config, scoring_enabled, event_type, divisions_enabled, competition_type, awards_enabled')
         .eq('id', eventId)
         .single(),
       listCategories(eventId, organizerId),

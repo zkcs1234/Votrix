@@ -32,6 +32,8 @@ import { syncEventSchedules } from './event-schedule-sync.service.js'
 import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
 import { deleteDraft } from './draft.service.js'
 import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
+import { recordEventActivity } from '../foundation/activity.js'
+import { recordAudit } from '../foundation/audit.js'
 
 // Phase 7 — Polling question types are now registry-driven. The legacy
 // POLL_QUESTION_TYPES constants and the `multiple_choice` alias are kept in
@@ -252,6 +254,14 @@ export async function registerRespondentToPoll({ eventId, email, organizerId, te
     throw new ApiError(500, 'Failed to create invitation record')
   }
 
+  recordEventActivity({
+    eventId,
+    action: 'polling.respondent.register',
+    userId: organizerId,
+    module: 'polling',
+    details: { respondentUserId: user.id, email: user.email, isNewRespondent: isNew },
+  })
+
   return {
     user: sanitizeUser(user),
     isNewRespondent: isNew,
@@ -295,6 +305,14 @@ export async function registerExistingRespondent({ eventId, email, organizerId }
     console.error('[polling] invitations insert failed:', dbErr.message)
     throw new ApiError(500, 'Failed to create invitation record')
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'polling.respondent.register',
+    userId: organizerId,
+    module: 'polling',
+    details: { respondentUserId: voter.id, email: voter.email, existingAccount: true },
+  })
 
   return { user: sanitizeUser(voter), invitationSent: false }
 }
@@ -385,6 +403,14 @@ export async function sendRespondentInvitation({ eventId, voterId, organizerId }
     }
   }
 
+  recordEventActivity({
+    eventId,
+    action: 'polling.respondent.invitation.send',
+    userId: organizerId,
+    module: 'polling',
+    details: { respondentUserId: voterId, email: voter.email, sent: emailResult?.sent || false },
+  })
+
   return { user: voter, email: emailResult, invitationSent: emailResult?.sent, temporaryPassword: tempPassword }
 }
 
@@ -459,6 +485,14 @@ export async function sendAllPendingRespondentInvitations({ eventId, organizerId
       results.push({ voterId: voter.id, email: voter.email, success: false, error: err.message })
     }
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'polling.respondent.invitation.send_all',
+    userId: organizerId,
+    module: 'polling',
+    details: { total: pendingRespondents.length, sent: sentCount, failed: failedCount },
+  })
 
   return { total: pendingRespondents.length, sent: sentCount, failed: failedCount, results }
 }
@@ -571,6 +605,13 @@ export async function createPollEvent(organizerId, payload) {
   await deleteDraft(organizerId, 'polling').catch((err) => {
     console.error('[polling] failed to clear draft after create:', err.message)
   })
+  recordEventActivity({
+    eventId: data.id,
+    action: 'polling.event.create',
+    userId: organizerId,
+    module: 'polling',
+    details: { title: data.title },
+  })
   return mapPollEvent(data)
 }
 
@@ -612,6 +653,13 @@ export async function updatePollEvent(eventId, organizerId, payload) {
   await syncEventSchedules().catch((err) => {
     console.error('[polling] schedule sync failed after update:', err.message)
   })
+  recordEventActivity({
+    eventId,
+    action: 'polling.event.update',
+    userId: organizerId,
+    module: 'polling',
+    details: { changedKeys: Object.keys(updates) },
+  })
   return mapPollEvent(data)
 }
 
@@ -633,6 +681,13 @@ export async function setPollOpen(eventId, organizerId, pollingEnabled) {
   emitToEvent(eventId, 'poll:polling-toggled', {
     eventId,
     pollingEnabled: Boolean(pollingEnabled),
+  })
+
+  recordEventActivity({
+    eventId,
+    action: pollingEnabled ? 'polling.poll.open' : 'polling.poll.close',
+    userId: organizerId,
+    module: 'polling',
   })
 
   return mapPollEvent(data)
@@ -716,6 +771,14 @@ type_config: typeConfig,
     typeConfig,
     payload.options,
   )
+
+  recordEventActivity({
+    eventId,
+    action: 'polling.question.create',
+    userId: organizerId,
+    module: 'polling',
+    details: { questionId: question.id, type: question.type },
+  })
 
   return mapQuestion(question, options, typeDef)
 }
@@ -803,6 +866,14 @@ let options = []
     options = optMap[questionId] ?? []
   }
 
+  recordEventActivity({
+    eventId,
+    action: 'polling.question.update',
+    userId: organizerId,
+    module: 'polling',
+    details: { questionId, changedKeys: Object.keys(updates) },
+  })
+
   return mapQuestion(question, options, finalTypeDef)
 }
 
@@ -853,6 +924,14 @@ export async function deleteQuestion(eventId, organizerId, questionId) {
       console.error('[polling] Question option image cleanup error:', err.message),
     )
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'polling.question.delete',
+    userId: organizerId,
+    module: 'polling',
+    details: { questionId },
+  })
 }
 
 export async function duplicateQuestion(eventId, organizerId, questionId) {
@@ -944,6 +1023,14 @@ export async function duplicateQuestion(eventId, organizerId, questionId) {
     newOptions = opts ?? []
   }
 
+  recordEventActivity({
+    eventId,
+    action: 'polling.question.duplicate',
+    userId: organizerId,
+    module: 'polling',
+    details: { sourceQuestionId: questionId, questionId: newQuestion.id },
+  })
+
   return mapQuestion(newQuestion, newOptions, typeDef)
 }
 
@@ -966,6 +1053,14 @@ export async function reorderQuestions(eventId, organizerId, orders) {
       
     if (error) throw new ApiError(500, error.message)
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'polling.question.reorder',
+    userId: organizerId,
+    module: 'polling',
+    details: { count: updates.length },
+  })
 
   return listQuestions(eventId, organizerId)
 }
@@ -1192,6 +1287,17 @@ export async function submitPollResponse(eventId, voterId, answers, startedAt) {
   // Trigger admin platform stats refresh
   emitToRole('admin', 'platform:stats-updated', {})
 
+  // Audit the response submission (fire-and-forget; never throws). Record ONLY
+  // that a response was submitted and how many answers it held — never the
+  // answer content, to keep individual responses confidential.
+  recordEventActivity({
+    eventId,
+    action: 'polling.response.submit',
+    userId: voterId,
+    module: 'polling',
+    details: { answerCount: rows.length },
+  })
+
   return { success: true, submissionId: submission.id, message: 'Response submitted' }
 }
 
@@ -1324,15 +1430,38 @@ export async function listCustomQuestionTypes(userId) {
 
 export async function createCustomQuestionType(userId, payload) {
   const org = await getOrCreatePollingOrganization(userId)
-  return createCustomType(org.id, payload)
+  const created = await createCustomType(org.id, payload)
+  recordAudit({
+    userId,
+    action: 'polling.question_type.create',
+    entity: 'poll_question_types',
+    entityId: created?.id ?? null,
+    details: { key: created?.key ?? payload?.key ?? null, label: created?.label ?? payload?.label ?? null },
+  })
+  return created
 }
 
 export async function updateCustomQuestionType(typeId, userId, payload) {
   const org = await getOrCreatePollingOrganization(userId)
-  return updateCustomType(org.id, typeId, payload)
+  const updated = await updateCustomType(org.id, typeId, payload)
+  recordAudit({
+    userId,
+    action: 'polling.question_type.update',
+    entity: 'poll_question_types',
+    entityId: typeId,
+    details: { label: updated?.label ?? payload?.label ?? null },
+  })
+  return updated
 }
 
 export async function deleteCustomQuestionType(typeId, userId) {
   const org = await getOrCreatePollingOrganization(userId)
-  return deleteCustomType(org.id, typeId)
+  const result = await deleteCustomType(org.id, typeId)
+  recordAudit({
+    userId,
+    action: 'polling.question_type.delete',
+    entity: 'poll_question_types',
+    entityId: typeId,
+  })
+  return result
 }

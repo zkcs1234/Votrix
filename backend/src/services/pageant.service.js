@@ -1,4 +1,5 @@
 import { db as getClient } from '../foundation/db.js'
+import { recordEventActivity } from '../foundation/activity.js'
 import { ApiError } from '../utils/ApiError.js'
 import {
   DB_TABLES,
@@ -231,6 +232,13 @@ export async function createCompetitionEvent(organizerId, payload) {
   await deleteDraft(organizerId, 'competition').catch((err) => {
     console.error('[competition] failed to clear draft after create:', err.message)
   })
+  recordEventActivity({
+    eventId: data.id,
+    action: 'competition.event.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { title: data.title },
+  })
   return mapEvent(data)
 }
 
@@ -275,6 +283,13 @@ export async function updateCompetitionEvent(eventId, organizerId, payload) {
   await syncEventSchedules().catch((err) => {
     console.error('[competition] schedule sync failed after update:', err.message)
   })
+  recordEventActivity({
+    eventId,
+    action: 'competition.event.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { changedKeys: Object.keys(updates) },
+  })
   return mapEvent(data)
 }
 
@@ -313,7 +328,14 @@ export async function setEventScoring(eventId, organizerId, scoringEnabled) {
     eventId,
     scoringEnabled: Boolean(scoringEnabled),
   })
-  
+
+  recordEventActivity({
+    eventId,
+    action: scoringEnabled ? 'competition.scoring.enable' : 'competition.scoring.disable',
+    userId: organizerId,
+    module: 'competition',
+  })
+
   return mapEvent(data)
 }
 
@@ -374,6 +396,13 @@ export async function createContestant(eventId, organizerId, payload) {
     }
     throw new ApiError(500, error.message)
   }
+  recordEventActivity({
+    eventId,
+    action: 'competition.contestant.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { contestantId: data.id, name: data.name, contestantNumber: data.contestant_number },
+  })
   return mapContestant(data)
 }
 
@@ -427,6 +456,13 @@ export async function updateContestant(eventId, organizerId, contestantId, paylo
     )
   }
 
+  recordEventActivity({
+    eventId,
+    action: 'competition.contestant.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { contestantId, name: data.name },
+  })
   return mapContestant(data)
 }
 
@@ -456,6 +492,14 @@ export async function deleteContestant(eventId, organizerId, contestantId) {
       console.error('[competition] Contestant photo cleanup error:', err.message),
     )
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.contestant.delete',
+    userId: organizerId,
+    module: 'competition',
+    details: { contestantId },
+  })
 }
 
 export async function getNextContestantNumber(eventId, organizerId, divisionId = null) {
@@ -529,6 +573,13 @@ export async function createCriteria(eventId, organizerId, payload) {
     .single()
 
   if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.criteria.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId: data.id, name: data.name },
+  })
   return mapCriteria(data)
 }
 
@@ -563,6 +614,13 @@ export async function updateCriteria(eventId, organizerId, criteriaId, payload) 
 
   if (error) throw new ApiError(500, error.message)
   if (!data) throw new ApiError(404, 'Criteria not found')
+  recordEventActivity({
+    eventId,
+    action: 'competition.criteria.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId, name: data.name },
+  })
   return mapCriteria(data)
 }
 
@@ -576,6 +634,13 @@ export async function deleteCriteria(eventId, organizerId, criteriaId) {
     .eq('event_id', eventId)
 
   if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.criteria.delete',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId },
+  })
 }
 
 // ——— Judges ———
@@ -667,6 +732,14 @@ export async function inviteJudge(eventId, organizerId, { email, temporaryPasswo
         eventTitle: event.title,
       })
 
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.invite',
+    userId: organizerId,
+    module: 'competition',
+    details: { judgeUserId: user.id, email: user.email, isNewJudge: isNew, emailSent: emailResult?.sent ?? null },
+  })
+
   return { user: sanitizeUser(user), isNewJudge: isNew, email: emailResult }
 }
 
@@ -701,6 +774,14 @@ export async function registerJudge(eventId, organizerId, { email, temporaryPass
   } catch (dbErr) {
     console.error('[registerJudge] invitations upsert failed:', dbErr.message)
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.register',
+    userId: organizerId,
+    module: 'competition',
+    details: { judgeUserId: user.id, email: user.email, isNewJudge: isNew },
+  })
 
   return { user, isNewJudge: isNew, invitationSent: false }
 }
@@ -784,13 +865,21 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
     }
   }
 
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.invitation.send',
+    userId: organizerId,
+    module: 'competition',
+    details: { judgeUserId: userId, email: judgeEmail, invitationType, sent: emailResult?.sent || false },
+  })
+
   return {
     email: emailResult,
     invitationSent: emailResult?.sent || false,
     invitationType,
     temporaryPassword: tempPassword,
-    message: emailResult?.sent 
-      ? `Invitation sent successfully to ${judgeEmail}` 
+    message: emailResult?.sent
+      ? `Invitation sent successfully to ${judgeEmail}`
       : `Invitation failed: ${emailResult?.error || 'Unknown error'}`
   }
 }
@@ -901,6 +990,14 @@ export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
       })
     }
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.invitation.send_all',
+    userId: organizerId,
+    module: 'competition',
+    details: { total: pendingJudges.length, sent, failed },
+  })
 
   return { total: pendingJudges.length, sent, failed, results }
 }

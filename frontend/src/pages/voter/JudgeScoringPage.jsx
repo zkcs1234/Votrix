@@ -49,6 +49,79 @@ export default function JudgeScoringPage() {
   // Confirmation toast state
   const [showConfirmation, setShowConfirmation] = useState(false)
 
+  // Interactive award tasks (vote / judge selection)
+  const [awardTasks, setAwardTasks] = useState([])
+  const [awardBusy, setAwardBusy] = useState(null)
+
+  const loadAwardTasks = useCallback(async () => {
+    try {
+      const { data } = await pageantService.getAwardTasks(eventId)
+      setAwardTasks(data.awards ?? [])
+    } catch {
+      setAwardTasks([])
+    }
+  }, [eventId])
+
+  useEffect(() => { loadAwardTasks() }, [loadAwardTasks])
+  useSocketEvent('award:status-changed', () => loadAwardTasks(), [loadAwardTasks])
+
+  const submitAwardPick = useCallback(async (awardId, contestantId) => {
+    setAwardBusy(awardId)
+    try {
+      await pageantService.submitAwardSelection(eventId, awardId, contestantId)
+      await loadAwardTasks()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to submit selection')
+    } finally {
+      setAwardBusy(null)
+    }
+  }, [eventId, loadAwardTasks])
+
+  const renderAwardTasks = () => {
+    if (!awardTasks.length) return null
+    return (
+      <div className="space-y-4">
+        {awardTasks.map((a) => (
+          <div key={a.id} className="rounded-xl border border-amber-500/40 bg-amber-950/20 p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-amber-300">{a.name}</span>
+              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300 uppercase tracking-wide">
+                {a.method === 'vote' ? 'Vote' : 'Judge Selection'}
+              </span>
+            </div>
+            {a.description && <p className="mt-1 text-xs text-white/60">{a.description}</p>}
+            <p className="mt-2 text-xs text-white/70">Choose one contestant:</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {a.contestants.map((c) => {
+                const selected = a.mySelection === c.id
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={awardBusy === a.id}
+                    onClick={() => submitAwardPick(a.id, c.id)}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition disabled:opacity-50 ${
+                      selected
+                        ? 'border-amber-500 bg-amber-500/20 text-amber-200'
+                        : 'border-v-border bg-v-surface text-v-text hover:bg-v-surface-elevated'
+                    }`}
+                  >
+                    {c.photo && <img src={c.photo} alt="" className="h-8 w-8 rounded object-cover" />}
+                    <span>#{c.contestantNumber} {c.name}</span>
+                    {selected && <span className="ml-auto text-xs">✓ Selected</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {a.mySelection && (
+              <p className="mt-2 text-xs text-amber-300/80">Your selection is saved. Tap another to change it while the award is open.</p>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   // Check if session is active
   const isSessionActive = sessionState?.status === 'active'
 
@@ -463,7 +536,10 @@ export default function JudgeScoringPage() {
         <VoterEventHeader event={sheet?.event} eyebrow="Judge scoring">
           <p className="text-sm font-medium text-white/75">Waiting for session to start</p>
         </VoterEventHeader>
-        
+
+        {/* Interactive award tasks can be open even with no scoring session */}
+        {renderAwardTasks()}
+
         <div className="v-card p-8 text-center space-y-4">
           <div className="h-12 w-12 rounded-full bg-v-surface border border-v-border mx-auto flex items-center justify-center">
             <div className="h-2 w-2 rounded-full bg-v-text-muted"></div>
@@ -637,6 +713,9 @@ export default function JudgeScoringPage() {
           </p>
         )}
       </div>
+
+      {/* Interactive award tasks (vote / judge selection) */}
+      {renderAwardTasks()}
 
       <CompetitionScoringForm
         sheet={sheet}
