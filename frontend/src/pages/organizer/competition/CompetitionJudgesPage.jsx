@@ -147,7 +147,10 @@ export default function CompetitionJudgesPage() {
     try {
       await pageantService.registerJudge(eventId, { email })
       setEmail('')
-      load()
+      // Refresh both the judges table (load) and the assignment panel's
+      // foundation snapshot (loadFoundation) so a newly registered judge is
+      // immediately assignable — otherwise the panel keeps showing "No judges yet".
+      await Promise.all([load(), loadFoundation()])
       success('Judge registered. Send invitation when ready.')
     } catch (err) {
       const msg = err.response?.data?.message || 'Registration failed'
@@ -184,7 +187,8 @@ export default function CompetitionJudgesPage() {
       setImportResult({ succeeded: data.succeeded, total: data.total })
       setCsvPreview(null)
       success(`Registered ${data.succeeded} of ${data.total} judges. Send invitations later.`)
-      load()
+      // Refresh the assignment panel's foundation too, so imported judges appear there.
+      await Promise.all([load(), loadFoundation()])
     } catch (err) {
       const msg = err.response?.data?.message || 'Registration failed'
       setError(msg)

@@ -394,6 +394,29 @@ Kept in the database for backward compatibility but **not used by current applic
 
 > **Also note the rename churn:** the competition tables were renamed pageant → `competition_*` (011), and judges went first‑class‑table → unified‑into‑`event_participants` (041), and voters went `event_voters` → `event_participants` (029). Each step left a compatibility view behind. The *live* model is clean; the *leftover* views are the clutter.
 
+### 7.1 Views explained — "working" ≠ "used"
+
+A **view** is a saved `SELECT` query that behaves like a table when you read it, but **stores no data of its own** — it just re-reads a real table live. This trips people up, so two facts that are true *at the same time*:
+
+- The `contestants` view **still works and shows your data.** It is literally defined `CREATE VIEW contestants AS SELECT * FROM competition_contestants`, so every contestant you add appears in it instantly. `SELECT count(*) FROM contestants` equals `SELECT count(*) FROM competition_contestants`.
+- The `contestants` view is still **dead**, meaning **no application code reads or writes it.** The app talks to the real table `competition_contestants` directly. You seeing rows in the view is the *mirror* working — not the app using it.
+
+> **Analogy:** a backward-compat view is an **old phone number that still forwards to your new number.** Dial the old number and your phone still rings (it works) — but nobody dials it anymore because everyone has the new number (it's unused). "Dead" here means *unused*, not *disconnected*.
+
+**Why this matters for cleanup:** dropping a dead view **deletes zero data** — the rows live in the real table the view points at. `DROP VIEW contestants` removes only the old alias; `competition_contestants` and every contestant in it are untouched. The only risk is an *external* consumer (a Supabase saved query, a BI dashboard, an export script) that still reads the old name — your app doesn't.
+
+**Not every view is dead.** The database has two kinds of views, and only one kind is clutter:
+
+| View | Kind | Used by the app? | In the live map? |
+|---|---|---|---|
+| `contestants`, `criteria`, `judge_scores` | backward-compat shim (rename leftovers) | ❌ dead (label strings only) | excluded |
+| `v_event_voters`, `v_legacy_competition_judges` | backward-compat shim | ❌ dead | excluded |
+| `competition_judges` | backward-compat shim (over `event_participants`) | ❌ dead (only a stale `DB_TABLES` constant) | excluded |
+| **`v_competition_active_session`** | **functional helper** (joins live session → round + contestant) | ✅ **alive** — the live judge screen reads it | **included** |
+| **`v_poll_question_types`** | **functional helper** (unions built-in + custom types) | ✅ **alive** — the polling engine reads it | **included** |
+
+So the six backward-compat shims are dead; the two functional helper views are alive and stay in the schema. *Working* is not the test — *used by the application* is.
+
 ---
 
 ## 8. Quick reference — the 30 live tables
