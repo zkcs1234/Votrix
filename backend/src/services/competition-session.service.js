@@ -1543,6 +1543,13 @@ export async function finalizeRound(eventId, organizerId, roundId, { overrides =
   if (round.finalized_at && !force) throw new ApiError(409, 'This round has already been finalized')
   if (round.is_open) throw new ApiError(400, 'Close the round before finalizing it')
 
+  // On a forced recompute, first sync the ranking store from the live-session
+  // scores so the refreshed snapshot reflects any score corrections made since the
+  // original finalize (e.g. a direct edit to the session scores).
+  if (force) {
+    await backfillLiveScoresToRankingStore(eventId)
+  }
+
   // H1: division-aware standing + qualifiers (per division when enabled).
   const { standing, auto } = await computeRoundAdvancement(eventId, round, scoringConfig, event)
   if (!standing.length) {
