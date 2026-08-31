@@ -381,8 +381,22 @@ function computeLegacyPerRound({ scores, contestants, criteria, rounds, byContes
 function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCriteria, byContestant, cfg, dp }) {
   const critById = new Map(criteria.map((c) => [c.id, c]))
 
-  // Group scores by (contestant, criteria, round) — round_id kept this time.
+  // How many rounds each criterion belongs to. A criterion in exactly ONE round
+  // can safely accept scores that lack a round_id (e.g. scored while no round was
+  // active, or via a path that didn't stamp round_id) — there is no other round
+  // to attribute them to, so no double-counting. A criterion shared across rounds
+  // must match round_id exactly.
+  const roundsPerCriterion = new Map()
+  for (const round of rounds) {
+    for (const id of Array.isArray(roundCriteria[round.id]) ? roundCriteria[round.id] : []) {
+      roundsPerCriterion.set(id, (roundsPerCriterion.get(id) ?? 0) + 1)
+    }
+  }
+
+  // Group scores by (contestant, criteria, round) — round_id kept this time —
+  // plus a round-agnostic bucket for the single-round-tolerance fallback.
   const byCellRound = new Map()
+  const byCellAny = new Map()
   for (const s of scores) {
     const cid = s.contestant_id ?? s.contestantId
     const critId = s.criteria_id ?? s.criteriaId
@@ -390,6 +404,9 @@ function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCri
     const key = `${cid}|${critId}|${rid}`
     if (!byCellRound.has(key)) byCellRound.set(key, [])
     byCellRound.get(key).push(Number(s.score))
+    const anyKey = `${cid}|${critId}`
+    if (!byCellAny.has(anyKey)) byCellAny.set(anyKey, [])
+    byCellAny.get(anyKey).push(Number(s.score))
   }
 
   // For the UI breakdown, aggregate each criterion's cells across the rounds
@@ -406,7 +423,13 @@ function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCri
       if (!row) continue
       let roundValue = 0
       for (const crit of roundCrits) {
-        const cell = byCellRound.get(`${contestant.id}|${crit.id}|${round.id}`) ?? []
+        const exact = byCellRound.get(`${contestant.id}|${crit.id}|${round.id}`) ?? []
+        // Single-round criterion with no round-matched scores → accept its scores
+        // regardless of round_id so existing (unstamped) scores still count.
+        const cell =
+          exact.length === 0 && (roundsPerCriterion.get(crit.id) ?? 0) <= 1
+            ? byCellAny.get(`${contestant.id}|${crit.id}`) ?? []
+            : exact
         const reduced = reduceScores(cell, cfg)
         // Criterion normalized WITHIN this round.
         roundValue += reduced * (Number(crit.percentage ?? 0) / totalPct)

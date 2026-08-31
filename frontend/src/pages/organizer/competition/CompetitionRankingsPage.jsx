@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
+import { competitionSessionService } from '@/services/competition-session.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 import { useSocketEvent } from '@/hooks/useSocketEvent'
@@ -28,9 +29,22 @@ export default function CompetitionRankingsPage() {
     }).finally(() => setLoading(false))
   }, [eventId, divisionId])
 
+  // On first open, silently re-sync the ranking store from the real live-session
+  // scores judges submitted, THEN load — so the rankings reflect the corrected
+  // scores automatically (the first scoring wrote stale values during the bug).
+  // Idempotent; only runs once per mount. Division changes / refresh just reload.
+  const didResync = useRef(false)
   useEffect(() => {
-    load()
     subscribeRoom(`event:${eventId}:organizer`)
+    if (didResync.current) {
+      load()
+      return
+    }
+    didResync.current = true
+    competitionSessionService
+      .resyncRankingStore(eventId)
+      .catch(() => {}) // best-effort; still show whatever the store has
+      .finally(() => load())
   }, [eventId, load])
 
   useSocketEvent('rankings:updated', ({ rankings }) => {
@@ -110,13 +124,44 @@ export default function CompetitionRankingsPage() {
                 {r.weightedScore.toFixed(2)}
                 <span className="ml-1 text-sm font-normal text-v-text-subtle">weighted</span>
               </p>
-              <ul className="mt-2 flex flex-wrap gap-2 text-xs text-v-text-subtle">
-                {r.criteriaBreakdown.map((c) => (
-                  <li key={c.criteriaId} className="rounded bg-v-surface-elevated px-2 py-1">
-                    {c.criteriaName}: avg {c.average} ({c.percentage}%)
-                  </li>
-                ))}
-              </ul>
+              {(() => {
+                const breakdown = r.criteriaBreakdown ?? []
+                const scored = breakdown.filter((c) => (c.judgeCount ?? (c.average > 0 ? 1 : 0)) > 0)
+                const unscored = breakdown.length - scored.length
+                if (!scored.length) {
+                  return <p className="mt-2 text-xs text-v-text-subtle">No scores yet.</p>
+                }
+                return (
+                  <>
+                    <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
+                      {scored.map((c) => (
+                        <div
+                          key={c.criteriaId}
+                          className="rounded-lg border border-v-border/60 bg-v-surface-elevated px-2.5 py-1.5"
+                        >
+                          <p
+                            className="truncate text-[11px] leading-tight text-v-text-subtle"
+                            title={c.criteriaName}
+                          >
+                            {c.criteriaName}
+                          </p>
+                          <p className="mt-0.5 text-sm font-semibold text-v-text tabular-nums">
+                            {c.average}
+                            <span className="ml-1 text-[10px] font-normal text-v-text-subtle">
+                              · {c.percentage}%
+                            </span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {unscored > 0 && (
+                      <p className="mt-1.5 text-[11px] text-v-text-subtle">
+                        +{unscored} criteria not yet scored
+                      </p>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           </div>
         ))}

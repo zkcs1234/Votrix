@@ -84,8 +84,13 @@ export const competitionSessionService = {
   },
 
   /** POST /api/organizer/competition/events/:eventId/session/finalize-round */
-  finalizeRound(eventId, roundId, overrides = null) {
-    return api.post(`${BASE}/events/${eventId}/session/finalize-round`, { roundId, overrides })
+  finalizeRound(eventId, roundId, overrides = null, force = false) {
+    return api.post(`${BASE}/events/${eventId}/session/finalize-round`, { roundId, overrides, force })
+  },
+
+  /** POST /api/organizer/competition/events/:eventId/session/resync-scores */
+  resyncRankingStore(eventId) {
+    return api.post(`${BASE}/events/${eventId}/session/resync-scores`, {})
   },
 
   /** GET /api/organizer/competition/events/:eventId/rounds/:roundId/results */

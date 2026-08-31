@@ -140,11 +140,18 @@ export const previewRoundAdvancement = asyncHandler(async (req, res) => {
 
 /** POST /api/organizer/competition/events/:eventId/session/finalize-round */
 export const finalizeRound = asyncHandler(async (req, res) => {
-  const { roundId, overrides } = req.body ?? {}
+  const { roundId, overrides, force } = req.body ?? {}
   if (!roundId) throw new ApiError(400, 'roundId is required')
   const result = await sessionService.finalizeRound(req.params.eventId, req.user.id, roundId, {
     overrides: overrides ?? null,
+    force: force === true,
   })
+  res.json({ success: true, ...result })
+})
+
+/** POST /api/organizer/competition/events/:eventId/session/resync-scores */
+export const resyncRankingStore = asyncHandler(async (req, res) => {
+  const result = await sessionService.resyncRankingStore(req.params.eventId, req.user.id)
   res.json({ success: true, ...result })
 })
 

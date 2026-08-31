@@ -251,3 +251,66 @@ describe('characterization: engine has NO division concept (division split is qu
     expect(rankings[0].rank).toBe(1)
   })
 })
+
+describe('legacy round-weight normalization (inflation guard)', () => {
+  // In legacy mode (no per-round criteria), every round reuses ALL criteria and
+  // holds the same value. The final must NOT be that value × (sum of round
+  // weights); it is normalized so an event whose round weights don't total 100%
+  // can't inflate the overall past a single round's score.
+  const contestants = [{ id: 'c1', name: 'T', contestant_number: 1 }]
+  const criteria = [
+    { id: 'k1', name: 'A', percentage: 30 },
+    { id: 'k2', name: 'B', percentage: 25 },
+    { id: 'k3', name: 'C', percentage: 25 },
+    { id: 'k4', name: 'D', percentage: 20 },
+  ]
+  const scores = [
+    { contestant_id: 'c1', criteria_id: 'k1', score: 90 },
+    { contestant_id: 'c1', criteria_id: 'k2', score: 89 },
+    { contestant_id: 'c1', criteria_id: 'k3', score: 78 },
+    { contestant_id: 'c1', criteria_id: 'k4', score: 80 },
+  ]
+
+  test('round weights summing to <100% do not inflate (was 70.34 → 84.75)', () => {
+    const { rankings } = computeRankings({
+      scores,
+      contestants,
+      criteria,
+      rounds: [{ id: 'r1', weight: 20 }, { id: 'r2', weight: 63 }],
+    })
+    expect(rankings[0].finalScore).toBe(84.75)
+  })
+
+  test('round weights summing to >100% cannot exceed the round score (was 101.7)', () => {
+    const { rankings } = computeRankings({
+      scores,
+      contestants,
+      criteria,
+      rounds: [{ id: 'r1', weight: 20 }, { id: 'r2', weight: 100 }],
+    })
+    expect(rankings[0].finalScore).toBe(84.75)
+  })
+
+  test('round weights already summing to 100% are unchanged', () => {
+    const { rankings } = computeRankings({
+      scores,
+      contestants,
+      criteria,
+      rounds: [{ id: 'r1', weight: 50 }, { id: 'r2', weight: 50 }],
+    })
+    expect(rankings[0].finalScore).toBe(84.75)
+  })
+
+  test('scoped mode is unaffected: an unscored round contributes 0', () => {
+    const scoped = scores.map((s) => ({ ...s, round_id: 'r1' }))
+    const { rankings } = computeRankings({
+      scores: scoped,
+      contestants,
+      criteria,
+      rounds: [{ id: 'r1', weight: 20 }, { id: 'r2', weight: 80 }],
+      roundCriteria: { r1: ['k1', 'k2', 'k3', 'k4'], r2: ['k1', 'k2', 'k3', 'k4'] },
+    })
+    // Production Number contributes 84.75 × 20% = 16.95; the unscored round adds 0.
+    expect(rankings[0].finalScore).toBe(16.95)
+  })
+})

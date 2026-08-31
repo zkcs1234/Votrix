@@ -897,6 +897,17 @@ async function backfillLiveScoresToRankingStore(eventId) {
   }
 }
 
+// Organizer-triggered re-sync: mirror ALL locked live-session scores into the
+// ranking store so rankings/results are computed from what judges actually
+// entered. Use when the two stores may have drifted (e.g. scores entered before
+// the live→rankings write-through existed). Idempotent.
+export async function resyncRankingStore(eventId, organizerId) {
+  await assertCompetitionEvent(eventId, organizerId)
+  await backfillLiveScoresToRankingStore(eventId)
+  emitToEvent(eventId, 'rankings:updated', { eventId })
+  return { success: true }
+}
+
 // ---------------------------------------------------------------------------
 // Judge submits score for current contestant in the session
 // ---------------------------------------------------------------------------
@@ -1515,7 +1526,7 @@ export async function previewRoundAdvancement(eventId, organizerId, roundId) {
 // Finalize a round: compute its standing, snapshot it, choose qualifiers (auto +
 // organizer override), lock the round, and seed the next round with qualifiers.
 // Nothing is ever auto-deleted; the organizer confirms via `overrides`.
-export async function finalizeRound(eventId, organizerId, roundId, { overrides = null } = {}) {
+export async function finalizeRound(eventId, organizerId, roundId, { overrides = null, force = false } = {}) {
   await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
   const scoringConfig = mergeScoringConfig(event.scoring_config)
@@ -1528,7 +1539,10 @@ export async function finalizeRound(eventId, organizerId, roundId, { overrides =
     .maybeSingle()
   if (rErr) throw new ApiError(500, rErr.message)
   if (!round) throw new ApiError(404, 'Round not found')
-  if (round.finalized_at) throw new ApiError(409, 'This round has already been finalized')
+  // `force` allows RE-finalizing an already-finalized round to refresh its frozen
+  // snapshot (e.g. after a scoring fix or a late criteria→round link). Without it,
+  // a finalized round is immutable.
+  if (round.finalized_at && !force) throw new ApiError(409, 'This round has already been finalized')
   if (round.is_open) throw new ApiError(400, 'Close the round before finalizing it')
 
   // H1: division-aware standing + qualifiers (per division when enabled).
@@ -1538,18 +1552,27 @@ export async function finalizeRound(eventId, organizerId, roundId, { overrides =
   }
 
   const qualifiedSet = applyQualifierOverride(auto, overrides)
-  const now = new Date().toISOString()
 
-  // M2: atomically CLAIM the finalize — only the first caller flips finalized_at
-  // from NULL, so concurrent/double-clicked finalizes can't both proceed.
-  const { data: claimed, error: claimErr } = await getClient()
-    .from(DB_TABLES.COMPETITION_ROUNDS)
-    .update({ finalized_at: now })
-    .eq('id', roundId)
-    .is('finalized_at', null)
-    .select('id')
-  if (claimErr) throw new ApiError(500, claimErr.message)
-  if (!claimed?.length) throw new ApiError(409, 'This round has already been finalized')
+  // M2: on a FIRST finalize, atomically CLAIM by flipping finalized_at from NULL
+  // so concurrent/double-clicked finalizes can't both proceed. On a forced
+  // re-finalize the round is already claimed, so we keep its original timestamp
+  // and just refresh the snapshot below.
+  let now
+  let didClaim = false
+  if (round.finalized_at && force) {
+    now = round.finalized_at
+  } else {
+    now = new Date().toISOString()
+    const { data: claimed, error: claimErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUNDS)
+      .update({ finalized_at: now })
+      .eq('id', roundId)
+      .is('finalized_at', null)
+      .select('id')
+    if (claimErr) throw new ApiError(500, claimErr.message)
+    if (!claimed?.length) throw new ApiError(409, 'This round has already been finalized')
+    didClaim = true
+  }
 
   const nextRound = await getNextRound(eventId, round)
   const qualifiers = [...qualifiedSet]
@@ -1582,10 +1605,14 @@ export async function finalizeRound(eventId, organizerId, roundId, { overrides =
       seededCount = qualifiers.length
     }
   } catch (err) {
-    await getClient()
-      .from(DB_TABLES.COMPETITION_ROUNDS)
-      .update({ finalized_at: null })
-      .eq('id', roundId)
+    // Only release the claim if THIS call created it — never un-finalize a round
+    // that was already finalized before a forced recompute.
+    if (didClaim) {
+      await getClient()
+        .from(DB_TABLES.COMPETITION_ROUNDS)
+        .update({ finalized_at: null })
+        .eq('id', roundId)
+    }
     throw err
   }
 

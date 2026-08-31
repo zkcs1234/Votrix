@@ -204,14 +204,22 @@ export default function CompetitionLiveControlPage() {
       if (checked && !s.qualified) add.push(s.contestantId)
       if (!checked && s.qualified) remove.push(s.contestantId)
     }
+    const isRecompute = Boolean(finalizePreview.finalized)
     setFinalizeSubmitting(true)
     try {
-      const { data } = await competitionSessionService.finalizeRound(eventId, finalizeRoundId, { add, remove })
+      const { data } = await competitionSessionService.finalizeRound(
+        eventId,
+        finalizeRoundId,
+        { add, remove },
+        isRecompute, // force = re-finalize to refresh a frozen snapshot
+      )
       closeFinalize()
       await loadSession()
       alert(
-        `Round "${data.roundName}" finalized. ${data.qualifiers.length} qualifier(s)` +
-          (data.nextRoundName ? ` seeded into "${data.nextRoundName}".` : '.'),
+        isRecompute
+          ? `Round "${data.roundName}" standings recomputed with the current scores.`
+          : `Round "${data.roundName}" finalized. ${data.qualifiers.length} qualifier(s)` +
+              (data.nextRoundName ? ` seeded into "${data.nextRoundName}".` : '.'),
       )
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to finalize round')
@@ -375,7 +383,9 @@ export default function CompetitionLiveControlPage() {
               </div>
             )}
 
-            {/* Phase 6 — finalize the active round & advance qualifiers */}
+            {/* Phase 6 — finalize the active round & advance qualifiers.
+                Once finalized, the same control re-opens to RECOMPUTE the frozen
+                standings snapshot (e.g. after a scoring fix). */}
             {session.activeRound?.id && (
               <div className="space-y-1">
                 <button
@@ -384,10 +394,16 @@ export default function CompetitionLiveControlPage() {
                   disabled={finalizeLoading}
                   className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 transition hover:bg-amber-500/20 disabled:opacity-50"
                 >
-                  {finalizeLoading ? 'Loading…' : 'Finalize round & advance'}
+                  {finalizeLoading
+                    ? 'Loading…'
+                    : session.activeRound.finalized
+                      ? 'Recompute finalized standings'
+                      : 'Finalize round & advance'}
                 </button>
                 <p className="text-[11px] text-v-text-subtle">
-                  Snapshots this round's standing and seeds qualifiers into the next round. Review before confirming.
+                  {session.activeRound.finalized
+                    ? 'This round is finalized. Recompute to refresh its saved standings with the current scores.'
+                    : "Snapshots this round's standing and seeds qualifiers into the next round. Review before confirming."}
                 </p>
               </div>
             )}
@@ -621,7 +637,11 @@ export default function CompetitionLiveControlPage() {
                 onClick={confirmFinalize}
                 disabled={finalizeSubmitting || finalizeLoading || !finalizePreview}
               >
-                {finalizeSubmitting ? 'Finalizing…' : 'Finalize & advance'}
+                {finalizeSubmitting
+                  ? 'Working…'
+                  : finalizePreview?.finalized
+                    ? 'Recompute standings'
+                    : 'Finalize & advance'}
               </Button>
             </div>
           </div>
