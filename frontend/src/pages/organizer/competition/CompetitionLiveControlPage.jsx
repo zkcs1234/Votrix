@@ -34,6 +34,10 @@ export default function CompetitionLiveControlPage() {
   const [finalizeLoading, setFinalizeLoading] = useState(false)
   const [finalizeSubmitting, setFinalizeSubmitting] = useState(false)
 
+  // Stage-group builder (simultaneous multi-contestant scoring). Selection is
+  // seeded from whatever group is currently on stage.
+  const [stageSel, setStageSel] = useState(() => new Set())
+
   const showLoader = useDelayedLoading(loading, 300)
 
   const loadSession = useCallback(async () => {
@@ -61,6 +65,24 @@ export default function CompetitionLiveControlPage() {
   useEffect(() => {
     loadSession()
   }, [loadSession])
+
+  const stageGroupKey = (session?.stageContestants ?? []).map((c) => c.id).join(',')
+  useEffect(() => {
+    setStageSel(new Set((session?.stageContestants ?? []).map((c) => c.id)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stageGroupKey])
+
+  const applyStageGroup = async (ids) => {
+    setActionLoading('stageGroup')
+    try {
+      await competitionSessionService.setStageGroup(eventId, ids)
+      await loadSession()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update stage group')
+    } finally {
+      setActionLoading(null)
+    }
+  }
 
   const refreshJudgeProgress = useCallback(async () => {
     try {
@@ -110,6 +132,19 @@ export default function CompetitionLiveControlPage() {
       await loadSession()
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to set active round')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const selectContestant = async (contestantId) => {
+    if (!contestantId) return
+    setActionLoading('setContestant')
+    try {
+      await competitionSessionService.setActiveContestant(eventId, contestantId)
+      await loadSession()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to select contestant')
     } finally {
       setActionLoading(null)
     }
@@ -400,6 +435,83 @@ export default function CompetitionLiveControlPage() {
               Next <SkipForward className="h-4 w-4 ml-1" />
             </Button>
           </div>
+
+          {/* Jump directly to any contestant in the order. */}
+          {session.roundContestants?.length > 0 && (
+            <div className="mt-3">
+              <label htmlFor="jump-contestant" className="mb-1 block text-xs text-v-text-subtle">
+                Or jump to contestant:
+              </label>
+              <select
+                id="jump-contestant"
+                value={session.activeContestant?.id ?? ''}
+                disabled={actionLoading === 'setContestant'}
+                onChange={(e) => selectContestant(e.target.value)}
+                className="w-full rounded-lg border border-v-border bg-v-surface px-3 py-2 text-sm text-v-text focus:border-v-primary focus:outline-none disabled:opacity-50"
+              >
+                <option value="" disabled>Select a contestant…</option>
+                {session.roundContestants.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    #{c.contestantNumber} {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Stage group — put several contestants on stage at once (paired
+              pageant / head-to-head). Only offered when divisions are enabled
+              (e.g. Male + Female on stage together); solo events stay single. */}
+          {foundation?.event?.divisions_enabled && session.roundContestants?.length > 1 && (
+            <details className="mt-3 rounded-lg border border-v-border bg-v-surface-elevated/40 px-3 py-2">
+              <summary className="cursor-pointer text-xs font-medium text-v-text-muted">
+                Stage group — score several at once
+                {session.stageContestants?.length > 0 && ` (${session.stageContestants.length} on stage)`}
+              </summary>
+              <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
+                {session.roundContestants.map((c) => (
+                  <label key={c.id} className="flex items-center gap-2 text-sm text-v-text">
+                    <input
+                      type="checkbox"
+                      checked={stageSel.has(c.id)}
+                      onChange={(e) => {
+                        setStageSel((prev) => {
+                          const next = new Set(prev)
+                          if (e.target.checked) next.add(c.id)
+                          else next.delete(c.id)
+                          return next
+                        })
+                      }}
+                    />
+                    #{c.contestantNumber} {c.name}
+                  </label>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={actionLoading === 'stageGroup' || stageSel.size < 2}
+                  onClick={() => applyStageGroup([...stageSel])}
+                  className="rounded-lg bg-v-primary px-3 py-1.5 text-xs font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
+                >
+                  {actionLoading === 'stageGroup' ? 'Applying…' : `Put ${stageSel.size || ''} on stage`}
+                </button>
+                {session.stageContestants?.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={actionLoading === 'stageGroup'}
+                    onClick={() => applyStageGroup([])}
+                    className="rounded-lg border border-v-border px-3 py-1.5 text-xs font-medium text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
+                  >
+                    Clear group (single mode)
+                  </button>
+                )}
+              </div>
+              <p className="mt-1 text-[11px] text-v-text-subtle">
+                Pick 2+ contestants. Judges will see all of them and score each individually.
+              </p>
+            </details>
+          )}
         </div>
       </div>
 

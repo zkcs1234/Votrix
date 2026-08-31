@@ -26,6 +26,7 @@ function mapSession(row) {
     currentRoundId: row.current_round_id,
     currentRoundName: row.current_round_name ?? null,
     activeContestantId: row.active_contestant_id,
+    activeContestantIds: Array.isArray(row.active_contestant_ids) ? row.active_contestant_ids : null,
     activeContestantName: row.active_contestant_name ?? null,
     activeContestantNumber: row.active_contestant_number ?? null,
     activeContestantPhoto: row.active_contestant_photo ?? null,
@@ -80,6 +81,132 @@ export async function getActiveSession(eventId) {
 
   if (error) throw new ApiError(500, error.message)
   return data ? mapSession(data) : null
+}
+
+// Find the current live session INCLUDING a paused one. The
+// v_competition_active_session view filters to status='active', so a paused
+// session is invisible to getActiveSession — which is correct for the scoring
+// paths (judges must not score while paused) but wrong for the organizer's
+// controls, which must still see (and resume) a paused session. Reads the base
+// table directly so pause → resume works repeatedly.
+async function getCurrentSession(eventId) {
+  const { data, error } = await getClient()
+    .from('competition_sessions')
+    .select('*')
+    .eq('event_id', eventId)
+    .in('status', ['active', 'paused'])
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw new ApiError(500, error.message)
+  return data ? mapSession(data) : null
+}
+
+// ---------------------------------------------------------------------------
+// Enriched active session for the organizer Live Control page.
+//
+// The flat mapSession shape (currentRoundId, activeContestantId, contestantOrder…)
+// is correct but the Live Control UI consumes a richer object: the active round
+// with its criteria, the ordered contestant list resolved to objects, the active
+// contestant object, the round list to switch between, and index/division. This
+// assembles that WITHOUT changing the flat internal getActiveSession the scoring
+// paths rely on — the extra fields are additive.
+// ---------------------------------------------------------------------------
+export async function getActiveSessionDetailed(eventId) {
+  // Includes a paused session so Live Control keeps its controls (Resume/End)
+  // after a pause instead of falling back to the "start" screen.
+  const session = await getCurrentSession(eventId)
+  if (!session) return null
+
+  const { data: rounds } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUNDS)
+    .select('id, name, is_open, display_order, finalized_at')
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  const availableRounds = (rounds ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    isOpen: r.is_open,
+    finalized: Boolean(r.finalized_at),
+  }))
+
+  // Resolve the session's contestant order into display objects.
+  const order = session.contestantOrder ?? []
+  const contestantsById = new Map()
+  if (order.length) {
+    const { data: cs } = await getClient()
+      .from(DB_TABLES.CONTESTANTS)
+      .select('id, name, contestant_number, photo')
+      .in('id', order)
+    for (const c of cs ?? []) {
+      contestantsById.set(c.id, {
+        id: c.id,
+        name: c.name,
+        contestantNumber: c.contestant_number,
+        photo: c.photo,
+      })
+    }
+  }
+  const roundContestants = order.map((id) => contestantsById.get(id)).filter(Boolean)
+
+  // Active round enriched with its criteria (round-scoped, else event-wide).
+  let activeRound = null
+  if (session.currentRoundId) {
+    const r = (rounds ?? []).find((x) => x.id === session.currentRoundId)
+    let criteria = []
+    const { data: rcrit } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
+      .select('criteria_id')
+      .eq('round_id', session.currentRoundId)
+    if (rcrit && rcrit.length) {
+      const ids = rcrit.map((x) => x.criteria_id)
+      const { data: crits } = await getClient()
+        .from(DB_TABLES.CRITERIA)
+        .select('id, name, percentage')
+        .in('id', ids)
+      criteria = crits ?? []
+    } else {
+      const { data: crits } = await getClient()
+        .from(DB_TABLES.CRITERIA)
+        .select('id, name, percentage')
+        .eq('event_id', eventId)
+      criteria = crits ?? []
+    }
+    activeRound = {
+      id: session.currentRoundId,
+      name: r?.name ?? session.currentRoundName ?? 'Round',
+      isOpen: r?.is_open ?? true,
+      finalized: Boolean(r?.finalized_at),
+      contestants: roundContestants,
+      criteria,
+    }
+  }
+
+  const activeContestant = session.activeContestantId
+    ? contestantsById.get(session.activeContestantId) ?? {
+        id: session.activeContestantId,
+        name: session.activeContestantName,
+        contestantNumber: session.activeContestantNumber,
+        photo: session.activeContestantPhoto,
+      }
+    : null
+
+  const stageContestants = (session.activeContestantIds ?? [])
+    .map((id) => contestantsById.get(id))
+    .filter(Boolean)
+
+  return {
+    ...session,
+    availableRounds,
+    activeRound,
+    activeContestant,
+    activeContestantIndex: session.currentContestantOrder ?? 0,
+    roundContestants,
+    stageContestants,
+    activeDivisionId: session.currentDivisionId ?? null,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -436,6 +563,8 @@ export async function setActiveContestant(eventId, organizerId, contestantId) {
     .update({
       active_contestant_id: contestantId,
       current_contestant_order: orderIndex,
+      // Selecting a single contestant leaves any stage group (single mode).
+      active_contestant_ids: null,
     })
     .eq('id', session.id)
     .select('*')
@@ -445,6 +574,48 @@ export async function setActiveContestant(eventId, organizerId, contestantId) {
 
   const updated = mapSession(data)
 
+  emitToEvent(eventId, 'session:contestant-changed', {
+    session: updated,
+    previousContestantId: session.activeContestantId,
+  })
+
+  return updated
+}
+
+// ---------------------------------------------------------------------------
+// Stage group — put MULTIPLE contestants on stage at once (paired pageant,
+// head-to-head battle). Each is still scored individually by the judges. Passing
+// an empty list clears the group and returns to single-active mode.
+// ---------------------------------------------------------------------------
+export async function setStageGroup(eventId, organizerId, contestantIds) {
+  const session = await assertActiveSession(eventId, organizerId)
+
+  const ids = Array.isArray(contestantIds) ? [...new Set(contestantIds)] : []
+  for (const id of ids) {
+    if (!session.contestantOrder.includes(id)) {
+      throw new ApiError(400, 'A selected contestant is not in the current round order')
+    }
+  }
+
+  const primary = ids[0] ?? session.activeContestantId ?? null
+  const orderIndex = primary ? Math.max(0, session.contestantOrder.indexOf(primary)) : 0
+
+  const { data, error } = await getClient()
+    .from('competition_sessions')
+    .update({
+      active_contestant_ids: ids.length ? ids : null,
+      active_contestant_id: primary,
+      current_contestant_order: orderIndex,
+    })
+    .eq('id', session.id)
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+
+  const updated = mapSession(data)
+
+  // Judges reload their sheet on this event (same as a contestant change).
   emitToEvent(eventId, 'session:contestant-changed', {
     session: updated,
     previousContestantId: session.activeContestantId,
@@ -571,9 +742,12 @@ export async function pauseSession(eventId, organizerId) {
 // Resume the session
 // ---------------------------------------------------------------------------
 export async function resumeSession(eventId, organizerId) {
-  const session = await assertActiveSession(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
 
-  // Allow resuming even if status check fails — we need to find paused sessions too
+  // Find the active OR paused session (the active-only view hides paused ones).
+  const session = await getCurrentSession(eventId)
+  if (!session) throw new ApiError(404, 'No live session to resume for this event')
+
   const { data, error } = await getClient()
     .from('competition_sessions')
     .update({
@@ -598,7 +772,11 @@ export async function resumeSession(eventId, organizerId) {
 // Complete the session
 // ---------------------------------------------------------------------------
 export async function completeSession(eventId, organizerId) {
-  const session = await assertActiveSession(eventId, organizerId)
+  await assertCompetitionEvent(eventId, organizerId)
+
+  // Allow ending an active OR paused session.
+  const session = await getCurrentSession(eventId)
+  if (!session) throw new ApiError(404, 'No live session to end for this event')
 
   const now = new Date().toISOString()
 
@@ -655,13 +833,13 @@ export async function completeSession(eventId, organizerId) {
 // values written here were already validated against criteria bounds and the
 // judge's scope on the session path above.
 // ---------------------------------------------------------------------------
-async function bridgeSessionScoresToRankingStore(session, judgeId, scoreMap) {
+async function bridgeSessionScoresToRankingStore(session, judgeId, scoreMap, contestantIdArg) {
   const criteriaIds = Object.keys(scoreMap ?? {})
   if (!criteriaIds.length) return
 
   const roundId = session.currentRoundId ?? null
   const divisionId = session.currentDivisionId ?? null
-  const contestantId = session.activeContestantId
+  const contestantId = contestantIdArg ?? session.activeContestantId
 
   let del = getClient()
     .from(DB_TABLES.JUDGE_SCORES)
@@ -722,7 +900,7 @@ async function backfillLiveScoresToRankingStore(eventId) {
 // ---------------------------------------------------------------------------
 // Judge submits score for current contestant in the session
 // ---------------------------------------------------------------------------
-export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
+export async function submitJudgeSessionScore(eventId, judgeId, { scores, contestantId } = {}) {
   const enrollment = await assertJudgeEnrolled(eventId, judgeId)
   const event = await getEventById(eventId)
 
@@ -738,8 +916,19 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
     throw new ApiError(400, 'No active contestant to score')
   }
 
+  // Resolve the target contestant. In stage-group mode multiple contestants are
+  // on stage; the judge must say which one this submission is for. Without a
+  // group, it defaults to the single active contestant (back-compat).
+  const onStage = session.activeContestantIds?.length
+    ? session.activeContestantIds
+    : [session.activeContestantId]
+  const targetContestantId = contestantId ?? onStage[0]
+  if (!onStage.includes(targetContestantId)) {
+    throw new ApiError(400, 'That contestant is not currently on stage')
+  }
+
   // Validate that this contestant is in the current round's order
-  if (!session.contestantOrder.includes(session.activeContestantId)) {
+  if (!session.contestantOrder.includes(targetContestantId)) {
     throw new ApiError(400, 'Active contestant is not in the current round')
   }
 
@@ -762,7 +951,7 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
     .eq('session_id', session.id)
     .eq('judge_id', judgeId)
     .eq('round_id', session.currentRoundId)
-    .eq('contestant_id', session.activeContestantId)
+    .eq('contestant_id', targetContestantId)
     .maybeSingle()
 
   if (existing && existing.is_locked) {
@@ -852,7 +1041,7 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
     if (error) throw new ApiError(500, error.message)
 
     // Phase 3 (§7.1): mirror into the ranking store so live scores rank.
-    await bridgeSessionScoresToRankingStore(session, judgeId, scoreMap)
+    await bridgeSessionScoresToRankingStore(session, judgeId, scoreMap, targetContestantId)
 
     // M3: audit the score submission (fire-and-forget; recordAudit never throws).
     recordAudit({
@@ -860,14 +1049,14 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
       action: 'competition.score.submitted',
       entity: 'competition_session',
       entityId: session.id,
-      details: { eventId, roundId: session.currentRoundId, contestantId: session.activeContestantId },
+      details: { eventId, roundId: session.currentRoundId, contestantId: targetContestantId },
     })
 
     // Notify organizer that a judge submitted
     emitToEventOrganizer(eventId, 'session:judge-score-submitted', {
       sessionId: session.id,
       roundId: session.currentRoundId,
-      contestantId: session.activeContestantId,
+      contestantId: targetContestantId,
       judgeId,
       locked: true,
     })
@@ -882,7 +1071,7 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
       session_id: session.id,
       event_id: eventId,
       round_id: session.currentRoundId,
-      contestant_id: session.activeContestantId,
+      contestant_id: targetContestantId,
       judge_id: judgeId,
       scores: scoreMap,
       is_locked: true,
@@ -894,13 +1083,13 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores }) {
   if (error) throw new ApiError(500, error.message)
 
   // Phase 3 (§7.1): mirror into the ranking store so live scores rank.
-  await bridgeSessionScoresToRankingStore(session, judgeId, scoreMap)
+  await bridgeSessionScoresToRankingStore(session, judgeId, scoreMap, targetContestantId)
 
   // Notify organizer
   emitToEventOrganizer(eventId, 'session:judge-score-submitted', {
     sessionId: session.id,
     roundId: session.currentRoundId,
-    contestantId: session.activeContestantId,
+    contestantId: targetContestantId,
     judgeId,
     locked: true,
   })
@@ -940,12 +1129,16 @@ export async function getJudgeSessionView(eventId, judgeId) {
     }
   }
 
-  // Get the active contestant details
-  const { data: contestant } = await getClient()
+  // Stage contestants: the group when set, else just the single active one.
+  const stageIds = session.activeContestantIds?.length
+    ? session.activeContestantIds
+    : [session.activeContestantId]
+
+  const { data: stageRows } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
     .select('id, event_id, name, photo, contestant_number')
-    .eq('id', session.activeContestantId)
-    .single()
+    .in('id', stageIds)
+  const stageById = new Map((stageRows ?? []).map((c) => [c.id, c]))
 
   // Get criteria for the current round
   let criteria = []
@@ -975,23 +1168,17 @@ export async function getJudgeSessionView(eventId, judgeId) {
     criteria = (crits ?? []).map(mapCriteria)
   }
 
-  // Check if judge already submitted for this contestant
-  const { data: existingScore } = await getClient()
+  // This judge's existing session scores for every on-stage contestant.
+  const { data: existingRows } = await getClient()
     .from('competition_session_judge_scores')
-    .select('*')
+    .select('contestant_id, scores, is_locked')
     .eq('session_id', session.id)
     .eq('judge_id', judgeId)
     .eq('round_id', session.currentRoundId)
-    .eq('contestant_id', session.activeContestantId)
-    .maybeSingle()
-
-  const hasSubmitted = !!(existingScore && existingScore.is_locked)
-  const existingScores = existingScore?.scores ?? {}
+    .in('contestant_id', stageIds)
+  const existingByContestant = new Map((existingRows ?? []).map((r) => [r.contestant_id, r]))
 
   // §8C: the event scale is the single source of truth for the score range.
-  // Resolve every criterion's bounds from the scale so the judge UI shows and
-  // enforces the same range the backend validates against (previously each
-  // criterion carried its own min/max, which could disagree with the scale).
   const scoringConfig = mergeScoringConfig(event.scoring_config)
   const eventBounds = resolveScoreBounds(scoringConfig)
   const criteriaWithBounds = criteria.map((c) => ({
@@ -1000,15 +1187,39 @@ export async function getJudgeSessionView(eventId, judgeId) {
     maxScore: eventBounds.max,
   }))
 
+  // One entry per on-stage contestant with that contestant's own scores/lock.
+  const stageContestants = stageIds
+    .map((id) => stageById.get(id))
+    .filter(Boolean)
+    .map((c) => {
+      const ex = existingByContestant.get(c.id)
+      return {
+        ...mapContestant(c),
+        existingScores: ex?.scores ?? {},
+        hasSubmitted: !!(ex && ex.is_locked),
+      }
+    })
+
+  const primary = stageContestants[0] ?? null
+
   return {
     session,
+    // The judge page reads `activeSession` on mount to set its state.
+    activeSession: session,
     event: { id: eventId, title: event.title, eventType: event.event_type },
-    contestant: contestant ? mapContestant(contestant) : null,
+    // The scoring form renders `contestants` — the on-stage set (one in single
+    // mode, several in a stage group). Each entry carries its own scores/lock.
+    contestants: stageContestants,
+    // Back-compat single-contestant fields (the primary on-stage contestant).
+    contestant: primary ? { id: primary.id, name: primary.name, photo: primary.photo, contestantNumber: primary.contestantNumber } : null,
+    existingScores: primary?.existingScores ?? {},
+    hasSubmitted: primary?.hasSubmitted ?? false,
+    // Stage group: every on-stage contestant, each scored individually.
+    stageGroup: Boolean(session.activeContestantIds?.length),
+    stageContestants,
     criteria: criteriaWithBounds,
     scoringConfig,
     scoreBounds: eventBounds,
-    existingScores,
-    hasSubmitted,
     totalContestants: session.contestantOrder.length,
     currentPosition: session.currentContestantOrder + 1,
   }

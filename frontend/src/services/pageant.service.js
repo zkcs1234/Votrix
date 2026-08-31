@@ -264,8 +264,8 @@ export const pageantService = {
   },
 
   // Live session scoring - individual score submission during live sessions
-  submitSessionScore(eventId, scores) {
-    return api.post(`${judge}/events/${eventId}/session-score`, { scores })
+  submitSessionScore(eventId, scores, contestantId) {
+    return api.post(`${judge}/events/${eventId}/session-score`, { scores, contestantId })
   },
 }
 

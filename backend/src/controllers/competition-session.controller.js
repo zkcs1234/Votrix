@@ -8,7 +8,9 @@ import * as sessionService from '../services/competition-session.service.js'
 
 /** GET /api/organizer/competition/events/:eventId/session/active */
 export const getActiveSession = asyncHandler(async (req, res) => {
-  const session = await sessionService.getActiveSession(req.params.eventId)
+  // Enriched shape for Live Control (activeRound, activeContestant,
+  // availableRounds, roundContestants, activeContestantIndex, activeDivisionId).
+  const session = await sessionService.getActiveSessionDetailed(req.params.eventId)
   res.json({ success: true, session })
 })
 
@@ -60,6 +62,20 @@ export const setActiveContestant = asyncHandler(async (req, res) => {
     req.params.eventId,
     req.user.id,
     contestantId,
+  )
+  res.json({ success: true, session })
+})
+
+/** POST /api/organizer/competition/events/:eventId/session/stage-group */
+export const setStageGroup = asyncHandler(async (req, res) => {
+  const { contestantIds } = req.body
+  if (!Array.isArray(contestantIds)) {
+    return res.status(400).json({ success: false, message: 'contestantIds must be an array' })
+  }
+  const session = await sessionService.setStageGroup(
+    req.params.eventId,
+    req.user.id,
+    contestantIds,
   )
   res.json({ success: true, session })
 })

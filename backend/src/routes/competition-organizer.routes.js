@@ -72,6 +72,7 @@ router.post('/session/complete', sessionCtrl.completeSession)
 router.post('/session/next-contestant', sessionCtrl.nextContestant)
 router.post('/session/prev-contestant', sessionCtrl.previousContestant)
 router.post('/session/set-contestant', sessionCtrl.setActiveContestant)
+router.post('/session/stage-group', sessionCtrl.setStageGroup)
 router.post('/session/set-round', sessionCtrl.setActiveRound)
 router.post('/session/set-division', sessionCtrl.setActiveDivision)
 

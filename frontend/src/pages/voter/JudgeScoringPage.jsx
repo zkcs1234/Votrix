@@ -10,6 +10,18 @@ import ParticipantInformationGate from '@/components/voter/ParticipantInformatio
 import CompetitionScoringForm from '@/components/voter/competition/CompetitionScoringForm'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
 
+// Build the flat scores map (keyed `contestantId:criteriaId`) that the scoring
+// form and auto-save use, from each on-stage contestant's existing scores.
+function scoresFromSheet(data) {
+  const out = {}
+  for (const c of data?.contestants ?? []) {
+    for (const [critId, val] of Object.entries(c.existingScores ?? {})) {
+      out[`${c.id}:${critId}`] = val
+    }
+  }
+  return out
+}
+
 export default function JudgeScoringPage() {
   const { eventId } = useParams()
   const [sheet, setSheet] = useState(null)
@@ -97,10 +109,8 @@ export default function JudgeScoringPage() {
       .getSessionView(eventId)
       .then(({ data }) => {
         setSheet(data)
-        // Initialize scores from existing locked submissions
-        if (data.existingScores) {
-          setScores(data.existingScores)
-        }
+        // Initialize scores (per on-stage contestant) from existing submissions.
+        setScores(scoresFromSheet(data))
       })
       .catch((err) => {
         console.error('[Load session view]', err)
@@ -132,7 +142,7 @@ export default function JudgeScoringPage() {
       // Update sheet with filtered data
       setSheet(data)
       setSelectedDivisionId(divisionId)
-      setScores(data.existingScores || {})
+      setScores(scoresFromSheet(data))
       
     } catch (err) {
       console.error('Division change error:', err)
@@ -191,12 +201,22 @@ export default function JudgeScoringPage() {
   useSocketEvent('session:status-changed', ({ session }) => {
     if (!session) return
     setSessionState(session)
-    if (session.status === 'active' && session.activeContestantId) {
-      setActiveContestantId(session.activeContestantId)
+    if (session.status === 'active') {
+      // Reload the sheet: the initial mount load may have run BEFORE the session
+      // existed (empty criteria/contestants), so without this the judge would see
+      // an "active" session with nothing to score.
+      pageantService
+        .getSessionView(eventId)
+        .then(({ data }) => {
+          setSheet(data)
+          setScores(scoresFromSheet(data))
+        })
+        .catch((err) => console.error('[Judge] reload on session start failed:', err))
+      setActiveContestantId(session.activeContestantId ?? null)
     } else {
       setActiveContestantId(null)
     }
-  }, [])
+  }, [eventId])
 
   useSocketEvent('session:contestant-changed', ({ session }) => {
     if (!session) return
@@ -219,7 +239,7 @@ export default function JudgeScoringPage() {
           .getSessionView(eventId, { divisionId: session.currentDivisionId })
           .then(({ data }) => {
             setSheet(data)
-            setScores(data.existingScores || {})
+            setScores(scoresFromSheet(data))
           })
           .catch((err) => {
             console.error('[Division change] Failed to reload scoring sheet:', err)
@@ -250,9 +270,13 @@ export default function JudgeScoringPage() {
     const key = `${contestantId}:${criteriaId}`
     
     setScores(prev => ({ ...prev, [key]: value }))
-    
-    // Only auto-save for active contestant in active session
-    if (!isSessionActive || contestantId !== activeContestantId || !sheet?.criteria) {
+
+    // Auto-save for any ON-STAGE contestant (a stage group has several; single
+    // mode has just the active one).
+    const onStageIds = sheet?.stageGroup
+      ? (sheet.stageContestants ?? []).map((c) => c.id)
+      : [activeContestantId]
+    if (!isSessionActive || !onStageIds.includes(contestantId) || !sheet?.criteria) {
       return
     }
     
@@ -291,7 +315,7 @@ export default function JudgeScoringPage() {
         
         // Only submit if all criteria are scored for this contestant
         if (allScored) {
-          await pageantService.submitSessionScore(eventId, contestantScores)
+          await pageantService.submitSessionScore(eventId, contestantScores, contestantId)
           console.log(`[Auto-save] Submitted scores for contestant ${contestantId}`)
           
           // Show confirmation toast
@@ -349,7 +373,7 @@ export default function JudgeScoringPage() {
       for (const submission of submissionQueue) {
         try {
           // Retry the submission
-          await pageantService.submitSessionScore(eventId, submission.scores)
+          await pageantService.submitSessionScore(eventId, submission.scores, submission.contestantId)
           
           console.log(`[Retry Queue] Successfully submitted scores for contestant ${submission.contestantId}`)
           
@@ -390,7 +414,7 @@ export default function JudgeScoringPage() {
     for (const submission of submissionQueue) {
       try {
         // Retry the submission
-        await pageantService.submitSessionScore(eventId, submission.scores)
+        await pageantService.submitSessionScore(eventId, submission.scores, submission.contestantId)
         
         console.log(`[Manual Retry] Successfully submitted scores for contestant ${submission.contestantId}`)
         

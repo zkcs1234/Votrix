@@ -78,7 +78,7 @@ describe('S2 fallback — round with no assigned criteria returns ALL event crit
         },
       ],
       competition_contestants: [
-        { data: { id: 'c1', event_id: 'evt', name: 'Alice', photo: null, contestant_number: 1 }, error: null },
+        { data: [{ id: 'c1', event_id: 'evt', name: 'Alice', photo: null, contestant_number: 1 }], error: null },
       ],
       // The active round r1 has NO criteria assigned -> triggers the fallback.
       competition_round_criteria: [{ data: [], error: null }],
@@ -92,7 +92,7 @@ describe('S2 fallback — round with no assigned criteria returns ALL event crit
           error: null,
         },
       ],
-      competition_session_judge_scores: [{ data: null, error: null }],
+      competition_session_judge_scores: [{ data: [], error: null }],
     })
 
     const view = await getJudgeSessionView('evt', 'judge-1')
