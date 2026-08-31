@@ -1,17 +1,24 @@
 import { useRef, useEffect } from 'react'
-import ScoreInput from '@/components/ui/ScoreInput'
+import ScoreInputBase from '@/components/ui/ScoreInput'
 
-export default function CompetitionScoringForm({ 
-  sheet, 
-  scores, 
-  onScoreChange, 
-  disabled, 
+export default function CompetitionScoringForm({
+  sheet,
+  scores,
+  onScoreChange,
+  disabled,
   liveMode = false,
   activeContestantId = null,
+  activeContestantIds = null,
   sessionState = null
 }) {
   const { contestants, criteria } = sheet
   const contestantRefs = useRef({})
+
+  // A contestant is "active" if it is the single active one OR (in a stage
+  // group) any of the contestants currently on stage.
+  const isActive = (id) =>
+    liveMode &&
+    (activeContestantIds?.length ? activeContestantIds.includes(id) : activeContestantId === id)
 
   // Auto-scroll to active contestant in live mode
   useEffect(() => {
@@ -43,13 +50,25 @@ export default function CompetitionScoringForm({
   // Get contestant card class based on live mode status
   const getContestantCardClass = (contestantId) => {
     const baseClass = "v-card p-6 transition-all duration-300"
-    
-    if (liveMode && activeContestantId === contestantId) {
+
+    if (isActive(contestantId)) {
       return `${baseClass} ring-2 ring-emerald-500 bg-emerald-950/20 shadow-lg shadow-emerald-500/20`
     }
-    
+
     return baseClass
   }
+
+  // Prominent contestant-number badge so the organizer/judge can spot who is
+  // being scored at a glance.
+  const NumberBadge = ({ number, active }) => (
+    <span
+      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-base font-bold tabular-nums ${
+        active ? 'bg-emerald-500 text-white' : 'bg-v-surface-elevated text-v-text border border-v-border'
+      }`}
+    >
+      #{number}
+    </span>
+  )
 
   return (
     <div className="space-y-6">
@@ -71,24 +90,23 @@ export default function CompetitionScoringForm({
           </thead>
           <tbody>
             {orderedContestants.map((cont) => (
-              <tr 
-                key={cont.id} 
+              <tr
+                key={cont.id}
                 ref={(el) => (contestantRefs.current[cont.id] = el)}
                 className={`border-b border-v-border/50 ${
-                  liveMode && activeContestantId === cont.id 
-                    ? 'bg-emerald-950/20 ring-1 ring-emerald-500/50' 
+                  isActive(cont.id)
+                    ? 'bg-emerald-950/20 ring-1 ring-emerald-500/50'
                     : ''
                 }`}
               >
                 <td className="p-3">
                   <div className="flex items-center gap-3">
+                    <NumberBadge number={cont.contestantNumber} active={isActive(cont.id)} />
                     {cont.photo && (
                       <img src={cont.photo} alt="" className="h-10 w-10 rounded-lg object-cover" />
                     )}
-                    <span className="font-medium text-v-text">
-                      #{cont.contestantNumber} {cont.name}
-                    </span>
-                    {liveMode && activeContestantId === cont.id && (
+                    <span className="font-medium text-v-text">{cont.name}</span>
+                    {isActive(cont.id) && (
                       <span className="ml-2 rounded-full bg-emerald-500 px-2 py-1 text-xs font-medium text-white">
                         Active
                       </span>
@@ -97,7 +115,7 @@ export default function CompetitionScoringForm({
                 </td>
                 {criteria.map((crit) => (
                   <td key={crit.id} className="p-2">
-                    <ScoreInput
+                    <ScoreInputComponent
                       contestantId={cont.id}
                       criteria={crit}
                       scores={scores}
@@ -120,13 +138,12 @@ export default function CompetitionScoringForm({
             className={getContestantCardClass(cont.id)}
           >
             <div className="flex items-center gap-3">
+              <NumberBadge number={cont.contestantNumber} active={isActive(cont.id)} />
               {cont.photo && (
                 <img src={cont.photo} alt="" className="h-12 w-12 rounded-lg object-cover" />
               )}
-              <h4 className="v-section-title">
-                #{cont.contestantNumber} {cont.name}
-              </h4>
-              {liveMode && activeContestantId === cont.id && (
+              <h4 className="v-section-title">{cont.name}</h4>
+              {isActive(cont.id) && (
                 <span className="ml-auto rounded-full bg-emerald-500 px-3 py-1 text-xs font-medium text-white">
                   Active
                 </span>
@@ -141,7 +158,7 @@ export default function CompetitionScoringForm({
                       {crit.minScore}–{crit.maxScore}
                     </span>
                   </label>
-                  <ScoreInput
+                  <ScoreInputComponent
                     contestantId={cont.id}
                     criteria={crit}
                     scores={scores}
@@ -159,19 +176,19 @@ export default function CompetitionScoringForm({
   )
 }
 
-function ScoreInputComponent({ contestantId, criteria, scores, onScoreChange, disabled }) {
+function ScoreInputComponent({ contestantId, criteria, scores, onScoreChange, disabled, size = 'sm' }) {
   const key = `${contestantId}:${criteria.id}`
   const currentValue = scores[key] ?? ''
 
   return (
-    <ScoreInput
+    <ScoreInputBase
       min={criteria.minScore}
       max={criteria.maxScore}
       step="0.5"
       value={currentValue}
       onChange={(val) => onScoreChange(contestantId, criteria.id, val)}
       disabled={disabled}
-      size="sm"
+      size={size}
     />
   )
 }

@@ -1178,6 +1178,18 @@ export async function getJudgeSessionView(eventId, judgeId) {
     .in('contestant_id', stageIds)
   const existingByContestant = new Map((existingRows ?? []).map((r) => [r.contestant_id, r]))
 
+  // Resolve the current round's NAME so the judge always sees a friendly label
+  // (the socket-emitted session carries no join, so it can arrive name-less).
+  let roundName = session.currentRoundName ?? null
+  if (session.currentRoundId && !roundName) {
+    const { data: roundRow } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUNDS)
+      .select('name')
+      .eq('id', session.currentRoundId)
+      .maybeSingle()
+    roundName = roundRow?.name ?? null
+  }
+
   // §8C: the event scale is the single source of truth for the score range.
   const scoringConfig = mergeScoringConfig(event.scoring_config)
   const eventBounds = resolveScoreBounds(scoringConfig)
@@ -1217,6 +1229,8 @@ export async function getJudgeSessionView(eventId, judgeId) {
     // Stage group: every on-stage contestant, each scored individually.
     stageGroup: Boolean(session.activeContestantIds?.length),
     stageContestants,
+    roundName,
+    roundId: session.currentRoundId ?? null,
     criteria: criteriaWithBounds,
     scoringConfig,
     scoreBounds: eventBounds,

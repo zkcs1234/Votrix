@@ -176,17 +176,20 @@ export default function JudgeScoringPage() {
     }
   }, [sheet?.activeSession])
 
-  // Re-sync the whole session view from the server (used on (re)connect).
+  // Re-sync the whole session view from the server (used on (re)connect and on
+  // round/contestant/stage changes so the round name, criteria, on-stage set and
+  // existing scores all refresh together).
   const syncSessionView = useCallback(() => {
     pageantService
       .getSessionView(eventId)
       .then(({ data }) => {
         setSheet(data)
+        setScores(scoresFromSheet(data))
         if (data.activeSession) {
           setSessionState(data.activeSession)
-          if (data.activeSession.status === 'active' && data.activeSession.activeContestantId) {
-            setActiveContestantId(data.activeSession.activeContestantId)
-          }
+          setActiveContestantId(
+            data.activeSession.status === 'active' ? data.activeSession.activeContestantId ?? null : null,
+          )
         }
       })
       .catch((err) => console.error('[WS] Failed to sync session:', err))
@@ -221,13 +224,16 @@ export default function JudgeScoringPage() {
   useSocketEvent('session:contestant-changed', ({ session }) => {
     if (!session) return
     setSessionState(session)
-    if (session.activeContestantId) {
-      setActiveContestantId(session.activeContestantId)
-      setScores({}) // clear scores for the new contestant
-    } else {
-      setActiveContestantId(null)
-    }
-  }, [])
+    // Reload the sheet so the on-stage set (single or stage group), its criteria
+    // and existing scores all refresh for the new context.
+    syncSessionView()
+  }, [syncSessionView])
+
+  // Round switched by the organizer — reload so the round name + criteria update.
+  useSocketEvent('session:round-changed', ({ session }) => {
+    if (session) setSessionState(session)
+    syncSessionView()
+  }, [syncSessionView])
 
   useSocketEvent('session:division-changed', ({ session }) => {
     if (!session) return
@@ -540,15 +546,17 @@ export default function JudgeScoringPage() {
         <div className="flex items-center gap-3">
           <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-emerald-300">Live Session Active</p>
-            {sessionState?.currentRoundId && (
+            <p className="text-xs font-medium uppercase tracking-wider text-emerald-400/70">Live Session Active</p>
+            {(sheet?.roundName || sessionState?.currentRoundName || sessionState?.currentRoundId) ? (
+              <p className="mt-0.5 text-lg font-bold text-emerald-200">
+                {sheet?.roundName || sessionState?.currentRoundName || 'Current round'}
+              </p>
+            ) : (
+              <p className="mt-0.5 text-sm font-semibold text-emerald-200">No round selected</p>
+            )}
+            {activeContestantId && sessionState?.contestantOrder && (
               <p className="text-xs text-emerald-400/80">
-                Round: {sessionState.currentRoundName || sessionState.currentRoundId}
-                {activeContestantId && sessionState.contestantOrder && (
-                  <span className="ml-2">
-                    Contestant {sessionState.contestantOrder.indexOf(activeContestantId) + 1} of {sessionState.contestantOrder.length}
-                  </span>
-                )}
+                Contestant {sessionState.contestantOrder.indexOf(activeContestantId) + 1} of {sessionState.contestantOrder.length}
               </p>
             )}
           </div>
@@ -637,6 +645,7 @@ export default function JudgeScoringPage() {
         disabled={autoSaving}
         liveMode={true}
         activeContestantId={activeContestantId}
+        activeContestantIds={sheet?.stageGroup ? (sheet.stageContestants ?? []).map((c) => c.id) : null}
         sessionState={sessionState}
       />
 
