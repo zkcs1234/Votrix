@@ -7,7 +7,7 @@ import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES, SCORE_POLICIES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { assertJudgeEnrolled, canJudgeScore } from './pageant.service.js'
-import { mergeScoringConfig, resolveScoreBounds, isScoreInBounds, computeRankings } from '../modules/scoring-engine.js'
+import { mergeScoringConfig, resolveScoreBounds, computeRankings } from '../modules/scoring-engine.js'
 import { selectQualifiers, applyQualifierOverride } from '../modules/advancement.js'
 import { recordAudit } from '../foundation/audit.js'
 import { emitToEvent, emitToEventOrganizer, emitToEventVoters, emitToUser } from '../websocket/ws-emitter.js'
@@ -1004,6 +1004,12 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores, contes
   // ignored here while the batch path rejected out-of-scale scores). The
   // per-criterion min/max remains an optional override that must fit inside the
   // scale — matching submitJudgeScores.
+  // §8C: the event scale is the single source of truth for the valid range, and
+  // it must match what the judge FORM allows (the form uses these same scale
+  // bounds). We deliberately IGNORE any stray per-criterion min_score/max_score
+  // here — the UI no longer lets organizers set per-criterion ranges, so a
+  // leftover value (e.g. an "Audience Impact" max of 10 on a 1–100 event) must
+  // not silently cap a judge's score below the scale.
   const scoringConfig = mergeScoringConfig(event.scoring_config)
   const eventBounds = resolveScoreBounds(scoringConfig)
 
@@ -1017,18 +1023,10 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores, contes
     if (Number.isNaN(num)) {
       throw new ApiError(400, `Score for "${crit.name}" must be a number`)
     }
-    const min = crit.minScore ?? eventBounds.min
-    const max = crit.maxScore ?? eventBounds.max
-    if (num < min || num > max) {
+    if (num < eventBounds.min || num > eventBounds.max) {
       throw new ApiError(
         400,
-        `Score for "${crit.name}" must be between ${min} and ${max}`,
-      )
-    }
-    if (!isScoreInBounds(num, scoringConfig)) {
-      throw new ApiError(
-        400,
-        `Score for "${crit.name}" is outside the configured score type (${eventBounds.min}–${eventBounds.max})`,
+        `Score for "${crit.name}" must be between ${eventBounds.min} and ${eventBounds.max}`,
       )
     }
     scoreMap[crit.id] = num

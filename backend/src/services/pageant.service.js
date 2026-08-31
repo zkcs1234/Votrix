@@ -21,7 +21,6 @@ import {
   computeRankings,
   resolveScoreBounds,
   mergeScoringConfig,
-  isScoreInBounds,
 } from '../modules/scoring-engine.js'
 import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
 import { emitToEvent } from '../websocket/ws-emitter.js'
@@ -1304,20 +1303,13 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
       throw new ApiError(400, `Score for ${crit.name} must be a number`)
     }
 
-    // Per-criterion min/max continue to win if explicitly configured;
-    // otherwise we fall back to the event-level score-type bounds.
-    const min = crit.minScore ?? eventBounds.min
-    const max = crit.maxScore ?? eventBounds.max
-    if (score < min || score > max) {
+    // §8C: the event score scale (Structure & Scoring → Scoring config) is the
+    // single source of truth for the valid range. Any stray per-criterion
+    // min_score/max_score is ignored — the UI no longer sets per-criterion ranges.
+    if (score < eventBounds.min || score > eventBounds.max) {
       throw new ApiError(
         400,
-        `Score for ${crit.name} must be between ${min} and ${max}`,
-      )
-    }
-    if (!isScoreInBounds(score, scoringConfig)) {
-      throw new ApiError(
-        400,
-        `Score for ${crit.name} is outside the configured score type (${eventBounds.min}–${eventBounds.max})`,
+        `Score for ${crit.name} must be between ${eventBounds.min} and ${eventBounds.max}`,
       )
     }
 
