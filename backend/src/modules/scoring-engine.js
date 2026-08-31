@@ -246,8 +246,21 @@ export function computeRankings({
     ? rounds
     : [{ id: null, name: 'Overall', weight: 100 }]
 
+  // Legacy safety (no per-round criteria): every round reuses ALL criteria, so
+  // each round holds the SAME value V. The final Σ(V × weight/100) then collapses
+  // to V × (Σ round weights)/100 — which INFLATES the overall (even past 100)
+  // whenever the round weights don't total 100%. Normalize the weights so an
+  // unpartitioned event can't blow past a single round's score. No effect when
+  // weights already total 100%, and no effect in scoped mode (correct there) or
+  // when categories drive the grouping.
+  const roundWeightTotal = (rounds ?? []).reduce((s, r) => s + Number(r.weight ?? 0), 0)
+  const roundWeightScale =
+    !scoped && categories.length === 0 && rounds.length > 0 && roundWeightTotal > 0
+      ? 100 / roundWeightTotal
+      : 1
+
   // 3. Combine rounds → categories (SHARED by both paths; reads row.perRound).
-  combineRoundsToFinal({ contestants, categories, effectiveRounds, byContestant, dp })
+  combineRoundsToFinal({ contestants, categories, effectiveRounds, byContestant, dp, roundWeightScale })
 
   // Phase 7: optional deterministic tie-break key.
   const tieBreakActive = cfg.tieBreaker === 'highest_criterion'
@@ -430,7 +443,7 @@ function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCri
 
 // SHARED: combine per-round values → per-category → final. Reads row.perRound
 // (populated by whichever path ran) so both legacy and scoped modes reuse it.
-function combineRoundsToFinal({ contestants, categories, effectiveRounds, byContestant, dp }) {
+function combineRoundsToFinal({ contestants, categories, effectiveRounds, byContestant, dp, roundWeightScale = 1 }) {
   if (categories.length === 0) {
     for (const contestant of contestants) {
       const row = byContestant.get(contestant.id)
@@ -438,7 +451,7 @@ function combineRoundsToFinal({ contestants, categories, effectiveRounds, byCont
       let final = 0
       for (const round of effectiveRounds) {
         const v = row.perRound[round.id ?? 'overall']?.value ?? 0
-        final += v * (Number(round.weight ?? 100) / 100)
+        final += v * ((Number(round.weight ?? 100) * roundWeightScale) / 100)
       }
       row.finalScore = round2(final, dp)
     }
