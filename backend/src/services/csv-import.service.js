@@ -5,6 +5,7 @@ import { assertOrganizerOwnsEvent } from './event.service.js'
 import { inviteVoterToEvent, inviteRegisteredVoter, registerVoterToEvent, registerExistingVoter } from './invitation.service.js'
 import { db as getClient } from '../foundation/db.js'
 import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
+import { recordEventActivity } from '../foundation/activity.js'
 
 function parseCsvBuffer(buffer) {
   return new Promise((resolve, reject) => {
@@ -347,6 +348,14 @@ export async function registerVotersFromCsv(eventId, organizerId, parsedData) {
     if (err instanceof ApiError) throw err
     throw new ApiError(500, err.message || 'CSV registration failed')
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'election.voter.csv_import',
+    userId: organizerId,
+    module: 'election',
+    details: { total: parsedData.length, succeeded: results.length },
+  })
 
   return {
     total: parsedData.length,

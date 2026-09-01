@@ -13,6 +13,11 @@ export default function CompetitionScoringForm({
 }) {
   const { contestants, criteria } = sheet
   const contestantRefs = useRef({})
+  // §8C: the event SCALE is the source of truth for the valid range. Use the
+  // sheet's scale bounds for every input so a stale per-criterion min/max can
+  // never cap a valid score (which is how 90 got truncated to 9). Falls back to
+  // per-criterion values only if the sheet didn't send scale bounds.
+  const scaleBounds = sheet.scoreBounds ?? null
 
   // A contestant is "active" if it is the single active one OR (in a stage
   // group) any of the contestants currently on stage.
@@ -118,6 +123,7 @@ export default function CompetitionScoringForm({
                     <ScoreInputComponent
                       contestantId={cont.id}
                       criteria={crit}
+                      bounds={scaleBounds}
                       scores={scores}
                       onScoreChange={onScoreChange}
                       disabled={disabled}
@@ -161,6 +167,7 @@ export default function CompetitionScoringForm({
                   <ScoreInputComponent
                     contestantId={cont.id}
                     criteria={crit}
+                    bounds={scaleBounds}
                     scores={scores}
                     onScoreChange={onScoreChange}
                     disabled={disabled}
@@ -176,14 +183,18 @@ export default function CompetitionScoringForm({
   )
 }
 
-function ScoreInputComponent({ contestantId, criteria, scores, onScoreChange, disabled, size = 'sm' }) {
+function ScoreInputComponent({ contestantId, criteria, bounds, scores, onScoreChange, disabled, size = 'sm' }) {
   const key = `${contestantId}:${criteria.id}`
   const currentValue = scores[key] ?? ''
+  // Scale bounds win; fall back to the criterion's own range only if the scale
+  // wasn't provided by the sheet.
+  const min = bounds?.min ?? criteria.minScore
+  const max = bounds?.max ?? criteria.maxScore
 
   return (
     <ScoreInputBase
-      min={criteria.minScore}
-      max={criteria.maxScore}
+      min={min}
+      max={max}
       step="0.5"
       value={currentValue}
       onChange={(val) => onScoreChange(contestantId, criteria.id, val)}

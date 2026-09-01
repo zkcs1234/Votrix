@@ -8,6 +8,7 @@ import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './mailer.service.js'
 import { createNotification } from './notification.service.js'
 import { registerParticipant } from './participant.service.js'
+import { recordEventActivity } from '../foundation/activity.js'
 
 
 async function ensureVoterAccount(email, plainPassword, resetPasswordForExisting = true) {
@@ -139,6 +140,14 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
     }
   }
 
+  recordEventActivity({
+    eventId,
+    action: 'election.voter.invite',
+    userId: organizerId,
+    module: 'election',
+    details: { voterUserId: user.id, email: user.email, isNewVoter: isNew, sent: emailResult?.sent || false },
+  })
+
   return {
     user,
     event: { id: event.id, title: event.title },
@@ -204,6 +213,14 @@ export async function inviteRegisteredVoter({ eventId, email, organizerId }) {
       console.error('[invitation] failed to mark invitation_sent=true:', dbErr.message)
     }
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'election.voter.invite',
+    userId: organizerId,
+    module: 'election',
+    details: { voterUserId: voter.id, email: voter.email, existingAccount: true, sent: emailResult?.sent || false },
+  })
 
   return { user: voter, event: { id: event.id, title: event.title } }
 }
@@ -293,6 +310,14 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
     })
   }
 
+  recordEventActivity({
+    eventId,
+    action: 'election.voter.invitation.resend',
+    userId: organizerId,
+    module: 'election',
+    details: { voterUserId: voterId, email: voter.email, invitationType, sent: emailResult?.sent || false },
+  })
+
   return {
     email: emailResult,
     invitationType,
@@ -381,6 +406,14 @@ export async function registerVoterToEvent({ eventId, email, organizerId, tempor
     throw new ApiError(500, 'Failed to create invitation record')
   }
 
+  recordEventActivity({
+    eventId,
+    action: 'election.voter.register',
+    userId: organizerId,
+    module: 'election',
+    details: { voterUserId: user.id, email: user.email, isNewVoter: isNew },
+  })
+
   return {
     user,
     event: { id: event.id, title: event.title },
@@ -434,6 +467,14 @@ export async function registerExistingVoter({ eventId, email, organizerId }) {
     console.error('[registration] invitations insert failed:', dbErr.message)
     throw new ApiError(500, 'Failed to create invitation record')
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'election.voter.register',
+    userId: organizerId,
+    module: 'election',
+    details: { voterUserId: voter.id, email: voter.email, existingAccount: true },
+  })
 
   return {
     user: sanitizeUser(voter),
@@ -550,6 +591,14 @@ export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
       console.error('[send-invitation] createNotification failed (non-fatal):', notifErr.message)
     }
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'election.voter.invitation.send',
+    userId: organizerId,
+    module: 'election',
+    details: { voterUserId: voterId, email: voter.email, invitationType, sent: emailResult?.sent || false },
+  })
 
   return {
     user: voter,
@@ -690,6 +739,14 @@ export async function sendAllPendingInvitations({ eventId, organizerId }) {
       })
     }
   }
+
+  recordEventActivity({
+    eventId,
+    action: 'election.voter.invitation.send_all',
+    userId: organizerId,
+    module: 'election',
+    details: { total: pendingVoters.length, sent: sentCount, failed: failedCount },
+  })
 
   return {
     total: pendingVoters.length,

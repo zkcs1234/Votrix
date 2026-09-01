@@ -48,6 +48,7 @@ export default function JudgeScoringPage() {
   
   // Confirmation toast state
   const [showConfirmation, setShowConfirmation] = useState(false)
+  const [lastSavedName, setLastSavedName] = useState('')
 
   // Interactive award tasks (vote / judge selection)
   const [awardTasks, setAwardTasks] = useState([])
@@ -380,8 +381,12 @@ export default function JudgeScoringPage() {
           break
         }
         
+        // §8C: validate against the event SCALE (source of truth), falling back
+        // to the criterion range only if the scale wasn't provided.
+        const boundMin = sheet?.scoreBounds?.min ?? criteria.minScore
+        const boundMax = sheet?.scoreBounds?.max ?? criteria.maxScore
         const numValue = Number(score)
-        if (isNaN(numValue) || numValue < criteria.minScore || numValue > criteria.maxScore) {
+        if (isNaN(numValue) || numValue < boundMin || numValue > boundMax) {
           allScored = false
           break
         }
@@ -396,7 +401,13 @@ export default function JudgeScoringPage() {
         if (allScored) {
           await pageantService.submitSessionScore(eventId, contestantScores, contestantId)
           console.log(`[Auto-save] Submitted scores for contestant ${contestantId}`)
-          
+
+          // Name the contestant that was actually just saved (matters in a
+          // stage group where more than one contestant is scored).
+          const savedName =
+            (sheet?.stageContestants ?? sheet?.contestants ?? []).find((c) => c.id === contestantId)?.name || ''
+          setLastSavedName(savedName)
+
           // Show confirmation toast
           setShowConfirmation(true)
           
@@ -682,36 +693,47 @@ export default function JudgeScoringPage() {
       )}
 
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-sm">
-        <p className="text-v-text-muted">
-          {activeContestantId ? (
+        {(() => {
+          // On-stage contestants: the whole stage group, or the single active one.
+          const onStage = sheet?.stageGroup
+            ? (sheet.stageContestants ?? [])
+            : (activeContestantId
+                ? [sheet?.contestants?.find((c) => c.id === activeContestantId)].filter(Boolean)
+                : [])
+          if (!onStage.length) {
+            return <p className="text-v-text-muted">Waiting for organizer to select contestant...</p>
+          }
+          const critCount = sheet?.criteria?.length || 0
+          const doneFor = (cid) =>
+            (sheet?.criteria ?? []).filter((crit) => {
+              const s = scores[`${cid}:${crit.id}`]
+              return s !== undefined && s !== '' && s !== null
+            }).length
+          return (
             <>
-              Scoring contestant: <strong className="text-white">
-                {sheet?.contestants?.find(c => c.id === activeContestantId)?.name || 'Unknown'}
-              </strong>{' '}
-              on <strong className="text-white">{sheet?.criteria?.length || 0}</strong> criteria
+              <p className="text-v-text-muted">
+                Scoring{' '}
+                {onStage.length > 1 ? (
+                  <strong className="text-white">{onStage.length} contestants on stage</strong>
+                ) : (
+                  <>contestant: <strong className="text-white">{onStage[0].name}</strong></>
+                )}{' '}
+                on <strong className="text-white">{critCount}</strong> criteria
+              </p>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-v-text-subtle">
+                {onStage.map((c) => {
+                  const done = doneFor(c.id)
+                  const complete = done === critCount && critCount > 0
+                  return (
+                    <span key={c.id} className={complete ? 'text-emerald-400' : ''}>
+                      {c.name}: {done}/{critCount}{complete ? ' ✓' : ''}
+                    </span>
+                  )
+                })}
+              </div>
             </>
-          ) : (
-            'Waiting for organizer to select contestant...'
-          )}
-        </p>
-        {activeContestantId && sheet?.criteria && (
-          <p className="mt-1 text-xs text-v-text-subtle">
-            {(() => {
-              const activeContestant = sheet.contestants?.find(c => c.id === activeContestantId)
-              if (!activeContestant) return 'Contestant not found'
-              
-              const contestantScores = sheet.criteria.map(crit => {
-                const key = `${activeContestant.id}:${crit.id}`
-                const score = scores[key]
-                return score !== undefined && score !== '' && score !== null ? score : null
-              }).filter(score => score !== null)
-              
-              const isComplete = contestantScores.length === sheet.criteria.length
-              
-              return `Progress: ${contestantScores.length} / ${sheet.criteria.length} criteria scored${isComplete ? ' ✓' : ''}`
-            })()}
-          </p>
-        )}
+          )
+        })()}
       </div>
 
       {/* Interactive award tasks (vote / judge selection) */}
@@ -737,7 +759,7 @@ export default function JudgeScoringPage() {
       {/* Live mode scoring instructions */}
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-center">
         <p className="text-sm text-v-text-muted">
-          Complete all criteria for the active contestant - scores auto-save when finished
+          Complete all criteria for {sheet?.stageGroup ? 'each contestant on stage' : 'the active contestant'} — scores auto-save when finished
         </p>
       </div>
       
@@ -749,7 +771,7 @@ export default function JudgeScoringPage() {
             <div className="flex-1">
               <p className="font-bold text-white">Scores Submitted!</p>
               <p className="mt-1 text-sm text-white">
-                {sheet?.contestants?.find(c => c.id === activeContestantId)?.name}
+                {lastSavedName || sheet?.contestants?.find(c => c.id === activeContestantId)?.name}
               </p>
               <p className="mt-1 text-xs text-white/80">Your scores are locked</p>
             </div>

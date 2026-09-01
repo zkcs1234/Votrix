@@ -422,6 +422,15 @@ export async function updatePosition(eventId, organizerId, positionId, payload) 
 
   if (error) throw new ApiError(500, error.message)
   if (!data) throw new ApiError(404, 'Position not found')
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.position.update',
+    entity: 'positions',
+    entityId: positionId,
+    details: { name: data.name, changedKeys: Object.keys(updates), eventId },
+  })
+
   return mapPosition(data)
 }
 
@@ -584,6 +593,14 @@ export async function updateCandidate(eventId, organizerId, candidateId, payload
       console.error('[election] Old candidate photo cleanup error:', err.message),
     )
   }
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.candidate.update',
+    entity: 'candidates',
+    entityId: candidateId,
+    details: { name: data.name, changedKeys: Object.keys(updates), eventId },
+  })
 
   return mapCandidate(data)
 }

@@ -13,6 +13,7 @@
 import { db, wrap } from '../foundation/db.js'
 import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
 import { badRequest, notFound } from '../foundation/errors.js'
+import { recordAudit } from '../foundation/audit.js'
 
 /**
  * Get the organizer's profile from the users table.
@@ -76,6 +77,14 @@ export async function updateOrganizerProfile(organizerId, { organizationName, or
 
   const user = await wrap(result, { context: 'organizerProfile.updateProfile' })
   if (!user) throw notFound('Organizer not found')
+
+  recordAudit({
+    userId: organizerId,
+    action: 'organizer.profile.update',
+    entity: 'users',
+    entityId: organizerId,
+    details: { changedKeys: Object.keys(updates) },
+  })
 
   return {
     id: user.id,

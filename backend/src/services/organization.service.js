@@ -8,6 +8,7 @@ import { mapOrganization as mapOrganizationShared } from '../foundation/mapper.j
 import { forbidden, badRequest } from '../foundation/errors.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, ORG_TYPES } from '../utils/constants.js'
+import { recordAudit } from '../foundation/audit.js'
 
 // Re-export the shared mapper so existing imports
 // `import { mapOrganization } from './organization.service.js'`
@@ -140,6 +141,14 @@ export async function updateOrganizationLogo(organizerId, logoUrl, imageAssetId 
       console.error('[organization] Old logo cleanup error:', err.message),
     )
   }
+
+  recordAudit({
+    userId: organizerId,
+    action: 'organizer.logo.update',
+    entity: 'users',
+    entityId: organizerId,
+    details: { hasLogo: Boolean(userData?.organization_logo) },
+  })
 
   return {
     ...mapOrganization(org),
