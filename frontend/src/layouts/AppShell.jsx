@@ -118,17 +118,14 @@ function SidebarContent({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className={`hidden lg:inline-flex items-center ${isCollapsed ? 'rounded-full border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15' : 'rounded-lg text-gray-400 hover:bg-white/10 hover:text-white'} transition-colors duration-150 ${isCollapsed ? 'p-2.5 justify-center' : 'p-2.5 gap-3'}`}
+              className={`hidden lg:inline-flex items-center justify-center rounded-lg p-2.5 transition-colors duration-150 ${isCollapsed ? 'border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15' : 'text-gray-400 hover:bg-white/10 hover:text-white'}`}
               aria-expanded={!isCollapsed}
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               {isCollapsed ? (
                 <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
               ) : (
-                <>
-                  <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
-                  <span className="text-sm font-medium">Collapse</span>
-                </>
+                <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
               )}
             </button>
           )}
