@@ -298,7 +298,7 @@ try {
         competitionType,
       }
       const { data: res } = await draftService.publishDraft('competition', payload)
-      navigate(`/organizer/competition/events/${res.event.id}/contestants`, { replace: true })
+      navigate(`/organizer/competition/events/${res.event.id}/workspace`, { replace: true })
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to publish event')
     } finally {
