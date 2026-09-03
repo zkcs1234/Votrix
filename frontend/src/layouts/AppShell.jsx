@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Bell, LogOut, ChevronLeft, ChevronRight, User } from 'lucide-react'
+import { Menu, Bell, LogOut, ChevronLeft, PanelLeftClose, PanelLeftOpen, User } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { authService } from '@/services/auth.service'
 import { notificationsService } from '@/services/notifications.service'
@@ -118,14 +118,14 @@ function SidebarContent({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className={`hidden lg:inline-flex items-center justify-center rounded-lg p-2.5 transition-colors duration-150 ${isCollapsed ? 'border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15' : 'text-gray-400 hover:bg-white/10 hover:text-white'}`}
+              className={`hidden lg:inline-flex h-10 w-10 items-center justify-center rounded-lg transition-colors duration-150 ${isCollapsed ? 'border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15' : 'text-gray-400 hover:bg-white/10 hover:text-white'}`}
               aria-expanded={!isCollapsed}
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               {isCollapsed ? (
-                <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
+                <PanelLeftOpen className="h-5 w-5" strokeWidth={1.5} />
               ) : (
-                <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+                <PanelLeftClose className="h-5 w-5" strokeWidth={1.5} />
               )}
             </button>
           )}
