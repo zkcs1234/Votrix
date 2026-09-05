@@ -46,6 +46,11 @@ export const setPollOpen = asyncHandler(async (req, res) => {
   res.json({ success: true, event })
 })
 
+export const publishEvent = asyncHandler(async (req, res) => {
+  const event = await pollingService.publishPollEvent(req.params.eventId, req.user.id)
+  res.json({ success: true, event })
+})
+
 export const uploadBanner = asyncHandler(async (req, res) => {
   const result = await uploadImageFile(req.file, UPLOAD_KIND.BANNER, `poll-${req.params.eventId}`)
   const event = await pollingService.updatePollEvent(req.params.eventId, req.user.id, {

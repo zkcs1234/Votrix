@@ -5,7 +5,9 @@
 > **Deliberately excluded** (dead / legacy / superseded — see [§7](#7-legacy-not-in-the-diagrams)):
 > `event_voters`, the `competition_judges` **table** (now a view), and the backward‑compat views `contestants`, `criteria`, `judge_scores`, `v_event_voters`, `v_legacy_competition_judges`.
 >
-> Source of truth: migrations `001` → `060`. Diagrams render on GitHub / any Mermaid viewer.
+> **Dead *columns* inside the live tables** (present but unused by the app) are catalogued separately in [§8](#8-unused--vestigial-columns-dead-columns) — e.g. `positions.min_vote`, `users.username`.
+>
+> Source of truth: migrations `001` → `067`. Diagrams render on GitHub / any Mermaid viewer.
 
 ---
 
@@ -85,7 +87,7 @@ erDiagram
 
     users {
         uuid id PK
-        varchar username "admin only"
+        varchar username "DEAD - unused, see §8"
         varchar email "organizer/voter"
         text password "bcrypt"
         user_role role "admin|organizer|voter"
@@ -152,7 +154,7 @@ erDiagram
     positions {
         uuid id PK
         uuid event_id FK "-> events"
-        int min_vote
+        int min_vote "DEAD - unused, see §8"
         int max_vote
         int number_of_winners
         int display_order
@@ -419,7 +421,39 @@ So the six backward-compat shims are dead; the two functional helper views are a
 
 ---
 
-## 8. Quick reference — the 30 live tables
+## 8. Unused / vestigial columns (dead columns)
+
+These columns **exist in the live tables above** but the running application never meaningfully reads or writes them (verified against `backend/src` and `frontend/src`, excluding migrations, tests, and one-off scripts). Dropping any of them would not change app behaviour — but confirm no external report/export depends on them first, exactly like the dead views in [§7](#7-legacy-not-in-the-diagrams).
+
+### 8.1 Fully dead — zero application references
+
+| Column | Table | Added by | Why it's dead / replaced by |
+|---|---|---|---|
+| `min_vote` | `positions` | 001 | Never read in code. Only the DB `CHECK (min_vote >= 0 …)` constraint uses it. The ballot UI enforces limits with `max_vote` + `allow_skip` + `number_of_winners`. |
+| `is_judge` | `event_participants` | 005 (on old `event_voters`) | Superseded by `participant_type = 'COMPETITION_JUDGE'` + `judge_role`. The one code hit (`pageant.service.js`) *synthesises* an `is_judge: true` output field — it never reads the column. |
+| `participant_info_fields` | `events` | 030 | Zero references. Superseded by `information_form_schema` (the JSONB form config the app actually uses). |
+| `email_status` | `invitations` | 032 | Email-delivery tracking that was never wired up. No reads or writes in code. |
+| `email_delivered_at` | `invitations` | 032 | Same — email tracking never implemented. |
+| `email_bounced_at` | `invitations` | 032 | Same — email tracking never implemented. |
+
+### 8.2 Vestigial — present but never populated / queried
+
+| Column | Table | Added by | Status |
+|---|---|---|---|
+| `username` | `users` | 001 | No code path queries by username — `findUserByUsername()` exists but has **no callers**, and no app code ever assigns a username (admin rows are inserted via the SQL seed). `token.service` / `userMapper` only pass the value through, emitting `null` for every real account. Kept for the admin-login concept, but unused by the live app. |
+| `temp_password` | `invitations` | 001 | Only ever written as `null` (two spots in `invitation.service.js`); never populated with a real value and never read. The "show temp password" flow is not active. |
+
+### 8.3 Transitional — superseded but still read as a fallback (not fully dead)
+
+| Column | Table | Note |
+|---|---|---|
+| `image_url` | `poll_questions`, `poll_options` | Superseded by `image_asset_id` (migration 037). Still **read** as a fallback in `polling.service.js` and consumed by the `migrate_existing_images.js` backfill script, so it is *not* safe to drop until every row's image has been migrated to `image_asset_id`. |
+
+> **How this was verified:** each candidate column name was grepped across `backend/src` and `frontend/src` (excluding `database/migrations/`, `__tests__`, and standalone scripts). "Dead" = the column name never appears as a `.select(...)` field, insert/update key, `.eq()`/filter, or mapped response property anywhere the app runs.
+
+---
+
+## 9. Quick reference — the 30 live tables
 
 **Core (5):** `users`, `organizations`, `events`, `event_participants`, `invitations`
 **Election (3):** `positions`, `candidates`, `election_votes`

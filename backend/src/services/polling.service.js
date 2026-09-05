@@ -698,6 +698,70 @@ export async function getPollSettings(eventId, organizerId) {
   return mapPollEvent(event)
 }
 
+// ——— Publish (finish setup → release to schedule) ———
+
+/**
+ * Publish a fully-built poll that is still in the `draft` (setup) state.
+ *
+ * Publishing does NOT open the poll. It only releases the event from the setup
+ * flow into the normal schedule-driven lifecycle by flipping `draft` →
+ * `scheduled`; the schedule sync then reconciles it to `scheduled` / `active` /
+ * `completed` based purely on the event's start/end dates. Poll open/close
+ * timing always comes from the dates, never from this action.
+ *
+ * Guarded so a poll can only be published once, and only when it has the
+ * minimum content needed to run: at least one question and one registered
+ * respondent.
+ */
+export async function publishPollEvent(eventId, organizerId) {
+  const event = await assertPollingEvent(eventId, organizerId)
+
+  if (event.status !== 'draft') {
+    throw new ApiError(400, 'This poll has already been published')
+  }
+
+  const questions = await listQuestions(eventId, organizerId)
+  if (questions.length === 0) {
+    throw new ApiError(400, 'Add at least one question before publishing.')
+  }
+
+  const { count: respondentCount, error: respErr } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+
+  if (respErr) throw new ApiError(500, respErr.message)
+  if (!respondentCount || respondentCount === 0) {
+    throw new ApiError(400, 'Register at least one respondent before publishing.')
+  }
+
+  const { error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({ status: 'scheduled' })
+    .eq('id', eventId)
+
+  if (error) throw new ApiError(500, error.message)
+
+  // Hand the event to the scheduler; it decides scheduled/active/completed
+  // purely from the dates. The status may change again immediately here.
+  await syncEventSchedules().catch((err) => {
+    console.error('[polling] schedule sync failed after publish:', err.message)
+  })
+
+  recordEventActivity({
+    eventId,
+    action: 'polling.event.publish',
+    userId: organizerId,
+    module: 'polling',
+    details: { title: event.title },
+  })
+
+  // Re-read so the returned status reflects any reconciliation the sync applied.
+  const published = await getEventById(eventId)
+  return mapPollEvent(published)
+}
+
 // ——— Questions & options ———
 
 async function loadOptionsForQuestions(questionIds) {
@@ -1177,6 +1241,13 @@ async function listQuestionsPublic(eventId, registry = null) {
 export async function submitPollResponse(eventId, voterId, answers, startedAt) {
   await assertVoterCanRespond(eventId, voterId)
   const event = await getEventById(eventId)
+
+  // An unpublished (draft/setup) poll can never accept responses, regardless of
+  // its schedule. polling_enabled is already false for such polls; this is an
+  // explicit guard so the intent is unmistakable.
+  if (event.status === 'draft') {
+    throw new ApiError(403, 'This poll has not been published yet')
+  }
 
   if (!isPollOpen(event)) {
     throw new ApiError(403, 'This poll is closed or expired')

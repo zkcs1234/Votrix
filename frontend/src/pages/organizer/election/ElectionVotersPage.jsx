@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
+import { Check, X } from 'lucide-react'
 import { electionService } from '@/services/election.service'
 import Button from '@/components/ui/Button'
+import StageFooter from '@/components/ui/StageFooter'
 import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
@@ -85,6 +87,7 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
 
 export default function ElectionVotersPage() {
   const { eventId } = useParams()
+  const navigate = useNavigate()
   const [voters, setVoters] = useState([])
   const [formSchema, setFormSchema] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -96,6 +99,11 @@ export default function ElectionVotersPage() {
   const [registering, setRegistering] = useState(false)
   const [sendingAll, setSendingAll] = useState(false)
   const [sendingId, setSendingId] = useState(null)
+  // Publish readiness: an event still in `draft` (setup) is published from here.
+  const [eventStatus, setEventStatus] = useState(null)
+  const [positionsCount, setPositionsCount] = useState(0)
+  const [candidatesCount, setCandidatesCount] = useState(0)
+  const [publishing, setPublishing] = useState(false)
   const { success, error: showError } = useToast()
 
   // Use delayed loading
@@ -117,6 +125,29 @@ export default function ElectionVotersPage() {
       }
     })()
     return () => { alive = false }
+  }, [eventId])
+
+  // Load publish-readiness context: the event's status plus how many positions
+  // and candidates exist. Used to decide whether the "Finish & Publish" action
+  // shows and whether it is enabled.
+  const reloadSetup = async () => {
+    try {
+      const [{ data: ev }, { data: pos }, { data: cand }] = await Promise.all([
+        electionService.getEvent(eventId),
+        electionService.listPositions(eventId),
+        electionService.listCandidates(eventId),
+      ])
+      setEventStatus(ev.event?.status ?? null)
+      setPositionsCount(Array.isArray(pos.positions) ? pos.positions.length : 0)
+      setCandidatesCount(Array.isArray(cand.candidates) ? cand.candidates.length : 0)
+    } catch (err) {
+      console.error('Failed to load publish readiness:', err)
+    }
+  }
+
+  useEffect(() => {
+    reloadSetup()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId])
 
   // Reload voters from server
@@ -226,6 +257,27 @@ export default function ElectionVotersPage() {
       showError(err.response?.data?.message || 'Failed to send invitations')
     } finally {
       setSendingAll(false)
+    }
+  }
+
+  // Publish the fully-built setup event. This does NOT open voting — it hands
+  // the event to the schedule; voting opens/closes purely on the start/end
+  // dates. Requires ≥1 position, ≥1 candidate, ≥1 voter (enforced again on the
+  // backend).
+  const isSetup = eventStatus === 'draft'
+  const publishReady = positionsCount > 0 && candidatesCount > 0 && voters.length > 0
+
+  const handlePublish = async () => {
+    if (!publishReady) return
+    setPublishing(true)
+    try {
+      await electionService.publishEvent(eventId)
+      success('Event published. It will open for voting based on its schedule.')
+      navigate('/organizer/election/events')
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to publish event')
+    } finally {
+      setPublishing(false)
     }
   }
 
@@ -363,7 +415,50 @@ export default function ElectionVotersPage() {
         onExportCsv
         exportLabel="Export CSV"
       />
+
+      {isSetup && (
+        <div className="v-card-sm">
+          <h3 className="v-label mb-1">Ready to publish?</h3>
+          <p className="v-helper-text mb-3">
+            Publishing finishes setup and hands the event to its schedule. It does not open voting
+            immediately — voting opens and closes based on the start and end dates you set.
+          </p>
+          <ul className="space-y-1.5">
+            <ReadinessItem ok={positionsCount > 0} label="At least one position" />
+            <ReadinessItem ok={candidatesCount > 0} label="At least one candidate" />
+            <ReadinessItem ok={voters.length > 0} label="At least one registered voter" />
+          </ul>
+        </div>
+      )}
+
+      {isSetup && (
+        <StageFooter
+          module="election"
+          currentKey="voters"
+          eventId={eventId}
+          saving={publishing}
+          onNext={handlePublish}
+          nextLabel="Finish & Publish"
+          nextDisabled={!publishReady}
+        />
+      )}
     </div>
+  )
+}
+
+function ReadinessItem({ ok, label }) {
+  return (
+    <li className="flex items-center gap-2 text-sm">
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+          ok ? 'bg-emerald-500 text-white' : 'bg-v-danger/15 text-v-danger'
+        }`}
+        aria-hidden
+      >
+        {ok ? <Check className="h-3 w-3" strokeWidth={3} /> : <X className="h-3 w-3" strokeWidth={3} />}
+      </span>
+      <span className={ok ? 'text-v-text' : 'text-v-text-subtle'}>{label}</span>
+    </li>
   )
 }
 

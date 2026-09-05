@@ -301,7 +301,11 @@ try {
     }
   }
 
-  const handleFinishDraft = async () => {
+  // Create the real event from the draft and continue into the setup steps
+  // (Positions → Candidates → Voters). This is NOT the publish step anymore:
+  // the event is created in the `draft` (setup) state and stays out of the
+  // schedule until the organizer clicks "Finish & Publish" on the Voters page.
+  const handleContinueToPositions = async () => {
     setSaving(true)
     setError(null)
     try {
@@ -317,7 +321,7 @@ try {
       const { data: res } = await draftService.publishDraft('election', payload)
       navigate(`/organizer/election/events/${res.event.id}/positions`, { replace: true })
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to publish event')
+      setError(err.response?.data?.message || 'Failed to save event')
     } finally {
       setSaving(false)
     }
@@ -569,8 +573,8 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               currentKey="information-form"
               eventId={stepperEventId}
               saving={saving}
-              onNext={isNew ? handleFinishDraft : undefined}
-              nextLabel={isNew ? 'Finish & Publish' : 'Continue to Positions'}
+              onNext={isNew ? handleContinueToPositions : undefined}
+              nextLabel="Continue to Positions"
               nextPath={isNew ? undefined : `/organizer/election/events/${eventId}/positions`}
               saveStatus={saveStatus}
               lastSavedAt={lastSavedAt}

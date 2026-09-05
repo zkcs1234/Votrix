@@ -315,7 +315,11 @@ try {
     }
   }
 
-  const handleFinishDraft = async () => {
+  // Create the real event from the draft and continue into the setup steps
+  // (Builder → Respondents). This is NOT the publish step anymore: the event is
+  // created in the `draft` (setup) state and stays out of the schedule until
+  // the organizer clicks "Finish & Publish" on the Respondents page.
+  const handleContinueToBuilder = async () => {
     setSaving(true)
     setError(null)
     try {
@@ -324,7 +328,7 @@ try {
       const { data: res } = await draftService.publishDraft('polling', payload)
       navigate(`/organizer/polling/events/${res.event.id}/builder`, { replace: true })
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to publish event')
+      setError(err.response?.data?.message || 'Failed to save event')
     } finally {
       setSaving(false)
     }
@@ -609,8 +613,8 @@ const stepperEventId = isNew ? 'new' : eventId
               currentKey="information-form"
               eventId={stepperEventId}
               saving={saving}
-              onNext={isNew ? handleFinishDraft : undefined}
-              nextLabel={isNew ? 'Finish & Publish' : 'Continue to Builder'}
+              onNext={isNew ? handleContinueToBuilder : undefined}
+              nextLabel="Continue to Builder"
               nextPath={isNew ? undefined : `/organizer/polling/events/${eventId}/builder`}
               saveStatus={saveStatus}
               lastSavedAt={lastSavedAt}

@@ -295,7 +295,14 @@ async function buildContestantOrder(eventId, roundId, divisionId) {
 // Start a live session — organizer initiates the competition
 // ---------------------------------------------------------------------------
 export async function startSession(eventId, organizerId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  const event = await assertCompetitionEvent(eventId, organizerId)
+
+  // A live session can only run on a published event. While the event is still
+  // in `draft` (setup), it has not been released to its schedule yet, so it
+  // must be published from the Judges page before scoring can start.
+  if (event.status === 'draft') {
+    throw new ApiError(400, 'Publish this event before starting a live session.')
+  }
 
   // Check if there's already an active session
   const existing = await getActiveSession(eventId)

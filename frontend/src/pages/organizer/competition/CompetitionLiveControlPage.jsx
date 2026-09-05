@@ -25,6 +25,7 @@ export default function CompetitionLiveControlPage() {
   const [actionLoading, setActionLoading] = useState(null)
   const [judgeProgress, setJudgeProgress] = useState([])
   const [event, setEvent] = useState(null)
+  const [eventStatus, setEventStatus] = useState(null)
   const [foundation, setFoundation] = useState(null)
 
   // Phase 6 — round finalize & advancement review modal.
@@ -42,13 +43,15 @@ export default function CompetitionLiveControlPage() {
 
   const loadSession = useCallback(async () => {
     try {
-      const [{ data: sessionData }, { data: foundationData }] = await Promise.all([
+      const [{ data: sessionData }, { data: foundationData }, { data: eventData }] = await Promise.all([
         competitionSessionService.getActiveSession(eventId).catch(() => ({ data: {} })),
-        pageantService.getFoundation(eventId).catch(() => ({ data: {} }))
+        pageantService.getFoundation(eventId).catch(() => ({ data: {} })),
+        pageantService.getEvent(eventId).catch(() => ({ data: {} })),
       ])
-      
+
       setSession(sessionData.session || null)
-      setEvent(sessionData.event || null)
+      setEvent(sessionData.event || eventData.event || null)
+      setEventStatus(eventData.event?.status ?? null)
       setFoundation(foundationData.foundation || null)
 
       if (sessionData.session?.status === SESSION_STATUS.ACTIVE || sessionData.session?.status === SESSION_STATUS.PAUSED) {
@@ -268,7 +271,11 @@ export default function CompetitionLiveControlPage() {
     return (
       <div className="space-y-6">
         <PageHeader eventId={eventId} title={event?.title ?? 'Competition Live Control'} />
-        <NoSessionView onStart={() => performAction('start', 'start')} actionLoading={actionLoading} />
+        <NoSessionView
+          onStart={() => performAction('start', 'start')}
+          actionLoading={actionLoading}
+          isDraft={eventStatus === 'draft'}
+        />
       </div>
     )
   }
@@ -744,7 +751,7 @@ function PageHeader({ eventId, title }) {
   )
 }
 
-function NoSessionView({ onStart, actionLoading }) {
+function NoSessionView({ onStart, actionLoading, isDraft = false }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-v-border px-6 py-16 text-center">
       <Play className="mb-4 h-12 w-12 text-v-text-subtle" />
@@ -753,7 +760,12 @@ function NoSessionView({ onStart, actionLoading }) {
         Start a live competition session to control the flow of rounds and contestants in real time.
         Judges will automatically see only the active round and current contestant.
       </p>
-      <Button onClick={onStart} loading={actionLoading === 'start'} size="lg">
+      {isDraft && (
+        <p className="mb-4 max-w-md text-sm text-v-warning">
+          This event is still in setup. Publish it from the Judges page before starting a live session.
+        </p>
+      )}
+      <Button onClick={onStart} loading={actionLoading === 'start'} size="lg" disabled={isDraft}>
         <Play className="h-4 w-4 mr-2" /> Start Live Session
       </Button>
     </div>

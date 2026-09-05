@@ -15,6 +15,7 @@ export default function StageFooter({
   backLabel,
   showSidebarHint = true,
   nextPath,
+  nextDisabled = false,
   saveStatus = 'idle',
   lastSavedAt = null,
 }) {
@@ -52,7 +53,7 @@ export default function StageFooter({
 
         {nextHref ? (
           onNext ? (
-            <Button type="button" onClick={onNext} disabled={saving}>
+            <Button type="button" onClick={onNext} disabled={saving || nextDisabled}>
               {saving ? 'Saving...' : nextLabel ?? `Next: ${next.label}`}
               <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
             </Button>

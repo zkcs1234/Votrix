@@ -36,6 +36,11 @@ export const pageantService = {
     return api.patch(`${org}/events/${eventId}/scoring`, { scoringEnabled })
   },
 
+  // Publish a fully-built setup (draft) competition: releases it to the schedule.
+  publishEvent(eventId) {
+    return api.post(`${org}/events/${eventId}/publish`)
+  },
+
   uploadBanner(eventId, file) {
     const form = new FormData()
     form.append('banner', file)

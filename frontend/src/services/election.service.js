@@ -126,6 +126,11 @@ export const electionService = {
     return api.post(`${base}/events/${eventId}/finalize`)
   },
 
+  // Publish a fully-built setup (draft) event: releases it to the schedule.
+  publishEvent(eventId) {
+    return api.post(`${base}/events/${eventId}/publish`)
+  },
+
   // ——— Participant Information Form ———
   getInformationForm(eventId) {
     return api.get(`${base}/events/${eventId}/information-form`)

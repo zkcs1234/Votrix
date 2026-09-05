@@ -339,6 +339,84 @@ export async function setEventScoring(eventId, organizerId, scoringEnabled) {
   return mapEvent(data)
 }
 
+// ——— Publish (finish setup → release to schedule) ———
+
+/**
+ * Publish a fully-built competition that is still in the `draft` (setup) state.
+ *
+ * Publishing does NOT start scoring. It only releases the event from the setup
+ * flow into the normal schedule-driven lifecycle by flipping `draft` →
+ * `scheduled`; the schedule sync then reconciles it to `scheduled` / `active` /
+ * `completed` based on the event's start/end dates. Scoring goes live
+ * separately, when the organizer starts a live session from Live Control.
+ *
+ * Guarded so an event can only be published once, and only when it has the
+ * minimum content needed to run: at least one contestant, one active judge, and
+ * one criterion. The stricter run-time rules (criteria weights totalling 100%,
+ * rounds with assigned contestants) are enforced when the session is started.
+ */
+export async function publishCompetitionEvent(eventId, organizerId) {
+  const event = await assertCompetitionEvent(eventId, organizerId)
+
+  if (event.status !== 'draft') {
+    throw new ApiError(400, 'This event has already been published')
+  }
+
+  const { count: contestantCount, error: contestantErr } = await getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+  if (contestantErr) throw new ApiError(500, contestantErr.message)
+  if (!contestantCount || contestantCount === 0) {
+    throw new ApiError(400, 'Add at least one contestant before publishing.')
+  }
+
+  const { count: judgeCount, error: judgeErr } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .eq('is_active', true)
+  if (judgeErr) throw new ApiError(500, judgeErr.message)
+  if (!judgeCount || judgeCount === 0) {
+    throw new ApiError(400, 'Add at least one judge before publishing.')
+  }
+
+  const { count: criterionCount, error: criterionErr } = await getClient()
+    .from(DB_TABLES.CRITERIA)
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+  if (criterionErr) throw new ApiError(500, criterionErr.message)
+  if (!criterionCount || criterionCount === 0) {
+    throw new ApiError(400, 'Add at least one criterion before publishing.')
+  }
+
+  const { error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({ status: 'scheduled' })
+    .eq('id', eventId)
+
+  if (error) throw new ApiError(500, error.message)
+
+  // Hand the event to the scheduler; it decides scheduled/active/completed
+  // purely from the dates. The status may change again immediately here.
+  await syncEventSchedules().catch((err) => {
+    console.error('[competition] schedule sync failed after publish:', err.message)
+  })
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.event.publish',
+    userId: organizerId,
+    module: 'competition',
+    details: { title: event.title },
+  })
+
+  // Re-read so the returned status reflects any reconciliation the sync applied.
+  const published = await getEventById(eventId)
+  return mapEvent(published)
+}
+
 // ——— Contestants ———
 
 export async function listContestants(eventId, organizerId, filters = {}) {

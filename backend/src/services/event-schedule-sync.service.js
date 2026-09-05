@@ -6,7 +6,25 @@ import { emitToEvent } from '../websocket/ws-emitter.js'
 let syncTimer = null
 let syncInFlight = false
 
+// Modules whose "publish at the end of setup" flow keeps an event in the
+// `draft` (setup) state until the organizer explicitly publishes it. For these,
+// a draft is deliberately excluded from schedule-driven activation: an
+// unpublished event must never open voting/scoring/polling on its own, no matter
+// what its start/end dates say. Publishing (see each module's publish*Event
+// service) flips the status to 'scheduled', at which point the schedule below
+// takes over. Competition/pageant is included too: it also builds as a draft and
+// is published at the end of setup; its scoring still goes live via Live Control.
+const PUBLISH_GATED_EVENT_TYPES = new Set([
+  EVENT_TYPES.ELECTION,
+  EVENT_TYPES.POLLING,
+  ...COMPETITION_SCORING_EVENT_TYPES,
+])
+
 function getDesiredState(event, now) {
+  if (event.status === 'draft' && PUBLISH_GATED_EVENT_TYPES.has(event.event_type)) {
+    return null
+  }
+
   const withinSchedule = isWithinEventSchedule(event, now)
   const pastEnd = Boolean(event.end_date && new Date(event.end_date) < now)
 

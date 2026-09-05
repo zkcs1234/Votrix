@@ -834,6 +834,13 @@ export async function submitBallot(eventId, voterId, payload) {
   const enrollment = await assertVoterEnrolled(eventId, voterId)
   const event = await getEventById(eventId)
 
+  // An unpublished (draft/setup) event can never accept votes, regardless of
+  // its schedule. voting_enabled is already false for such events; this is an
+  // explicit guard so the intent is unmistakable.
+  if (event.status === 'draft') {
+    throw new ApiError(403, 'This event has not been published yet')
+  }
+
   // Replay Protection Check
   const submittedNonce = payload?.votingNonce || payload?._votingNonce
   if (enrollment.voting_nonce && submittedNonce && submittedNonce !== enrollment.voting_nonce) {
@@ -1303,4 +1310,78 @@ export async function finalizeElectionEvent(eventId, organizerId) {
   emitToEvent(eventId, 'election:finalized', { eventId })
 
   return mapEvent(data)
+}
+
+// ——— Publish (finish setup → release to schedule) ———
+
+/**
+ * Publish a fully-built election that is still in the `draft` (setup) state.
+ *
+ * Publishing does NOT open voting. It only releases the event from the setup
+ * flow into the normal schedule-driven lifecycle by flipping `draft` →
+ * `scheduled`; the schedule sync then reconciles it to `scheduled` / `active` /
+ * `completed` based purely on the event's start/end dates. Voting timing always
+ * comes from the dates, never from this action.
+ *
+ * Guarded so an event can only be published once, and only when it has the
+ * minimum content needed to run: at least one position, one candidate, and one
+ * registered voter.
+ */
+export async function publishElectionEvent(eventId, organizerId) {
+  const event = await assertOrganizerOwnsEvent(eventId, organizerId)
+
+  if (event.event_type !== EVENT_TYPES.ELECTION) {
+    throw new ApiError(400, 'Not an election event')
+  }
+  if (event.status !== 'draft') {
+    throw new ApiError(400, 'This event has already been published')
+  }
+
+  const positions = await listPositions(eventId, organizerId)
+  if (positions.length === 0) {
+    throw new ApiError(400, 'Add at least one position before publishing.')
+  }
+
+  const candidates = await listCandidates(eventId, organizerId)
+  if (candidates.length === 0) {
+    throw new ApiError(400, 'Add at least one candidate before publishing.')
+  }
+
+  const { count: voterCount, error: voterErr } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
+
+  if (voterErr) throw new ApiError(500, voterErr.message)
+  if (!voterCount || voterCount === 0) {
+    throw new ApiError(400, 'Register at least one voter before publishing.')
+  }
+
+  const { error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({ status: 'scheduled' })
+    .eq('id', eventId)
+
+  if (error) throw new ApiError(500, error.message)
+
+  // Hand the event to the scheduler; it decides scheduled/active/completed
+  // purely from the dates. The status may change again immediately here.
+  await syncEventSchedules().catch((err) => {
+    console.error('[election] schedule sync failed after publish:', err.message)
+  })
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.event.publish',
+    entity: 'events',
+    entityId: eventId,
+    details: { title: event.title },
+  })
+
+  invalidateDashboardCache(organizerId)
+
+  // Re-read so the returned status reflects any reconciliation the sync applied.
+  const published = await getEventById(eventId)
+  return mapEvent(published)
 }

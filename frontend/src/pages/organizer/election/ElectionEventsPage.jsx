@@ -122,7 +122,9 @@ function EventCard({ event, onToggleVoting, onDuplicate, onPreview }) {
           {event.title}
         </Link>
         <div className="mt-1 flex items-center gap-2">
-          <span className="text-sm text-v-text-subtle capitalize">{event.status}</span>
+          <span className="text-sm text-v-text-subtle capitalize">
+            {event.status === 'draft' ? 'Setup — not published' : event.status}
+          </span>
           {event.electionStatus && (
             <span className="v-badge v-badge-info text-xs">{event.electionStatus}</span>
           )}
@@ -146,24 +148,33 @@ function EventCard({ event, onToggleVoting, onDuplicate, onPreview }) {
           <Copy className="h-3.5 w-3.5" strokeWidth={2} />
           {duplicating ? 'Copying...' : 'Duplicate'}
         </button>
-        <button
-          type="button"
-          onClick={handleToggle}
-          disabled={toggling}
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-            event.votingEnabled
-              ? 'border border-red-800 text-v-danger hover:bg-red-950/40'
-              : 'border border-emerald-800 text-emerald-300 hover:bg-emerald-950/40'
-          } disabled:opacity-50`}
-        >
-          {toggling
-            ? event.votingEnabled
-              ? 'Closing...'
-              : 'Opening...'
-            : event.votingEnabled
-              ? 'Close voting'
-              : 'Open voting'}
-        </button>
+        {event.status === 'draft' ? (
+          <Link
+            to={`/organizer/election/events/${event.id}/positions`}
+            className="rounded-lg border border-v-primary bg-v-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-v-primary-hover"
+          >
+            Continue setup
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={handleToggle}
+            disabled={toggling}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+              event.votingEnabled
+                ? 'border border-red-800 text-v-danger hover:bg-red-950/40'
+                : 'border border-emerald-800 text-emerald-300 hover:bg-emerald-950/40'
+            } disabled:opacity-50`}
+          >
+            {toggling
+              ? event.votingEnabled
+                ? 'Closing...'
+                : 'Opening...'
+              : event.votingEnabled
+                ? 'Close voting'
+                : 'Open voting'}
+          </button>
+        )}
         <Link
           to={`/organizer/election/events/${event.id}/edit`}
           className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated"

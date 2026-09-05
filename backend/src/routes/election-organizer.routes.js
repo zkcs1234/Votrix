@@ -44,6 +44,7 @@ router.post('/events/:eventId/voters/import-register', csvImportLimiter, ctrl.re
 
 router.post('/events/:eventId/duplicate', ctrl.duplicateEvent)
 router.post('/events/:eventId/finalize', ctrl.finalizeEvent)
+router.post('/events/:eventId/publish', ctrl.publishEvent)
 router.get('/events/:eventId/ballot-preview', ctrl.getBallotPreview)
 
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)

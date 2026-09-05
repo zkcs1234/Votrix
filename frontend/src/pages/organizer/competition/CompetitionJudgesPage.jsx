@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
+import { Check, X } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import Button from '@/components/ui/Button'
+import StageFooter from '@/components/ui/StageFooter'
 import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
 import JudgeAssignmentPanel from '@/components/organizer/competition/JudgeAssignmentPanel'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -78,6 +80,7 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
 
 export default function CompetitionJudgesPage() {
   const { eventId } = useParams()
+  const navigate = useNavigate()
   const [judges, setJudges] = useState([])
   const [formSchema, setFormSchema] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -90,6 +93,9 @@ export default function CompetitionJudgesPage() {
   const [search, setSearch] = useState('')
   const [error, setError] = useState(null)
   const [foundation, setFoundation] = useState(null)
+  // Publish readiness: a competition still in `draft` (setup) is published here.
+  const [eventStatus, setEventStatus] = useState(null)
+  const [publishing, setPublishing] = useState(false)
   const fileInputRef = useRef(null)
 
   const { success, error: showError } = useToast()
@@ -133,12 +139,44 @@ export default function CompetitionJudgesPage() {
     }
   }, [eventId])
 
+  const loadStatus = useCallback(async () => {
+    try {
+      const { data } = await pageantService.getEvent(eventId)
+      setEventStatus(data.event?.status ?? null)
+    } catch (err) {
+      console.error('Failed to load event status:', err)
+    }
+  }, [eventId])
+
   useEffect(() => {
     load()
     loadFoundation()
-  }, [load, loadFoundation])
+    loadStatus()
+  }, [load, loadFoundation, loadStatus])
 
   const pendingCount = judges.filter((j) => !j.invitationSent && j.judgeId).length
+
+  // Publish the fully-built setup competition. This does NOT start scoring — it
+  // hands the event to the schedule; scoring goes live later from Live Control.
+  // Requires ≥1 contestant, ≥1 judge, ≥1 criterion (enforced again on backend).
+  const isSetup = eventStatus === 'draft'
+  const contestantsCount = foundation?.contestants?.length ?? 0
+  const criteriaCount = foundation?.criteria?.length ?? 0
+  const publishReady = contestantsCount > 0 && judges.length > 0 && criteriaCount > 0
+
+  const handlePublish = async () => {
+    if (!publishReady) return
+    setPublishing(true)
+    try {
+      await pageantService.publishEvent(eventId)
+      success('Event published. Start scoring anytime from Live Control.')
+      navigate(`/organizer/competition/events/${eventId}/live`)
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to publish event')
+    } finally {
+      setPublishing(false)
+    }
+  }
 
   const handleRegister = async (e) => {
     e.preventDefault()
@@ -380,6 +418,49 @@ export default function CompetitionJudgesPage() {
       <div className="border-t border-v-border pt-6">
         <JudgeAssignmentPanel foundation={foundation} reload={loadFoundation} />
       </div>
+
+      {isSetup && (
+        <div className="v-card-sm">
+          <h3 className="v-label mb-1">Ready to publish?</h3>
+          <p className="v-helper-text mb-3">
+            Publishing finishes setup and hands the event to its schedule. It does not start scoring —
+            you start the live scoring session from Live Control when you are ready.
+          </p>
+          <ul className="space-y-1.5">
+            <ReadinessItem ok={contestantsCount > 0} label="At least one contestant" />
+            <ReadinessItem ok={judges.length > 0} label="At least one judge" />
+            <ReadinessItem ok={criteriaCount > 0} label="At least one criterion" />
+          </ul>
+        </div>
+      )}
+
+      {isSetup && (
+        <StageFooter
+          module="competition"
+          currentKey="judges"
+          eventId={eventId}
+          saving={publishing}
+          onNext={handlePublish}
+          nextLabel="Finish & Publish"
+          nextDisabled={!publishReady}
+        />
+      )}
     </div>
+  )
+}
+
+function ReadinessItem({ ok, label }) {
+  return (
+    <li className="flex items-center gap-2 text-sm">
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+          ok ? 'bg-emerald-500 text-white' : 'bg-v-danger/15 text-v-danger'
+        }`}
+        aria-hidden
+      >
+        {ok ? <Check className="h-3 w-3" strokeWidth={3} /> : <X className="h-3 w-3" strokeWidth={3} />}
+      </span>
+      <span className={ok ? 'text-v-text' : 'text-v-text-subtle'}>{label}</span>
+    </li>
   )
 }

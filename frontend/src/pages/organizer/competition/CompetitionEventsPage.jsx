@@ -63,19 +63,33 @@ New event
           key={event.id}
           className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-border bg-v-surface p-5"
         >
-          <Link
-            to={`/organizer/competition/events/${event.id}/contestants`}
-            className="text-lg font-medium text-v-text hover:text-v-text"
-          >
-            {event.title}
-          </Link>
-          <div className="flex gap-2">
+          <div>
             <Link
-              to={`/organizer/competition/events/${event.id}/live`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-800 bg-emerald-950/30 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-950/50"
+              to={`/organizer/competition/events/${event.id}/contestants`}
+              className="text-lg font-medium text-v-text hover:text-v-text"
             >
-              Live Control
+              {event.title}
             </Link>
+            <div className="mt-1 text-sm text-v-text-subtle capitalize">
+              {event.status === 'draft' ? 'Setup — not published' : event.status}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {event.status === 'draft' ? (
+              <Link
+                to={`/organizer/competition/events/${event.id}/contestants`}
+                className="rounded-lg border border-v-primary bg-v-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-v-primary-hover"
+              >
+                Continue setup
+              </Link>
+            ) : (
+              <Link
+                to={`/organizer/competition/events/${event.id}/live`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-800 bg-emerald-950/30 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-950/50"
+              >
+                Live Control
+              </Link>
+            )}
             <Link
               to={`/organizer/competition/events/${event.id}/edit`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
