@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 
 export default function OrganizationLogoUpload({
@@ -10,6 +10,12 @@ export default function OrganizationLogoUpload({
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
   const [logo, setLogo] = useState(logoUrl)
+
+  // Keep the preview in sync when the parent supplies the logo after mount
+  // (e.g. dashboard data loads late, or a WebSocket stats refresh arrives).
+  useEffect(() => {
+    setLogo(logoUrl)
+  }, [logoUrl])
 
   const handleFile = async (file) => {
     setUploading(true)

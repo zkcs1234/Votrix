@@ -6,6 +6,7 @@ import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES, SCORE_POLICIES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
+import { mapEvent } from '../foundation/mapper.js'
 import { assertJudgeEnrolled, canJudgeScore } from './pageant.service.js'
 import { mergeScoringConfig, resolveScoreBounds, computeRankings } from '../modules/scoring-engine.js'
 import { selectQualifiers, applyQualifierOverride } from '../modules/advancement.js'
@@ -1175,11 +1176,15 @@ export async function getJudgeSessionView(eventId, judgeId) {
   const enrollment = await assertJudgeEnrolled(eventId, judgeId)
   const event = await getEventById(eventId)
 
+  // Full event DTO so the judge header can render the banner + organization
+  // logo (mapEvent pulls the logo from the embedded organizations → users).
+  const eventInfo = mapEvent(event)
+
   const session = await getActiveSession(eventId)
   if (!session) {
     return {
       session: null,
-      event: { id: eventId, title: event.title, eventType: event.event_type },
+      event: eventInfo,
       message: 'No active live session',
     }
   }
@@ -1187,7 +1192,7 @@ export async function getJudgeSessionView(eventId, judgeId) {
   if (session.status !== 'active') {
     return {
       session,
-      event: { id: eventId, title: event.title, eventType: event.event_type },
+      event: eventInfo,
       message: 'Session is not active',
     }
   }
@@ -1195,7 +1200,7 @@ export async function getJudgeSessionView(eventId, judgeId) {
   if (!session.activeContestantId) {
     return {
       session,
-      event: { id: eventId, title: event.title, eventType: event.event_type },
+      event: eventInfo,
       message: 'Waiting for organizer to select a contestant',
     }
   }
@@ -1289,7 +1294,7 @@ export async function getJudgeSessionView(eventId, judgeId) {
     session,
     // The judge page reads `activeSession` on mount to set its state.
     activeSession: session,
-    event: { id: eventId, title: event.title, eventType: event.event_type },
+    event: eventInfo,
     // The scoring form renders `contestants` — the on-stage set (one in single
     // mode, several in a stage group). Each entry carries its own scores/lock.
     contestants: stageContestants,

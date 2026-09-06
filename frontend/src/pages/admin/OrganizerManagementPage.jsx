@@ -76,6 +76,25 @@ function OrganizerTableSkeleton() {
   )
 }
 
+function getInitials(name) {
+  if (!name) return 'OR'
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return 'OR'
+  return words.slice(0, 2).map((word) => word[0]).join('').toUpperCase()
+}
+
+function OrgLogo({ logo, name }) {
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-v-border bg-v-surface-elevated text-xs font-semibold text-v-text-muted">
+      {logo ? (
+        <img src={logo} alt="" className="h-full w-full object-cover" />
+      ) : (
+        getInitials(name)
+      )}
+    </div>
+  )
+}
+
 function getStatusTone(status) {
   return STATUS_CONFIG[status]?.tone ?? 'default'
 }
@@ -315,9 +334,12 @@ export default function OrganizerManagementPage() {
                   return (
                     <tr key={org.id} className="hover:bg-v-surface-elevated/50 cursor-pointer" onClick={() => navigate(`/admin/organizers/${org.id}`)}>
                       <td>
-                        <div className="space-y-1">
-                          <p className="font-medium text-v-text">{org.organization_name || '—'}</p>
-                          <p className="v-caption">{org.organization_type_display || ''}</p>
+                        <div className="flex items-center gap-3">
+                          <OrgLogo logo={org.organization_logo} name={org.organization_name} />
+                          <div className="space-y-1">
+                            <p className="font-medium text-v-text">{org.organization_name || '—'}</p>
+                            <p className="v-caption">{org.organization_type_display || ''}</p>
+                          </div>
                         </div>
                       </td>
                       <td>

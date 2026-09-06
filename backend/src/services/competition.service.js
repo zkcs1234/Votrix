@@ -824,7 +824,7 @@ export async function getCompetitionFoundation(eventId, organizerId) {
     await Promise.all([
       getClient()
         .from(DB_TABLES.EVENTS)
-        .select('id, title, scoring_config, scoring_enabled, event_type, divisions_enabled, competition_type, awards_enabled')
+        .select('id, title, scoring_config, scoring_enabled, event_type, divisions_enabled, competition_type')
         .eq('id', eventId)
         .single(),
       listCategories(eventId, organizerId),

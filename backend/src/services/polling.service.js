@@ -63,7 +63,9 @@ function mapPollEvent(row) {
       ? {
           id: org.id,
           name: org.organization_name,
-          logo: null, // Logo moved to users table in migration 028
+          // Logo lives on users.organization_logo (migration 028); populated
+          // when the query embeds organizations → users ( organization_logo ).
+          logo: org.users?.organization_logo ?? null,
         }
       : null,
   }
@@ -1394,7 +1396,8 @@ export async function listVoterPollEvents(voterId) {
         organization_id,
         organizations (
           id,
-          organization_name
+          organization_name,
+          users ( organization_logo )
         )
       )
     `,

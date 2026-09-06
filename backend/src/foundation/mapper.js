@@ -60,11 +60,13 @@ export function mapEvent(row) {
     updatedAt: row.updated_at,
     // Organization data from join
     // Note: logo is now on users.organization_logo, not organizations.logo
+    // (migration 028). It is populated when the query embeds the organizer via
+    // organizations → users ( organization_logo ); otherwise it stays null.
     organization: org
       ? {
           id: org.id,
           name: org.organization_name,
-          logo: null, // Logo moved to users table in migration 028
+          logo: org.users?.organization_logo ?? null,
         }
       : null,
   }
