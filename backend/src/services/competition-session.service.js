@@ -1730,6 +1730,266 @@ export async function finalizeRound(eventId, organizerId, roundId, { overrides =
   }
 }
 
+// ===========================================================================
+// Option B — STAGE finalize / advancement / carry.
+//
+// A stage is a competition_category with is_stage = true that owns rounds. Its
+// cut rule (advancement_type/value) and carry_policy live on the category. The
+// final event ranking already weights every stage by its category weight, so
+// carry_policy here ONLY affects the standing used to decide who ADVANCES out of
+// a stage — the stage-level analogue of a round's cumulative score_policy. Prior
+// stages' contributions are recomputed from existing scores, so NO new table is
+// needed. The per-round finalize path above is untouched.
+// ===========================================================================
+
+async function getStageRounds(eventId, categoryId) {
+  const { data } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUNDS)
+    .select('id, name, weight, display_order, score_policy')
+    .eq('event_id', eventId)
+    .eq('category_id', categoryId)
+    .order('display_order', { ascending: true })
+  return data ?? []
+}
+
+// A stage's base score per contestant = Σ (round.weight/100 × that round's
+// independent standing score). Returns Map<contestantId, {score, divisionId,
+// contestantName, contestantNumber}>.
+async function computeStageBaseScores(eventId, category, scoringConfig, { divisionId } = {}) {
+  const rounds = await getStageRounds(eventId, category.id)
+  const acc = new Map()
+  const weightTotal = rounds.reduce((s, r) => s + Number(r.weight ?? 0), 0) || 100
+  for (const r of rounds) {
+    // Force independent so a stage round contributes its own score only; the
+    // stage combination applies the weights.
+    const st = await computeRoundStanding(
+      eventId,
+      { ...r, score_policy: SCORE_POLICIES.INDEPENDENT },
+      scoringConfig,
+      { divisionId },
+    )
+    const w = Number(r.weight ?? 0) / weightTotal
+    for (const s of st) {
+      const cur =
+        acc.get(s.contestantId) ??
+        {
+          score: 0,
+          divisionId: s.divisionId ?? null,
+          contestantName: s.contestantName,
+          contestantNumber: s.contestantNumber,
+        }
+      cur.score += Number(s.score) * w
+      acc.set(s.contestantId, cur)
+    }
+  }
+  return acc
+}
+
+async function computeStageStanding(eventId, category, scoringConfig, { divisionId } = {}) {
+  const base = await computeStageBaseScores(eventId, category, scoringConfig, { divisionId })
+  const standing = [...base.entries()].map(([contestantId, v]) => ({
+    contestantId,
+    contestantName: v.contestantName,
+    contestantNumber: v.contestantNumber,
+    divisionId: v.divisionId ?? null,
+    score: v.score,
+  }))
+
+  const policy = category.carry_policy ?? 'reset'
+  if (policy === 'carry_50' || policy === 'carry_full') {
+    const factor = policy === 'carry_50' ? 0.5 : 1
+    const { data: priorStages } = await getClient()
+      .from(DB_TABLES.COMPETITION_CATEGORIES)
+      .select('*')
+      .eq('event_id', eventId)
+      .eq('is_stage', true)
+      .not('finalized_at', 'is', null)
+      .lt('display_order', category.display_order)
+    for (const ps of priorStages ?? []) {
+      const priorBase = await computeStageBaseScores(eventId, ps, scoringConfig, { divisionId })
+      for (const s of standing) {
+        const pv = priorBase.get(s.contestantId)
+        if (pv) s.score += pv.score * factor
+      }
+    }
+  }
+
+  return rankByScore(standing)
+}
+
+// Division-aware stage advancement (top-N per division when divisions are on).
+async function computeStageAdvancement(eventId, category, scoringConfig, event) {
+  const auto = new Set()
+  if (event?.divisions_enabled) {
+    const { data: divs } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('event_id', eventId)
+    if (divs?.length) {
+      const standing = []
+      for (const d of divs) {
+        const s = await computeStageStanding(eventId, category, scoringConfig, { divisionId: d.id })
+        for (const id of selectQualifiers(s, category.advancement_type, category.advancement_value)) {
+          auto.add(id)
+        }
+        standing.push(...s)
+      }
+      return { standing, auto }
+    }
+  }
+  const standing = await computeStageStanding(eventId, category, scoringConfig, {})
+  for (const id of selectQualifiers(standing, category.advancement_type, category.advancement_value)) {
+    auto.add(id)
+  }
+  return { standing, auto }
+}
+
+async function getStage(eventId, categoryId) {
+  const { data, error } = await getClient()
+    .from(DB_TABLES.COMPETITION_CATEGORIES)
+    .select('*')
+    .eq('id', categoryId)
+    .eq('event_id', eventId)
+    .maybeSingle()
+  if (error) throw new ApiError(500, error.message)
+  if (!data || !data.is_stage) throw new ApiError(404, 'Stage not found')
+  return data
+}
+
+async function getNextStage(eventId, category) {
+  const { data } = await getClient()
+    .from(DB_TABLES.COMPETITION_CATEGORIES)
+    .select('id, name, display_order')
+    .eq('event_id', eventId)
+    .eq('is_stage', true)
+    .gt('display_order', category.display_order)
+    .order('display_order', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return data ?? null
+}
+
+async function getFirstRoundOfStage(eventId, categoryId) {
+  const { data } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUNDS)
+    .select('id, name, display_order')
+    .eq('event_id', eventId)
+    .eq('category_id', categoryId)
+    .order('display_order', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return data ?? null
+}
+
+// Preview a stage's standing + auto qualifiers WITHOUT committing.
+export async function previewStageAdvancement(eventId, organizerId, categoryId) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const event = await getEventById(eventId)
+  const scoringConfig = mergeScoringConfig(event.scoring_config)
+  const category = await getStage(eventId, categoryId)
+
+  const { standing, auto } = await computeStageAdvancement(eventId, category, scoringConfig, event)
+  const nextStage = await getNextStage(eventId, category)
+
+  return {
+    stageId: categoryId,
+    stageName: category.name,
+    finalized: Boolean(category.finalized_at),
+    advancementType: category.advancement_type,
+    advancementValue: category.advancement_value,
+    carryPolicy: category.carry_policy,
+    divisionsEnabled: Boolean(event.divisions_enabled),
+    nextStageId: nextStage?.id ?? null,
+    nextStageName: nextStage?.name ?? null,
+    standing: standing.map((s) => ({ ...s, qualified: auto.has(s.contestantId) })),
+  }
+}
+
+// Finalize a stage: compute standing, choose qualifiers (auto + override), mark
+// the stage finalized, and seed the next stage's first round with qualifiers.
+export async function finalizeStage(
+  eventId,
+  organizerId,
+  categoryId,
+  { overrides = null, force = false } = {},
+) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const event = await getEventById(eventId)
+  const scoringConfig = mergeScoringConfig(event.scoring_config)
+  const category = await getStage(eventId, categoryId)
+  if (category.finalized_at && !force) {
+    throw new ApiError(409, 'This stage has already been finalized')
+  }
+  if (force) await backfillLiveScoresToRankingStore(eventId)
+
+  const { standing, auto } = await computeStageAdvancement(eventId, category, scoringConfig, event)
+  if (!standing.length) throw new ApiError(400, 'No scored contestants to finalize in this stage')
+
+  const qualifiedSet = applyQualifierOverride(auto, overrides)
+  const qualifiers = [...qualifiedSet]
+
+  // Atomic claim on first finalize (prevents double finalize).
+  let now
+  if (category.finalized_at && force) {
+    now = category.finalized_at
+  } else {
+    now = new Date().toISOString()
+    const { data: claimed, error: claimErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_CATEGORIES)
+      .update({ finalized_at: now })
+      .eq('id', categoryId)
+      .is('finalized_at', null)
+      .select('id')
+    if (claimErr) throw new ApiError(500, claimErr.message)
+    if (!claimed?.length) throw new ApiError(409, 'This stage has already been finalized')
+  }
+
+  const nextStage = await getNextStage(eventId, category)
+  let seededCount = 0
+  if (nextStage && qualifiers.length) {
+    const firstRound = await getFirstRoundOfStage(eventId, nextStage.id)
+    if (firstRound) {
+      const rows = qualifiers.map((cid) => ({ round_id: firstRound.id, contestant_id: cid }))
+      const { error: seedErr } = await getClient()
+        .from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS)
+        .upsert(rows, { onConflict: 'round_id,contestant_id', ignoreDuplicates: true })
+      if (seedErr) throw new ApiError(500, seedErr.message)
+      seededCount = qualifiers.length
+    }
+  }
+
+  recordAudit({
+    userId: organizerId,
+    action: 'competition.stage.finalized',
+    entity: 'competition_category',
+    entityId: categoryId,
+    details: { eventId, qualifiers, seededCount, nextStageId: nextStage?.id ?? null },
+  })
+  emitToEvent(eventId, 'session:round-finalized', {
+    stageId: categoryId,
+    nextStageId: nextStage?.id ?? null,
+    qualifiedCount: qualifiers.length,
+  })
+  try {
+    const { getLiveRankings } = await import('./pageant.service.js')
+    const rankings = await getLiveRankings(eventId, organizerId)
+    emitToEvent(eventId, 'rankings:updated', { eventId, rankings })
+  } catch (e) {
+    console.error('[finalizeStage] rankings refresh failed:', e.message)
+  }
+
+  return {
+    stageId: categoryId,
+    stageName: category.name,
+    finalizedAt: now,
+    standing: standing.map((s) => ({ ...s, qualified: qualifiedSet.has(s.contestantId) })),
+    qualifiers,
+    nextStageId: nextStage?.id ?? null,
+    nextStageName: nextStage?.name ?? null,
+    seededCount,
+  }
+}
+
 // Read a finalized round's snapshot (for the review/results UI).
 export async function getRoundResults(eventId, organizerId, roundId) {
   await assertCompetitionEvent(eventId, organizerId)

@@ -204,6 +204,17 @@ export const deleteJudgeAssignment = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Assignment removed' })
 })
 
+// Option B — set a judge's score weight (per-judge, kept in sync across scopes).
+export const setJudgeWeight = asyncHandler(async (req, res) => {
+  const result = await competitionService.setJudgeWeight(
+    req.params.eventId,
+    req.user.id,
+    req.params.judgeId,
+    req.body?.weight,
+  )
+  res.json({ success: true, ...result })
+})
+
 // ---------------------------------------------------------------------------
 // Full snapshot: returns categories, rounds, criteria, contestants, judges,
 // assignments, and the scoring config in one round-trip. Used by the

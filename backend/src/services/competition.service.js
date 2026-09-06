@@ -96,6 +96,13 @@ function mapCategory(row) {
     displayOrder: row.display_order,
     weight: Number(row.weight),
     isActive: row.is_active,
+    // Option B — stage behavior (migration 069). Safe defaults so a pre-069 DB
+    // or a plain category reads as a non-stage with no cut/carry.
+    isStage: row.is_stage ?? false,
+    advancementType: row.advancement_type ?? 'none',
+    advancementValue: row.advancement_value ?? null,
+    carryPolicy: row.carry_policy ?? 'reset',
+    finalizedAt: row.finalized_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -147,6 +154,15 @@ export async function createCategory(eventId, organizerId, payload) {
       display_order: payload.displayOrder ?? 0,
       weight: payload.weight ?? 0,
       is_active: payload.isActive ?? true,
+      // Option B — stage behavior (only set when provided; DB defaults otherwise).
+      ...(payload.isStage !== undefined ? { is_stage: payload.isStage } : {}),
+      ...(payload.advancementType !== undefined
+        ? { advancement_type: payload.advancementType }
+        : {}),
+      ...(payload.advancementValue !== undefined
+        ? { advancement_value: payload.advancementValue }
+        : {}),
+      ...(payload.carryPolicy !== undefined ? { carry_policy: payload.carryPolicy } : {}),
     })
     .select('*')
     .single()
@@ -183,6 +199,11 @@ export async function updateCategory(eventId, organizerId, categoryId, payload) 
   if (payload.weight !== undefined) updates.weight = payload.weight
   if (payload.isActive !== undefined) updates.is_active = payload.isActive
   if (payload.divisionId !== undefined) updates.division_id = payload.divisionId
+  // Option B — stage behavior.
+  if (payload.isStage !== undefined) updates.is_stage = payload.isStage
+  if (payload.advancementType !== undefined) updates.advancement_type = payload.advancementType
+  if (payload.advancementValue !== undefined) updates.advancement_value = payload.advancementValue
+  if (payload.carryPolicy !== undefined) updates.carry_policy = payload.carryPolicy
 
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_CATEGORIES)
@@ -671,6 +692,7 @@ function mapAssignment(row) {
     judgeId: row.participant_id,
     scope: row.scope,
     scopeId: row.scope_id,
+    weight: row.weight ?? null,
     createdAt: row.created_at,
   }
 }
@@ -736,7 +758,12 @@ export async function createJudgeAssignment(eventId, organizerId, judgeId, paylo
 
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
-    .insert({ participant_id: judgeId, scope: payload.scope, scope_id: scopeId })
+    .insert({
+      participant_id: judgeId,
+      scope: payload.scope,
+      scope_id: scopeId,
+      ...(payload.weight !== undefined ? { weight: payload.weight } : {}),
+    })
     .select('*')
     .single()
   if (error) {
@@ -771,6 +798,45 @@ export async function deleteJudgeAssignment(eventId, organizerId, judgeId, assig
     details: { judgeId, assignmentId },
   })
   return { success: true }
+}
+
+// Option B — set a judge's score weight. Weight lives on the judge's assignment
+// rows; a per-judge weight is kept in sync across all of that judge's scopes so
+// the engine can read it by user regardless of which scope it looks at. Pass
+// null to clear (back to equal weighting for that judge).
+export async function setJudgeWeight(eventId, organizerId, judgeId, weight) {
+  await assertCompetitionEvent(eventId, organizerId)
+  await assertJudgeParticipant(eventId, judgeId)
+
+  const value =
+    weight === null || weight === undefined || weight === '' ? null : Number(weight)
+  if (value !== null && (Number.isNaN(value) || value < 0 || value > 100)) {
+    throw new ApiError(400, 'weight must be between 0 and 100')
+  }
+
+  const { data: rows, error: findErr } = await getClient()
+    .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
+    .select('id')
+    .eq('participant_id', judgeId)
+  if (findErr) throw new ApiError(500, findErr.message)
+  if (!rows?.length) {
+    throw new ApiError(400, 'Assign this judge to at least one round or the event before setting a weight')
+  }
+
+  const { error } = await getClient()
+    .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
+    .update({ weight: value })
+    .eq('participant_id', judgeId)
+  if (error) throw new ApiError(500, error.message)
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.weight.set',
+    userId: organizerId,
+    module: 'competition',
+    details: { judgeId, weight: value },
+  })
+  return { judgeId, weight: value }
 }
 
 // ---------------------------------------------------------------------------
@@ -858,7 +924,7 @@ export async function getCompetitionFoundation(eventId, organizerId) {
   if (judgeParticipantIds.length) {
     const { data: assignments, error: assignmentError } = await getClient()
       .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
-      .select('id, participant_id, scope, scope_id')
+      .select('id, participant_id, scope, scope_id, weight')
       .in('participant_id', judgeParticipantIds)
 
     if (assignmentError) throw new ApiError(500, assignmentError.message)
@@ -897,6 +963,7 @@ export async function getCompetitionFoundation(eventId, organizerId) {
       judgeId: a.participant_id,
       scope: a.scope,
       scopeId: a.scope_id,
+      weight: a.weight ?? null,
     })),
   }
 }

@@ -1683,6 +1683,39 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
     }
   }
 
+  // Option B — judge weighting. When enabled, build a user_id → weight map from
+  // the judges' assignment rows (scores are keyed by users.id, assignments by
+  // event_participants.id, so we join through the judge participants). Left null
+  // when weighting is off, so the engine keeps its equal-average behavior.
+  let judgeWeights = null
+  if (mergeScoringConfig(eventRes.data?.scoring_config).judgeWeightingEnabled) {
+    const { data: judgeParts } = await getClient()
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .select('id, user_id')
+      .eq('event_id', eventId)
+      .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    const partIds = (judgeParts ?? []).map((p) => p.id)
+    if (partIds.length) {
+      const { data: assignRows } = await getClient()
+        .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
+        .select('participant_id, weight')
+        .in('participant_id', partIds)
+      const weightByPart = new Map()
+      for (const a of assignRows ?? []) {
+        if (a.weight === null || a.weight === undefined) continue
+        // keep the max weight seen for a participant (they're kept in sync anyway)
+        const prev = weightByPart.get(a.participant_id)
+        if (prev === undefined || Number(a.weight) > prev) weightByPart.set(a.participant_id, Number(a.weight))
+      }
+      const userById = new Map((judgeParts ?? []).map((p) => [p.id, p.user_id]))
+      judgeWeights = {}
+      for (const [partId, w] of weightByPart) {
+        const uid = userById.get(partId)
+        if (uid) judgeWeights[uid] = w
+      }
+    }
+  }
+
   // H2 note: the FINAL event ranking is the weighted combination of rounds
   // (Σ round.value × round.weight) — the standard model. A round's `score_policy`
   // (independent/cumulative) governs how that round's standing is computed for
@@ -1696,6 +1729,7 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
     categories: categoriesRes.data ?? [],
     config: eventRes.data?.scoring_config,
     roundCriteria,
+    judgeWeights,
   })
 
   // Map the engine's nested shape to the public shape the UI already uses.

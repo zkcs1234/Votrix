@@ -81,6 +81,33 @@ export const CALCULATION_METHODS = {
   SUM: 'sum',
   HIGHEST_SCORE: 'highest_score',
   LOWEST_REMOVAL: 'lowest_removal',
+  // Option B additions.
+  // trimmed_average — drop N highest + N lowest judge scores, then average.
+  // rank_based      — derived: each judge's numbers are turned into per-contestant
+  //                   ranks, then combined (judges keep entering numbers).
+  // percentile      — each judge's scores are percentile-normalized before
+  //                   combining, neutralizing strict vs. lenient judges.
+  TRIMMED_AVERAGE: 'trimmed_average',
+  RANK_BASED: 'rank_based',
+  PERCENTILE: 'percentile',
+}
+
+// Option B — deterministic tie-breakers (events.scoring_config.tieBreaker).
+// null = standard "1224" shared ranks on genuine ties (unchanged default).
+export const TIE_BREAKERS = {
+  HIGHEST_CRITERION: 'highest_criterion', // higher single best per-criterion average
+  HIGHEST_ROUND: 'highest_round', // higher score in a chosen round (or the best round)
+  COUNTBACK: 'countback', // won more individual criteria head-to-head
+  JUDGES_MAJORITY: 'judges_majority', // more judges scored them higher overall
+  MANUAL: 'manual', // organizer resolves live (no auto ordering)
+}
+
+// Option B — how a stage's score follows qualifiers into the next stage
+// (competition_categories.carry_policy).
+export const CARRY_POLICIES = {
+  RESET: 'reset', // next stage starts at zero (most common)
+  CARRY_50: 'carry_50', // keep 50% of this stage's score
+  CARRY_FULL: 'carry_full', // keep this stage's full score
 }
 
 // Phase 6 — round progression.

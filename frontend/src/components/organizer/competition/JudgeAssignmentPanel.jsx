@@ -95,6 +95,31 @@ export default function JudgeAssignmentPanel({ foundation, reload }) {
   const isEventScope = scope === 'event'
   const scopeOptions = { event: 'Event', division: 'Division', category: 'Category', round: 'Round' }
 
+  // Option B — per-judge weighting. Enabled via Scoring Rules; weight lives on
+  // the judge's assignment rows (kept in sync), so read it from any assignment.
+  const weightingEnabled = Boolean(
+    foundation?.scoringConfig?.judgeWeightingEnabled ??
+      foundation?.event?.scoring_config?.judgeWeightingEnabled,
+  )
+  const judgeWeight = (judgeId) => {
+    const a = (foundation?.assignments ?? []).find(
+      (x) => x.judgeId === judgeId && x.weight !== null && x.weight !== undefined,
+    )
+    return a ? Number(a.weight) : null
+  }
+  const setWeight = async (judge, value) => {
+    try {
+      await pageantService.setJudgeWeight(eventId, judge.id, value === '' ? null : Number(value))
+      reload()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to set judge weight')
+    }
+  }
+  const weightTotal = (foundation?.judges ?? []).reduce((s, j) => {
+    const w = judgeWeight(j.id)
+    return s + (w ?? 0)
+  }, 0)
+
   return (
     <div className="space-y-3">
       <div>
@@ -103,6 +128,16 @@ export default function JudgeAssignmentPanel({ foundation, reload }) {
           Scope each judge to specific rounds, divisions, or categories. Leave a judge unassigned for
           event-wide scoring.
         </p>
+        {weightingEnabled && (
+          <p
+            className={`mt-1 text-xs ${
+              Math.abs(weightTotal - 100) < 0.1 ? 'text-v-success' : 'text-amber-400'
+            }`}
+          >
+            Judge weighting is on. Weights currently total {Math.round(weightTotal * 100) / 100}%
+            {Math.abs(weightTotal - 100) < 0.1 ? ' ✓' : ' — they should total 100%.'}
+          </p>
+        )}
       </div>
 
       {/* Bulk: assign all judges to one scope at once. */}
@@ -153,6 +188,24 @@ export default function JudgeAssignmentPanel({ foundation, reload }) {
                     {judge.email} · {judge.role}
                   </p>
                 </div>
+                {weightingEnabled && (
+                  <label className="flex items-center gap-2 text-xs text-v-text-muted">
+                    Weight %
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      defaultValue={judgeWeight(judge.id) ?? ''}
+                      onBlur={(e) => setWeight(judge, e.target.value)}
+                      className="w-20 rounded-lg border border-v-border bg-v-surface px-2 py-1 text-sm text-v-text"
+                      title={
+                        (foundation?.assignments ?? []).some((a) => a.judgeId === judge.id)
+                          ? "Set this judge's score weight"
+                          : 'Assign this judge to a scope first, then set a weight'
+                      }
+                    />
+                  </label>
+                )}
               </div>
 
               <div className="space-y-1 rounded-lg bg-v-surface-elevated px-3 py-2 text-sm">

@@ -7,6 +7,8 @@ import {
   EVENT_STATUS,
   ADVANCEMENT_TYPES,
   SCORE_POLICIES,
+  TIE_BREAKERS,
+  CARRY_POLICIES,
 } from '../utils/constants.js'
 import { validateUUID } from '../utils/sanitize.js'
 import { isValidCompetitionType, getTemplate } from '../modules/competition-templates.js'
@@ -134,7 +136,7 @@ export function validateCategory(body) {
     throw new ApiError(400, 'Category weight must be between 0 and 100')
   }
   const displayOrder = body.displayOrder !== undefined ? Number(body.displayOrder) : 0
-  return {
+  const payload = {
     name: body.name.trim(),
     description: body.description?.trim() || null,
     displayOrder: Number.isInteger(displayOrder) ? displayOrder : 0,
@@ -142,6 +144,38 @@ export function validateCategory(body) {
     isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
     divisionId: body.divisionId || null,
   }
+
+  // Option B — stage behavior. A category is promoted to a first-class "stage"
+  // (a phase like Prelims/Finals) when it carries a cut rule and carry policy.
+  // These are only written when explicitly provided, so a plain category edit
+  // never resets them.
+  if (body.isStage !== undefined) payload.isStage = Boolean(body.isStage)
+  if (body.advancementType !== undefined) {
+    if (!Object.values(ADVANCEMENT_TYPES).includes(body.advancementType)) {
+      throw new ApiError(
+        400,
+        `advancementType must be one of: ${Object.values(ADVANCEMENT_TYPES).join(', ')}`,
+      )
+    }
+    payload.advancementType = body.advancementType
+  }
+  if (body.advancementValue !== undefined) {
+    payload.advancementValue =
+      body.advancementValue === null || body.advancementValue === ''
+        ? null
+        : Number(body.advancementValue)
+  }
+  if (body.carryPolicy !== undefined) {
+    if (!Object.values(CARRY_POLICIES).includes(body.carryPolicy)) {
+      throw new ApiError(
+        400,
+        `carryPolicy must be one of: ${Object.values(CARRY_POLICIES).join(', ')}`,
+      )
+    }
+    payload.carryPolicy = body.carryPolicy
+  }
+
+  return payload
 }
 
 // ---------------------------------------------------------------------------
@@ -265,13 +299,26 @@ export function validateScoringConfig(body) {
     config.includeOverallRanking = Boolean(body.includeOverallRanking)
   }
 
-  // Phase 7: optional tie-breaker.
+  // Phase 7 / Option B: optional tie-breaker.
   if (body.tieBreaker !== undefined) {
-    const allowed = [null, 'none', 'highest_criterion']
+    const allowed = [null, 'none', ...Object.values(TIE_BREAKERS)]
     if (!allowed.includes(body.tieBreaker)) {
-      throw new ApiError(400, 'tieBreaker must be one of: none, highest_criterion')
+      throw new ApiError(
+        400,
+        `tieBreaker must be one of: none, ${Object.values(TIE_BREAKERS).join(', ')}`,
+      )
     }
     config.tieBreaker = body.tieBreaker === 'none' ? null : body.tieBreaker
+  }
+
+  // Option B: which round decides a 'highest_round' tie (optional).
+  if (body.tieBreakRoundId !== undefined) {
+    config.tieBreakRoundId = body.tieBreakRoundId || null
+  }
+
+  // Option B: enable per-judge weighting when combining scores.
+  if (body.judgeWeightingEnabled !== undefined) {
+    config.judgeWeightingEnabled = Boolean(body.judgeWeightingEnabled)
   }
 
   return config
@@ -299,7 +346,22 @@ export function validateAssignment(body) {
   if (!body?.scopeId) {
     throw new ApiError(400, 'scopeId is required')
   }
-  return { scope: body.scope, scopeId: body.scopeId }
+  const payload = { scope: body.scope, scopeId: body.scopeId }
+
+  // Option B — optional per-judge weight (0–100). Omitted / null = equal weighting.
+  if (body.weight !== undefined) {
+    if (body.weight === null || body.weight === '') {
+      payload.weight = null
+    } else {
+      const w = Number(body.weight)
+      if (Number.isNaN(w) || w < 0 || w > 100) {
+        throw new ApiError(400, 'weight must be between 0 and 100')
+      }
+      payload.weight = w
+    }
+  }
+
+  return payload
 }
 
 // ---------------------------------------------------------------------------

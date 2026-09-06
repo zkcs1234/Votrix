@@ -53,6 +53,8 @@ router.delete('/judges-v2/:judgeId', ctrl.deleteJudgeV2)
 router.get('/judges-v2/:judgeId/assignments', ctrl.listJudgeAssignments)
 router.post('/judges-v2/:judgeId/assignments', ctrl.createJudgeAssignment)
 router.delete('/judges-v2/:judgeId/assignments/:assignmentId', ctrl.deleteJudgeAssignment)
+// Option B — per-judge score weight
+router.patch('/judges-v2/:judgeId/weight', ctrl.setJudgeWeight)
 
 // ---------------------------------------------------------------------------
 // Live Competition Session (Phase 7)
@@ -82,6 +84,9 @@ router.get('/session/judge-progress', sessionCtrl.getJudgeProgress)
 // Round finalize & advancement (Phase 6)
 router.get('/rounds/:roundId/advancement-preview', sessionCtrl.previewRoundAdvancement)
 router.post('/session/finalize-round', sessionCtrl.finalizeRound)
+// Option B — stage-level advancement
+router.get('/stages/:categoryId/advancement-preview', sessionCtrl.previewStageAdvancement)
+router.post('/session/finalize-stage', sessionCtrl.finalizeStage)
 router.post('/session/resync-scores', sessionCtrl.resyncRankingStore)
 router.get('/rounds/:roundId/results', sessionCtrl.getRoundResults)
 

@@ -7,6 +7,7 @@
 import {
   SCORE_TYPES,
   CALCULATION_METHODS,
+  TIE_BREAKERS,
 } from '../utils/constants.js'
 
 export const DEFAULT_SCORING_CONFIG = Object.freeze({
@@ -17,11 +18,15 @@ export const DEFAULT_SCORING_CONFIG = Object.freeze({
   customMax: null,
   dropHighest: 0,
   dropLowest: 0,
-  // Phase 7: optional deterministic tie-break. null = equal ranks on ties
-  // (standard-competition "1224", unchanged). 'highest_criterion' = among tied
-  // final scores, the contestant with the higher single best per-criterion
-  // average ranks first.
+  // Phase 7 / Option B: optional deterministic tie-break. null = equal ranks on
+  // ties (standard-competition "1224", unchanged). See TIE_BREAKERS.
   tieBreaker: null,
+  // Option B: when tieBreaker === 'highest_round', which round decides. null =
+  // use each contestant's single best round value.
+  tieBreakRoundId: null,
+  // Option B: when true, judges' scores are combined using their per-assignment
+  // weight instead of a plain equal average. Default false = today's behavior.
+  judgeWeightingEnabled: false,
 })
 
 export function mergeScoringConfig(raw) {
@@ -41,6 +46,8 @@ export function mergeScoringConfig(raw) {
     dropLowest: Number.isFinite(Number(raw.dropLowest))
       ? Number(raw.dropLowest)
       : DEFAULT_SCORING_CONFIG.dropLowest,
+    judgeWeightingEnabled: Boolean(raw.judgeWeightingEnabled),
+    tieBreakRoundId: raw.tieBreakRoundId ?? null,
   }
 }
 
@@ -111,13 +118,54 @@ export function reduceScores(scores, config) {
     case CALCULATION_METHODS.HIGHEST_SCORE:
       return highest(list)
     case CALCULATION_METHODS.LOWEST_REMOVAL:
+    case CALCULATION_METHODS.TRIMMED_AVERAGE:
+      // Both drop N highest + N lowest judge scores, then average the rest.
+      // trimmed_average is the organizer-facing label; the math is identical.
       return lowestRemoved(list, cfg.dropLowest, cfg.dropHighest)
     case CALCULATION_METHODS.WEIGHTED_AVERAGE:
+    case CALCULATION_METHODS.PERCENTILE:
+    case CALCULATION_METHODS.RANK_BASED:
     default:
       // weighted-average reduction across judges is a per-criterion average.
-      // The per-criterion *weight* is applied by the caller.
+      // The per-criterion *weight* is applied by the caller. percentile and
+      // rank_based transform the scores upstream (see preprocessScoresForMethod)
+      // and then combine like a weighted average, so they land here too.
       return average(list)
   }
+}
+
+// Judge-weighted reduction of ONE cell (all judges' scores for a single
+// contestant × criterion). `cell` is an array of { score, judgeId }. When judge
+// weighting is off, or no weights are known, this is byte-identical to
+// reduceScores over the plain values — so existing events are unaffected.
+function reduceCell(cell, cfg, judgeWeights) {
+  const values = cell.map((x) => Number(x.score)).filter((n) => !Number.isNaN(n))
+  const weightingOn =
+    cfg.judgeWeightingEnabled &&
+    judgeWeights &&
+    (cfg.calculationMethod === CALCULATION_METHODS.AVERAGE ||
+      cfg.calculationMethod === CALCULATION_METHODS.WEIGHTED_AVERAGE ||
+      cfg.calculationMethod === CALCULATION_METHODS.PERCENTILE ||
+      cfg.calculationMethod === CALCULATION_METHODS.RANK_BASED)
+
+  if (!weightingOn) return reduceScores(values, cfg)
+
+  // Weighted mean across judges. A judge with no known weight falls back to the
+  // average of the known weights so they still count (never silently dropped).
+  const known = cell
+    .map((x) => ({ v: Number(x.score), w: Number(judgeWeights.get?.(x.judgeId) ?? judgeWeights[x.judgeId]) }))
+    .filter((x) => !Number.isNaN(x.v))
+  if (!known.length) return 0
+  const knownWeights = known.map((x) => x.w).filter((w) => Number.isFinite(w) && w > 0)
+  const fallback = knownWeights.length ? knownWeights.reduce((a, b) => a + b, 0) / knownWeights.length : 1
+  let wsum = 0
+  let acc = 0
+  for (const x of known) {
+    const w = Number.isFinite(x.w) && x.w > 0 ? x.w : fallback
+    acc += x.v * w
+    wsum += w
+  }
+  return wsum > 0 ? acc / wsum : 0
 }
 
 // ---------------------------------------------------------------------------
@@ -191,10 +239,29 @@ export function computeRankings({
   categories = [],
   config = {},
   roundCriteria = null,
+  judgeWeights = null,
 }) {
   const cfg = mergeScoringConfig(config)
   const method = cfg.calculationMethod
   const dp = Math.max(0, Math.min(6, cfg.decimalPlaces))
+
+  // Option B: judge weighting lookup (judgeId → weight). Accept a Map or a plain
+  // object. Left null / disabled ⇒ equal weighting (today's behavior).
+  const judgeWeightMap =
+    cfg.judgeWeightingEnabled && judgeWeights
+      ? judgeWeights instanceof Map
+        ? judgeWeights
+        : new Map(Object.entries(judgeWeights))
+      : null
+
+  // Option B: percentile and rank_based work by TRANSFORMING each judge's raw
+  // numbers before the normal weighted pipeline runs. Judges still enter numbers
+  // (derived-rank model) — this only reshapes what those numbers mean. Every
+  // other method uses the scores untouched, so their output is unchanged.
+  const workingScores =
+    method === CALCULATION_METHODS.PERCENTILE || method === CALCULATION_METHODS.RANK_BASED
+      ? preprocessScoresForMethod(scores, contestants, method)
+      : scores
 
   // Build contestant result skeletons.
   const results = contestants.map((c) => ({
@@ -220,7 +287,7 @@ export function computeRankings({
 
   if (scoped) {
     computeScopedPerRound({
-      scores,
+      scores: workingScores,
       contestants,
       criteria,
       rounds,
@@ -228,10 +295,11 @@ export function computeRankings({
       byContestant,
       cfg,
       dp,
+      judgeWeights: judgeWeightMap,
     })
   } else {
     computeLegacyPerRound({
-      scores,
+      scores: workingScores,
       contestants,
       criteria,
       rounds,
@@ -239,6 +307,7 @@ export function computeRankings({
       cfg,
       method,
       dp,
+      judgeWeights: judgeWeightMap,
     })
   }
 
@@ -262,23 +331,12 @@ export function computeRankings({
   // 3. Combine rounds → categories (SHARED by both paths; reads row.perRound).
   combineRoundsToFinal({ contestants, categories, effectiveRounds, byContestant, dp, roundWeightScale })
 
-  // Phase 7: optional deterministic tie-break key.
-  const tieBreakActive = cfg.tieBreaker === 'highest_criterion'
-  if (tieBreakActive) {
-    for (const row of results) {
-      const avgs = Object.values(row.perCriterion).map((c) => c.average ?? 0)
-      row._tieKey = avgs.length ? Math.max(...avgs) : 0
-    }
-  }
-
-  // Sort by final score desc (then tie-break key desc when active); assign ranks.
-  const sorted = [...results].sort(
-    (a, b) =>
-      b.finalScore - a.finalScore ||
-      (tieBreakActive ? (b._tieKey ?? 0) - (a._tieKey ?? 0) : 0),
-  )
-  assignRanks(sorted, tieBreakActive)
-  if (tieBreakActive) for (const row of sorted) delete row._tieKey
+  // Option B: resolve ties per the configured tie-breaker (or standard "1224"
+  // shared ranks when none). Sort by final score, then break equal-score groups.
+  const sorted = resolveTiesAndRank(results, cfg, {
+    scores: workingScores,
+    criteria,
+  })
 
   // Weight totals for organizer feedback.
   const criterionTotals = criteria.reduce((s, c) => s + Number(c.percentage ?? 0), 0)
@@ -297,13 +355,14 @@ export function computeRankings({
 
 // LEGACY per-round population (unchanged behavior): criteria are one flat pool,
 // every round is computed over ALL criteria (so rounds do not differentiate).
-function computeLegacyPerRound({ scores, contestants, criteria, rounds, byContestant, cfg, method, dp }) {
+function computeLegacyPerRound({ scores, contestants, criteria, rounds, byContestant, cfg, method, dp, judgeWeights = null }) {
   // Group scores by (contestant, criteria) — round_id intentionally ignored.
+  // Each cell keeps { score, judgeId } so judge weighting can apply.
   const byCell = new Map()
   for (const s of scores) {
     const key = `${s.contestant_id ?? s.contestantId}|${s.criteria_id ?? s.criteriaId}`
     if (!byCell.has(key)) byCell.set(key, [])
-    byCell.get(key).push(Number(s.score))
+    byCell.get(key).push({ score: Number(s.score), judgeId: s.judge_id ?? s.judgeId ?? null })
   }
 
   // 1. Per-criterion reduction.
@@ -314,7 +373,7 @@ function computeLegacyPerRound({ scores, contestants, criteria, rounds, byContes
     const criterionWeight = Number(crit.percentage ?? 0) / 100
     for (const contestant of contestants) {
       const cellScores = byCell.get(`${contestant.id}|${crit.id}`) ?? []
-      const reduced = reduceScores(cellScores, cfg)
+      const reduced = reduceCell(cellScores, cfg, judgeWeights)
       const row = byContestant.get(contestant.id)
       if (!row) continue
       row.perCriterion[crit.id] = {
@@ -378,7 +437,7 @@ function computeLegacyPerRound({ scores, contestants, criteria, rounds, byContes
 // criteria (normalized within the round); scores attributed to their round_id so
 // the same criterion scored in two rounds does NOT merge. Also fills
 // row.perCriterion with an event-level aggregate (across rounds) for the UI.
-function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCriteria, byContestant, cfg, dp }) {
+function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCriteria, byContestant, cfg, dp, judgeWeights = null }) {
   const critById = new Map(criteria.map((c) => [c.id, c]))
 
   // How many rounds each criterion belongs to. A criterion in exactly ONE round
@@ -402,16 +461,17 @@ function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCri
     const critId = s.criteria_id ?? s.criteriaId
     const rid = s.round_id ?? s.roundId ?? null
     const key = `${cid}|${critId}|${rid}`
+    const entry = { score: Number(s.score), judgeId: s.judge_id ?? s.judgeId ?? null }
     if (!byCellRound.has(key)) byCellRound.set(key, [])
-    byCellRound.get(key).push(Number(s.score))
+    byCellRound.get(key).push(entry)
     const anyKey = `${cid}|${critId}`
     if (!byCellAny.has(anyKey)) byCellAny.set(anyKey, [])
-    byCellAny.get(anyKey).push(Number(s.score))
+    byCellAny.get(anyKey).push(entry)
   }
 
   // For the UI breakdown, aggregate each criterion's cells across the rounds
   // that use it, so row.perCriterion still carries one entry per criterion.
-  const aggByCrit = new Map() // `${contestantId}|${critId}` -> number[]
+  const aggByCrit = new Map() // `${contestantId}|${critId}` -> Array<{score, judgeId}>
 
   for (const round of rounds) {
     const critIds = Array.isArray(roundCriteria[round.id]) ? roundCriteria[round.id] : []
@@ -430,7 +490,7 @@ function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCri
           exact.length === 0 && (roundsPerCriterion.get(crit.id) ?? 0) <= 1
             ? byCellAny.get(`${contestant.id}|${crit.id}`) ?? []
             : exact
-        const reduced = reduceScores(cell, cfg)
+        const reduced = reduceCell(cell, cfg, judgeWeights)
         // Criterion normalized WITHIN this round.
         roundValue += reduced * (Number(crit.percentage ?? 0) / totalPct)
 
@@ -457,7 +517,7 @@ function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCri
         criteriaId: crit.id,
         criteriaName: crit.name,
         percentage: Number(crit.percentage ?? 0),
-        average: round2(reduceScores(cell, cfg), dp),
+        average: round2(reduceCell(cell, cfg, judgeWeights), dp),
         judgeCount: cell.length,
       }
     }
@@ -518,4 +578,212 @@ function combineRoundsToFinal({ contestants, categories, effectiveRounds, byCont
     }
     row.finalScore = round2(final, dp)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Option B — score pre-processing for percentile / rank_based methods.
+// Judges still enter plain numbers; these transforms reshape those numbers so
+// the normal weighted pipeline then combines them the way the method intends.
+// Returns a NEW array; the input is never mutated.
+// ---------------------------------------------------------------------------
+function preprocessScoresForMethod(scores, contestants, method) {
+  const rows = (scores ?? []).filter((s) => !Number.isNaN(Number(s.score)))
+  if (!rows.length) return scores
+
+  if (method === CALCULATION_METHODS.PERCENTILE) {
+    // Normalize each judge against THEIR OWN scores: replace every score with
+    // its percentile rank (0–100) among that judge's submissions. A strict judge
+    // (all low) and a lenient judge (all high) then contribute on the same 0–100
+    // scale, so neither drags nor inflates the result.
+    const byJudge = new Map()
+    for (const s of rows) {
+      const j = s.judge_id ?? s.judgeId ?? '__nojudge__'
+      if (!byJudge.has(j)) byJudge.set(j, [])
+      byJudge.get(j).push(Number(s.score))
+    }
+    const sortedByJudge = new Map()
+    for (const [j, vals] of byJudge) sortedByJudge.set(j, [...vals].sort((a, b) => a - b))
+    return rows.map((s) => {
+      const j = s.judge_id ?? s.judgeId ?? '__nojudge__'
+      const arr = sortedByJudge.get(j) ?? []
+      const v = Number(s.score)
+      const n = arr.length
+      if (n <= 1) return { ...s, score: 100 } // a lone score is its judge's top
+      let less = 0
+      let equal = 0
+      for (const x of arr) {
+        if (x < v) less++
+        else if (x === v) equal++
+      }
+      const pct = ((less + 0.5 * equal) / n) * 100
+      return { ...s, score: pct }
+    })
+  }
+
+  // RANK_BASED (derived): within each (judge, criteria, round) group, rank the
+  // contestants by that judge's number and replace the number with rank points
+  // (best = 100 … worst = 0). Only the ORDER a judge gave matters, which is the
+  // classic "judges place contestants in order" behavior — without changing the
+  // judge's numeric input.
+  const groups = new Map()
+  for (const s of rows) {
+    const j = s.judge_id ?? s.judgeId ?? '__nojudge__'
+    const crit = s.criteria_id ?? s.criteriaId ?? '__nocrit__'
+    const rid = s.round_id ?? s.roundId ?? '__noround__'
+    const key = `${j}|${crit}|${rid}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(s)
+  }
+  const pointsFor = new Map() // group row identity → points
+  for (const [, list] of groups) {
+    const ordered = [...list].sort((a, b) => Number(b.score) - Number(a.score))
+    const n = ordered.length
+    ordered.forEach((s, idx) => {
+      // Ties (equal raw score) share the average of their positions' points.
+      pointsFor.set(s, n <= 1 ? 100 : ((n - 1 - idx) / (n - 1)) * 100)
+    })
+    // Average points across equal-score ties so ordering within a tie is neutral.
+    let i = 0
+    while (i < n) {
+      let jdx = i
+      while (jdx + 1 < n && Number(ordered[jdx + 1].score) === Number(ordered[i].score)) jdx++
+      if (jdx > i) {
+        let acc = 0
+        for (let k = i; k <= jdx; k++) acc += pointsFor.get(ordered[k])
+        const avg = acc / (jdx - i + 1)
+        for (let k = i; k <= jdx; k++) pointsFor.set(ordered[k], avg)
+      }
+      i = jdx + 1
+    }
+  }
+  return rows.map((s) => ({ ...s, score: pointsFor.has(s) ? pointsFor.get(s) : Number(s.score) }))
+}
+
+// ---------------------------------------------------------------------------
+// Option B — tie resolution. Sorts by final score, then breaks equal-score
+// groups per cfg.tieBreaker. With no tie-breaker (default) this reproduces the
+// standard "1224" shared-rank behavior exactly.
+// ---------------------------------------------------------------------------
+function resolveTiesAndRank(results, cfg, ctx) {
+  const { compare, equal } = buildTieResolver(cfg.tieBreaker || null, results, cfg, ctx)
+
+  const sorted = [...results].sort((a, b) => b.finalScore - a.finalScore || compare(a, b))
+
+  sorted.forEach((row, i) => {
+    if (i > 0) {
+      const prev = sorted[i - 1]
+      if (row.finalScore === prev.finalScore && equal(prev, row)) {
+        row.rank = prev.rank
+        return
+      }
+    }
+    row.rank = i + 1
+  })
+
+  for (const row of sorted) delete row._tieKey
+  return sorted
+}
+
+function buildTieResolver(tieBreaker, results, cfg, ctx) {
+  const NONE = { compare: () => 0, equal: () => true }
+  if (!tieBreaker || tieBreaker === TIE_BREAKERS.MANUAL) {
+    // manual: leave genuine ties as shared ranks; the organizer resolves live.
+    return NONE
+  }
+
+  if (tieBreaker === TIE_BREAKERS.HIGHEST_CRITERION) {
+    for (const row of results) {
+      const avgs = Object.values(row.perCriterion).map((c) => c.average ?? 0)
+      row._tieKey = avgs.length ? Math.max(...avgs) : 0
+    }
+    return {
+      compare: (a, b) => (b._tieKey ?? 0) - (a._tieKey ?? 0),
+      equal: (a, b) => (a._tieKey ?? 0) === (b._tieKey ?? 0),
+    }
+  }
+
+  if (tieBreaker === TIE_BREAKERS.HIGHEST_ROUND) {
+    const roundId = cfg.tieBreakRoundId ?? null
+    for (const row of results) {
+      const vals = Object.values(row.perRound).map((r) => r.value ?? 0)
+      row._tieKey = roundId
+        ? Number(row.perRound[roundId]?.value ?? 0)
+        : vals.length
+          ? Math.max(...vals)
+          : 0
+    }
+    return {
+      compare: (a, b) => (b._tieKey ?? 0) - (a._tieKey ?? 0),
+      equal: (a, b) => (a._tieKey ?? 0) === (b._tieKey ?? 0),
+    }
+  }
+
+  if (tieBreaker === TIE_BREAKERS.COUNTBACK) {
+    // Head-to-head across criteria: whoever wins more individual criteria ranks
+    // first. Uses the per-criterion averages already computed on each row.
+    const critIds = (ctx.criteria ?? []).map((c) => c.id)
+    const wins = (a, b) => {
+      let aw = 0
+      let bw = 0
+      for (const id of critIds) {
+        const av = a.perCriterion[id]?.average ?? 0
+        const bv = b.perCriterion[id]?.average ?? 0
+        if (av > bv) aw++
+        else if (bv > av) bw++
+      }
+      return aw - bw
+    }
+    return { compare: (a, b) => wins(b, a), equal: (a, b) => wins(a, b) === 0 }
+  }
+
+  if (tieBreaker === TIE_BREAKERS.JUDGES_MAJORITY) {
+    // Whoever more judges scored higher OVERALL wins. Build each judge's overall
+    // (criteria-weighted) score per contestant from the raw score rows.
+    const perJudge = buildPerJudgeOverall(ctx.scores, ctx.criteria) // Map<contestantId, Map<judgeId, number>>
+    const wins = (a, b) => {
+      const am = perJudge.get(a.contestantId) ?? new Map()
+      const bm = perJudge.get(b.contestantId) ?? new Map()
+      let aw = 0
+      let bw = 0
+      for (const [j, av] of am) {
+        if (!bm.has(j)) continue
+        const bv = bm.get(j)
+        if (av > bv) aw++
+        else if (bv > av) bw++
+      }
+      return aw - bw
+    }
+    return { compare: (a, b) => wins(b, a), equal: (a, b) => wins(a, b) === 0 }
+  }
+
+  return NONE
+}
+
+// Map<contestantId, Map<judgeId, overallWeightedScore>> from raw score rows.
+function buildPerJudgeOverall(scores, criteria) {
+  const pctById = new Map((criteria ?? []).map((c) => [c.id, Number(c.percentage ?? 0)]))
+  // per (contestant, judge): accumulate score*pct and pct for a weighted mean.
+  const acc = new Map()
+  for (const s of scores ?? []) {
+    const cid = s.contestant_id ?? s.contestantId
+    const jid = s.judge_id ?? s.judgeId ?? '__nojudge__'
+    const critId = s.criteria_id ?? s.criteriaId
+    const v = Number(s.score)
+    if (Number.isNaN(v)) continue
+    const pct = pctById.get(critId) ?? 0
+    const key = `${cid}|${jid}`
+    if (!acc.has(key)) acc.set(key, { cid, jid, num: 0, den: 0 })
+    const cell = acc.get(key)
+    // If a criterion has no weight (0), still count it evenly so the judge's
+    // overall is never empty when weights are unset.
+    const w = pct > 0 ? pct : 1
+    cell.num += v * w
+    cell.den += w
+  }
+  const out = new Map()
+  for (const { cid, jid, num, den } of acc.values()) {
+    if (!out.has(cid)) out.set(cid, new Map())
+    out.get(cid).set(jid, den > 0 ? num / den : 0)
+  }
+  return out
 }

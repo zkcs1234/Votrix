@@ -232,6 +232,10 @@ export const pageantService = {
   deleteJudgeAssignment(eventId, participantId, assignmentId) {
     return api.delete(`${org}/events/${eventId}/judges-v2/${participantId}/assignments/${assignmentId}`)
   },
+  // Option B — per-judge score weight (kept in sync across the judge's assignments)
+  setJudgeWeight(eventId, participantId, weight) {
+    return api.patch(`${org}/events/${eventId}/judges-v2/${participantId}/weight`, { weight })
+  },
 
   // ——— Participant Information Form ———
   getInformationForm(eventId) {

@@ -149,6 +149,27 @@ export const finalizeRound = asyncHandler(async (req, res) => {
   res.json({ success: true, ...result })
 })
 
+/** GET /api/organizer/competition/events/:eventId/stages/:categoryId/advancement-preview */
+export const previewStageAdvancement = asyncHandler(async (req, res) => {
+  const preview = await sessionService.previewStageAdvancement(
+    req.params.eventId,
+    req.user.id,
+    req.params.categoryId,
+  )
+  res.json({ success: true, ...preview })
+})
+
+/** POST /api/organizer/competition/events/:eventId/session/finalize-stage */
+export const finalizeStage = asyncHandler(async (req, res) => {
+  const { stageId, overrides, force } = req.body ?? {}
+  if (!stageId) throw new ApiError(400, 'stageId is required')
+  const result = await sessionService.finalizeStage(req.params.eventId, req.user.id, stageId, {
+    overrides: overrides ?? null,
+    force: force === true,
+  })
+  res.json({ success: true, ...result })
+})
+
 /** POST /api/organizer/competition/events/:eventId/session/resync-scores */
 export const resyncRankingStore = asyncHandler(async (req, res) => {
   const result = await sessionService.resyncRankingStore(req.params.eventId, req.user.id)

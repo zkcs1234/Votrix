@@ -1,14 +1,14 @@
 import { useParams, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, CalendarDays, Users, Star, ListChecks, Award, Play, Settings2,
+  LayoutDashboard, CalendarDays, Users, Star, Award, Play, Settings2,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
 
 // Regrouped into Setup → Run → Results so the sidebar follows the actual
-// workflow order. "Structure & Scoring" (rounds + nested criteria) leads Setup;
-// "Criteria" remains for simple/no-round events. Routes are unchanged — only the
-// grouping and the Workspace label changed — so no bookmark breaks.
+// workflow order. "Structure & Scoring" (stages + rounds + nested criteria) leads
+// Setup — criteria are now defined inside that wizard, so the standalone Criteria
+// item was retired (its old URL redirects to the workspace).
 const BASE = '/organizer/competition/events'
 const navItems = [
   { label: 'Competition Scoring Dashboard', path: '/organizer/competition', icon: LayoutDashboard },
@@ -17,7 +17,6 @@ const navItems = [
   { section: 'Setup' },
   { label: 'Structure & Scoring', path: 'workspace', icon: Settings2, scoped: true, basePath: BASE },
   { label: 'Contestants', path: 'contestants', icon: Users, scoped: true, basePath: BASE },
-  { label: 'Criteria', path: 'criteria', icon: ListChecks, scoped: true, basePath: BASE },
   { label: 'Judges', path: 'judges', icon: Star, scoped: true, basePath: BASE },
 
   { section: 'Run' },
