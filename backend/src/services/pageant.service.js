@@ -1537,8 +1537,16 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
     categoriesQuery = categoriesQuery.or(`division_id.eq.${divisionId},division_id.is.null`)
   }
 
-  const [eventRes, contestantsRes, criteriaRes, judgesRes, roundsRes, categoriesRes, scoresRes] =
-    await Promise.all([
+  const [
+    eventRes,
+    contestantsRes,
+    criteriaRes,
+    judgesRes,
+    roundsRes,
+    categoriesRes,
+    scoresRes,
+    judgeWeightsRes,
+  ] = await Promise.all([
       getClient()
         .from(DB_TABLES.EVENTS)
         .select('scoring_config, divisions_enabled')
@@ -1555,7 +1563,12 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
       categoriesQuery,
       getClient()
         .from(DB_TABLES.JUDGE_SCORES)
-        .select('contestant_id, criteria_id, round_id, category_id, division_id, score, judge_id')
+        .select('contestant_id, criteria_id, round_id, category_id, division_id, score, judge_id'),
+      getClient()
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
+        .select('user_id, judge_weight')
+        .eq('event_id', eventId)
+        .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
     ])
 
   if (eventRes.error) throw new ApiError(500, eventRes.error.message)
@@ -1609,6 +1622,15 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
   // (independent/cumulative) governs how that round's standing is computed for
   // ADVANCEMENT decisions (see computeRoundStanding), not the weighted final;
   // applying cumulative here as well would double-count across the round weights.
+  // Judge weighting is opt-in: only judges with a weight actually set are sent
+  // to the engine. With none set the map is empty and every judge counts equally,
+  // exactly as before.
+  const judgeWeights = {}
+  for (const row of judgeWeightsRes.data ?? []) {
+    if (row.judge_weight === null || row.judge_weight === undefined) continue
+    judgeWeights[row.user_id] = Number(row.judge_weight)
+  }
+
   const { rankings, debug } = computeRankings({
     scores,
     contestants: contestantsRes.data ?? [],
@@ -1617,6 +1639,7 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
     categories: categoriesRes.data ?? [],
     config: eventRes.data?.scoring_config,
     roundCriteria,
+    judgeWeights,
   })
 
   // Map the engine's nested shape to the public shape the UI already uses.

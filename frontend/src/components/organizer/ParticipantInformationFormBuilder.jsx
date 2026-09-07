@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 import { Plus, Trash2, Eye, EyeOff } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -17,13 +17,13 @@ function generateFieldId() {
   return `field_${++fieldIdCounter}_${Date.now()}`
 }
 
-export default function ParticipantInformationFormBuilder({
+const ParticipantInformationFormBuilder = forwardRef(function ParticipantInformationFormBuilder({
   initialSchema,
   onSave,
   service,
   eventId,
   isDraft = false,
-}) {
+}, ref) {
 const [enabled, setEnabled] = useState(false)
   const [fields, setFields] = useState([])
   const [dirty, setDirty] = useState(false)
@@ -105,19 +105,19 @@ const [enabled, setEnabled] = useState(false)
       if (enabled) {
         if (fields.length === 0) {
           setError('Add at least one field or disable the form')
-          return
+          return false
         }
 
         for (const field of fields) {
           if (!field.label.trim()) {
             setError('Every field must have a label')
-            return
+            return false
           }
           if (field.type === 'dropdown') {
             const validOptions = (field.options || []).filter((o) => o.trim())
             if (validOptions.length < 1) {
               setError(`Dropdown "${field.label}" must have at least one option`)
-              return
+              return false
             }
           }
         }
@@ -142,13 +142,17 @@ const [enabled, setEnabled] = useState(false)
         await service.updateInformationForm(eventId, schema)
       }
       setDirty(false)
-      if (onSave) onSave(schema)
+      if (onSave) await onSave(schema)
+      return true
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save form')
+      return false
     } finally {
       setSaving(false)
     }
   }
+
+  useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave])
 
   return (
     <div className="space-y-6">
@@ -343,4 +347,6 @@ const [enabled, setEnabled] = useState(false)
       </div>
     </div>
   )
-}
+})
+
+export default ParticipantInformationFormBuilder

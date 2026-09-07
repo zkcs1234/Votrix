@@ -463,8 +463,11 @@ export async function assertScoringWeightsValid(eventId, organizerId) {
 
   const [{ data: cats, error: catErr }, { data: rounds, error: rErr }, { data: crits, error: cErr }] =
     await Promise.all([
-      getClient().from(DB_TABLES.COMPETITION_CATEGORIES).select('weight').eq('event_id', eventId),
-      getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('id, name, weight').eq('event_id', eventId),
+      getClient().from(DB_TABLES.COMPETITION_CATEGORIES).select('id, name, weight').eq('event_id', eventId),
+      getClient()
+        .from(DB_TABLES.COMPETITION_ROUNDS)
+        .select('id, name, weight, category_id, division_id')
+        .eq('event_id', eventId),
       getClient().from(DB_TABLES.CRITERIA).select('id, name, percentage').eq('event_id', eventId),
     ])
 
@@ -478,10 +481,61 @@ export async function assertScoringWeightsValid(eventId, organizerId) {
       throw new ApiError(400, `Category weights must total 100% (currently ${total}%)`)
     }
   }
+  // Round weights are checked exactly the way rankings are computed:
+  //   * A ranking for division D uses that division's rounds PLUS the shared
+  //     (division_id IS NULL) ones, so each division is validated over that set.
+  //   * Within a set, a round inside a category (a "stage") is a share of that
+  //     stage, so each stage's rounds total 100% on their own.
+  // Summing every round on the event together would wrongly demand 100% across
+  // N stages, or across divisions that are never ranked side by side.
   if ((rounds ?? []).length) {
-    const total = (rounds ?? []).reduce((s, r) => s + Number(r.weight), 0)
-    if (Math.abs(total - 100) > 0.01) {
-      throw new ApiError(400, `Round weights must total 100% (currently ${total}%)`)
+    const catNameById = new Map((cats ?? []).map((c) => [c.id, c.name]))
+    const divisionIds = [...new Set(rounds.map((r) => r.division_id).filter(Boolean))]
+
+    let divisionNameById = new Map()
+    if (divisionIds.length) {
+      const { data: divs } = await getClient()
+        .from(DB_TABLES.COMPETITION_DIVISIONS)
+        .select('id, name')
+        .eq('event_id', eventId)
+      divisionNameById = new Map((divs ?? []).map((d) => [d.id, d.name]))
+    }
+
+    const contexts = divisionIds.length
+      ? divisionIds.map((id) => ({
+          label: divisionNameById.get(id) ?? 'division',
+          rounds: rounds.filter((r) => !r.division_id || r.division_id === id),
+        }))
+      : [{ label: null, rounds }]
+
+    for (const ctx of contexts) {
+      const scope = ctx.label ? ` in "${ctx.label}"` : ''
+      if ((cats ?? []).length) {
+        const byCategory = new Map()
+        for (const r of ctx.rounds) {
+          const key = r.category_id ?? null
+          if (!byCategory.has(key)) byCategory.set(key, [])
+          byCategory.get(key).push(r)
+        }
+        for (const [categoryId, catRounds] of byCategory) {
+          const total = catRounds.reduce((s, r) => s + Number(r.weight), 0)
+          if (Math.abs(total - 100) > 0.01) {
+            const label = categoryId ? catNameById.get(categoryId) ?? 'stage' : 'the event'
+            throw new ApiError(
+              400,
+              `Round weights for "${label}"${scope} must total 100% (currently ${total}%)`,
+            )
+          }
+        }
+      } else {
+        const total = ctx.rounds.reduce((s, r) => s + Number(r.weight), 0)
+        if (Math.abs(total - 100) > 0.01) {
+          throw new ApiError(
+            400,
+            `Round weights${scope} must total 100% (currently ${total}%)`,
+          )
+        }
+      }
     }
   }
 
@@ -541,6 +595,8 @@ function mapJudge(row) {
     email: row.users?.email ?? row.email ?? null,
     displayName: row.display_name,
     role: row.judge_role ?? row.role ?? JUDGE_ROLES.JUDGE,
+    // null = weighted equally with every other judge.
+    weight: row.judge_weight === null || row.judge_weight === undefined ? null : Number(row.judge_weight),
     isActive: row.is_active,
     hasSubmitted: row.has_scored ?? row.has_submitted ?? false,
     invitationSent: row.invitation_sent ?? false,
@@ -554,7 +610,7 @@ export async function listCompetitionJudges(eventId, organizerId) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id, event_id, user_id, first_name, last_name, has_scored, judge_role, display_name, is_active, created_at, updated_at, users!inner (id, email)')
+    .select('id, event_id, user_id, first_name, last_name, has_scored, judge_role, judge_weight, display_name, is_active, created_at, updated_at, users!inner (id, email)')
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .order('created_at', { ascending: false })
@@ -606,7 +662,7 @@ export async function inviteCompetitionJudge(eventId, organizerId, payload) {
     .eq('event_id', eventId)
     .eq('user_id', user.id)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
-    .select('id, event_id, user_id, has_scored, judge_role, display_name, is_active, created_at, updated_at, users (id, email)')
+    .select('id, event_id, user_id, has_scored, judge_role, judge_weight, display_name, is_active, created_at, updated_at, users (id, email)')
     .single()
   if (error) throw new ApiError(500, error.message)
   return mapJudge(data)
@@ -623,6 +679,18 @@ export async function updateCompetitionJudge(eventId, organizerId, judgeId, payl
   }
   if (payload.displayName !== undefined) updates.display_name = payload.displayName
   if (payload.isActive !== undefined) updates.is_active = payload.isActive
+  // null clears the weight, putting this judge back on equal footing.
+  if (payload.weight !== undefined) {
+    if (payload.weight === null || payload.weight === '') {
+      updates.judge_weight = null
+    } else {
+      const weight = Number(payload.weight)
+      if (!Number.isFinite(weight) || weight < 0 || weight > 100) {
+        throw new ApiError(400, 'weight must be a number between 0 and 100')
+      }
+      updates.judge_weight = weight
+    }
+  }
 
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
@@ -630,7 +698,7 @@ export async function updateCompetitionJudge(eventId, organizerId, judgeId, payl
     .eq('id', judgeId)
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
-    .select('id, event_id, user_id, has_scored, judge_role, display_name, is_active, created_at, updated_at, users (id, email)')
+    .select('id, event_id, user_id, has_scored, judge_role, judge_weight, display_name, is_active, created_at, updated_at, users (id, email)')
     .single()
   if (error) throw new ApiError(500, error.message)
   if (!data) throw new ApiError(404, 'Judge not found')

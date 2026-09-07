@@ -7,6 +7,7 @@ import {
   EVENT_STATUS,
   ADVANCEMENT_TYPES,
   SCORE_POLICIES,
+  TIE_BREAKERS,
 } from '../utils/constants.js'
 import { validateUUID } from '../utils/sanitize.js'
 import { isValidCompetitionType, getTemplate } from '../modules/competition-templates.js'
@@ -267,11 +268,19 @@ export function validateScoringConfig(body) {
 
   // Phase 7: optional tie-breaker.
   if (body.tieBreaker !== undefined) {
-    const allowed = [null, 'none', 'highest_criterion']
+    const allowed = [null, ...Object.values(TIE_BREAKERS)]
     if (!allowed.includes(body.tieBreaker)) {
-      throw new ApiError(400, 'tieBreaker must be one of: none, highest_criterion')
+      throw new ApiError(
+        400,
+        `tieBreaker must be one of: ${Object.values(TIE_BREAKERS).join(', ')}`,
+      )
     }
-    config.tieBreaker = body.tieBreaker === 'none' ? null : body.tieBreaker
+    config.tieBreaker = body.tieBreaker === TIE_BREAKERS.NONE ? null : body.tieBreaker
+  }
+
+  // Only meaningful for the highest_round strategy; null means "their best round".
+  if (body.tieBreakerRoundId !== undefined) {
+    config.tieBreakerRoundId = body.tieBreakerRoundId || null
   }
 
   return config
@@ -285,11 +294,26 @@ export function validateJudgeRole(body) {
   if (role !== undefined && !Object.values(JUDGE_ROLES).includes(role)) {
     throw new ApiError(400, `Invalid role. Must be one of: ${Object.values(JUDGE_ROLES).join(', ')}`)
   }
-  return {
+  const payload = {
     role: role ?? JUDGE_ROLES.JUDGE,
     displayName: body?.displayName?.trim() || null,
     isActive: body?.isActive !== undefined ? Boolean(body.isActive) : true,
   }
+  // Only forwarded when explicitly sent — the fields above are reset on every
+  // update, and silently clearing a judge's weight alongside a name edit would
+  // change how the event scores.
+  if (body?.weight !== undefined) {
+    if (body.weight === null || body.weight === '') {
+      payload.weight = null
+    } else {
+      const weight = Number(body.weight)
+      if (!Number.isFinite(weight) || weight < 0 || weight > 100) {
+        throw new ApiError(400, 'weight must be a number between 0 and 100')
+      }
+      payload.weight = weight
+    }
+  }
+  return payload
 }
 
 export function validateAssignment(body) {

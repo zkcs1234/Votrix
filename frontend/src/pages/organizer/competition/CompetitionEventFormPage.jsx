@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,6 +16,7 @@ import useDraft from '@/hooks/useDraft'
 import useSilentDraftAutosave from '@/hooks/useSilentDraftAutosave'
 import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
+import { EVENT_STAGES } from '@/utils/eventStages'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
@@ -35,6 +36,7 @@ export default function CompetitionEventFormPage() {
   const location = useLocation()
   const isNew = !eventId || eventId === 'new'
   const navigate = useNavigate()
+  const infoFormRef = useRef(null)
 
 const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [banner, setBanner] = useState(null)
@@ -289,6 +291,8 @@ try {
     setSaving(true)
     setError(null)
     try {
+      const saved = await infoFormRef.current?.save()
+      if (saved === false) return
       const data = getValues()
       const payload = {
         title: data.title,
@@ -356,6 +360,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             currentKey={step}
             eventId={stepperEventId}
             completedKeys={completedKeys}
+            visibleStages={EVENT_STAGES.competition.slice(0, 3)}
           />
 
           <div className="w-full">
@@ -501,16 +506,17 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               <p className="v-caption">Loading information form...</p>
             ) : (
               <ParticipantInformationFormBuilder
+                ref={infoFormRef}
                 initialSchema={infoFormSchema}
                 service={pageantService}
                 eventId={eventId}
                 isDraft={isNew}
-                onSave={(schema) => {
+                onSave={async (schema) => {
                   setInfoFormSchema(schema)
                   if (isNew) {
                     const data = getValues()
                     setDraftRestored(true)
-                    saveDraftAsync(buildDraftSnapshot(data, 'information-form', banner, schema))
+                    await saveDraft(buildDraftSnapshot(data, 'information-form', banner, schema))
                   }
                 }}
               />
@@ -552,9 +558,16 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               currentKey="information-form"
               eventId={stepperEventId}
               saving={saving}
-              onNext={isNew ? handleFinishDraft : undefined}
-              nextLabel={isNew ? 'Finish & Publish' : 'Continue to Contestants'}
-              nextPath={isNew ? undefined : `/organizer/competition/events/${eventId}/contestants`}
+              onNext={isNew ? handleFinishDraft : async () => {
+                setSaving(true)
+                try {
+                  const saved = await infoFormRef.current?.save()
+                  if (saved !== false) navigate(`/organizer/competition/events/${eventId}/workspace`)
+                } finally {
+                  setSaving(false)
+                }
+              }}
+              nextLabel="Save & Continue"
               saveStatus={saveStatus}
               lastSavedAt={lastSavedAt}
             />

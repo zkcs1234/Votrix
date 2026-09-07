@@ -12,7 +12,7 @@ import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
 const BASE = '/organizer/competition/events'
 const navItems = [
   { label: 'Competition Scoring Dashboard', path: '/organizer/competition', icon: LayoutDashboard },
-  { label: 'Competition Scoring Events', path: '/organizer/competition/events', icon: CalendarDays },
+  { label: 'EVENTS', path: '/organizer/competition/events', icon: CalendarDays },
 
   { section: 'Setup' },
   { label: 'Structure & Scoring', path: 'workspace', icon: Settings2, scoped: true, basePath: BASE },

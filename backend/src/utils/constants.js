@@ -81,6 +81,20 @@ export const CALCULATION_METHODS = {
   SUM: 'sum',
   HIGHEST_SCORE: 'highest_score',
   LOWEST_REMOVAL: 'lowest_removal',
+  RANK_BASED: 'rank_based',
+  PERCENTILE: 'percentile',
+}
+
+// Deterministic tie-break strategies applied when two contestants finish on the
+// exact same final score. MANUAL resolves nothing on purpose — it leaves the tie
+// visible so the organizer calls it live.
+export const TIE_BREAKERS = {
+  NONE: 'none',
+  HIGHEST_CRITERION: 'highest_criterion',
+  HIGHEST_ROUND: 'highest_round',
+  COUNTBACK: 'countback',
+  JUDGES_MAJORITY: 'judges_majority',
+  MANUAL: 'manual',
 }
 
 // Phase 6 — round progression.

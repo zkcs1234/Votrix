@@ -12,7 +12,8 @@ import { assertOrganizerOwnsEvent } from './event.service.js'
 import { emitToEvent, emitToEventOrganizer } from '../websocket/ws-emitter.js'
 import { recordEventActivity } from '../foundation/activity.js'
 
-const AWARD_METHODS = new Set(['score', 'criteria', 'vote', 'selection'])
+const AWARD_METHODS = new Set(['score', 'criteria', 'vote', 'selection', 'tier'])
+const MAX_TIER_BANDS = 12
 
 async function assertCompetitionEvent(eventId, organizerId) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
@@ -34,6 +35,7 @@ function mapAward(row) {
     categoryId: row.category_id ?? null,
     sourceRoundId: row.source_round_id ?? null,
     sourceCriteriaId: row.source_criteria_id ?? null,
+    tierBands: Array.isArray(row.tier_bands) ? row.tier_bands : null,
     status: row.status,
     tieBreak: row.tie_break ?? null,
     displayOrder: row.display_order ?? 0,
@@ -89,12 +91,36 @@ function validatePayload(payload) {
   if (method === 'criteria' && !payload.sourceCriteriaId) {
     throw new ApiError(400, 'A Criteria award needs a source criterion')
   }
-  return { name, method }
+  return { name, method, tierBands: method === 'tier' ? validateTierBands(payload.tierBands) : null }
+}
+
+// A tier award sorts contestants into labelled score bands rather than picking a
+// single winner, so it needs at least one band and every band needs a usable range.
+function validateTierBands(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new ApiError(400, 'A Tier award needs at least one score band')
+  }
+  if (raw.length > MAX_TIER_BANDS) {
+    throw new ApiError(400, `A Tier award can have at most ${MAX_TIER_BANDS} score bands`)
+  }
+  return raw.map((band) => {
+    const label = (band?.label ?? '').trim()
+    if (!label) throw new ApiError(400, 'Every score band needs a label')
+    const min = Number(band?.min)
+    const max = Number(band?.max)
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      throw new ApiError(400, `Score band "${label}" needs numeric min and max values`)
+    }
+    if (max < min) {
+      throw new ApiError(400, `Score band "${label}" has a max below its min`)
+    }
+    return { label, min, max }
+  })
 }
 
 export async function createAward(eventId, organizerId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
-  const { name, method } = validatePayload(payload)
+  const { name, method, tierBands } = validatePayload(payload)
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_AWARDS)
     .insert({
@@ -106,6 +132,7 @@ export async function createAward(eventId, organizerId, payload) {
       category_id: payload.categoryId || null,
       source_round_id: payload.sourceRoundId || null,
       source_criteria_id: payload.sourceCriteriaId || null,
+      tier_bands: tierBands,
       tie_break: payload.tieBreak || null,
       display_order: Number.isFinite(Number(payload.displayOrder)) ? Number(payload.displayOrder) : 0,
     })
@@ -124,7 +151,7 @@ export async function createAward(eventId, organizerId, payload) {
 
 export async function updateAward(eventId, organizerId, awardId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
-  const { name, method } = validatePayload(payload)
+  const { name, method, tierBands } = validatePayload(payload)
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_AWARDS)
     .update({
@@ -135,6 +162,7 @@ export async function updateAward(eventId, organizerId, awardId, payload) {
       category_id: payload.categoryId || null,
       source_round_id: payload.sourceRoundId || null,
       source_criteria_id: payload.sourceCriteriaId || null,
+      tier_bands: tierBands,
       tie_break: payload.tieBreak || null,
     })
     .eq('id', awardId)
@@ -202,7 +230,9 @@ export async function computeAwardWinners(eventId, organizerId) {
   const awards = await listAwards(eventId, organizerId)
   if (!awards.length) return []
 
-  const hasDerived = awards.some((a) => a.method === 'score' || a.method === 'criteria')
+  const hasDerived = awards.some(
+    (a) => a.method === 'score' || a.method === 'criteria' || a.method === 'tier',
+  )
   const hasInteractive = awards.some((a) => a.method === 'vote' || a.method === 'selection')
 
   // Rankings cache for derived awards.
@@ -231,7 +261,28 @@ export async function computeAwardWinners(eventId, organizerId) {
 
   const out = []
   for (const a of awards) {
-    if (a.method === 'score' || a.method === 'criteria') {
+    if (a.method === 'tier') {
+      // Not a contest: every contestant whose final score lands in a band earns
+      // that band, so a band can have many recipients or none.
+      const { rankings } = await rankingsFor(a.divisionId)
+      const bands = Array.isArray(a.tierBands) ? a.tierBands : []
+      const recipients = []
+      for (const r of rankings ?? []) {
+        const score = r.finalScore ?? null
+        if (score == null) continue
+        const band = bands.find((b) => score >= Number(b.min) && score <= Number(b.max))
+        if (!band) continue
+        recipients.push({
+          contestantId: r.contestantId,
+          contestantName: r.contestantName,
+          contestantNumber: r.contestantNumber,
+          photo: r.photo,
+          value: score,
+          tier: band.label,
+        })
+      }
+      out.push({ ...a, winner: null, recipients, resolvable: true })
+    } else if (a.method === 'score' || a.method === 'criteria') {
       const { rankings } = await rankingsFor(a.divisionId)
       let winner = null
       let best = -Infinity

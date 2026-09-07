@@ -7,7 +7,21 @@ import { useToast } from '@/hooks/useToast'
 import { HELPER_TEXT, INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 
 const inputClass = `${INPUT_CLASS} w-full`
-const EMPTY = { name: '', description: '', method: 'score', sourceRoundId: '', sourceCriteriaId: '', divisionId: '', categoryId: '' }
+const DEFAULT_TIER_BANDS = [
+  { min: 90, max: 100, label: 'Platinum' },
+  { min: 80, max: 89.99, label: 'Gold' },
+  { min: 70, max: 79.99, label: 'Silver' },
+]
+const EMPTY = {
+  name: '',
+  description: '',
+  method: 'score',
+  sourceRoundId: '',
+  sourceCriteriaId: '',
+  divisionId: '',
+  categoryId: '',
+  tierBands: DEFAULT_TIER_BANDS,
+}
 
 export default function CompetitionAwardsPage() {
   const { eventId } = useParams()
@@ -61,6 +75,7 @@ export default function CompetitionAwardsPage() {
         categoryId: form.categoryId || null,
         sourceRoundId: form.sourceRoundId || null,
         sourceCriteriaId: form.sourceCriteriaId || null,
+        tierBands: form.method === 'tier' ? form.tierBands : null,
       })
       setForm(EMPTY)
       setLoading(true)
@@ -91,7 +106,14 @@ export default function CompetitionAwardsPage() {
   }
 
   const isInteractive = (a) => a.method === 'vote' || a.method === 'selection'
-  const methodLabel = { score: 'Score', criteria: 'Criteria', vote: 'Vote', selection: 'Judge Selection' }
+  const methodLabel = { score: 'Score', criteria: 'Criteria', vote: 'Vote', selection: 'Judge Selection', tier: 'Tier' }
+
+  const updateBand = (index, key, value) => {
+    const tierBands = form.tierBands.map((band, i) =>
+      i === index ? { ...band, [key]: key === 'label' ? value : Number(value) } : band,
+    )
+    setForm({ ...form, tierBands })
+  }
 
   if (loading) {
     return <div className="flex justify-center py-20"><LoadingSpinner /></div>
@@ -165,15 +187,68 @@ export default function CompetitionAwardsPage() {
               >
                 <option value="score">Score — highest score in a round</option>
                 <option value="criteria">Criteria — highest in one criterion</option>
+                <option value="tier">Tier — final score falls into a range</option>
                 <option value="vote">Vote — judges each pick one</option>
                 <option value="selection">Judge Selection — judges each pick one</option>
               </select>
               <p className={HELPER_TEXT}>
                 {form.method === 'vote' || form.method === 'selection'
                   ? 'Judges pick one contestant during a live award session you open in Live Control.'
-                  : 'Decided automatically from scores judges already give.'}
+                  : form.method === 'tier'
+                    ? "Not a contest between contestants — everyone whose final score lands in a range earns that tier, so a tier can have several winners or none."
+                    : 'Decided automatically from scores judges already give.'}
               </p>
             </div>
+
+            {form.method === 'tier' && (
+              <div className="sm:col-span-2">
+                <label className={LABEL_CLASS}>Score ranges and their tier labels</label>
+                <div className="space-y-2">
+                  {form.tierBands.map((band, i) => (
+                    <div key={i} className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="number"
+                        className={`${INPUT_CLASS} w-24`}
+                        value={band.min}
+                        onChange={(e) => updateBand(i, 'min', e.target.value)}
+                      />
+                      <span className="text-xs text-v-text-subtle">to</span>
+                      <input
+                        type="number"
+                        className={`${INPUT_CLASS} w-24`}
+                        value={band.max}
+                        onChange={(e) => updateBand(i, 'max', e.target.value)}
+                      />
+                      <span className="text-xs text-v-text-subtle">→</span>
+                      <input
+                        className={`${INPUT_CLASS} flex-1`}
+                        value={band.label}
+                        onChange={(e) => updateBand(i, 'label', e.target.value)}
+                        placeholder="e.g. Gold"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm({ ...form, tierBands: form.tierBands.filter((_, x) => x !== i) })
+                        }
+                        className="rounded-lg px-2 py-1 text-sm text-v-danger"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForm({ ...form, tierBands: [...form.tierBands, { min: 0, max: 0, label: '' }] })
+                  }
+                  className="mt-2 rounded-lg border border-dashed border-v-border px-3 py-1.5 text-xs font-medium text-v-primary"
+                >
+                  + Add a range
+                </button>
+              </div>
+            )}
 
             {form.method === 'score' && (
               <div>
@@ -249,11 +324,27 @@ export default function CompetitionAwardsPage() {
                         ? `· Highest score in ${rounds.find((r) => r.id === a.sourceRoundId)?.name ?? 'round'}`
                         : a.method === 'criteria'
                           ? `· Highest in ${criteria.find((c) => c.id === a.sourceCriteriaId)?.name ?? 'criterion'}`
-                          : `· ${a.status}`}
+                          : a.method === 'tier'
+                            ? `· ${(a.tierBands ?? []).map((b) => `${b.label} (${b.min}–${b.max})`).join(', ')}`
+                            : `· ${a.status}`}
                       {a.divisionId && divisions.find((d) => d.id === a.divisionId) ? ` · ${divisions.find((d) => d.id === a.divisionId).name}` : ''}
                     </p>
                     <p className="mt-1 text-sm">
-                      {isInteractive(a) ? (
+                      {a.method === 'tier' ? (
+                        (a.recipients ?? []).length ? (
+                          <span className="font-medium text-v-success">
+                            {(a.tierBands ?? [])
+                              .map((band) => {
+                                const n = (a.recipients ?? []).filter((r) => r.tier === band.label).length
+                                return n ? `${band.label}: ${n}` : null
+                              })
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        ) : (
+                          <span className="text-v-text-subtle">Nobody has landed in a tier yet</span>
+                        )
+                      ) : isInteractive(a) ? (
                         a.winner
                           ? <span className="font-medium text-v-success">Leading: #{a.winner.contestantNumber} {a.winner.contestantName} ({a.votes} vote{a.votes !== 1 ? 's' : ''}){a.tie ? ' · tie' : ''}</span>
                           : <span className="text-v-text-subtle">{a.submitted ?? 0}/{a.totalJudges ?? 0} judges submitted</span>

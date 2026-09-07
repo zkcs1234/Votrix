@@ -3,22 +3,33 @@ import { Link, useParams } from 'react-router-dom'
 
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import StructureScoringWizard from '@/components/organizer/competition/StructureScoringWizard'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 
 // Phase 4 — Competition Scoring Foundation workspace.
 // Single page that exposes the dynamic structure of an event:
 // categories, rounds, criteria, contestants, judges, and scoring config.
+//
+// Two ways in: a guided wizard that walks the five setup steps in order (the
+// default until an event has rounds), and the direct tabs below for editing a
+// competition that's already configured.
 export default function CompetitionWorkspacePage() {
   const { eventId } = useParams()
   const [foundation, setFoundation] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('rounds')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [mode, setMode] = useState(null)
 
   const load = () => {
     pageantService
       .getFoundation(eventId)
-      .then(({ data }) => setFoundation(data.foundation))
+      .then(({ data }) => {
+        setFoundation(data.foundation)
+        // Only decide this once, on first load — re-deciding on every reload
+        // would yank the organizer out of the wizard the moment they add a round.
+        setMode((current) => current ?? ((data.foundation?.rounds ?? []).length ? 'tabs' : 'wizard'))
+      })
       .finally(() => setLoading(false))
   }
 
@@ -42,8 +53,9 @@ export default function CompetitionWorkspacePage() {
             {foundation?.event?.title ?? 'Structure & Scoring'}
           </h2>
           <p className="mt-1 text-sm text-v-text-subtle">
-            Define the <strong>rounds</strong> (the weighted, judged segments), plus divisions and
-            scoring rules. Contestants and criteria are assigned to rounds on their own pages.
+            {mode === 'wizard'
+              ? 'Go through the steps below in order — each one builds on the last. You can come back and change anything later.'
+              : 'Define the rounds (the weighted, judged segments), plus divisions and scoring rules.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-sm">
@@ -60,6 +72,26 @@ export default function CompetitionWorkspacePage() {
         </div>
       </div>
 
+      {mode === 'wizard' ? (
+        <>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setMode('tabs')}
+              className="text-xs text-v-text-subtle underline hover:text-v-text-muted"
+              title="Skip the guided steps and edit rounds, divisions and scoring directly"
+            >
+              Switch to direct editing
+            </button>
+          </div>
+          <StructureScoringWizard
+            foundation={foundation}
+            reload={load}
+            onExit={() => setMode('tabs')}
+          />
+        </>
+      ) : (
+        <>
       <div className="flex items-center justify-between gap-2 border-b border-v-border text-sm">
         <div className="flex gap-2">
           {(() => {
@@ -88,19 +120,29 @@ export default function CompetitionWorkspacePage() {
             ))
           })()}
         </div>
-        {!showAdvanced && (foundation?.categories ?? []).length === 0 && (
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => {
-              setShowAdvanced(true)
-              setActiveTab('structure')
-            }}
+            onClick={() => setMode('wizard')}
             className="text-xs text-v-text-subtle hover:text-v-text-muted"
-            title="Categories group rounds into higher-level weighted buckets. Most competitions don't need this."
+            title="Walk through the five setup steps in order"
           >
-            + Advanced (Categories)
+            Guided setup
           </button>
-        )}
+          {!showAdvanced && (foundation?.categories ?? []).length === 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowAdvanced(true)
+                setActiveTab('structure')
+              }}
+              className="text-xs text-v-text-subtle hover:text-v-text-muted"
+              title="Categories group rounds into higher-level weighted buckets. Most competitions don't need this."
+            >
+              + Advanced (Categories)
+            </button>
+          )}
+        </div>
       </div>
 
       <TypeHint type={foundation?.event?.competition_type} />
@@ -110,6 +152,8 @@ export default function CompetitionWorkspacePage() {
       {activeTab === 'divisions' && <DivisionsTab foundation={foundation} reload={load} />}
       {activeTab === 'rounds' && <RoundsTab foundation={foundation} reload={load} />}
       {activeTab === 'scoring' && <ScoringTab foundation={foundation} reload={load} />}
+        </>
+      )}
     </div>
   )
 }

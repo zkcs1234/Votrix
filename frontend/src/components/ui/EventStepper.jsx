@@ -2,8 +2,8 @@ import { Link } from 'react-router-dom'
 import { Check } from 'lucide-react'
 import { EVENT_STAGES, MODULE_BASE_PATH } from '@/utils/eventStages'
 
-export default function EventStepper({ module, currentKey, eventId, completedKeys = [] }) {
-  const stages = EVENT_STAGES[module] ?? []
+export default function EventStepper({ module, currentKey, eventId, completedKeys = [], visibleStages }) {
+  const stages = visibleStages ?? EVENT_STAGES[module] ?? []
   const currentIndex = stages.findIndex((s) => s.key === currentKey)
   const base = MODULE_BASE_PATH[module]
 

@@ -105,6 +105,8 @@ export default function JudgeAssignmentPanel({ foundation, reload }) {
         </p>
       </div>
 
+      <JudgeWeighting foundation={foundation} reload={reload} />
+
       {/* Bulk: assign all judges to one scope at once. */}
       {(foundation?.judges ?? []).length > 0 && (
         <div className="flex flex-wrap items-end gap-2 rounded-lg border border-v-border bg-v-surface px-3 py-2.5 text-sm">
@@ -153,6 +155,9 @@ export default function JudgeAssignmentPanel({ foundation, reload }) {
                     {judge.email} · {judge.role}
                   </p>
                 </div>
+                {judge.weight !== null && judge.weight !== undefined && (
+                  <JudgeWeightInput judge={judge} reload={reload} />
+                )}
               </div>
 
               <div className="space-y-1 rounded-lg bg-v-surface-elevated px-3 py-2 text-sm">
@@ -217,6 +222,110 @@ export default function JudgeAssignmentPanel({ foundation, reload }) {
           </li>
         )}
       </ul>
+    </div>
+  )
+}
+
+// Judge score weighting. "Equal" is the absence of any weight, so turning
+// weighting on seeds an even split and turning it off clears every weight back
+// to null rather than leaving stale numbers behind.
+function JudgeWeighting({ foundation, reload }) {
+  const { eventId } = useParams()
+  const judges = foundation?.judges ?? []
+  const [busy, setBusy] = useState(false)
+
+  if (!judges.length) return null
+
+  const weighted = judges.filter((j) => j.weight !== null && j.weight !== undefined)
+  const custom = weighted.length > 0
+  const total = weighted.reduce((s, j) => s + Number(j.weight ?? 0), 0)
+  const balanced = Math.abs(total - 100) < 0.1
+
+  const setCustom = async (enable) => {
+    setBusy(true)
+    try {
+      const even = Math.round((100 / judges.length) * 100) / 100
+      await Promise.all(
+        judges.map((j) =>
+          pageantService.updateJudgeV2(eventId, j.id, {
+            role: j.role,
+            displayName: j.displayName,
+            isActive: j.isActive,
+            weight: enable ? even : null,
+          }),
+        ),
+      )
+      reload()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update judge weighting')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-v-border bg-v-surface px-3 py-2.5 text-sm">
+      <label className="flex cursor-pointer items-center gap-2 text-v-text-muted">
+        <input
+          type="checkbox"
+          checked={!custom}
+          disabled={busy}
+          onChange={(e) => setCustom(!e.target.checked)}
+        />
+        Every judge&apos;s score counts equally
+      </label>
+      <p className="mt-1.5 text-xs leading-relaxed text-v-text-subtle">
+        {custom
+          ? 'Each judge below has their own weight. A higher weight gives that judge more influence on the final score. All weights must total 100%.'
+          : 'Uncheck this to give a head judge more influence than a guest judge when scores are combined.'}
+      </p>
+      {custom && (
+        <p className={`mt-1.5 text-xs ${balanced ? 'text-v-success' : 'font-semibold text-amber-500'}`}>
+          Weights currently total {Math.round(total * 100) / 100}%.{' '}
+          {balanced ? 'Correct.' : 'They need to total 100% before scoring is accurate.'}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function JudgeWeightInput({ judge, reload }) {
+  const { eventId } = useParams()
+  const [value, setValue] = useState(judge.weight ?? 0)
+  const [busy, setBusy] = useState(false)
+
+  const save = async () => {
+    if (Number(value) === Number(judge.weight)) return
+    setBusy(true)
+    try {
+      await pageantService.updateJudgeV2(eventId, judge.id, {
+        role: judge.role,
+        displayName: judge.displayName,
+        isActive: judge.isActive,
+        weight: Math.max(0, Math.min(100, Number(value) || 0)),
+      })
+      reload()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to save weight')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-v-text-muted">Score weight</span>
+      <input
+        type="number"
+        min={0}
+        max={100}
+        disabled={busy}
+        className="w-20 rounded-lg border border-v-border bg-v-surface px-2 py-1 text-sm text-v-text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+      />
+      <span className="text-xs text-v-text-muted">%</span>
     </div>
   )
 }

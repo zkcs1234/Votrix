@@ -28,6 +28,9 @@ export default function ModuleStageLayout({ module, children }) {
   const isFormWizard = currentKey && (FORM_WIZARD_STAGES[module] ?? []).includes(currentKey)
 
   const enabled = Boolean(eventId && eventId !== 'new' && currentKey && !isFormWizard)
+  const visibleStages = module === 'competition' && currentKey === 'workspace'
+    ? (EVENT_STAGES[module] ?? []).slice(0, 4)
+    : undefined
 
   // Auto-mark the current stage as completed once the user visits it, so the
   // stepper keeps it checked on subsequent edits.
@@ -44,6 +47,7 @@ export default function ModuleStageLayout({ module, children }) {
         currentKey={currentKey}
         eventId={eventId}
         completedKeys={completedKeys}
+        visibleStages={visibleStages}
       />
       {children}
       <StageFooter module={module} currentKey={currentKey} eventId={eventId} />
