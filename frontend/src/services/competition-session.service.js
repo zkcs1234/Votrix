@@ -66,6 +66,11 @@ export const competitionSessionService = {
     return api.post(`${BASE}/events/${eventId}/session/set-round`, { roundId })
   },
 
+  /** POST /api/organizer/competition/events/:eventId/session/set-active-criteria */
+  setActiveCriteria(eventId, criteriaIds) {
+    return api.post(`${BASE}/events/${eventId}/session/set-active-criteria`, { criteriaIds })
+  },
+
   /** POST /api/organizer/competition/events/:eventId/session/set-division */
   setActiveDivision(eventId, divisionId) {
     return api.post(`${BASE}/events/${eventId}/session/set-division`, { divisionId })

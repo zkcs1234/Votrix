@@ -236,6 +236,13 @@ export default function JudgeScoringPage() {
     syncSessionView()
   }, [syncSessionView])
 
+  // Organizer opened/closed criteria for the current round — reload so closed
+  // criteria (and their minors) disappear from the sheet immediately.
+  useSocketEvent('session:active-criteria-changed', ({ session }) => {
+    if (session) setSessionState(session)
+    syncSessionView()
+  }, [syncSessionView])
+
   useSocketEvent('session:division-changed', ({ session }) => {
     if (!session) return
     setSessionState(session)
@@ -295,30 +302,36 @@ export default function JudgeScoringPage() {
     
     // Debounce the auto-save to avoid too many API calls
     autoSaveTimeouts.current[contestantTimeoutKey] = setTimeout(async () => {
-      // Build scores object for current contestant
+      // Build scores object for current contestant, keyed by MINOR criterion id
+      // (judges score minors; a criterion with no minors is scored directly).
       let contestantScores = {}
       let allScored = true
-      
-      for (const criteria of sheet.criteria) {
-        const scoreKey = `${contestantId}:${criteria.id}`
-        const score = scores[scoreKey]
-        
-        if (score === undefined || score === '' || score === null) {
-          allScored = false
-          break
+
+      outer: for (const criteria of sheet.criteria) {
+        const targets =
+          criteria.minors && criteria.minors.length
+            ? criteria.minors
+            : [{ id: criteria.id, minScore: criteria.minScore, maxScore: criteria.maxScore }]
+        for (const t of targets) {
+          const scoreKey = `${contestantId}:${t.id}`
+          const score = scores[scoreKey]
+
+          if (score === undefined || score === '' || score === null) {
+            allScored = false
+            break outer
+          }
+
+          // Validate against the minor's own bounds (fall back to event scale).
+          const boundMin = t.minScore ?? sheet?.scoreBounds?.min
+          const boundMax = t.maxScore ?? sheet?.scoreBounds?.max
+          const numValue = Number(score)
+          if (isNaN(numValue) || numValue < boundMin || numValue > boundMax) {
+            allScored = false
+            break outer
+          }
+
+          contestantScores[t.id] = numValue
         }
-        
-        // §8C: validate against the event SCALE (source of truth), falling back
-        // to the criterion range only if the scale wasn't provided.
-        const boundMin = sheet?.scoreBounds?.min ?? criteria.minScore
-        const boundMax = sheet?.scoreBounds?.max ?? criteria.maxScore
-        const numValue = Number(score)
-        if (isNaN(numValue) || numValue < boundMin || numValue > boundMax) {
-          allScored = false
-          break
-        }
-        
-        contestantScores[criteria.id] = numValue
       }
       
       try {
@@ -564,7 +577,7 @@ export default function JudgeScoringPage() {
                 {sheet?.roundName || sessionState?.currentRoundName || 'Current round'}
               </p>
             ) : (
-              <p className="mt-0.5 text-sm font-semibold text-emerald-200">No round selected</p>
+              <p className="mt-0.5 text-sm font-semibold text-emerald-200">Scoring</p>
             )}
             {activeContestantId && sessionState?.contestantOrder && (
               <p className="text-xs text-emerald-400/80">
@@ -628,10 +641,15 @@ export default function JudgeScoringPage() {
           if (!onStage.length) {
             return <p className="text-v-text-muted">Waiting for organizer to select contestant...</p>
           }
-          const critCount = sheet?.criteria?.length || 0
+          // Count MINOR criteria (what judges actually score); a criterion with
+          // no minors counts as one scorable item.
+          const scoreTargets = (sheet?.criteria ?? []).flatMap((crit) =>
+            crit.minors && crit.minors.length ? crit.minors : [{ id: crit.id }],
+          )
+          const critCount = scoreTargets.length
           const doneFor = (cid) =>
-            (sheet?.criteria ?? []).filter((crit) => {
-              const s = scores[`${cid}:${crit.id}`]
+            scoreTargets.filter((t) => {
+              const s = scores[`${cid}:${t.id}`]
               return s !== undefined && s !== '' && s !== null
             }).length
           return (

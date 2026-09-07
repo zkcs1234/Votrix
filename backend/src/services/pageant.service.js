@@ -57,6 +57,20 @@ function mapCriteria(row) {
   }
 }
 
+function mapMinorCriteria(row) {
+  return {
+    id: row.id,
+    criteriaId: row.criteria_id,
+    eventId: row.event_id,
+    name: row.name,
+    scoreType: row.score_type,
+    customMin: row.custom_min === null || row.custom_min === undefined ? null : Number(row.custom_min),
+    customMax: row.custom_max === null || row.custom_max === undefined ? null : Number(row.custom_max),
+    displayOrder: row.display_order ?? 0,
+    isActive: row.is_active !== false,
+  }
+}
+
 async function assertCompetitionEvent(eventId, organizerId) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
   if (!COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)) {
@@ -620,7 +634,131 @@ export async function listCriteria(eventId, organizerId, filters = {}) {
   const { data, error } = await query.order('created_at', { ascending: true })
 
   if (error) throw new ApiError(500, error.message)
-  return (data ?? []).map(mapCriteria)
+  const criteria = (data ?? []).map(mapCriteria)
+
+  // Nest minor criteria (judges score these; each carries its own score type).
+  if (criteria.length) {
+    const { data: minors, error: minErr } = await getClient()
+      .from(DB_TABLES.MINOR_CRITERIA)
+      .select('id, criteria_id, event_id, name, score_type, custom_min, custom_max, display_order, is_active')
+      .in('criteria_id', criteria.map((c) => c.id))
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true })
+    if (minErr) throw new ApiError(500, minErr.message)
+    const byCrit = new Map()
+    for (const m of minors ?? []) {
+      if (!byCrit.has(m.criteria_id)) byCrit.set(m.criteria_id, [])
+      byCrit.get(m.criteria_id).push(mapMinorCriteria(m))
+    }
+    for (const c of criteria) c.minorCriteria = byCrit.get(c.id) ?? []
+  }
+
+  return criteria
+}
+
+// ——— Minor criteria ———
+
+export async function listMinorCriteria(eventId, organizerId, criteriaId) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const { data, error } = await getClient()
+    .from(DB_TABLES.MINOR_CRITERIA)
+    .select('id, criteria_id, event_id, name, score_type, custom_min, custom_max, display_order, is_active')
+    .eq('criteria_id', criteriaId)
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (error) throw new ApiError(500, error.message)
+  return (data ?? []).map(mapMinorCriteria)
+}
+
+async function assertCriteriaInEvent(eventId, criteriaId) {
+  const { data, error } = await getClient()
+    .from(DB_TABLES.CRITERIA)
+    .select('id')
+    .eq('id', criteriaId)
+    .eq('event_id', eventId)
+    .maybeSingle()
+  if (error) throw new ApiError(500, error.message)
+  if (!data) throw new ApiError(400, 'Criteria does not belong to this event')
+}
+
+export async function createMinorCriteria(eventId, organizerId, criteriaId, payload) {
+  await assertCompetitionEvent(eventId, organizerId)
+  await assertCriteriaInEvent(eventId, criteriaId)
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.MINOR_CRITERIA)
+    .insert({
+      criteria_id: criteriaId,
+      event_id: eventId,
+      name: payload.name,
+      score_type: payload.scoreType,
+      custom_min: payload.customMin,
+      custom_max: payload.customMax,
+      display_order: payload.displayOrder ?? 0,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.minor_criteria.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId, minorCriteriaId: data.id, name: data.name },
+  })
+  return mapMinorCriteria(data)
+}
+
+export async function updateMinorCriteria(eventId, organizerId, criteriaId, minorId, payload) {
+  await assertCompetitionEvent(eventId, organizerId)
+
+  const updates = {}
+  if (payload.name !== undefined) updates.name = payload.name
+  if (payload.scoreType !== undefined) updates.score_type = payload.scoreType
+  if (payload.customMin !== undefined) updates.custom_min = payload.customMin
+  if (payload.customMax !== undefined) updates.custom_max = payload.customMax
+  if (payload.displayOrder !== undefined) updates.display_order = payload.displayOrder
+  if (payload.isActive !== undefined) updates.is_active = payload.isActive
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.MINOR_CRITERIA)
+    .update(updates)
+    .eq('id', minorId)
+    .eq('criteria_id', criteriaId)
+    .eq('event_id', eventId)
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+  if (!data) throw new ApiError(404, 'Minor criteria not found')
+  recordEventActivity({
+    eventId,
+    action: 'competition.minor_criteria.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId, minorCriteriaId: minorId, name: data.name },
+  })
+  return mapMinorCriteria(data)
+}
+
+export async function deleteMinorCriteria(eventId, organizerId, criteriaId, minorId) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const { error } = await getClient()
+    .from(DB_TABLES.MINOR_CRITERIA)
+    .delete()
+    .eq('id', minorId)
+    .eq('criteria_id', criteriaId)
+    .eq('event_id', eventId)
+  if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.minor_criteria.delete',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId, minorCriteriaId: minorId },
+  })
 }
 
 export async function createCriteria(eventId, organizerId, payload) {
@@ -1634,7 +1772,7 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
       categoriesQuery,
       getClient()
         .from(DB_TABLES.JUDGE_SCORES)
-        .select('contestant_id, criteria_id, round_id, category_id, division_id, score, judge_id')
+        .select('contestant_id, criteria_id, minor_criteria_id, round_id, category_id, division_id, score, judge_id')
     ])
 
   if (eventRes.error) throw new ApiError(500, eventRes.error.message)
@@ -1683,6 +1821,33 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
     }
   }
 
+  // Nest minor criteria under each criterion so the engine builds each
+  // criterion's score from its minors (normalized + averaged). A criterion with
+  // no minors (not-yet-migrated) falls back to the engine's legacy per-criterion
+  // path, leaving its numbers unchanged.
+  const critList = criteriaRes.data ?? []
+  if (critList.length) {
+    const { data: minorRows } = await getClient()
+      .from(DB_TABLES.MINOR_CRITERIA)
+      .select('id, criteria_id, name, score_type, custom_min, custom_max, display_order')
+      .in('criteria_id', critList.map((c) => c.id))
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true })
+    const byCrit = new Map()
+    for (const m of minorRows ?? []) {
+      if (!byCrit.has(m.criteria_id)) byCrit.set(m.criteria_id, [])
+      byCrit.get(m.criteria_id).push({
+        id: m.id,
+        criteriaId: m.criteria_id,
+        name: m.name,
+        scoreType: m.score_type,
+        customMin: m.custom_min,
+        customMax: m.custom_max,
+      })
+    }
+    for (const c of critList) c.minorCriteria = byCrit.get(c.id) ?? []
+  }
+
   // H2 note: the FINAL event ranking is the weighted combination of rounds
   // (Σ round.value × round.weight) — the standard model. A round's `score_policy`
   // (independent/cumulative) governs how that round's standing is computed for
@@ -1691,7 +1856,7 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
   const { rankings, debug } = computeRankings({
     scores,
     contestants: contestantsRes.data ?? [],
-    criteria: criteriaRes.data ?? [],
+    criteria: critList,
     rounds: roundsRes.data ?? [],
     categories: categoriesRes.data ?? [],
     config: eventRes.data?.scoring_config,

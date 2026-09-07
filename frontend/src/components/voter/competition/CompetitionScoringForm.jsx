@@ -13,11 +13,23 @@ export default function CompetitionScoringForm({
 }) {
   const { contestants, criteria } = sheet
   const contestantRefs = useRef({})
-  // §8C: the event SCALE is the source of truth for the valid range. Use the
-  // sheet's scale bounds for every input so a stale per-criterion min/max can
-  // never cap a valid score (which is how 90 got truncated to 9). Falls back to
-  // per-criterion values only if the sheet didn't send scale bounds.
+
+  // Judges score MINOR criteria. Each criterion contributes one or more minor
+  // columns; each minor carries its own score type/bounds. A criterion with no
+  // minors (not-yet-migrated) falls back to a single column scored directly
+  // against the criterion, using the sheet's event scale.
   const scaleBounds = sheet.scoreBounds ?? null
+  const critColumns = (criteria ?? []).map((crit) => {
+    const minors =
+      crit.minors && crit.minors.length
+        ? crit.minors
+        : [{ id: crit.id, name: crit.name, minScore: crit.minScore, maxScore: crit.maxScore }]
+    return { crit, minors }
+  })
+  const boundsFor = (minor) => ({
+    min: minor.minScore ?? scaleBounds?.min ?? 1,
+    max: minor.maxScore ?? scaleBounds?.max ?? 100,
+  })
 
   // A contestant is "active" if it is the single active one OR (in a stage
   // group) any of the contestants currently on stage.
@@ -80,17 +92,40 @@ export default function CompetitionScoringForm({
       <div className="hidden overflow-x-auto rounded-2xl border border-v-border md:block">
         <table className="w-full min-w-150 text-sm">
           <thead>
+            {/* Criterion group header — spans its minor columns. */}
             <tr className="border-b border-v-border bg-v-surface-elevated">
-              <th className="p-3 text-left v-caption">Contestant</th>
-              {criteria.map((c) => (
-                <th key={c.id} className="p-3 text-center">
-                  <span className="text-v-text-muted">{c.name}</span>
-                  <br />
-                  <span className="v-caption">
-                    {c.minScore}–{c.maxScore} · {c.percentage}%
-                  </span>
+              <th className="p-3 text-left v-caption" rowSpan={2}>
+                Contestant
+              </th>
+              {critColumns.map(({ crit, minors }) => (
+                <th
+                  key={crit.id}
+                  colSpan={minors.length}
+                  className="border-l border-v-border p-2 text-center"
+                >
+                  <span className="text-v-text-muted">{crit.name}</span>
+                  <span className="v-caption block">{crit.percentage}%</span>
                 </th>
               ))}
+            </tr>
+            {/* Minor-criteria sub-header. */}
+            <tr className="border-b border-v-border bg-v-surface-elevated/60">
+              {critColumns.flatMap(({ minors }) =>
+                minors.map((m, i) => {
+                  const b = boundsFor(m)
+                  return (
+                    <th
+                      key={m.id}
+                      className={`p-2 text-center v-caption font-normal ${i === 0 ? 'border-l border-v-border' : ''}`}
+                    >
+                      {m.name}
+                      <span className="block text-v-text-subtle">
+                        {b.min}–{b.max}
+                      </span>
+                    </th>
+                  )
+                }),
+              )}
             </tr>
           </thead>
           <tbody>
@@ -118,18 +153,20 @@ export default function CompetitionScoringForm({
                     )}
                   </div>
                 </td>
-                {criteria.map((crit) => (
-                  <td key={crit.id} className="p-2">
-                    <ScoreInputComponent
-                      contestantId={cont.id}
-                      criteria={crit}
-                      bounds={scaleBounds}
-                      scores={scores}
-                      onScoreChange={onScoreChange}
-                      disabled={disabled}
-                    />
-                  </td>
-                ))}
+                {critColumns.flatMap(({ minors }) =>
+                  minors.map((m, i) => (
+                    <td key={m.id} className={`p-2 ${i === 0 ? 'border-l border-v-border' : ''}`}>
+                      <ScoreInputComponent
+                        contestantId={cont.id}
+                        target={m}
+                        bounds={boundsFor(m)}
+                        scores={scores}
+                        onScoreChange={onScoreChange}
+                        disabled={disabled}
+                      />
+                    </td>
+                  )),
+                )}
               </tr>
             ))}
           </tbody>
@@ -155,24 +192,36 @@ export default function CompetitionScoringForm({
                 </span>
               )}
             </div>
-            <div className="mt-4 space-y-3">
-              {criteria.map((crit) => (
-                <div key={crit.id} className="flex items-center justify-between gap-2">
-                  <label className="v-caption">
-                    {crit.name}
-                    <span className="block text-xs text-v-text-subtle">
-                      {crit.minScore}–{crit.maxScore}
-                    </span>
-                  </label>
-                  <ScoreInputComponent
-                    contestantId={cont.id}
-                    criteria={crit}
-                    bounds={scaleBounds}
-                    scores={scores}
-                    onScoreChange={onScoreChange}
-                    disabled={disabled}
-                    size="md"
-                  />
+            <div className="mt-4 space-y-4">
+              {critColumns.map(({ crit, minors }) => (
+                <div key={crit.id} className="rounded-lg border border-v-border/70 p-3">
+                  <p className="mb-2 text-xs font-medium text-v-text-muted">
+                    {crit.name} <span className="text-v-text-subtle">· {crit.percentage}%</span>
+                  </p>
+                  <div className="space-y-3">
+                    {minors.map((m) => {
+                      const b = boundsFor(m)
+                      return (
+                        <div key={m.id} className="flex items-center justify-between gap-2">
+                          <label className="v-caption">
+                            {m.name}
+                            <span className="block text-xs text-v-text-subtle">
+                              {b.min}–{b.max}
+                            </span>
+                          </label>
+                          <ScoreInputComponent
+                            contestantId={cont.id}
+                            target={m}
+                            bounds={b}
+                            scores={scores}
+                            onScoreChange={onScoreChange}
+                            disabled={disabled}
+                            size="md"
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               ))}
             </div>
@@ -183,13 +232,14 @@ export default function CompetitionScoringForm({
   )
 }
 
-function ScoreInputComponent({ contestantId, criteria, bounds, scores, onScoreChange, disabled, size = 'sm' }) {
-  const key = `${contestantId}:${criteria.id}`
+// `target` is the thing being scored — a minor criterion (normal path) or, for a
+// not-yet-migrated criterion, the criterion itself. It carries id + bounds, and
+// scores are keyed `${contestantId}:${target.id}`.
+function ScoreInputComponent({ contestantId, target, bounds, scores, onScoreChange, disabled, size = 'sm' }) {
+  const key = `${contestantId}:${target.id}`
   const currentValue = scores[key] ?? ''
-  // Scale bounds win; fall back to the criterion's own range only if the scale
-  // wasn't provided by the sheet.
-  const min = bounds?.min ?? criteria.minScore
-  const max = bounds?.max ?? criteria.maxScore
+  const min = bounds?.min ?? target.minScore ?? 1
+  const max = bounds?.max ?? target.maxScore ?? 100
 
   return (
     <ScoreInputBase
@@ -197,7 +247,7 @@ function ScoreInputComponent({ contestantId, criteria, bounds, scores, onScoreCh
       max={max}
       step="0.5"
       value={currentValue}
-      onChange={(val) => onScoreChange(contestantId, criteria.id, val)}
+      onChange={(val) => onScoreChange(contestantId, target.id, val)}
       disabled={disabled}
       size={size}
     />

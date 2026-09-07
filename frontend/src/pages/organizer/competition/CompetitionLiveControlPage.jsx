@@ -104,6 +104,7 @@ export default function CompetitionLiveControlPage() {
   useSocketEvent('session:status-changed', () => loadSession(), [loadSession])
   useSocketEvent('session:contestant-changed', () => loadSession(), [loadSession])
   useSocketEvent('session:round-changed', () => loadSession(), [loadSession])
+  useSocketEvent('session:active-criteria-changed', () => loadSession(), [loadSession])
   useSocketEvent('session:division-changed', () => loadSession(), [loadSession])
   useSocketEvent('session:judge-score-submitted', () => refreshJudgeProgress(), [refreshJudgeProgress])
 
@@ -135,6 +136,25 @@ export default function CompetitionLiveControlPage() {
       await loadSession()
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to set active round')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  // Open/close a criterion for scoring in the current round. We always send the
+  // explicit list of currently-open criteria (flipping the toggled one) so we
+  // never depend on the "empty = all open" default.
+  const toggleCriterion = async (criteriaId) => {
+    const crits = session?.criteriaControl ?? []
+    const nextActive = crits
+      .filter((c) => (c.id === criteriaId ? !c.active : c.active))
+      .map((c) => c.id)
+    setActionLoading('setCriteria')
+    try {
+      await competitionSessionService.setActiveCriteria(eventId, nextActive)
+      await loadSession()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update active criteria')
     } finally {
       setActionLoading(null)
     }
@@ -315,9 +335,15 @@ export default function CompetitionLiveControlPage() {
           <div>
             <h3 className="mb-1 text-sm font-medium text-v-text-muted uppercase tracking-wider">Current Stage</h3>
             <div className="mb-2">
-              <p className="text-xl font-bold text-v-text">{session.activeRound?.name ?? 'No round active'}</p>
+              <p className="text-xl font-bold text-v-text">
+                {session.hasRounds
+                  ? (session.activeRound?.name ?? 'No round active')
+                  : 'Criteria scoring'}
+              </p>
               <p className="text-sm text-v-text-subtle">
-                {session.activeRound?.contestants?.length ?? 0} contestants · {session.activeRound?.criteria?.length ?? 0} criteria
+                {(session.activeRound?.contestants?.length ?? session.roundContestants?.length ?? 0)} contestants
+                {' · '}
+                {session.criteriaControl?.length ?? 0} criteria
               </p>
             </div>
             
@@ -387,6 +413,44 @@ export default function CompetitionLiveControlPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Which criteria are open for scoring. Works with rounds (the
+                active round's criteria) or without (event-wide criteria). Judges
+                only see open criteria; opening one exposes its minor criteria. */}
+            {session.criteriaControl?.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-v-text-subtle mb-1">Criteria open for scoring:</p>
+                <div className="flex flex-wrap gap-2">
+                  {session.criteriaControl.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => toggleCriterion(c.id)}
+                      disabled={actionLoading === 'setCriteria'}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                        c.active
+                          ? 'border border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                          : 'border border-v-border text-v-text-subtle hover:bg-v-surface-elevated'
+                      }`}
+                      title={
+                        c.active
+                          ? 'Open — judges can score this. Click to close.'
+                          : 'Closed — hidden from judges. Click to open.'
+                      }
+                    >
+                      {c.active ? '● ' : '○ '}
+                      {c.name}
+                      {c.minors?.length ? (
+                        <span className="ml-1 opacity-70">({c.minors.length})</span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-v-text-subtle">
+                  Judges only see open criteria. The number is how many minor criteria it holds.
+                </p>
               </div>
             )}
 

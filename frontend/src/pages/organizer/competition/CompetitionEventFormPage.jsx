@@ -557,8 +557,8 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               eventId={stepperEventId}
               saving={saving}
               onNext={isNew ? handleContinueToContestants : undefined}
-              nextLabel="Continue to Contestants"
-              nextPath={isNew ? undefined : `/organizer/competition/events/${eventId}/contestants`}
+              nextLabel="Continue to Structure & Scoring"
+              nextPath={isNew ? undefined : `/organizer/competition/events/${eventId}/workspace`}
               saveStatus={saveStatus}
               lastSavedAt={lastSavedAt}
             />

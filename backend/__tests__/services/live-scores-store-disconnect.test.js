@@ -169,11 +169,13 @@ describe('§7.1 live-session score submission — store disconnect', () => {
     const insert = rankingWrites.find((w) => w.op === 'insert')
     expect(insert).toBeDefined()
     // Flattened, ranking-store row shape with the score value carried through.
+    // A criterion with no minor criteria bridges with minor_criteria_id: null.
     expect(insert.payload).toEqual([
       {
         judge_id: judgeId,
         contestant_id: 'c1',
         criteria_id: 'k1',
+        minor_criteria_id: null,
         round_id: 'r1',
         division_id: null,
         category_id: null,

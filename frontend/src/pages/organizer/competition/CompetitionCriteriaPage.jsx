@@ -30,10 +30,180 @@ function resolveScaleBounds(scoringConfig) {
   }
 }
 
+// Score type lives on each MINOR criterion now (not the criterion / event).
+const SCORE_TYPE_OPTIONS = [
+  { value: 'range_1_100', label: '1–100' },
+  { value: 'range_1_10', label: '1–10' },
+  { value: 'decimal', label: 'Decimal (0–10)' },
+  { value: 'custom_range', label: 'Custom range' },
+]
+
+function minorBoundsLabel(m) {
+  switch (m.scoreType) {
+    case 'range_1_10':
+      return '1–10'
+    case 'decimal':
+      return '0–10'
+    case 'custom_range':
+      return `${m.customMin ?? '?'}–${m.customMax ?? '?'}`
+    case 'range_1_100':
+    default:
+      return '1–100'
+  }
+}
+
+// Minor criteria sit beneath a criterion. Judges score THESE. They carry no
+// percentage (equal weight within the criterion) and each owns its score type.
+function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
+  const minors = criterion.minorCriteria ?? []
+  const [adding, setAdding] = useState(false)
+  const [form, setForm] = useState({ name: '', scoreType: 'range_1_100', customMin: '', customMax: '' })
+  const [busy, setBusy] = useState(false)
+
+  const add = async (e) => {
+    e.preventDefault()
+    if (!form.name.trim()) {
+      showError('Enter a minor criteria name')
+      return
+    }
+    const payload = { name: form.name.trim(), scoreType: form.scoreType }
+    if (form.scoreType === 'custom_range') {
+      payload.customMin = Number(form.customMin)
+      payload.customMax = Number(form.customMax)
+      if (Number.isNaN(payload.customMin) || Number.isNaN(payload.customMax) || payload.customMax <= payload.customMin) {
+        showError('Enter a valid custom range (max greater than min)')
+        return
+      }
+    }
+    setBusy(true)
+    try {
+      await pageantService.createMinorCriteria(eventId, criterion.id, payload)
+      setForm({ name: '', scoreType: 'range_1_100', customMin: '', customMax: '' })
+      setAdding(false)
+      onChanged()
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to add minor criteria')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (minorId) => {
+    try {
+      await pageantService.deleteMinorCriteria(eventId, criterion.id, minorId)
+      onChanged()
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to delete minor criteria')
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-v-border/70 bg-v-surface-elevated/40 p-3">
+      <p className="mb-2 text-[11px] uppercase tracking-wider text-v-text-muted">
+        Minor criteria — judges score these
+      </p>
+      {minors.length > 0 ? (
+        <ul className="space-y-1.5">
+          {minors.map((m) => (
+            <li
+              key={m.id}
+              className="flex items-center justify-between gap-2 rounded-md border border-v-border bg-v-surface px-3 py-1.5 text-sm"
+            >
+              <span className="min-w-0 truncate text-v-text">{m.name}</span>
+              <span className="flex items-center gap-2">
+                <span className="rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-v-primary">
+                  {minorBoundsLabel(m)}
+                </span>
+                <button
+                  type="button"
+                  className="rounded p-1 text-v-danger hover:bg-v-danger-bg"
+                  onClick={() => remove(m.id)}
+                  title="Delete minor criterion"
+                >
+                  <X className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-v-text-subtle">
+          No minor criteria yet. Add at least one so judges can score this criterion.
+        </p>
+      )}
+
+      {adding ? (
+        <form onSubmit={add} className="mt-2 flex flex-wrap items-end gap-2">
+          <input
+            className={`${inputClass} flex-1 min-w-[10rem]`}
+            placeholder="Minor criterion name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            autoFocus
+          />
+          <select
+            className={`${inputClass} w-auto`}
+            value={form.scoreType}
+            onChange={(e) => setForm({ ...form, scoreType: e.target.value })}
+          >
+            {SCORE_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          {form.scoreType === 'custom_range' && (
+            <>
+              <input
+                type="number"
+                className={`${inputClass} w-20`}
+                placeholder="min"
+                value={form.customMin}
+                onChange={(e) => setForm({ ...form, customMin: e.target.value })}
+              />
+              <input
+                type="number"
+                className={`${inputClass} w-20`}
+                placeholder="max"
+                value={form.customMax}
+                onChange={(e) => setForm({ ...form, customMax: e.target.value })}
+              />
+            </>
+          )}
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-lg bg-v-primary px-3 py-2 text-sm font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
+          >
+            {busy ? 'Adding…' : 'Add'}
+          </button>
+          <button
+            type="button"
+            className="rounded-lg border border-v-border px-3 py-2 text-sm text-v-text-muted hover:text-v-text"
+            onClick={() => setAdding(false)}
+          >
+            Cancel
+          </button>
+        </form>
+      ) : (
+        <button
+          type="button"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-v-border px-2.5 py-1.5 text-xs text-v-text-muted hover:text-v-text"
+          onClick={() => setAdding(true)}
+        >
+          <Plus className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
+          Add minor criterion
+        </button>
+      )}
+    </div>
+  )
+}
+
 // Round-aware Criteria page. When the event has rounds (defined in Structure &
 // Scoring), you pick a round and configure the criteria that belong to it — each
 // round's criteria total 100% within that round. With no rounds, it's a flat
-// event-wide criteria list (simple competitions).
+// event-wide criteria list (simple competitions). Each criterion holds minor
+// criteria; judges score the minor criteria and the score type lives on each.
 export default function CompetitionCriteriaPage() {
   const { eventId } = useParams()
   const [foundation, setFoundation] = useState(null)
@@ -216,14 +386,12 @@ export default function CompetitionCriteriaPage() {
             </div>
           )}
 
-          {!hasRounds && list.length === 0 && (
+          {list.length === 0 && (
             <div className="mb-3 rounded-lg border border-v-border bg-v-surface px-4 py-2.5 text-xs text-v-text-muted">
-              Every criterion inherits the event <strong>score scale</strong> (currently{' '}
-              <strong>
-                {scoreBounds.min}–{scoreBounds.max}
-              </strong>
-              ). Change it in <strong>Structure &amp; Scoring → Scoring config</strong> before adding
-              criteria if you want a different scale.
+              Add a criterion with its <strong>weight %</strong>, then add{' '}
+              <strong>minor criteria</strong> beneath it — judges score the minor criteria, and each
+              one carries its own <strong>score type</strong> (1–100, 1–10, …). The criterion&apos;s
+              score is the average of its minor criteria.
             </div>
           )}
 
@@ -337,44 +505,51 @@ export default function CompetitionCriteriaPage() {
             return (
               <li
                 key={c.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-v-border bg-v-surface px-4 py-3"
+                className="rounded-xl border border-v-border bg-v-surface px-4 py-3"
               >
-                <div className="min-w-0 flex items-start gap-3">
-                  <div>
-                    <p className="font-medium text-v-text">{c.name}</p>
-                    <p className="mt-1 text-xs text-v-text-subtle">
-                      Weight: {Number(c.percentage).toFixed(2)}% · Score range: {scoreBounds.min}–
-                      {scoreBounds.max}
-                    </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0 flex items-start gap-3">
+                    <div>
+                      <p className="font-medium text-v-text">{c.name}</p>
+                      <p className="mt-1 text-xs text-v-text-subtle">
+                        Weight: {Number(c.percentage).toFixed(2)}%
+                      </p>
+                    </div>
+                    {!hasRounds && divisionsEnabled && divisionName && (
+                      <span className="mt-0.5 rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium text-v-primary uppercase tracking-wide">
+                        {divisionName}
+                      </span>
+                    )}
                   </div>
-                  {!hasRounds && divisionsEnabled && divisionName && (
-                    <span className="mt-0.5 rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium text-v-primary uppercase tracking-wide">
-                      {divisionName}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {hasRounds && (
+                  <div className="flex items-center gap-1.5">
+                    {hasRounds && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-v-text-muted hover:bg-v-surface-elevated"
+                        onClick={() => removeFromRound(c.id)}
+                        title="Remove from this round (keeps the criterion)"
+                      >
+                        <X className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
+                        Remove from round
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-v-text-muted hover:bg-v-surface-elevated"
-                      onClick={() => removeFromRound(c.id)}
-                      title="Remove from this round (keeps the criterion)"
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-v-danger hover:bg-v-danger-bg"
+                      onClick={() => deleteCriterion(c.id)}
+                      title="Delete this criterion from the event"
                     >
-                      <X className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
-                      Remove from round
+                      <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden />
+                      Delete
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-v-danger hover:bg-v-danger-bg"
-                    onClick={() => deleteCriterion(c.id)}
-                    title="Delete this criterion from the event"
-                  >
-                    <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden />
-                    Delete
-                  </button>
+                  </div>
                 </div>
+                <MinorCriteriaManager
+                  eventId={eventId}
+                  criterion={c}
+                  onChanged={load}
+                  showError={showError}
+                />
               </li>
             )
           })}

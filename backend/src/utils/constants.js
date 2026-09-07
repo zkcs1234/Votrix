@@ -135,6 +135,7 @@ export const DB_TABLES = {
   CANDIDATES: 'candidates',
   CONTESTANTS: 'competition_contestants',
   CRITERIA: 'competition_criteria',
+  MINOR_CRITERIA: 'competition_minor_criteria',
   JUDGE_SCORES: 'competition_scores',
   COMPETITION_CATEGORIES: 'competition_categories',
   COMPETITION_ROUNDS: 'competition_rounds',

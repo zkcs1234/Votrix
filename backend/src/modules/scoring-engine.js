@@ -74,6 +74,36 @@ export function isScoreInBounds(value, config) {
 }
 
 // ---------------------------------------------------------------------------
+// Minor-criteria bounds + normalization.
+//
+// The score type now lives on each MINOR criterion (score_type + optional
+// custom_min/custom_max). To combine minors of DIFFERENT scales into one
+// criterion score, each minor's judge-average is normalized to a percentage of
+// its own max (average / max × 100). Dividing by max keeps range_1_100 minors
+// identical to their raw value (85 → 85) and rescales range_1_10 (8 → 80) and
+// decimal/custom onto the same 0–100 axis, so a criterion can freely mix scales.
+// A criterion's value is then the plain AVERAGE of its minors (no percentage —
+// equal weight), which is what the round-weighting math consumes.
+// ---------------------------------------------------------------------------
+export function resolveMinorScoreBounds(minor) {
+  return resolveScoreBounds({
+    scoreType: minor?.scoreType ?? minor?.score_type,
+    customMin: minor?.customMin ?? minor?.custom_min,
+    customMax: minor?.customMax ?? minor?.custom_max,
+  })
+}
+
+function normalizeMinorToPercent(value, minor) {
+  const { max } = resolveMinorScoreBounds(minor)
+  if (!Number.isFinite(value) || !(max > 0)) return 0
+  return (value / max) * 100
+}
+
+function minorList(crit) {
+  return Array.isArray(crit?.minorCriteria) ? crit.minorCriteria : []
+}
+
+// ---------------------------------------------------------------------------
 // Reduction functions — all consume an array of numeric scores.
 // They never throw; empty arrays return 0 so missing data degrades gracefully.
 // ---------------------------------------------------------------------------
@@ -298,31 +328,69 @@ export function computeRankings({
 // LEGACY per-round population (unchanged behavior): criteria are one flat pool,
 // every round is computed over ALL criteria (so rounds do not differentiate).
 function computeLegacyPerRound({ scores, contestants, criteria, rounds, byContestant, cfg, method, dp }) {
-  // Group scores by (contestant, criteria) — round_id intentionally ignored.
-  const byCell = new Map()
+  // Group scores by (contestant, criteria) and by (contestant, minor).
+  // round_id intentionally ignored on the legacy path.
+  const byCell = new Map() // criteria-level pool (no-minor fallback)
+  const byMinor = new Map() // minor-level pool (primary path)
   for (const s of scores) {
-    const key = `${s.contestant_id ?? s.contestantId}|${s.criteria_id ?? s.criteriaId}`
+    const cid = s.contestant_id ?? s.contestantId
+    const critId = s.criteria_id ?? s.criteriaId
+    const minorId = s.minor_criteria_id ?? s.minorCriteriaId ?? null
+    const key = `${cid}|${critId}`
     if (!byCell.has(key)) byCell.set(key, [])
     byCell.get(key).push(Number(s.score))
+    if (minorId) {
+      const mKey = `${cid}|${minorId}`
+      if (!byMinor.has(mKey)) byMinor.set(mKey, [])
+      byMinor.get(mKey).push(Number(s.score))
+    }
   }
 
-  // 1. Per-criterion reduction.
-  // The "weighted_average" method is the only one whose final value depends
-  // on criteria.percentage. For other methods we just record the reduced
-  // value; the caller may opt in to a weight check externally.
+  // 1. Per-criterion value.
+  //    With minor criteria: criterion = average of its minors, each normalized
+  //    to a percent of its own scale (equal weight; minors carry no percentage).
+  //    Without minors (deploy window / not-yet-migrated events): reduce the
+  //    criterion's own scores raw, exactly as before — keeps old numbers stable.
   for (const crit of criteria) {
-    const criterionWeight = Number(crit.percentage ?? 0) / 100
+    const minors = minorList(crit)
     for (const contestant of contestants) {
-      const cellScores = byCell.get(`${contestant.id}|${crit.id}`) ?? []
-      const reduced = reduceScores(cellScores, cfg)
       const row = byContestant.get(contestant.id)
       if (!row) continue
+      let value
+      let judgeCount
+      const minorsOut = {}
+      if (minors.length) {
+        const pcts = []
+        let maxCount = 0
+        for (const minor of minors) {
+          const cell = byMinor.get(`${contestant.id}|${minor.id}`) ?? []
+          const reduced = reduceScores(cell, cfg)
+          const pct = normalizeMinorToPercent(reduced, minor)
+          pcts.push(pct)
+          maxCount = Math.max(maxCount, cell.length)
+          minorsOut[minor.id] = {
+            minorCriteriaId: minor.id,
+            minorCriteriaName: minor.name,
+            scoreType: minor.scoreType ?? minor.score_type,
+            average: round2(reduced, dp),
+            percent: round2(pct, dp),
+            judgeCount: cell.length,
+          }
+        }
+        value = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0
+        judgeCount = maxCount
+      } else {
+        const cellScores = byCell.get(`${contestant.id}|${crit.id}`) ?? []
+        value = reduceScores(cellScores, cfg)
+        judgeCount = cellScores.length
+      }
       row.perCriterion[crit.id] = {
         criteriaId: crit.id,
         criteriaName: crit.name,
         percentage: Number(crit.percentage ?? 0),
-        average: round2(reduced, dp),
-        judgeCount: cellScores.length,
+        average: round2(value, dp),
+        judgeCount,
+        minors: minorsOut,
       }
     }
   }
@@ -385,7 +453,7 @@ function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCri
   // can safely accept scores that lack a round_id (e.g. scored while no round was
   // active, or via a path that didn't stamp round_id) — there is no other round
   // to attribute them to, so no double-counting. A criterion shared across rounds
-  // must match round_id exactly.
+  // must match round_id exactly. The same tolerance applies to its minors.
   const roundsPerCriterion = new Map()
   for (const round of rounds) {
     for (const id of Array.isArray(roundCriteria[round.id]) ? roundCriteria[round.id] : []) {
@@ -393,14 +461,26 @@ function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCri
     }
   }
 
-  // Group scores by (contestant, criteria, round) — round_id kept this time —
-  // plus a round-agnostic bucket for the single-round-tolerance fallback.
+  // Group scores keeping round_id, at both the minor level (primary) and the
+  // criteria level (no-minor fallback), each with a round-agnostic bucket for
+  // the single-round tolerance.
+  const byMinorRound = new Map()
+  const byMinorAny = new Map()
   const byCellRound = new Map()
   const byCellAny = new Map()
   for (const s of scores) {
     const cid = s.contestant_id ?? s.contestantId
     const critId = s.criteria_id ?? s.criteriaId
+    const minorId = s.minor_criteria_id ?? s.minorCriteriaId ?? null
     const rid = s.round_id ?? s.roundId ?? null
+    if (minorId) {
+      const mk = `${cid}|${minorId}|${rid}`
+      if (!byMinorRound.has(mk)) byMinorRound.set(mk, [])
+      byMinorRound.get(mk).push(Number(s.score))
+      const mak = `${cid}|${minorId}`
+      if (!byMinorAny.has(mak)) byMinorAny.set(mak, [])
+      byMinorAny.get(mak).push(Number(s.score))
+    }
     const key = `${cid}|${critId}|${rid}`
     if (!byCellRound.has(key)) byCellRound.set(key, [])
     byCellRound.get(key).push(Number(s.score))
@@ -409,9 +489,11 @@ function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCri
     byCellAny.get(anyKey).push(Number(s.score))
   }
 
-  // For the UI breakdown, aggregate each criterion's cells across the rounds
-  // that use it, so row.perCriterion still carries one entry per criterion.
-  const aggByCrit = new Map() // `${contestantId}|${critId}` -> number[]
+  // For the UI breakdown, aggregate each minor's (and each criterion's) cells
+  // across the rounds that use it, so row.perCriterion carries one entry per
+  // criterion with its minors nested.
+  const aggByMinor = new Map() // `${contestantId}|${minorId}` -> number[]
+  const aggByCrit = new Map() // `${contestantId}|${critId}`  -> number[] (fallback)
 
   for (const round of rounds) {
     const critIds = Array.isArray(roundCriteria[round.id]) ? roundCriteria[round.id] : []
@@ -423,20 +505,37 @@ function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCri
       if (!row) continue
       let roundValue = 0
       for (const crit of roundCrits) {
-        const exact = byCellRound.get(`${contestant.id}|${crit.id}|${round.id}`) ?? []
-        // Single-round criterion with no round-matched scores → accept its scores
-        // regardless of round_id so existing (unstamped) scores still count.
-        const cell =
-          exact.length === 0 && (roundsPerCriterion.get(crit.id) ?? 0) <= 1
-            ? byCellAny.get(`${contestant.id}|${crit.id}`) ?? []
-            : exact
-        const reduced = reduceScores(cell, cfg)
+        const tolerant = (roundsPerCriterion.get(crit.id) ?? 0) <= 1
+        const minors = minorList(crit)
+        let critValue
+        if (minors.length) {
+          // criterion = average of its minors, each normalized to a percent.
+          const pcts = []
+          for (const minor of minors) {
+            const exact = byMinorRound.get(`${contestant.id}|${minor.id}|${round.id}`) ?? []
+            const cell =
+              exact.length === 0 && tolerant
+                ? byMinorAny.get(`${contestant.id}|${minor.id}`) ?? []
+                : exact
+            pcts.push(normalizeMinorToPercent(reduceScores(cell, cfg), minor))
+            const aggKey = `${contestant.id}|${minor.id}`
+            if (!aggByMinor.has(aggKey)) aggByMinor.set(aggKey, [])
+            for (const v of cell) aggByMinor.get(aggKey).push(v)
+          }
+          critValue = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0
+        } else {
+          const exact = byCellRound.get(`${contestant.id}|${crit.id}|${round.id}`) ?? []
+          const cell =
+            exact.length === 0 && tolerant
+              ? byCellAny.get(`${contestant.id}|${crit.id}`) ?? []
+              : exact
+          critValue = reduceScores(cell, cfg)
+          const aggKey = `${contestant.id}|${crit.id}`
+          if (!aggByCrit.has(aggKey)) aggByCrit.set(aggKey, [])
+          for (const v of cell) aggByCrit.get(aggKey).push(v)
+        }
         // Criterion normalized WITHIN this round.
-        roundValue += reduced * (Number(crit.percentage ?? 0) / totalPct)
-
-        const aggKey = `${contestant.id}|${crit.id}`
-        if (!aggByCrit.has(aggKey)) aggByCrit.set(aggKey, [])
-        for (const v of cell) aggByCrit.get(aggKey).push(v)
+        roundValue += critValue * (Number(crit.percentage ?? 0) / totalPct)
       }
       row.perRound[round.id] = {
         roundId: round.id,
@@ -449,16 +548,45 @@ function computeScopedPerRound({ scores, contestants, criteria, rounds, roundCri
 
   // Event-level per-criterion aggregate (for the breakdown UI only).
   for (const crit of criteria) {
+    const minors = minorList(crit)
     for (const contestant of contestants) {
       const row = byContestant.get(contestant.id)
       if (!row) continue
-      const cell = aggByCrit.get(`${contestant.id}|${crit.id}`) ?? []
+      let value
+      let judgeCount
+      const minorsOut = {}
+      if (minors.length) {
+        const pcts = []
+        let maxCount = 0
+        for (const minor of minors) {
+          const cell = aggByMinor.get(`${contestant.id}|${minor.id}`) ?? []
+          const reduced = reduceScores(cell, cfg)
+          const pct = normalizeMinorToPercent(reduced, minor)
+          pcts.push(pct)
+          maxCount = Math.max(maxCount, cell.length)
+          minorsOut[minor.id] = {
+            minorCriteriaId: minor.id,
+            minorCriteriaName: minor.name,
+            scoreType: minor.scoreType ?? minor.score_type,
+            average: round2(reduced, dp),
+            percent: round2(pct, dp),
+            judgeCount: cell.length,
+          }
+        }
+        value = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0
+        judgeCount = maxCount
+      } else {
+        const cell = aggByCrit.get(`${contestant.id}|${crit.id}`) ?? []
+        value = reduceScores(cell, cfg)
+        judgeCount = cell.length
+      }
       row.perCriterion[crit.id] = {
         criteriaId: crit.id,
         criteriaName: crit.name,
         percentage: Number(crit.percentage ?? 0),
-        average: round2(reduceScores(cell, cfg), dp),
-        judgeCount: cell.length,
+        average: round2(value, dp),
+        judgeCount,
+        minors: minorsOut,
       }
     }
   }

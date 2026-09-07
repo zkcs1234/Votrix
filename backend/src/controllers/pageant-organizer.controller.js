@@ -8,6 +8,7 @@ import {
   validateCompetitionEvent,
   validateContestant,
   validateCriteria,
+  validateMinorCriteria,
   validateScoringToggle,
 } from '../validators/competition.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
@@ -160,6 +161,48 @@ export const deleteCriteria = asyncHandler(async (req, res) => {
     req.params.criteriaId,
   )
   res.json({ success: true, message: 'Criteria deleted' })
+})
+
+export const listMinorCriteria = asyncHandler(async (req, res) => {
+  const minorCriteria = await pageantService.listMinorCriteria(
+    req.params.eventId,
+    req.user.id,
+    req.params.criteriaId,
+  )
+  res.json({ success: true, minorCriteria })
+})
+
+export const createMinorCriteria = asyncHandler(async (req, res) => {
+  const payload = validateMinorCriteria(req.body, true)
+  const minorCriteria = await pageantService.createMinorCriteria(
+    req.params.eventId,
+    req.user.id,
+    req.params.criteriaId,
+    payload,
+  )
+  res.status(201).json({ success: true, minorCriteria })
+})
+
+export const updateMinorCriteria = asyncHandler(async (req, res) => {
+  const payload = validateMinorCriteria(req.body, false)
+  const minorCriteria = await pageantService.updateMinorCriteria(
+    req.params.eventId,
+    req.user.id,
+    req.params.criteriaId,
+    req.params.minorCriteriaId,
+    payload,
+  )
+  res.json({ success: true, minorCriteria })
+})
+
+export const deleteMinorCriteria = asyncHandler(async (req, res) => {
+  await pageantService.deleteMinorCriteria(
+    req.params.eventId,
+    req.user.id,
+    req.params.criteriaId,
+    req.params.minorCriteriaId,
+  )
+  res.json({ success: true, message: 'Minor criteria deleted' })
 })
 
 export const listJudges = asyncHandler(async (req, res) => {

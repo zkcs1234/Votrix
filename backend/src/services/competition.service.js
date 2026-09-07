@@ -865,6 +865,29 @@ export async function getCompetitionFoundation(eventId, organizerId) {
     assignmentRows = assignments ?? []
   }
 
+  // Minor criteria (judges score these; each owns its score type). Nested under
+  // their parent criterion below so the scoring engine and workspace get them.
+  const { data: minorRows, error: minorErr } = await getClient()
+    .from(DB_TABLES.MINOR_CRITERIA)
+    .select('id, criteria_id, event_id, name, score_type, custom_min, custom_max, display_order, is_active')
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (minorErr) throw new ApiError(500, minorErr.message)
+  const minorsByCrit = new Map()
+  for (const m of minorRows ?? []) {
+    if (!minorsByCrit.has(m.criteria_id)) minorsByCrit.set(m.criteria_id, [])
+    minorsByCrit.get(m.criteria_id).push({
+      id: m.id,
+      criteriaId: m.criteria_id,
+      name: m.name,
+      scoreType: m.score_type,
+      customMin: m.custom_min === null || m.custom_min === undefined ? null : Number(m.custom_min),
+      customMax: m.custom_max === null || m.custom_max === undefined ? null : Number(m.custom_max),
+      displayOrder: m.display_order ?? 0,
+    })
+  }
+
   return {
     event: eventRes.data,
     scoringConfig: mergeScoringConfig(eventRes.data.scoring_config),
@@ -885,6 +908,7 @@ export async function getCompetitionFoundation(eventId, organizerId) {
       minScore: c.min_score,
       maxScore: c.max_score,
       divisionId: c.division_id ?? null,
+      minorCriteria: minorsByCrit.get(c.id) ?? [],
     })),
     contestants: (contestants.data ?? []).map((c) => ({
       ...c,

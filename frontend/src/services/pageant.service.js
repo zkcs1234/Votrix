@@ -90,6 +90,28 @@ export const pageantService = {
     return api.delete(`${org}/events/${eventId}/criteria/${criteriaId}`)
   },
 
+  // Minor criteria (judges score these; each carries its own score type)
+  listMinorCriteria(eventId, criteriaId) {
+    return api.get(`${org}/events/${eventId}/criteria/${criteriaId}/minor-criteria`)
+  },
+
+  createMinorCriteria(eventId, criteriaId, payload) {
+    return api.post(`${org}/events/${eventId}/criteria/${criteriaId}/minor-criteria`, payload)
+  },
+
+  updateMinorCriteria(eventId, criteriaId, minorCriteriaId, payload) {
+    return api.patch(
+      `${org}/events/${eventId}/criteria/${criteriaId}/minor-criteria/${minorCriteriaId}`,
+      payload,
+    )
+  },
+
+  deleteMinorCriteria(eventId, criteriaId, minorCriteriaId) {
+    return api.delete(
+      `${org}/events/${eventId}/criteria/${criteriaId}/minor-criteria/${minorCriteriaId}`,
+    )
+  },
+
   // Canonical read path uses event_participants-backed judge enrollment.
   listJudges(eventId) {
     return api.get(`${org}/events/${eventId}/judges-v2`)

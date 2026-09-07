@@ -94,6 +94,20 @@ export const setActiveRound = asyncHandler(async (req, res) => {
   res.json({ success: true, session })
 })
 
+/** POST /api/organizer/competition/events/:eventId/session/set-active-criteria */
+export const setActiveCriteria = asyncHandler(async (req, res) => {
+  const { criteriaIds } = req.body
+  if (!Array.isArray(criteriaIds)) {
+    return res.status(400).json({ success: false, message: 'criteriaIds must be an array' })
+  }
+  const session = await sessionService.setActiveCriteria(
+    req.params.eventId,
+    req.user.id,
+    criteriaIds,
+  )
+  res.json({ success: true, session })
+})
+
 /** POST /api/organizer/competition/events/:eventId/session/set-division */
 export const setActiveDivision = asyncHandler(async (req, res) => {
   const { divisionId } = req.body

@@ -36,6 +36,12 @@ router.post('/events/:eventId/criteria', ctrl.createCriteria)
 router.patch('/events/:eventId/criteria/:criteriaId', ctrl.updateCriteria)
 router.delete('/events/:eventId/criteria/:criteriaId', ctrl.deleteCriteria)
 
+// Minor criteria (judges score these; each owns its score type)
+router.get('/events/:eventId/criteria/:criteriaId/minor-criteria', ctrl.listMinorCriteria)
+router.post('/events/:eventId/criteria/:criteriaId/minor-criteria', ctrl.createMinorCriteria)
+router.patch('/events/:eventId/criteria/:criteriaId/minor-criteria/:minorCriteriaId', ctrl.updateMinorCriteria)
+router.delete('/events/:eventId/criteria/:criteriaId/minor-criteria/:minorCriteriaId', ctrl.deleteMinorCriteria)
+
 router.get('/events/:eventId/judges', ctrl.listJudges)
 router.post('/events/:eventId/judges/invite', emailLimiter, ctrl.inviteJudge)
 

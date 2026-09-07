@@ -34,6 +34,9 @@ function mapSession(row) {
     activeContestantPhoto: row.active_contestant_photo ?? null,
     currentContestantOrder: row.current_contestant_order,
     contestantOrder: row.contestant_order ?? [],
+    // Live control: criteria of the current round open for scoring. Empty is
+    // treated by the app as "all criteria open" (see loadActiveScoringCriteria).
+    activeCriteriaIds: Array.isArray(row.active_criteria_ids) ? row.active_criteria_ids : [],
     startedAt: row.started_at,
     pausedAt: row.paused_at,
     completedAt: row.completed_at,
@@ -69,6 +72,106 @@ async function assertCompetitionEvent(eventId, organizerId) {
     throw new ApiError(400, 'This event is not a competition scoring event')
   }
   return event
+}
+
+// The ids of the criteria that belong to the current round (round-scoped, else
+// event-wide). Used to seed and bound the active-criteria gate.
+async function loadRoundCriteriaIds(eventId, roundId) {
+  if (roundId) {
+    const { data: rc } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
+      .select('criteria_id')
+      .eq('round_id', roundId)
+    if (rc && rc.length) return rc.map((x) => x.criteria_id)
+  }
+  const { data: crits } = await getClient()
+    .from(DB_TABLES.CRITERIA)
+    .select('id')
+    .eq('event_id', eventId)
+  return (crits ?? []).map((c) => c.id)
+}
+
+// The criteria a judge should score in the current round, with their minor
+// criteria (each carrying its own score type + resolved bounds). Applies the
+// live active-criteria gate: an empty gate means "all criteria open" so
+// pre-existing sessions and events keep working. A criterion with no minors
+// (deploy window / not-yet-migrated) is returned with an empty `minors` array
+// and its own bounds, and the callers score it directly by criterion id.
+async function loadActiveScoringCriteria(eventId, session, fallbackBounds) {
+  // Fetch the current round's criteria (full rows), else event-wide criteria.
+  let crits = []
+  let orderedIds = []
+  if (session.currentRoundId) {
+    const { data: rc } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
+      .select('criteria_id')
+      .eq('round_id', session.currentRoundId)
+    orderedIds = (rc ?? []).map((x) => x.criteria_id)
+    if (orderedIds.length) {
+      const { data } = await getClient()
+        .from(DB_TABLES.CRITERIA)
+        .select('id, event_id, name, percentage, min_score, max_score')
+        .in('id', orderedIds)
+      crits = data ?? []
+    }
+  }
+  if (!crits.length) {
+    const { data } = await getClient()
+      .from(DB_TABLES.CRITERIA)
+      .select('id, event_id, name, percentage, min_score, max_score')
+      .eq('event_id', eventId)
+    crits = data ?? []
+    orderedIds = crits.map((c) => c.id)
+  }
+
+  // Apply the live active-criteria gate (empty = all open).
+  const active = Array.isArray(session.activeCriteriaIds) ? session.activeCriteriaIds : []
+  if (active.length) {
+    const set = new Set(active)
+    crits = crits.filter((c) => set.has(c.id))
+  }
+  if (!crits.length) return []
+
+  const openIds = crits.map((c) => c.id)
+  const { data: minorRows } = await getClient()
+    .from(DB_TABLES.MINOR_CRITERIA)
+    .select('id, criteria_id, name, score_type, custom_min, custom_max, display_order')
+    .in('criteria_id', openIds)
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  const minorsByCrit = new Map()
+  for (const m of minorRows ?? []) {
+    if (!minorsByCrit.has(m.criteria_id)) minorsByCrit.set(m.criteria_id, [])
+    minorsByCrit.get(m.criteria_id).push(m)
+  }
+
+  // Preserve the round's criteria order.
+  const orderIndex = new Map(orderedIds.map((id, i) => [id, i]))
+  return crits
+    .sort((a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0))
+    .map((c) => ({
+      id: c.id,
+      eventId: c.event_id,
+      name: c.name,
+      percentage: Number(c.percentage),
+      minScore: fallbackBounds?.min ?? Number(c.min_score),
+      maxScore: fallbackBounds?.max ?? Number(c.max_score),
+      minors: (minorsByCrit.get(c.id) ?? []).map((m) => {
+        const b = resolveScoreBounds({
+          scoreType: m.score_type,
+          customMin: m.custom_min,
+          customMax: m.custom_max,
+        })
+        return {
+          id: m.id,
+          criteriaId: m.criteria_id,
+          name: m.name,
+          scoreType: m.score_type,
+          minScore: b.min,
+          maxScore: b.max,
+        }
+      }),
+    }))
 }
 
 // ---------------------------------------------------------------------------
@@ -153,36 +256,78 @@ export async function getActiveSessionDetailed(eventId) {
   }
   const roundContestants = order.map((id) => contestantsById.get(id)).filter(Boolean)
 
-  // Active round enriched with its criteria (round-scoped, else event-wide).
-  let activeRound = null
+  // Criteria control for Live Control — works with OR WITHOUT rounds. When a
+  // round is active it's that round's criteria; for criteria-only events (no
+  // rounds) it's the event-wide criteria. Each criterion carries an `active`
+  // flag (from the live gate; empty gate = all open) and its minor criteria, so
+  // Live Control can render the per-criterion toggles in either shape.
+  const gate = session.activeCriteriaIds ?? []
+  const isActive = (id) => gate.length === 0 || gate.includes(id)
+
+  let scopeCriteria = []
   if (session.currentRoundId) {
-    const r = (rounds ?? []).find((x) => x.id === session.currentRoundId)
-    let criteria = []
     const { data: rcrit } = await getClient()
       .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
       .select('criteria_id')
       .eq('round_id', session.currentRoundId)
-    if (rcrit && rcrit.length) {
-      const ids = rcrit.map((x) => x.criteria_id)
+    const ids = (rcrit ?? []).map((x) => x.criteria_id)
+    if (ids.length) {
       const { data: crits } = await getClient()
         .from(DB_TABLES.CRITERIA)
         .select('id, name, percentage')
         .in('id', ids)
-      criteria = crits ?? []
-    } else {
-      const { data: crits } = await getClient()
-        .from(DB_TABLES.CRITERIA)
-        .select('id, name, percentage')
-        .eq('event_id', eventId)
-      criteria = crits ?? []
+      scopeCriteria = crits ?? []
     }
+  }
+  if (!scopeCriteria.length) {
+    const { data: crits } = await getClient()
+      .from(DB_TABLES.CRITERIA)
+      .select('id, name, percentage')
+      .eq('event_id', eventId)
+    scopeCriteria = crits ?? []
+  }
+
+  const scopeCritIds = scopeCriteria.map((c) => c.id)
+  const minorsByCrit = new Map()
+  if (scopeCritIds.length) {
+    const { data: minorRows } = await getClient()
+      .from(DB_TABLES.MINOR_CRITERIA)
+      .select('id, criteria_id, name, score_type, custom_min, custom_max, display_order')
+      .in('criteria_id', scopeCritIds)
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true })
+    for (const m of minorRows ?? []) {
+      if (!minorsByCrit.has(m.criteria_id)) minorsByCrit.set(m.criteria_id, [])
+      minorsByCrit.get(m.criteria_id).push({
+        id: m.id,
+        name: m.name,
+        scoreType: m.score_type,
+        customMin: m.custom_min,
+        customMax: m.custom_max,
+      })
+    }
+  }
+
+  const criteriaControl = scopeCriteria.map((c) => ({
+    id: c.id,
+    name: c.name,
+    percentage: c.percentage,
+    active: isActive(c.id),
+    minors: minorsByCrit.get(c.id) ?? [],
+  }))
+
+  // Active round object — only when a round is open. Reuses criteriaControl.
+  let activeRound = null
+  if (session.currentRoundId) {
+    const r = (rounds ?? []).find((x) => x.id === session.currentRoundId)
     activeRound = {
       id: session.currentRoundId,
       name: r?.name ?? session.currentRoundName ?? 'Round',
       isOpen: r?.is_open ?? true,
       finalized: Boolean(r?.finalized_at),
       contestants: roundContestants,
-      criteria,
+      criteria: criteriaControl,
+      activeCriteriaIds: gate,
     }
   }
 
@@ -202,6 +347,8 @@ export async function getActiveSessionDetailed(eventId) {
   return {
     ...session,
     availableRounds,
+    hasRounds: (rounds ?? []).length > 0,
+    criteriaControl,
     activeRound,
     activeContestant,
     activeContestantIndex: session.currentContestantOrder ?? 0,
@@ -661,6 +808,10 @@ export async function setActiveRound(eventId, organizerId, roundId) {
   // Get contestant order for this round and current division
   const contestantOrder = await buildContestantOrder(eventId, roundId, session.currentDivisionId)
 
+  // Seed the live active-criteria gate to ALL of this round's criteria so
+  // scoring works immediately; the organizer can then close individual ones.
+  const activeCriteriaIds = await loadRoundCriteriaIds(eventId, roundId)
+
   const { data, error } = await getClient()
     .from('competition_sessions')
     .update({
@@ -668,6 +819,7 @@ export async function setActiveRound(eventId, organizerId, roundId) {
       active_contestant_id: contestantOrder.length > 0 ? contestantOrder[0] : null,
       current_contestant_order: 0,
       contestant_order: contestantOrder,
+      active_criteria_ids: activeCriteriaIds,
     })
     .eq('id', session.id)
     .select('*')
@@ -688,6 +840,53 @@ export async function setActiveRound(eventId, organizerId, roundId) {
     userId: organizerId,
     module: 'competition',
     details: { sessionId: session.id, roundId, previousRoundId: session.currentRoundId },
+  })
+
+  return updated
+}
+
+// ---------------------------------------------------------------------------
+// Set the live active-criteria gate for the current round.
+// `criteriaIds` is the set of the current round's criteria that judges may score
+// right now. Must be a subset of the round's criteria. Opening a criterion
+// exposes all of its minor criteria; minors are never gated individually.
+// ---------------------------------------------------------------------------
+export async function setActiveCriteria(eventId, organizerId, criteriaIds) {
+  const session = await assertActiveSession(eventId, organizerId)
+
+  // Scope: the current round's criteria, or — for criteria-only events with no
+  // rounds — the event-wide criteria. loadRoundCriteriaIds handles both (a null
+  // round falls back to event-wide).
+  const roundCriteriaIds = await loadRoundCriteriaIds(eventId, session.currentRoundId)
+  const allowed = new Set(roundCriteriaIds)
+  const requested = Array.isArray(criteriaIds) ? [...new Set(criteriaIds)] : []
+  const invalid = requested.filter((id) => !allowed.has(id))
+  if (invalid.length) {
+    throw new ApiError(400, 'One or more criteria do not belong to the current round')
+  }
+
+  const { data, error } = await getClient()
+    .from('competition_sessions')
+    .update({ active_criteria_ids: requested })
+    .eq('id', session.id)
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+  const updated = mapSession(data)
+
+  // Judges reload their sheet so closed criteria disappear immediately.
+  emitToEvent(eventId, 'session:active-criteria-changed', {
+    session: updated,
+    activeCriteriaIds: updated.activeCriteriaIds,
+  })
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.session.set_active_criteria',
+    userId: organizerId,
+    module: 'competition',
+    details: { sessionId: session.id, roundId: session.currentRoundId, activeCriteriaIds: requested },
   })
 
   return updated
@@ -891,13 +1090,47 @@ export async function completeSession(eventId, organizerId) {
 // judge's scope on the session path above.
 // ---------------------------------------------------------------------------
 async function bridgeSessionScoresToRankingStore(session, judgeId, scoreMap, contestantIdArg) {
-  const criteriaIds = Object.keys(scoreMap ?? {})
-  if (!criteriaIds.length) return
+  const keys = Object.keys(scoreMap ?? {})
+  if (!keys.length) return
 
   const roundId = session.currentRoundId ?? null
   const divisionId = session.currentDivisionId ?? null
   const contestantId = contestantIdArg ?? session.activeContestantId
 
+  // A score-map key is a MINOR criterion id (current model). Resolve each to its
+  // parent criterion. Legacy blobs (pre-minor deploy window) key by CRITERION id
+  // instead — those keys won't resolve as minors, so we treat them as criteria
+  // and attach the criterion's single default minor when one exists.
+  const { data: minorRows } = await getClient()
+    .from(DB_TABLES.MINOR_CRITERIA)
+    .select('id, criteria_id')
+    .in('id', keys)
+  const parentByMinor = new Map((minorRows ?? []).map((m) => [m.id, m.criteria_id]))
+
+  const legacyKeys = keys.filter((k) => !parentByMinor.has(k))
+  const defaultMinorByCrit = new Map()
+  if (legacyKeys.length) {
+    const { data: legacyMinors } = await getClient()
+      .from(DB_TABLES.MINOR_CRITERIA)
+      .select('id, criteria_id')
+      .in('criteria_id', legacyKeys)
+      .order('display_order', { ascending: true })
+    for (const m of legacyMinors ?? []) {
+      if (!defaultMinorByCrit.has(m.criteria_id)) defaultMinorByCrit.set(m.criteria_id, m.id)
+    }
+  }
+
+  // Build (criteriaId, minorId, score) triples.
+  const triples = keys.map((key) => {
+    if (parentByMinor.has(key)) {
+      return { criteriaId: parentByMinor.get(key), minorId: key, score: Number(scoreMap[key]) }
+    }
+    return { criteriaId: key, minorId: defaultMinorByCrit.get(key) ?? null, score: Number(scoreMap[key]) }
+  })
+
+  // Clear prior rows for these criteria (all their minors) in this cell, then
+  // re-insert, so a judge editing then re-locking never double-counts.
+  const criteriaIds = [...new Set(triples.map((t) => t.criteriaId))]
   let del = getClient()
     .from(DB_TABLES.JUDGE_SCORES)
     .delete()
@@ -908,14 +1141,15 @@ async function bridgeSessionScoresToRankingStore(session, judgeId, scoreMap, con
   const { error: delErr } = await del
   if (delErr) throw new ApiError(500, `Failed to sync live scores: ${delErr.message}`)
 
-  const rows = criteriaIds.map((criteriaId) => ({
+  const rows = triples.map((t) => ({
     judge_id: judgeId,
     contestant_id: contestantId,
-    criteria_id: criteriaId,
+    criteria_id: t.criteriaId,
+    minor_criteria_id: t.minorId,
     round_id: roundId,
     division_id: divisionId,
     category_id: null,
-    score: Number(scoreMap[criteriaId]),
+    score: t.score,
   }))
 
   const { error: insErr } = await getClient().from(DB_TABLES.JUDGE_SCORES).insert(rows)
@@ -1032,67 +1266,40 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores, contes
     throw new ApiError(409, 'You have already submitted scores for this contestant')
   }
 
-  // Get criteria for the current round (or event-wide)
-  let criteria = []
-  if (session.currentRoundId) {
-    const { data: roundCriteria } = await getClient()
-      .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
-      .select('criteria_id')
-      .eq('round_id', session.currentRoundId)
-
-    if (roundCriteria && roundCriteria.length > 0) {
-      const criteriaIds = roundCriteria.map(rc => rc.criteria_id)
-      const { data: crits } = await getClient()
-        .from(DB_TABLES.CRITERIA)
-        .select('id, event_id, name, percentage, min_score, max_score')
-        .in('id', criteriaIds)
-
-      criteria = (crits ?? []).map(mapCriteria)
-    }
-  }
-
-  if (criteria.length === 0) {
-    // Fallback to event-wide criteria
-    const { data: crits } = await getClient()
-      .from(DB_TABLES.CRITERIA)
-      .select('id, event_id, name, percentage, min_score, max_score')
-      .eq('event_id', eventId)
-
-    criteria = (crits ?? []).map(mapCriteria)
-  }
-
-  // Validate scores. §8C: the event scale (scoring_config.scoreType) is the
-  // source of truth for the range; the live path now enforces it too (it used to
-  // check only the per-criterion min/max, so a scale of 1–10 was silently
-  // ignored here while the batch path rejected out-of-scale scores). The
-  // per-criterion min/max remains an optional override that must fit inside the
-  // scale — matching submitJudgeScores.
-  // §8C: the event scale is the single source of truth for the valid range, and
-  // it must match what the judge FORM allows (the form uses these same scale
-  // bounds). We deliberately IGNORE any stray per-criterion min_score/max_score
-  // here — the UI no longer lets organizers set per-criterion ranges, so a
-  // leftover value (e.g. an "Audience Impact" max of 10 on a 1–100 event) must
-  // not silently cap a judge's score below the scale.
+  // Criteria the judge may score right now: the current round's criteria, gated
+  // by the live active-criteria set, each with its minor criteria. Judges score
+  // MINOR criteria, each validated against ITS OWN score type/bounds. A criterion
+  // with no minors (deploy window / not-yet-migrated) is scored directly against
+  // the event scale, exactly as before.
   const scoringConfig = mergeScoringConfig(event.scoring_config)
   const eventBounds = resolveScoreBounds(scoringConfig)
+  const activeCriteria = await loadActiveScoringCriteria(eventId, session, eventBounds)
+  if (!activeCriteria.length) {
+    throw new ApiError(400, 'No criteria are currently open for scoring')
+  }
 
   const scoreMap = {}
-  for (const crit of criteria) {
-    const value = scores[crit.id]
-    if (value === undefined || value === null || value === '') {
-      throw new ApiError(400, `Score for "${crit.name}" is required`)
+  for (const crit of activeCriteria) {
+    const targets = crit.minors.length
+      ? crit.minors
+      : [{ id: crit.id, name: crit.name, minScore: eventBounds.min, maxScore: eventBounds.max }]
+    for (const t of targets) {
+      const value = scores[t.id]
+      if (value === undefined || value === null || value === '') {
+        throw new ApiError(400, `Score for "${t.name}" is required`)
+      }
+      const num = Number(value)
+      if (Number.isNaN(num)) {
+        throw new ApiError(400, `Score for "${t.name}" must be a number`)
+      }
+      if (num < t.minScore || num > t.maxScore) {
+        throw new ApiError(
+          400,
+          `Score for "${t.name}" must be between ${t.minScore} and ${t.maxScore}`,
+        )
+      }
+      scoreMap[t.id] = num
     }
-    const num = Number(value)
-    if (Number.isNaN(num)) {
-      throw new ApiError(400, `Score for "${crit.name}" must be a number`)
-    }
-    if (num < eventBounds.min || num > eventBounds.max) {
-      throw new ApiError(
-        400,
-        `Score for "${crit.name}" must be between ${eventBounds.min} and ${eventBounds.max}`,
-      )
-    }
-    scoreMap[crit.id] = num
   }
 
   const now = new Date().toISOString()
@@ -1216,33 +1423,15 @@ export async function getJudgeSessionView(eventId, judgeId) {
     .in('id', stageIds)
   const stageById = new Map((stageRows ?? []).map((c) => [c.id, c]))
 
-  // Get criteria for the current round
-  let criteria = []
-  if (session.currentRoundId) {
-    const { data: roundCriteria } = await getClient()
-      .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
-      .select('criteria_id')
-      .eq('round_id', session.currentRoundId)
+  // §8C: the event scale is the fallback range for any criterion that has no
+  // minors (deploy window). Minors carry their own bounds (see below).
+  const scoringConfig = mergeScoringConfig(event.scoring_config)
+  const eventBounds = resolveScoreBounds(scoringConfig)
 
-    if (roundCriteria && roundCriteria.length > 0) {
-      const criteriaIds = roundCriteria.map(rc => rc.criteria_id)
-      const { data: crits } = await getClient()
-        .from(DB_TABLES.CRITERIA)
-        .select('id, event_id, name, percentage, min_score, max_score')
-        .in('id', criteriaIds)
-
-      criteria = (crits ?? []).map(mapCriteria)
-    }
-  }
-
-  if (criteria.length === 0) {
-    const { data: crits } = await getClient()
-      .from(DB_TABLES.CRITERIA)
-      .select('id, event_id, name, percentage, min_score, max_score')
-      .eq('event_id', eventId)
-
-    criteria = (crits ?? []).map(mapCriteria)
-  }
+  // Criteria the judge scores: current round, gated by the live active-criteria
+  // set, each with its minor criteria and their own bounds. Closed criteria are
+  // omitted entirely (hidden until opened).
+  const criteria = await loadActiveScoringCriteria(eventId, session, eventBounds)
 
   // This judge's existing session scores for every on-stage contestant.
   const { data: existingRows } = await getClient()
@@ -1265,15 +1454,6 @@ export async function getJudgeSessionView(eventId, judgeId) {
       .maybeSingle()
     roundName = roundRow?.name ?? null
   }
-
-  // §8C: the event scale is the single source of truth for the score range.
-  const scoringConfig = mergeScoringConfig(event.scoring_config)
-  const eventBounds = resolveScoreBounds(scoringConfig)
-  const criteriaWithBounds = criteria.map((c) => ({
-    ...c,
-    minScore: eventBounds.min,
-    maxScore: eventBounds.max,
-  }))
 
   // One entry per on-stage contestant with that contestant's own scores/lock.
   const stageContestants = stageIds
@@ -1307,7 +1487,8 @@ export async function getJudgeSessionView(eventId, judgeId) {
     stageContestants,
     roundName,
     roundId: session.currentRoundId ?? null,
-    criteria: criteriaWithBounds,
+    criteria,
+    activeCriteriaIds: session.activeCriteriaIds ?? [],
     scoringConfig,
     scoreBounds: eventBounds,
     totalContestants: session.contestantOrder.length,
@@ -1455,16 +1636,40 @@ async function computeRoundStanding(eventId, round, scoringConfig, { divisionId 
   if (critIds.length) criteriaQuery = criteriaQuery.in('id', critIds)
   const { data: criteria } = await criteriaQuery
 
+  // Nest minor criteria so the engine builds each criterion's score from them.
+  const criteriaList = criteria ?? []
+  if (criteriaList.length) {
+    const { data: minorRows } = await getClient()
+      .from(DB_TABLES.MINOR_CRITERIA)
+      .select('id, criteria_id, name, score_type, custom_min, custom_max, display_order')
+      .in('criteria_id', criteriaList.map((c) => c.id))
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true })
+    const byCrit = new Map()
+    for (const m of minorRows ?? []) {
+      if (!byCrit.has(m.criteria_id)) byCrit.set(m.criteria_id, [])
+      byCrit.get(m.criteria_id).push({
+        id: m.id,
+        criteriaId: m.criteria_id,
+        name: m.name,
+        scoreType: m.score_type,
+        customMin: m.custom_min,
+        customMax: m.custom_max,
+      })
+    }
+    for (const c of criteriaList) c.minorCriteria = byCrit.get(c.id) ?? []
+  }
+
   // Scores for THIS round only.
   const { data: scores } = await getClient()
     .from(DB_TABLES.JUDGE_SCORES)
-    .select('contestant_id, criteria_id, round_id, score, judge_id')
+    .select('contestant_id, criteria_id, minor_criteria_id, round_id, score, judge_id')
     .eq('round_id', roundId)
 
   const { rankings } = computeRankings({
     scores: (scores ?? []).filter((s) => contestantIds.includes(s.contestant_id)),
     contestants: contestants ?? [],
-    criteria: criteria ?? [],
+    criteria: criteriaList,
     rounds: [{ id: roundId, name: round.name, weight: 100 }],
     roundCriteria: critIds.length ? { [roundId]: critIds } : null,
     config: scoringConfig,

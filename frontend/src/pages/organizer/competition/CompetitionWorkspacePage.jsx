@@ -1,9 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useParams } from 'react-router-dom'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 
 import { pageantService } from '@/services/pageant.service'
+import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
+import { stagePath } from '@/utils/eventStages'
+
+// The Structure & Scoring workspace walks through its tabs like the event form's
+// stages: Rounds → Divisions → Scoring config → (Continue to Contestants).
+const WORKSPACE_TAB_FLOW = ['rounds', 'divisions', 'scoring']
+const WORKSPACE_TAB_LABEL = {
+  rounds: 'Rounds',
+  divisions: 'Divisions',
+  scoring: 'Scoring config',
+}
 
 // Phase 4 — Competition Scoring Foundation workspace.
 // Single page that exposes the dynamic structure of an event:
@@ -110,8 +123,79 @@ export default function CompetitionWorkspacePage() {
       {activeTab === 'divisions' && <DivisionsTab foundation={foundation} reload={load} />}
       {activeTab === 'rounds' && <RoundsTab foundation={foundation} reload={load} />}
       {activeTab === 'scoring' && <ScoringTab foundation={foundation} reload={load} />}
+
+      <WorkspaceStageFooter eventId={eventId} activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   )
+}
+
+// Sticky stage footer mirroring the event form's StageFooter, but stepping
+// through the workspace's own tabs. Portals into the shared #stage-footer-portal.
+function WorkspaceStageFooter({ eventId, activeTab, setActiveTab }) {
+  const idx = WORKSPACE_TAB_FLOW.indexOf(activeTab)
+
+  let back
+  let next
+  if (activeTab === 'structure') {
+    // Categories is an advanced side-tab, not part of the linear flow.
+    back = { label: 'Back: Rounds', onClick: () => setActiveTab('rounds') }
+    next = { label: 'Next: Scoring config', onClick: () => setActiveTab('scoring') }
+  } else {
+    back =
+      idx <= 0
+        ? { label: 'Back: Information Form', href: stagePath('competition', 'information-form', eventId) }
+        : {
+            label: `Back: ${WORKSPACE_TAB_LABEL[WORKSPACE_TAB_FLOW[idx - 1]]}`,
+            onClick: () => setActiveTab(WORKSPACE_TAB_FLOW[idx - 1]),
+          }
+    next =
+      idx >= WORKSPACE_TAB_FLOW.length - 1
+        ? { label: 'Continue to Contestants', href: `/organizer/competition/events/${eventId}/contestants` }
+        : {
+            label: `Continue to ${WORKSPACE_TAB_LABEL[WORKSPACE_TAB_FLOW[idx + 1]]}`,
+            onClick: () => setActiveTab(WORKSPACE_TAB_FLOW[idx + 1]),
+          }
+  }
+
+  const content = (
+    <div className="z-40 border-t border-v-border bg-v-surface shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+      <div className="mx-auto flex w-full items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3 md:px-8">
+        <div className="flex items-center gap-3">
+          {back.href ? (
+            <Link to={back.href}>
+              <Button type="button" variant="secondary">
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
+                {back.label}
+              </Button>
+            </Link>
+          ) : (
+            <Button type="button" variant="secondary" onClick={back.onClick}>
+              <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
+              {back.label}
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {next.href ? (
+            <Link to={next.href}>
+              <Button type="button">
+                {next.label}
+                <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
+              </Button>
+            </Link>
+          ) : (
+            <Button type="button" onClick={next.onClick}>
+              {next.label}
+              <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+
+  const target = typeof document !== 'undefined' ? document.getElementById('stage-footer-portal') : null
+  return target ? createPortal(content, target) : content
 }
 
 function SubNav({ to, children }) {

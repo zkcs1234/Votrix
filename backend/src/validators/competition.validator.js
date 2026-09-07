@@ -97,6 +97,52 @@ export function validateCriteria(body) {
   }
 }
 
+// Minor criteria carry NO percentage (equal weight within their criterion) and
+// own the score type. `isCreate` requires name + scoreType; updates are partial.
+export function validateMinorCriteria(body, isCreate = true) {
+  const out = {}
+
+  if (isCreate || body?.name !== undefined) {
+    if (!body?.name?.trim()) throw new ApiError(400, 'Minor criteria name is required')
+    out.name = body.name.trim()
+  }
+
+  if (isCreate || body?.scoreType !== undefined) {
+    const scoreType = body?.scoreType
+    if (!Object.values(SCORE_TYPES).includes(scoreType)) {
+      throw new ApiError(400, `scoreType must be one of: ${Object.values(SCORE_TYPES).join(', ')}`)
+    }
+    out.scoreType = scoreType
+  }
+
+  // Custom bounds only meaningful for custom_range; validated when provided.
+  const effectiveType = out.scoreType ?? body?.scoreType
+  if (effectiveType === SCORE_TYPES.CUSTOM_RANGE) {
+    const customMin = Number(body?.customMin)
+    const customMax = Number(body?.customMax)
+    if (Number.isNaN(customMin) || Number.isNaN(customMax)) {
+      throw new ApiError(400, 'customMin and customMax are required for a custom range')
+    }
+    if (customMax <= customMin) {
+      throw new ApiError(400, 'customMax must be greater than customMin')
+    }
+    out.customMin = customMin
+    out.customMax = customMax
+  } else if (isCreate || body?.scoreType !== undefined) {
+    // Non-custom scale: clear any stray custom bounds.
+    out.customMin = null
+    out.customMax = null
+  }
+
+  if (body?.displayOrder !== undefined) {
+    const displayOrder = Number(body.displayOrder)
+    out.displayOrder = Number.isInteger(displayOrder) ? displayOrder : 0
+  }
+  if (body?.isActive !== undefined) out.isActive = Boolean(body.isActive)
+
+  return out
+}
+
 export function validateScoringToggle(body) {
   if (typeof body?.scoringEnabled !== 'boolean') {
     throw new ApiError(400, 'scoringEnabled must be a boolean')
