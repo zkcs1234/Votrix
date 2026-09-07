@@ -187,6 +187,17 @@ export const searchIndex = [
     icon: Users,
   },
   {
+    id: 'org-comp-criteria',
+    title: 'Judging Criteria',
+    path: 'criteria',
+    scoped: true,
+    basePath: '/organizer/competition/events',
+    keywords: ['criteria', 'rubric', 'judging', 'competition'],
+    category: 'Events',
+    roles: [USER_ROLES.ORGANIZER],
+    icon: Settings,
+  },
+  {
     id: 'org-comp-judges',
     title: 'Judges',
     path: 'judges',

@@ -28,10 +28,8 @@ export default function CompetitionLiveControlPage() {
   const [eventStatus, setEventStatus] = useState(null)
   const [foundation, setFoundation] = useState(null)
 
-  // Phase 6 / Option B — round OR stage finalize & advancement review modal.
+  // Phase 6 — round finalize & advancement review modal.
   const [finalizeRoundId, setFinalizeRoundId] = useState(null)
-  const [finalizeKind, setFinalizeKind] = useState('round') // 'round' | 'stage'
-  const [finalizeStageId, setFinalizeStageId] = useState(null)
   const [finalizePreview, setFinalizePreview] = useState(null)
   const [finalizeChecked, setFinalizeChecked] = useState(() => new Set())
   const [finalizeLoading, setFinalizeLoading] = useState(false)
@@ -169,8 +167,6 @@ export default function CompetitionLiveControlPage() {
 
   // Phase 6 — open the finalize review modal for a round.
   const openFinalize = async (roundId) => {
-    setFinalizeKind('round')
-    setFinalizeStageId(null)
     setFinalizeRoundId(roundId)
     setFinalizePreview(null)
     setFinalizeLoading(true)
@@ -181,25 +177,6 @@ export default function CompetitionLiveControlPage() {
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to load advancement preview')
       setFinalizeRoundId(null)
-    } finally {
-      setFinalizeLoading(false)
-    }
-  }
-
-  // Option B — open the finalize review modal for a STAGE (category).
-  const openFinalizeStage = async (categoryId) => {
-    setFinalizeKind('stage')
-    setFinalizeRoundId(null)
-    setFinalizeStageId(categoryId)
-    setFinalizePreview(null)
-    setFinalizeLoading(true)
-    try {
-      const { data } = await competitionSessionService.previewStageAdvancement(eventId, categoryId)
-      setFinalizePreview(data)
-      setFinalizeChecked(new Set(data.standing.filter((s) => s.qualified).map((s) => s.contestantId)))
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to load stage advancement preview')
-      setFinalizeStageId(null)
     } finally {
       setFinalizeLoading(false)
     }
@@ -216,7 +193,6 @@ export default function CompetitionLiveControlPage() {
 
   const closeFinalize = () => {
     setFinalizeRoundId(null)
-    setFinalizeStageId(null)
     setFinalizePreview(null)
     setFinalizeChecked(new Set())
   }
@@ -234,53 +210,26 @@ export default function CompetitionLiveControlPage() {
     const isRecompute = Boolean(finalizePreview.finalized)
     setFinalizeSubmitting(true)
     try {
-      if (finalizeKind === 'stage') {
-        const { data } = await competitionSessionService.finalizeStage(
-          eventId,
-          finalizeStageId,
-          { add, remove },
-          isRecompute,
-        )
-        closeFinalize()
-        await loadSession()
-        alert(
-          isRecompute
-            ? `Stage "${data.stageName}" standings recomputed with the current scores.`
-            : `Stage "${data.stageName}" finalized. ${data.qualifiers.length} qualifier(s)` +
-                (data.nextStageName ? ` seeded into "${data.nextStageName}".` : '.'),
-        )
-      } else {
-        const { data } = await competitionSessionService.finalizeRound(
-          eventId,
-          finalizeRoundId,
-          { add, remove },
-          isRecompute, // force = re-finalize to refresh a frozen snapshot
-        )
-        closeFinalize()
-        await loadSession()
-        alert(
-          isRecompute
-            ? `Round "${data.roundName}" standings recomputed with the current scores.`
-            : `Round "${data.roundName}" finalized. ${data.qualifiers.length} qualifier(s)` +
-                (data.nextRoundName ? ` seeded into "${data.nextRoundName}".` : '.'),
-        )
-      }
+      const { data } = await competitionSessionService.finalizeRound(
+        eventId,
+        finalizeRoundId,
+        { add, remove },
+        isRecompute, // force = re-finalize to refresh a frozen snapshot
+      )
+      closeFinalize()
+      await loadSession()
+      alert(
+        isRecompute
+          ? `Round "${data.roundName}" standings recomputed with the current scores.`
+          : `Round "${data.roundName}" finalized. ${data.qualifiers.length} qualifier(s)` +
+              (data.nextRoundName ? ` seeded into "${data.nextRoundName}".` : '.'),
+      )
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to finalize')
+      alert(err.response?.data?.message || 'Failed to finalize round')
     } finally {
       setFinalizeSubmitting(false)
     }
   }
-
-  // The stage (is_stage category) that owns the active round, if any.
-  const activeStage = (() => {
-    const activeRoundId = session?.activeRound?.id
-    if (!activeRoundId) return null
-    const fr = (foundation?.rounds ?? []).find((r) => r.id === activeRoundId)
-    const catId = fr?.categoryId ?? fr?.category_id
-    if (!catId) return null
-    return (foundation?.categories ?? []).find((c) => c.id === catId && c.isStage) ?? null
-  })()
 
   if (loading && !showLoader) return null
 
@@ -465,32 +414,6 @@ export default function CompetitionLiveControlPage() {
                 </p>
               </div>
             )}
-
-            {/* Option B — finalize the STAGE the active round belongs to: applies
-                the stage cut and seeds qualifiers into the next stage. */}
-            {activeStage && (
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => openFinalizeStage(activeStage.id)}
-                  disabled={finalizeLoading}
-                  className="w-full rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-300 transition hover:bg-indigo-500/20 disabled:opacity-50"
-                >
-                  {finalizeLoading
-                    ? 'Loading…'
-                    : activeStage.finalizedAt
-                      ? `Recompute "${activeStage.name}" stage standings`
-                      : `Finalize stage "${activeStage.name}" & advance`}
-                </button>
-                <p className="text-[11px] text-v-text-subtle">
-                  Combines this stage&apos;s rounds, applies its cut rule
-                  {activeStage.carryPolicy && activeStage.carryPolicy !== 'reset'
-                    ? ' and carry-over'
-                    : ''}
-                  , and seeds qualifiers into the next stage.
-                </p>
-              </div>
-            )}
           </div>
         </div>
 
@@ -657,13 +580,13 @@ export default function CompetitionLiveControlPage() {
       </div>
 
 
-      {/* Phase 6 / Option B — finalize round OR stage & advancement review modal */}
-      {(finalizeRoundId || finalizeStageId) && (
+      {/* Phase 6 — finalize round & advancement review modal */}
+      {finalizeRoundId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-lg rounded-xl border border-v-border bg-v-surface shadow-2xl">
             <div className="flex items-center justify-between border-b border-v-border px-5 py-3">
               <h3 className="text-sm font-semibold text-v-text">
-                Finalize {finalizePreview?.stageName ?? finalizePreview?.roundName ?? (finalizeKind === 'stage' ? 'stage' : 'round')}
+                Finalize {finalizePreview?.roundName ?? 'round'}
               </h3>
               <button
                 type="button"
@@ -682,16 +605,10 @@ export default function CompetitionLiveControlPage() {
                   <p className="mb-3 text-xs text-v-text-subtle">
                     Advancement: <span className="text-v-text">{finalizePreview.advancementType}</span>
                     {finalizePreview.advancementValue != null && ` (${finalizePreview.advancementValue})`}
-                    {' · '}
-                    {finalizeKind === 'stage' ? 'Carry' : 'Policy'}:{' '}
-                    <span className="text-v-text">
-                      {finalizeKind === 'stage' ? finalizePreview.carryPolicy : finalizePreview.scorePolicy}
-                    </span>
-                    {(() => {
-                      const nextName = finalizePreview.nextStageName ?? finalizePreview.nextRoundName
-                      const kind = finalizeKind === 'stage' ? 'stage' : 'round'
-                      return nextName ? ` · Next: ${nextName}` : ` · No next ${kind}`
-                    })()}
+                    {' · '}Policy: <span className="text-v-text">{finalizePreview.scorePolicy}</span>
+                    {finalizePreview.nextRoundName
+                      ? ` · Next: ${finalizePreview.nextRoundName}`
+                      : ' · No next round'}
                   </p>
                   <p className="mb-2 text-xs text-v-text-muted">
                     Check who advances ({finalizeChecked.size} selected). Auto-selected can be overridden.

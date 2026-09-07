@@ -20,6 +20,7 @@ export const EVENT_STAGES = {
     // added then assigned to rounds on their own pages; Judges are added + assigned.
     { key: 'workspace', label: 'Structure & Scoring', path: 'workspace' },
     { key: 'contestants', label: 'Contestants', path: 'contestants' },
+    { key: 'criteria', label: 'Criteria', path: 'criteria' },
     { key: 'judges', label: 'Judges', path: 'judges' },
     // Run
     { key: 'live', label: 'Live Control', path: 'live' },

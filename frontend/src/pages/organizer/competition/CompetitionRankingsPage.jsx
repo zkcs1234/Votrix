@@ -8,26 +8,6 @@ import { useSocketEvent } from '@/hooks/useSocketEvent'
 import { subscribeRoom } from '@/services/socket.service'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 
-// Option B — human labels for the active scoring method / tie-break, shown so the
-// ranking is self-explanatory.
-const METHOD_LABELS = {
-  average: 'Average',
-  weighted_average: 'Weighted average',
-  sum: 'Sum',
-  trimmed_average: 'Trimmed average',
-  rank_based: 'Rank-based',
-  percentile: 'Percentile-normalized',
-  highest_score: 'Highest score',
-  lowest_removal: 'Lowest-score removal',
-}
-const TIEBREAK_LABELS = {
-  highest_criterion: 'Higher best criterion',
-  highest_round: 'Higher chosen round',
-  countback: 'Countback (criteria head-to-head)',
-  judges_majority: 'Judges’ majority',
-  manual: 'Organizer decides',
-}
-
 export default function CompetitionRankingsPage() {
   const { eventId } = useParams()
   const [data, setData] = useState(null)
@@ -124,27 +104,6 @@ export default function CompetitionRankingsPage() {
         Judges submitted: {data?.judges?.submitted ?? 0} / {data?.judges?.total ?? 0}
       </p>
 
-      {(() => {
-        const cfg = data?.scoringConfig ?? foundation?.scoringConfig ?? {}
-        const method = METHOD_LABELS[cfg.calculationMethod] ?? cfg.calculationMethod ?? 'Weighted average'
-        const tie = cfg.tieBreaker ? TIEBREAK_LABELS[cfg.tieBreaker] ?? cfg.tieBreaker : 'Shared rank'
-        return (
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full border border-v-border bg-v-surface px-2.5 py-1 text-v-text-muted">
-              Method: <span className="text-v-text">{method}</span>
-            </span>
-            <span className="rounded-full border border-v-border bg-v-surface px-2.5 py-1 text-v-text-muted">
-              Tie-break: <span className="text-v-text">{tie}</span>
-            </span>
-            {cfg.judgeWeightingEnabled && (
-              <span className="rounded-full border border-v-border bg-v-surface px-2.5 py-1 text-v-text-muted">
-                Judges weighted
-              </span>
-            )}
-          </div>
-        )
-      })()}
-
       <div className="space-y-4">
         {(data?.rankings ?? []).map((r) => (
           <div
@@ -165,7 +124,44 @@ export default function CompetitionRankingsPage() {
                 {r.weightedScore.toFixed(2)}
                 <span className="ml-1 text-sm font-normal text-v-text-subtle">weighted</span>
               </p>
-              <ContestantBreakdown row={r} foundation={foundation} />
+              {(() => {
+                const breakdown = r.criteriaBreakdown ?? []
+                const scored = breakdown.filter((c) => (c.judgeCount ?? (c.average > 0 ? 1 : 0)) > 0)
+                const unscored = breakdown.length - scored.length
+                if (!scored.length) {
+                  return <p className="mt-2 text-xs text-v-text-subtle">No scores yet.</p>
+                }
+                return (
+                  <>
+                    <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
+                      {scored.map((c) => (
+                        <div
+                          key={c.criteriaId}
+                          className="rounded-lg border border-v-border/60 bg-v-surface-elevated px-2.5 py-1.5"
+                        >
+                          <p
+                            className="truncate text-[11px] leading-tight text-v-text-subtle"
+                            title={c.criteriaName}
+                          >
+                            {c.criteriaName}
+                          </p>
+                          <p className="mt-0.5 text-sm font-semibold text-v-text tabular-nums">
+                            {c.average}
+                            <span className="ml-1 text-[10px] font-normal text-v-text-subtle">
+                              · {c.percentage}%
+                            </span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {unscored > 0 && (
+                      <p className="mt-1.5 text-[11px] text-v-text-subtle">
+                        +{unscored} criteria not yet scored
+                      </p>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           </div>
         ))}
@@ -179,118 +175,6 @@ export default function CompetitionRankingsPage() {
   )
 }
 
-
-// Option B — per-contestant score breakdown. When the event has stages, show a
-// stage → round → criteria hierarchy; otherwise fall back to the flat criteria
-// grid (single-stage / simple events).
-function ContestantBreakdown({ row, foundation }) {
-  const critAvg = new Map((row.criteriaBreakdown ?? []).map((c) => [c.criteriaId, c]))
-  const roundVal = new Map((row.perRound ?? []).map((r) => [r.roundId, r]))
-  const catVal = new Map((row.perCategory ?? []).map((c) => [c.categoryId, c]))
-
-  const stages = (foundation?.categories ?? [])
-    .filter((c) => c.isStage)
-    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-  const rounds = foundation?.rounds ?? []
-  const criteriaById = new Map((foundation?.criteria ?? []).map((c) => [c.id, c]))
-
-  const critChip = (critId) => {
-    const c = critAvg.get(critId) ?? {}
-    const name = c.criteriaName ?? criteriaById.get(critId)?.name ?? 'Criterion'
-    const scored = (c.judgeCount ?? (c.average > 0 ? 1 : 0)) > 0
-    return (
-      <div
-        key={critId}
-        className="rounded-lg border border-v-border/60 bg-v-surface-elevated px-2.5 py-1.5"
-      >
-        <p className="truncate text-[11px] leading-tight text-v-text-subtle" title={name}>
-          {name}
-        </p>
-        <p className="mt-0.5 text-sm font-semibold text-v-text tabular-nums">
-          {scored ? c.average : '—'}
-          {c.percentage != null && (
-            <span className="ml-1 text-[10px] font-normal text-v-text-subtle">· {c.percentage}%</span>
-          )}
-        </p>
-      </div>
-    )
-  }
-
-  // Flat fallback (no stages).
-  if (!stages.length) {
-    const breakdown = row.criteriaBreakdown ?? []
-    const scored = breakdown.filter((c) => (c.judgeCount ?? (c.average > 0 ? 1 : 0)) > 0)
-    const unscored = breakdown.length - scored.length
-    if (!scored.length) return <p className="mt-2 text-xs text-v-text-subtle">No scores yet.</p>
-    return (
-      <>
-        <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
-          {scored.map((c) => critChip(c.criteriaId))}
-        </div>
-        {unscored > 0 && (
-          <p className="mt-1.5 text-[11px] text-v-text-subtle">+{unscored} criteria not yet scored</p>
-        )}
-      </>
-    )
-  }
-
-  return (
-    <div className="mt-3 space-y-3">
-      {stages.map((stage) => {
-        const stageRounds = rounds
-          .filter((r) => (r.categoryId ?? r.category_id) === stage.id)
-          .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-        const sv = catVal.get(stage.id)
-        return (
-          <div key={stage.id} className="rounded-xl border border-v-border/70 bg-v-surface-elevated/40 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wide text-v-text-muted">
-                {stage.name}
-                <span className="ml-1.5 text-[10px] font-normal normal-case text-v-text-subtle">
-                  {stage.weight}% of final
-                </span>
-              </p>
-              {sv && (
-                <span className="text-sm font-semibold tabular-nums text-v-text">
-                  {Number(sv.value).toFixed(2)}
-                </span>
-              )}
-            </div>
-            <div className="space-y-2">
-              {stageRounds.map((rnd) => {
-                const rv = roundVal.get(rnd.id)
-                const ids = rnd.criteriaIds ?? []
-                return (
-                  <div key={rnd.id}>
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-medium text-v-text-subtle">
-                        {rnd.name}
-                        <span className="ml-1 text-[10px] text-v-text-subtle">· {rnd.weight}%</span>
-                      </p>
-                      {rv && (
-                        <span className="text-xs tabular-nums text-v-text-muted">
-                          {Number(rv.value).toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-                    {ids.length > 0 && (
-                      <div className="mt-1 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
-                        {ids.map((cid) => critChip(cid))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-              {!stageRounds.length && (
-                <p className="text-[11px] text-v-text-subtle">No rounds in this stage.</p>
-              )}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 function ResultsAndAwards({ results }) {
   if (!results) return null

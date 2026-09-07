@@ -1,51 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 
 import { pageantService } from '@/services/pageant.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
-import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
+import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 
-// Option B — Structure & Scoring is now a single guided wizard:
-//   Format → Build Stages & Rounds → Define Criteria → Divisions → Scoring → Review
-//
-// A "stage" is a first-class competition phase (Prelims / Semis / Finals). In the
-// data model a stage is a competition_category with is_stage = true that owns
-// rounds (category_id) and carries a cut rule (advancement) + carry policy.
-// Single-stage events just use event-wide rounds (category_id = null) — the
-// engine handles both. Criteria are defined per round inside this flow.
-
-const STEPS = [
-  { key: 'format', label: 'Format' },
-  { key: 'stages', label: 'Build Stages & Rounds' },
-  { key: 'criteria', label: 'Define Criteria' },
-  { key: 'divisions', label: 'Divisions' },
-  { key: 'scoring', label: 'Scoring Rules' },
-  { key: 'review', label: 'Review & Lock' },
-]
-
-const pct100 = (total) => Math.abs(Number(total) - 100) < 0.1
-const pctShow = (total) => Math.round(Number(total) * 100) / 100
-
+// Phase 4 — Competition Scoring Foundation workspace.
+// Single page that exposes the dynamic structure of an event:
+// categories, rounds, criteria, contestants, judges, and scoring config.
 export default function CompetitionWorkspacePage() {
   const { eventId } = useParams()
   const [foundation, setFoundation] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [stepKey, setStepKey] = useState('stages')
+  const [activeTab, setActiveTab] = useState('rounds')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
-  const load = useCallback(() => {
-    return pageantService
+  const load = () => {
+    pageantService
       .getFoundation(eventId)
       .then(({ data }) => setFoundation(data.foundation))
       .finally(() => setLoading(false))
-  }, [eventId])
+  }
 
   useEffect(() => {
     load()
-  }, [load])
-
-  const stepIndex = STEPS.findIndex((s) => s.key === stepKey)
-  const goNext = () => setStepKey(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key)
-  const goPrev = () => setStepKey(STEPS[Math.max(stepIndex - 1, 0)].key)
+  }, [eventId])
 
   if (loading) {
     return (
@@ -57,688 +36,149 @@ export default function CompetitionWorkspacePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-v-text">
-          {foundation?.event?.title ?? 'Structure & Scoring'}
-        </h2>
-        <p className="mt-1 text-sm text-v-text-subtle">
-          Set up how this competition is run and scored. Walk the steps in order — each builds on
-          the last. You can come back and change anything until you lock it.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-v-text">
+            {foundation?.event?.title ?? 'Structure & Scoring'}
+          </h2>
+          <p className="mt-1 text-sm text-v-text-subtle">
+            Define the <strong>rounds</strong> (the weighted, judged segments), plus divisions and
+            scoring rules. Contestants and criteria are assigned to rounds on their own pages.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <SubNav to={`/organizer/competition/events/${eventId}/contestants`}>
+            Contestants
+          </SubNav>
+          <SubNav to={`/organizer/competition/events/${eventId}/criteria`}>
+            Criteria
+          </SubNav>
+          <SubNav to={`/organizer/competition/events/${eventId}/judges`}>Judges</SubNav>
+          <SubNav to={`/organizer/competition/events/${eventId}/rankings`}>
+            Rankings
+          </SubNav>
+        </div>
       </div>
 
-      <WizardSteps steps={STEPS} current={stepKey} onSelect={setStepKey} />
-
-      <div className="pt-2">
-        {stepKey === 'format' && <FormatStep foundation={foundation} onNext={goNext} />}
-        {stepKey === 'stages' && (
-          <StagesRoundsStep foundation={foundation} reload={load} onNext={goNext} onPrev={goPrev} />
-        )}
-        {stepKey === 'criteria' && (
-          <CriteriaStep foundation={foundation} reload={load} onNext={goNext} onPrev={goPrev} />
-        )}
-        {stepKey === 'divisions' && (
-          <DivisionsStep foundation={foundation} reload={load} onNext={goNext} onPrev={goPrev} />
-        )}
-        {stepKey === 'scoring' && (
-          <ScoringStep foundation={foundation} reload={load} onNext={goNext} onPrev={goPrev} />
-        )}
-        {stepKey === 'review' && (
-          <ReviewStep foundation={foundation} onPrev={goPrev} />
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Shared UI
-// ---------------------------------------------------------------------------
-function WizardSteps({ steps, current, onSelect }) {
-  const currentIndex = steps.findIndex((s) => s.key === current)
-  return (
-    <ol className="flex w-full items-center gap-1 overflow-x-auto border-b border-v-border pb-3 text-sm">
-      {steps.map((s, i) => {
-        const done = i < currentIndex
-        const active = s.key === current
-        return (
-          <li key={s.key} className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => onSelect(s.key)}
-              className="flex items-center gap-2 rounded-lg px-2 py-1"
-            >
-              <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold ${
-                  active
-                    ? 'border-v-primary bg-v-primary text-white'
-                    : done
-                      ? 'border-emerald-500 bg-emerald-500 text-white'
-                      : 'border-v-border-strong text-v-text-subtle'
+      <div className="flex items-center justify-between gap-2 border-b border-v-border text-sm">
+        <div className="flex gap-2">
+          {(() => {
+            const hasCategories = (foundation?.categories ?? []).length > 0
+            // Rounds lead. Categories is an advanced layer (group rounds into
+            // weighted buckets) — only shown when revealed or already in use.
+            const tabs = [
+              { id: 'rounds', label: 'Rounds' },
+              { id: 'divisions', label: 'Divisions' },
+              { id: 'scoring', label: 'Scoring config' },
+              ...(showAdvanced || hasCategories ? [{ id: 'structure', label: 'Categories' }] : []),
+            ]
+            return tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`-mb-px border-b-2 px-3 py-2 ${
+                  activeTab === tab.id
+                    ? 'border-v-primary text-v-text'
+                    : 'border-transparent text-v-text-subtle hover:text-v-text-muted'
                 }`}
               >
-                {done ? '✓' : i + 1}
-              </span>
-              <span className={active ? 'font-medium text-v-text' : 'text-v-text-subtle'}>
-                {s.label}
-              </span>
-            </button>
-            {i < steps.length - 1 && <span className="mx-1 h-px w-4 bg-v-border" aria-hidden />}
-          </li>
-        )
-      })}
-    </ol>
-  )
-}
-
-function FooterNav({ onPrev, onNext, nextLabel = 'Next →', prevLabel = '‹ Back', nextDisabled }) {
-  return (
-    <div className="mt-6 flex justify-between">
-      {onPrev ? (
-        <button
-          type="button"
-          onClick={onPrev}
-          className="rounded-lg border border-v-border px-4 py-2 text-sm text-v-text-muted hover:bg-v-surface-elevated"
-        >
-          {prevLabel}
-        </button>
-      ) : (
-        <span />
-      )}
-      {onNext && (
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={nextDisabled}
-          className="rounded-lg bg-v-primary px-4 py-2 text-sm font-medium text-white hover:bg-v-primary-hover disabled:opacity-50"
-        >
-          {nextLabel}
-        </button>
-      )}
-    </div>
-  )
-}
-
-function WeightNote({ total, label = 'These' }) {
-  const ok = pct100(total)
-  return (
-    <p className={`mt-2 text-sm ${ok ? 'text-v-success' : 'text-amber-400'}`}>
-      {label} currently add up to {pctShow(total)}%. {ok ? "✓ That's correct." : 'They need to total 100%.'}
-    </p>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Step 1 — Format (guidance; non-destructive)
-// ---------------------------------------------------------------------------
-const FORMATS = [
-  {
-    key: 'simple',
-    title: 'Simple Scoring',
-    flow: 'One stage, one round — no elimination',
-    desc: 'Everyone is scored once and the highest total wins. Good for small or quick events.',
-  },
-  {
-    key: 'rounds',
-    title: 'Multiple Rounds',
-    flow: 'Several rounds, all counting toward one total',
-    desc: 'Contestants go through several rounds (e.g. Costume, Talent, Q&A); every round counts. Nobody is cut.',
-  },
-  {
-    key: 'elim',
-    title: 'Elimination Stages',
-    flow: 'Prelims → cut → Semis → cut → Finals',
-    desc: 'The big-stage pageant format. Contestants are narrowed stage by stage until a final round decides placements. Turn on multiple stages in the next step.',
-  },
-  {
-    key: 'rubric',
-    title: 'Judged Performance',
-    flow: 'Every contestant scored against the same checklist',
-    desc: 'For dance, singing, and similar. Each contestant is scored against a fixed set of criteria.',
-  },
-]
-
-function FormatStep({ foundation, onNext }) {
-  const stages = (foundation?.categories ?? []).filter((c) => c.isStage)
-  const rounds = foundation?.rounds ?? []
-  const [selected, setSelected] = useState(
-    stages.length ? 'elim' : rounds.length > 1 ? 'rounds' : 'rounds',
-  )
-
-  return (
-    <div>
-      <p className="mb-1 text-sm font-medium text-v-text">Which of these sounds most like your event?</p>
-      <p className={`${HELPER_TEXT} mb-4`}>
-        This is guidance only — it doesn&apos;t change anything yet. Build the exact structure in the
-        next step. Choose &ldquo;Elimination Stages&rdquo; if contestants are cut between phases.
-      </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {FORMATS.map((f) => {
-          const on = selected === f.key
-          return (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setSelected(f.key)}
-              className={`rounded-xl border p-4 text-left transition ${
-                on ? 'border-v-primary bg-v-primary/5' : 'border-v-border hover:bg-v-surface-elevated'
-              }`}
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-v-primary">
-                {f.flow}
-              </p>
-              <p className="mt-1 font-semibold text-v-text">{f.title}</p>
-              <p className="mt-1 text-sm text-v-text-subtle">{f.desc}</p>
-            </button>
-          )
-        })}
+                {tab.label}
+              </button>
+            ))
+          })()}
+        </div>
+        {!showAdvanced && (foundation?.categories ?? []).length === 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setShowAdvanced(true)
+              setActiveTab('structure')
+            }}
+            className="text-xs text-v-text-subtle hover:text-v-text-muted"
+            title="Categories group rounds into higher-level weighted buckets. Most competitions don't need this."
+          >
+            + Advanced (Categories)
+          </button>
+        )}
       </div>
-      <FooterNav onNext={onNext} nextLabel="Next: Build Stages & Rounds →" />
+
+      <TypeHint type={foundation?.event?.competition_type} />
+      <SetupReadiness foundation={foundation} />
+
+      {activeTab === 'structure' && <StructureTab foundation={foundation} reload={load} />}
+      {activeTab === 'divisions' && <DivisionsTab foundation={foundation} reload={load} />}
+      {activeTab === 'rounds' && <RoundsTab foundation={foundation} reload={load} />}
+      {activeTab === 'scoring' && <ScoringTab foundation={foundation} reload={load} />}
     </div>
   )
 }
 
+function SubNav({ to, children }) {
+  return (
+    <Link
+      to={to}
+      className="rounded-lg border border-v-border px-3 py-1.5 text-v-text-muted hover:bg-v-surface-elevated"
+    >
+      {children}
+    </Link>
+  )
+}
+
 // ---------------------------------------------------------------------------
-// Step 2 — Build Stages & Rounds
+// Tabs
 // ---------------------------------------------------------------------------
-function StagesRoundsStep({ foundation, reload, onNext, onPrev }) {
+function StructureTab({ foundation, reload }) {
   const { eventId } = useParams()
-  const stages = useMemo(
-    () =>
-      (foundation?.categories ?? [])
-        .filter((c) => c.isStage)
-        .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)),
+  const divisionsEnabled = foundation?.event?.divisions_enabled
+  const divisions = foundation?.divisions ?? []
+
+  const [name, setName] = useState('')
+  const [weight, setWeight] = useState(0)
+  const [divisionId, setDivisionId] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const totalWeight = useMemo(
+    () => (foundation?.categories ?? []).reduce((s, c) => s + Number(c.weight), 0),
     [foundation],
   )
-  const rounds = foundation?.rounds ?? []
-  const eventWideRounds = rounds.filter((r) => !r.categoryId)
-  const multiStage = stages.length > 0
 
-  const [busy, setBusy] = useState(false)
-  const [newStageName, setNewStageName] = useState('')
-  const [newStageWeight, setNewStageWeight] = useState('')
-
-  const setMode = async (yes) => {
-    if (yes === multiStage) return
-    if (!yes && stages.length) {
-      alert('Remove the stages below first to switch back to a single-stage event.')
-      return
-    }
-    if (yes) {
-      // Create the first stage; move any existing event-wide rounds into it so no
-      // structure is lost.
-      setBusy(true)
-      try {
-        const { data } = await pageantService.createCategory(eventId, {
-          name: 'Preliminaries',
-          weight: 100,
-          isStage: true,
-          advancementType: 'none',
-          carryPolicy: 'reset',
-          displayOrder: 0,
-        })
-        const stageId = data?.category?.id ?? data?.id
-        for (const r of eventWideRounds) {
-          await pageantService.updateRound(eventId, r.id, { ...roundPayload(r), categoryId: stageId })
-        }
-        await reload()
-      } finally {
-        setBusy(false)
-      }
-    }
-  }
-
-  const addStage = async () => {
-    if (!newStageName.trim()) return
-    setBusy(true)
-    try {
-      await pageantService.createCategory(eventId, {
-        name: newStageName.trim(),
-        weight: Number(newStageWeight || 0),
-        isStage: true,
-        advancementType: 'none',
-        carryPolicy: 'reset',
-        displayOrder: stages.length,
-      })
-      setNewStageName('')
-      setNewStageWeight('')
-      await reload()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const stageWeightTotal = stages.reduce((s, st) => s + Number(st.weight ?? 0), 0)
-  const eventRoundTotal = eventWideRounds.reduce((s, r) => s + Number(r.weight ?? 0), 0)
-
-  const canContinue = multiStage
-    ? stages.length > 0 && pct100(stageWeightTotal)
-    : eventWideRounds.length > 0 && pct100(eventRoundTotal)
-
-  return (
-    <div>
-      <div className="rounded-lg border border-v-border bg-v-surface p-4">
-        <label className={LABEL_CLASS}>Will this competition have multiple stages?</label>
-        <p className={HELPER_TEXT}>
-          Choose Yes if contestants move through separate phases such as Preliminaries → Semifinals →
-          Finals, with cuts between them.
-        </p>
-        <select
-          className={`${INPUT_CLASS} mt-2 sm:w-72`}
-          value={multiStage ? 'yes' : 'no'}
-          onChange={(e) => setMode(e.target.value === 'yes')}
-          disabled={busy}
-        >
-          <option value="no">No — one stage</option>
-          <option value="yes">Yes — multiple stages</option>
-        </select>
-      </div>
-
-      {!multiStage && (
-        <div className="mt-6">
-          <RoundsEditor
-            eventId={eventId}
-            stageId={null}
-            rounds={eventWideRounds}
-            reload={reload}
-            title="Rounds"
-            hint="Add the rounds contestants are judged on. Each round's weight counts toward the final score."
-          />
-          <WeightNote total={eventRoundTotal} label="Round weights" />
-        </div>
-      )}
-
-      {multiStage && (
-        <div className="mt-6 space-y-4">
-          {stages.map((stage, idx) => (
-            <StageCard key={stage.id} eventId={eventId} stage={stage} index={idx} rounds={rounds} reload={reload} />
-          ))}
-
-          <div className="rounded-xl border border-dashed border-v-border p-4">
-            <p className="mb-2 text-sm font-medium text-v-text">Add a stage</p>
-            <div className="grid gap-3 sm:grid-cols-[1fr_140px_auto]">
-              <input
-                className={INPUT_CLASS}
-                placeholder="e.g. Finals"
-                value={newStageName}
-                onChange={(e) => setNewStageName(e.target.value)}
-              />
-              <input
-                type="number"
-                className={INPUT_CLASS}
-                placeholder="Weight %"
-                min={0}
-                max={100}
-                value={newStageWeight}
-                onChange={(e) => setNewStageWeight(e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={addStage}
-                disabled={busy || !newStageName.trim()}
-                className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-50"
-              >
-                + Add stage
-              </button>
-            </div>
-          </div>
-
-          <WeightNote total={stageWeightTotal} label="Stage weights" />
-        </div>
-      )}
-
-      <FooterNav
-        onPrev={onPrev}
-        onNext={onNext}
-        nextLabel="Next: Define Criteria →"
-        nextDisabled={!canContinue}
-      />
-    </div>
-  )
-}
-
-// Full round payload for updates (the update validator resets unspecified fields).
-function roundPayload(r) {
-  return {
-    name: r.name,
-    description: r.description ?? null,
-    weight: r.weight,
-    displayOrder: r.displayOrder,
-    categoryId: r.categoryId ?? null,
-    divisionId: r.divisionId ?? null,
-    isOpen: r.isOpen,
-  }
-}
-
-function StageCard({ eventId, stage, index, rounds, reload }) {
-  const stageRounds = rounds.filter((r) => r.categoryId === stage.id)
-  const [name, setName] = useState(stage.name)
-  const [weight, setWeight] = useState(stage.weight)
-  const [cut, setCut] = useState(stage.advancementType ?? 'none')
-  const [cutValue, setCutValue] = useState(stage.advancementValue ?? '')
-  const [carry, setCarry] = useState(stage.carryPolicy ?? 'reset')
-  const [saving, setSaving] = useState(false)
-  const needsValue = cut === 'top_n' || cut === 'top_percent' || cut === 'threshold'
-
-  const saveStage = async () => {
+  const submit = async (e) => {
+    e.preventDefault()
     setSaving(true)
     try {
-      await pageantService.updateCategory(eventId, stage.id, {
-        name,
+      await pageantService.createCategory(eventId, { 
+        name, 
         weight: Number(weight),
-        isStage: true,
-        advancementType: cut,
-        advancementValue: needsValue && cutValue !== '' ? Number(cutValue) : null,
-        carryPolicy: carry,
+        divisionId: divisionId || null 
       })
-      await reload()
+      setName('')
+      setWeight(0)
+      setDivisionId('')
+      reload()
     } finally {
       setSaving(false)
     }
   }
 
-  const removeStage = async () => {
-    if (!confirm(`Remove the "${stage.name}" stage? Its rounds will be deleted.`)) return
-    await pageantService.deleteCategory(eventId, stage.id)
-    reload()
-  }
-
-  const roundTotal = stageRounds.reduce((s, r) => s + Number(r.weight ?? 0), 0)
-
   return (
-    <div className="rounded-xl border border-v-border bg-v-surface">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-v-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-v-primary text-xs font-semibold text-white">
-            {index + 1}
-          </span>
-          <span className="font-semibold text-v-text">{stage.name}</span>
-          <span className="text-xs text-v-text-subtle">{stage.weight}% of final</span>
-        </div>
-        <button type="button" onClick={removeStage} className="text-sm text-v-danger">
-          Remove stage
-        </button>
+    <div className="space-y-6">
+      <div className="rounded-lg border border-v-border bg-v-surface-elevated/50 px-4 py-2.5 text-xs text-v-text-muted">
+        <strong>Advanced.</strong> Categories group rounds into higher-level weighted buckets (e.g. a
+        “Talent” category holding a prelim and a final round). Most competitions don&apos;t need this —
+        rounds already carry their own weight. Assign a round to a category in the Rounds tab.
       </div>
-
-      <div className="space-y-4 px-4 py-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className={LABEL_CLASS}>Stage name</label>
-            <input className={INPUT_CLASS} value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div>
-            <label className={LABEL_CLASS}>Stage weight %</label>
-            <input
-              type="number"
-              className={INPUT_CLASS}
-              min={0}
-              max={100}
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <label className={LABEL_CLASS}>Who advances after this stage?</label>
-            <select className={INPUT_CLASS} value={cut} onChange={(e) => setCut(e.target.value)}>
-              <option value="none">Everyone — no cut</option>
-              <option value="top_n">Top N advance</option>
-              <option value="top_percent">Top % advance</option>
-              <option value="threshold">Score threshold</option>
-              <option value="manual">Manual pick</option>
-            </select>
-          </div>
-          <div>
-            <label className={LABEL_CLASS}>
-              {cut === 'top_n' ? 'N' : cut === 'top_percent' ? 'Percent' : cut === 'threshold' ? 'Min score' : 'Value'}
-            </label>
-            <input
-              type="number"
-              className={INPUT_CLASS}
-              value={cutValue}
-              disabled={!needsValue}
-              onChange={(e) => setCutValue(e.target.value)}
-              placeholder={needsValue ? '' : '—'}
-            />
-          </div>
-          <div>
-            <label className={LABEL_CLASS}>Do scores carry over?</label>
-            <select className={INPUT_CLASS} value={carry} onChange={(e) => setCarry(e.target.value)}>
-              <option value="reset">Reset — start next stage at zero</option>
-              <option value="carry_50">Carry 50% forward</option>
-              <option value="carry_full">Carry full score forward</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={saveStage}
-            disabled={saving}
-            className="rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save stage settings'}
-          </button>
-        </div>
-
-        <div className="border-t border-v-border pt-4">
-          <RoundsEditor
-            eventId={eventId}
-            stageId={stage.id}
-            rounds={stageRounds}
-            reload={reload}
-            title={`Rounds in ${stage.name}`}
-            hint="Each round is a judged segment. Round weights within a stage total 100%."
-          />
-          <WeightNote total={roundTotal} label="Round weights in this stage" />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Rounds editor reused for event-wide (single stage) and per-stage lists.
-function RoundsEditor({ eventId, stageId, rounds, reload, title, hint }) {
-  const [name, setName] = useState('')
-  const [weight, setWeight] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  const add = async () => {
-    if (!name.trim()) return
-    setBusy(true)
-    try {
-      await pageantService.createRound(eventId, {
-        name: name.trim(),
-        weight: Number(weight || 0),
-        categoryId: stageId,
-        displayOrder: rounds.length,
-      })
-      setName('')
-      setWeight('')
-      await reload()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const remove = async (r) => {
-    if (!confirm(`Delete round "${r.name}"?`)) return
-    await pageantService.deleteRound(eventId, r.id)
-    reload()
-  }
-
-  return (
-    <div>
-      <p className="text-sm font-medium text-v-text">{title}</p>
-      {hint && <p className={HELPER_TEXT}>{hint}</p>}
-      <ul className="mt-3 space-y-2">
-        {rounds.map((r) => (
-          <li
-            key={r.id}
-            className="flex items-center justify-between rounded-lg border border-v-border bg-v-surface px-3 py-2"
-          >
-            <span className="text-sm text-v-text">
-              {r.name} <span className="text-xs text-v-text-subtle">· {r.weight}%</span>
-              <span className="ml-2 text-xs text-v-text-subtle">
-                {(r.criteriaIds?.length ?? 0)} criteria
-              </span>
-            </span>
-            <button type="button" onClick={() => remove(r)} className="text-xs text-v-danger">
-              Delete
-            </button>
-          </li>
-        ))}
-        {rounds.length === 0 && (
-          <li className="rounded-lg border border-dashed border-v-border px-3 py-4 text-center text-sm text-v-text-subtle">
-            No rounds yet.
-          </li>
-        )}
-      </ul>
-      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_120px_auto]">
-        <input
-          className={INPUT_CLASS}
-          placeholder="Round name (e.g. Talent)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <input
-          type="number"
-          className={INPUT_CLASS}
-          placeholder="Weight %"
-          min={0}
-          max={100}
-          value={weight}
-          onChange={(e) => setWeight(e.target.value)}
-        />
-        <button
-          type="button"
-          onClick={add}
-          disabled={busy || !name.trim()}
-          className="rounded-lg border border-dashed border-v-border px-3 py-2 text-sm font-medium text-v-primary disabled:opacity-50"
-        >
-          + Add round
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Step 3 — Define Criteria (per round, minor criteria total 100%)
-// ---------------------------------------------------------------------------
-function resolveScaleBounds(cfg = {}) {
-  switch (cfg.scoreType) {
-    case 'range_1_10':
-      return { min: 1, max: 10 }
-    case 'decimal':
-      return { min: 0, max: 10 }
-    case 'custom_range': {
-      const min = Number(cfg.customMin ?? 0)
-      const max = Number(cfg.customMax ?? 100)
-      if (Number.isNaN(min) || Number.isNaN(max) || max < min) return { min: 0, max: 100 }
-      return { min, max }
-    }
-    default:
-      return { min: 1, max: 100 }
-  }
-}
-
-function CriteriaStep({ foundation, reload, onNext, onPrev }) {
-  const { eventId } = useParams()
-  const rounds = foundation?.rounds ?? []
-  const criteria = foundation?.criteria ?? []
-  const bounds = resolveScaleBounds(foundation?.event?.scoring_config)
-
-  const [selectedRoundId, setSelectedRoundId] = useState(rounds[0]?.id ?? null)
-  const [name, setName] = useState('')
-  const [percentage, setPercentage] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? rounds[0] ?? null
-  const roundCritIds = new Set(selectedRound?.criteriaIds ?? [])
-  const roundCriteria = criteria.filter((c) => roundCritIds.has(c.id))
-  const total = roundCriteria.reduce((s, c) => s + Number(c.percentage ?? 0), 0)
-
-  const add = async (e) => {
-    e.preventDefault()
-    if (!name.trim() || !(Number(percentage) > 0) || !selectedRound) return
-    setBusy(true)
-    try {
-      const { data } = await pageantService.createCriteria(eventId, {
-        name: name.trim(),
-        percentage: Number(percentage),
-        minScore: bounds.min,
-        maxScore: bounds.max,
-      })
-      const created = data?.criteria ?? data
-      if (created?.id) await pageantService.addRoundCriteria(eventId, selectedRound.id, created.id)
-      setName('')
-      setPercentage('')
-      await reload()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const removeFromRound = async (c) => {
-    await pageantService.removeRoundCriteria(eventId, selectedRound.id, c.id)
-    await pageantService.deleteCriteria(eventId, c.id).catch(() => {})
-    reload()
-  }
-
-  if (!rounds.length) {
-    return (
-      <div>
-        <div className="rounded-lg border border-dashed border-v-border px-4 py-8 text-center text-sm text-v-text-subtle">
-          Add at least one round in the previous step before defining criteria.
-        </div>
-        <FooterNav onPrev={onPrev} onNext={onNext} nextLabel="Next: Divisions →" />
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <p className={`${HELPER_TEXT} mb-3`}>
-        For each round, list exactly what judges score and how much each part is worth. Each round&apos;s
-        criteria must total 100%. Score scale is {bounds.min}–{bounds.max} (set in Scoring Rules).
-      </p>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        {rounds.map((r) => {
-          const ids = r.criteriaIds ?? []
-          const t = criteria.filter((c) => ids.includes(c.id)).reduce((s, c) => s + Number(c.percentage ?? 0), 0)
-          const ok = ids.length > 0 && pct100(t)
-          const active = r.id === selectedRound?.id
-          return (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => setSelectedRoundId(r.id)}
-              className={`rounded-lg border px-3 py-1.5 text-sm ${
-                active ? 'border-v-primary bg-v-primary/10 text-v-text' : 'border-v-border text-v-text-muted'
-              }`}
-            >
-              {r.name}
-              <span className={`ml-1.5 text-[10px] ${ok ? 'text-v-success' : 'text-amber-400'}`}>
-                {ids.length ? `${pctShow(t)}%` : '—'}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      <form onSubmit={add} className="grid gap-3 rounded-xl border border-v-border bg-v-surface p-4 sm:grid-cols-[1fr_140px_auto]">
+      <form
+        onSubmit={submit}
+        className={`grid gap-4 v-card p-6 ${divisionsEnabled ? 'sm:grid-cols-[1fr_120px_1fr_auto]' : 'sm:grid-cols-[1fr_120px_auto]'}`}
+      >
         <div>
-          <label className={LABEL_CLASS}>New criterion for &ldquo;{selectedRound?.name}&rdquo;</label>
+          <label className={LABEL_CLASS}>Category name</label>
           <input
             className={INPUT_CLASS}
-            placeholder="e.g. Technique, Stage Presence"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Talent, Evening Gown"
             required
           />
         </div>
@@ -746,201 +186,621 @@ function CriteriaStep({ foundation, reload, onNext, onPrev }) {
           <label className={LABEL_CLASS}>Weight %</label>
           <input
             type="number"
+            step="0.01"
             className={INPUT_CLASS}
+            value={weight}
+            onChange={(e) => setWeight(e.target.value)}
             min={0}
             max={100}
-            step="0.01"
-            value={percentage}
-            onChange={(e) => setPercentage(e.target.value)}
           />
         </div>
+        {divisionsEnabled && (
+          <div>
+            <label className={LABEL_CLASS}>Division (optional)</label>
+            <select
+              className={INPUT_CLASS}
+              value={divisionId}
+              onChange={(e) => setDivisionId(e.target.value)}
+            >
+              <option value="">— Event-wide —</option>
+              {divisions.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex items-end">
           <button
             type="submit"
-            disabled={busy}
-            className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-50"
+            disabled={saving}
+            className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-60"
           >
-            + Add
+            Add category
           </button>
         </div>
       </form>
 
-      <ul className="mt-4 space-y-2">
-        {roundCriteria.map((c) => (
-          <li
-            key={c.id}
-            className="flex items-center justify-between rounded-lg border border-v-border bg-v-surface px-3 py-2"
-          >
-            <span className="text-sm text-v-text">
-              {c.name} <span className="text-xs text-v-text-subtle">· {Number(c.percentage).toFixed(2)}%</span>
-            </span>
-            <button type="button" onClick={() => removeFromRound(c)} className="text-xs text-v-danger">
-              Remove
-            </button>
-          </li>
+      <p
+        className={`text-sm ${
+          Math.abs(totalWeight - 100) < 0.01 ? 'text-v-success' : 'text-amber-400'
+        }`}
+      >
+        Category weight total: {totalWeight.toFixed(2)}% (must equal 100%)
+      </p>
+
+      <ul className="space-y-2">
+        {(foundation?.categories ?? []).map((cat) => (
+          <CategoryRow key={cat.id} cat={cat} eventId={eventId} reload={reload} divisionsEnabled={divisionsEnabled} divisions={divisions} />
         ))}
-        {!roundCriteria.length && (
-          <li className="rounded-lg border border-dashed border-v-border px-3 py-4 text-center text-sm text-v-text-subtle">
-            No criteria in this round yet.
+        {!foundation?.categories?.length && (
+          <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
+            No categories yet. Categories are optional — add them to group criteria and rounds.
           </li>
         )}
       </ul>
-      <WeightNote total={total} label={`${selectedRound?.name ?? 'Round'} criteria`} />
-
-      <FooterNav onPrev={onPrev} onNext={onNext} nextLabel="Next: Divisions →" />
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Step 4 — Divisions
-// ---------------------------------------------------------------------------
-function DivisionsStep({ foundation, reload, onNext, onPrev }) {
+function CategoryRow({ cat, eventId, reload, divisionsEnabled, divisions }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState({
+    name: cat.name,
+    weight: cat.weight,
+    divisionId: cat.divisionId || '',
+    isActive: cat.isActive,
+  })
+
+  const save = async () => {
+    await pageantService.updateCategory(eventId, cat.id, {
+      name: draft.name,
+      weight: Number(draft.weight),
+      divisionId: draft.divisionId || null,
+      isActive: draft.isActive,
+    })
+    setEditing(false)
+    reload()
+  }
+
+  const remove = async () => {
+    if (!confirm('Delete this category?')) return
+    await pageantService.deleteCategory(eventId, cat.id)
+    reload()
+  }
+
+  const divisionName = cat.divisionId ? divisions.find(d => d.id === cat.divisionId)?.name : null
+
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-v-border px-4 py-3">
+      {editing ? (
+        <div className="flex w-full flex-wrap items-end gap-2">
+          <input
+            className={INPUT_CLASS}
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
+          <input
+            type="number"
+            step="0.01"
+            className={INPUT_CLASS}
+            value={draft.weight}
+            onChange={(e) => setDraft({ ...draft, weight: e.target.value })}
+          />
+          {divisionsEnabled && (
+            <select
+              className={INPUT_CLASS}
+              value={draft.divisionId}
+              onChange={(e) => setDraft({ ...draft, divisionId: e.target.value })}
+            >
+              <option value="">— Event-wide —</option>
+              {divisions.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          )}
+          <label className="flex items-center gap-1 text-xs text-v-text-muted">
+            <input
+              type="checkbox"
+              checked={draft.isActive}
+              onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
+            />
+            Active
+          </label>
+          <div className="ml-auto flex gap-2">
+            <button type="button" onClick={save} className="text-v-success text-sm">
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="text-v-text-subtle text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-3">
+            <div>
+              <p className="font-medium text-v-text">{cat.name}</p>
+              <p className="text-xs text-v-text-subtle">
+                {cat.weight}% · {cat.isActive ? 'Active' : 'Inactive'}
+              </p>
+            </div>
+            {divisionsEnabled && divisionName && (
+              <span className="rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium text-v-primary uppercase tracking-wide">
+                {divisionName}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2 text-sm">
+            <button type="button" onClick={() => setEditing(true)} className="text-v-text-muted">
+              Edit
+            </button>
+            <button type="button" onClick={remove} className="text-v-danger">
+              Delete
+            </button>
+          </div>
+        </>
+      )}
+    </li>
+  )
+}
+
+function RoundsTab({ foundation, reload }) {
   const { eventId } = useParams()
-  const enabled = foundation?.event?.divisions_enabled ?? false
+  const divisionsEnabled = foundation?.event?.divisions_enabled
   const divisions = foundation?.divisions ?? []
+
   const [name, setName] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [weight, setWeight] = useState(0)
+  const [categoryId, setCategoryId] = useState('')
+  const [divisionId, setDivisionId] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [expandedRoundId, setExpandedRoundId] = useState(null)
 
-  const toggle = async () => {
-    setBusy(true)
-    try {
-      await pageantService.setDivisionsEnabled(eventId, !enabled)
-      await reload()
-    } finally {
-      setBusy(false)
-    }
-  }
+  const totalWeight = useMemo(
+    () => (foundation?.rounds ?? []).reduce((s, r) => s + Number(r.weight), 0),
+    [foundation],
+  )
 
-  const add = async (e) => {
+  const submit = async (e) => {
     e.preventDefault()
-    if (!name.trim()) return
-    setBusy(true)
+    setSaving(true)
     try {
-      await pageantService.createDivision(eventId, { name: name.trim() })
+      await pageantService.createRound(eventId, {
+        name,
+        weight: Number(weight),
+        categoryId: categoryId || null,
+        divisionId: divisionId || null,
+      })
       setName('')
-      await reload()
+      setWeight(0)
+      setCategoryId('')
+      setDivisionId('')
+      reload()
     } finally {
-      setBusy(false)
+      setSaving(false)
     }
   }
 
-  const remove = async (d) => {
-    if (!confirm(`Delete division "${d.name}"?`)) return
+  const toggleOpen = async (round) => {
+    await pageantService.updateRound(eventId, round.id, { isOpen: !round.isOpen })
+    reload()
+  }
+
+  return (
+    <div className="space-y-6">
+      <form
+        onSubmit={submit}
+        className={`grid gap-4 v-card p-6 ${divisionsEnabled ? 'sm:grid-cols-[1fr_120px_1fr_1fr_auto]' : 'sm:grid-cols-[1fr_120px_1fr_auto]'}`}
+      >
+        <div>
+          <label className={LABEL_CLASS}>Round name</label>
+          <input
+            className={INPUT_CLASS}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Preliminary, Final"
+            required
+          />
+        </div>
+        <div>
+          <label className={LABEL_CLASS}>Weight %</label>
+          <input
+            type="number"
+            step="0.01"
+            className={INPUT_CLASS}
+            value={weight}
+            onChange={(e) => setWeight(e.target.value)}
+            min={0}
+            max={100}
+          />
+        </div>
+        <div>
+          <label className={LABEL_CLASS}>Category (optional)</label>
+          <select
+            className={INPUT_CLASS}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+          >
+            <option value="">— Event-wide —</option>
+            {(foundation?.categories ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {divisionsEnabled && (
+          <div>
+            <label className={LABEL_CLASS}>Division (optional)</label>
+            <select
+              className={INPUT_CLASS}
+              value={divisionId}
+              onChange={(e) => setDivisionId(e.target.value)}
+            >
+              <option value="">— Event-wide —</option>
+              {divisions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="flex items-end">
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-60"
+          >
+            Add round
+          </button>
+        </div>
+      </form>
+
+      <p
+        className={`text-sm ${
+          Math.abs(totalWeight - 100) < 0.01 ? 'text-v-success' : 'text-amber-400'
+        }`}
+      >
+        Round weight total: {totalWeight.toFixed(2)}% (must equal 100%)
+      </p>
+
+      <ul className="space-y-3">
+        {(foundation?.rounds ?? []).map((round) => {
+          const divisionName = round.division_id ? divisions.find(d => d.id === round.division_id)?.name : null
+
+          return (
+            <li
+              key={round.id}
+              className="rounded-xl border border-v-border bg-v-surface"
+            >
+              {/* Round header row */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <div>
+                    <p className="font-medium text-v-text">{round.name}</p>
+                    <p className="text-xs text-v-text-subtle mt-0.5">
+                      {round.weight}% · {round.contestantIds?.length ?? 0} contestants ·{' '}
+                      {round.criteriaIds?.length ?? 0} criteria ·{' '}
+                      {round.categoryId
+                        ? foundation?.categories?.find((c) => c.id === round.categoryId)?.name ?? 'Category'
+                        : 'Event-wide'}
+                    </p>
+                  </div>
+                  {divisionsEnabled && divisionName && (
+                    <span className="rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium text-v-primary uppercase tracking-wide">
+                      {divisionName}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2 text-sm">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedRoundId(expandedRoundId === round.id ? null : round.id)}
+                    className="rounded-lg border border-v-border px-3 py-1 text-xs text-v-text-muted hover:bg-v-surface-elevated"
+                  >
+                    {expandedRoundId === round.id ? 'Hide assignments' : 'Assign contestants & criteria'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleOpen(round)}
+                    className={round.isOpen ? 'text-v-success' : 'text-v-text-muted'}
+                  >
+                    {round.isOpen ? 'Open' : 'Closed'}
+                  </button>
+                  <button
+                    type="button"
+                    className="text-v-danger"
+                    onClick={async () => {
+                      if (confirm('Delete this round?')) {
+                        await pageantService.deleteRound(eventId, round.id)
+                        reload()
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              {/* Expanded assignment panel */}
+            {expandedRoundId === round.id && (
+              <RoundAssignmentPanel
+                eventId={eventId}
+                round={round}
+                allContestants={foundation?.contestants ?? []}
+                allCriteria={foundation?.criteria ?? []}
+                reload={reload}
+              />
+            )}
+          </li>
+        )})}
+        {!foundation?.rounds?.length && (
+          <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
+            No rounds yet. Rounds are optional — add them to stage the competition.
+          </li>
+        )}
+      </ul>
+    </div>
+  )
+}
+
+function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, reload }) {
+  const assignedContestantIds = new Set(round.contestantIds ?? [])
+  const assignedCriteriaIds = new Set(round.criteriaIds ?? [])
+
+  // Read-only per-round summary. The actual assignment now lives on the
+  // Contestants page (contestants → round) and the Criteria page (criteria →
+  // round), so a round only DEFINES itself here.
+  const assignedCritTotal = allCriteria
+    .filter((cr) => assignedCriteriaIds.has(cr.id))
+    .reduce((s, cr) => s + Number(cr.percentage ?? 0), 0)
+  const critComplete = assignedCriteriaIds.size > 0 && Math.abs(assignedCritTotal - 100) < 0.1
+
+  // Phase 6 — per-round advancement/elimination + score policy.
+  const [advType, setAdvType] = useState(round.advancementType ?? 'none')
+  const [advValue, setAdvValue] = useState(round.advancementValue ?? '')
+  const [scorePolicy, setScorePolicy] = useState(round.scorePolicy ?? 'independent')
+  const [savingAdv, setSavingAdv] = useState(false)
+  const isFinalized = Boolean(round.finalizedAt)
+  const needsValue = advType === 'top_n' || advType === 'top_percent' || advType === 'threshold'
+
+  const saveAdvancement = async () => {
+    setSavingAdv(true)
     try {
-      await pageantService.deleteDivision(eventId, d.id)
+      // Send the full round (the update validator resets unspecified fields).
+      await pageantService.updateRound(eventId, round.id, {
+        name: round.name,
+        description: round.description ?? null,
+        weight: round.weight,
+        displayOrder: round.displayOrder,
+        categoryId: round.categoryId ?? null,
+        divisionId: round.divisionId ?? null,
+        isOpen: round.isOpen,
+        advancementType: advType,
+        advancementValue: needsValue && advValue !== '' ? Number(advValue) : null,
+        scorePolicy,
+      })
       reload()
-    } catch {
-      alert('This division has data and cannot be deleted; deactivate it instead from the full page.')
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to save advancement settings')
+    } finally {
+      setSavingAdv(false)
     }
   }
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-v-primary/30 bg-v-primary/5 p-4">
-        <div>
-          <h3 className="font-semibold text-v-text">Separate categories, like Men and Women?</h3>
-          <p className="text-sm text-v-text-subtle">
-            Turn this on if groups should never be compared — each gets its own ranking and winner.
+    <div className="border-t border-v-border px-4 pb-4 pt-3 space-y-4">
+      {/* Read-only summary — assignment moved to the Contestants & Criteria pages. */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-v-border bg-v-surface px-3 py-2">
+          <p className="text-[11px] uppercase tracking-wider text-v-text-muted">Contestants</p>
+          <p className="text-sm text-v-text">
+            {assignedContestantIds.size} assigned{' '}
+            <span className="text-xs text-v-text-subtle">/ {allContestants.length} total</span>
+          </p>
+          <p className="mt-0.5 text-[11px] text-v-text-subtle">
+            Assign on the <strong>Contestants</strong> page.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={toggle}
-          disabled={busy}
-          className={`rounded-lg px-4 py-2 text-sm font-medium ${
-            enabled ? 'bg-red-500/10 text-red-500' : 'bg-v-primary text-white'
-          }`}
-        >
-          {enabled ? 'Disable divisions' : 'Enable divisions'}
-        </button>
+        <div className="rounded-lg border border-v-border bg-v-surface px-3 py-2">
+          <p className="text-[11px] uppercase tracking-wider text-v-text-muted">Criteria</p>
+          <p className={`text-sm ${critComplete ? 'text-v-success' : 'text-v-text'}`}>
+            {assignedCriteriaIds.size
+              ? `${assignedCritTotal.toFixed(0)}% ${critComplete ? '✓' : '/ 100%'}`
+              : 'None yet'}
+          </p>
+          <p className="mt-0.5 text-[11px] text-v-text-subtle">
+            Configure on the <strong>Criteria</strong> page.
+          </p>
+        </div>
       </div>
 
-      {enabled && (
-        <>
-          <form onSubmit={add} className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-            <input
-              className={INPUT_CLASS}
-              placeholder="Division name (e.g. Ms., Mr.)"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <button
-              type="submit"
-              disabled={busy || !name.trim()}
-              className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-50"
+      {/* Phase 6 — advancement / elimination + score policy */}
+      <div className="rounded-lg border border-v-border bg-v-surface-elevated/40 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-medium uppercase tracking-wider text-v-text-muted">
+            Advancement & scoring
+          </p>
+          {isFinalized && (
+            <span className="rounded bg-v-success/10 px-1.5 py-0.5 text-[10px] font-medium text-v-success">
+              Finalized
+            </span>
+          )}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-[11px] text-v-text-muted" title="Applies when deciding who advances. The final event ranking always combines rounds by their weights.">
+              Score policy (advancement)
+            </label>
+            <select
+              className="w-full rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text disabled:opacity-50"
+              value={scorePolicy}
+              disabled={isFinalized}
+              onChange={(e) => setScorePolicy(e.target.value)}
             >
-              + Add division
-            </button>
-          </form>
-          <ul className="mt-4 space-y-2">
-            {divisions.map((d) => (
-              <li
-                key={d.id}
-                className="flex items-center justify-between rounded-lg border border-v-border bg-v-surface px-3 py-2"
-              >
-                <span className="text-sm text-v-text">{d.name}</span>
-                <button type="button" onClick={() => remove(d)} className="text-xs text-v-danger">
-                  Delete
-                </button>
-              </li>
-            ))}
-            {!divisions.length && (
-              <li className="rounded-lg border border-dashed border-v-border px-3 py-4 text-center text-sm text-v-text-subtle">
-                No divisions yet.
-              </li>
-            )}
-          </ul>
-        </>
-      )}
-
-      <FooterNav onPrev={onPrev} onNext={onNext} nextLabel="Next: Scoring Rules →" />
+              <option value="independent">Independent — this round only</option>
+              <option value="cumulative">Cumulative — carry prior rounds</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-v-text-muted">Advancement</label>
+            <select
+              className="w-full rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text disabled:opacity-50"
+              value={advType}
+              disabled={isFinalized}
+              onChange={(e) => setAdvType(e.target.value)}
+            >
+              <option value="none">None (no elimination)</option>
+              <option value="top_n">Top N advance</option>
+              <option value="top_percent">Top % advance</option>
+              <option value="threshold">Score threshold</option>
+              <option value="manual">Manual pick</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-v-text-muted">
+              {advType === 'top_n' ? 'N' : advType === 'top_percent' ? 'Percent' : advType === 'threshold' ? 'Min score' : 'Value'}
+            </label>
+            <input
+              type="number"
+              className="w-full rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text disabled:opacity-50"
+              value={advValue}
+              disabled={isFinalized || !needsValue}
+              onChange={(e) => setAdvValue(e.target.value)}
+              placeholder={needsValue ? '' : '—'}
+            />
+          </div>
+        </div>
+        {/* Phase 4 (W5): explain what advancement does and where it runs. */}
+        <p className="mt-2 text-[11px] leading-relaxed text-v-text-subtle">
+          {advType === 'none' && 'No elimination — every contestant stays for the next round.'}
+          {advType === 'top_n' && 'The top N by score advance to the next round (per division when divisions are on).'}
+          {advType === 'top_percent' && 'The top N% by score advance to the next round.'}
+          {advType === 'threshold' && 'Contestants scoring at or above this value advance.'}
+          {advType === 'manual' && 'You pick who advances by hand when finalizing.'}
+          {' '}You set the rule here; you <strong>run</strong> it later from{' '}
+          <strong>Live Control → “Finalize round &amp; advance”</strong>, where you can review and override
+          the qualifiers before confirming.
+        </p>
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            disabled={savingAdv || isFinalized}
+            onClick={saveAdvancement}
+            className="rounded-lg bg-v-primary px-3 py-1.5 text-xs font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
+          >
+            {savingAdv ? 'Saving...' : 'Save settings'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Step 5 — Scoring Rules (Option B: new methods, tiebreaks, judge weighting)
-// ---------------------------------------------------------------------------
-const METHOD_DESC = {
-  average: 'Add up judges’ scores and divide by the number of judges.',
-  weighted_average: 'Rounds and criteria count by their weights — the standard method.',
-  sum: 'Add every score together, no dividing.',
-  trimmed_average: 'Drop the highest and lowest judge scores first, then average.',
-  rank_based: 'Judges still enter numbers; each judge’s numbers are turned into ranks, then combined — a strict or lenient judge can’t drag scores up or down.',
-  percentile: 'Each judge’s scores are normalized for how strict or lenient they are before combining.',
-  highest_score: 'Take the single highest judge score.',
-  lowest_removal: 'Drop the lowest score(s), then average.',
-}
-const TIEBREAK_DESC = {
-  none: 'Genuine ties share a rank (standard).',
-  highest_criterion: 'The contestant with the higher single best criterion wins the tie.',
-  highest_round: 'Whoever scored higher in a chosen round wins the tie.',
-  countback: 'Whoever won more individual criteria head-to-head wins.',
-  judges_majority: 'Whoever more judges scored higher overall wins.',
-  manual: 'The organizer decides the tie live.',
+// L3 — soft signposting: a read-only hint about which optional layers a given
+// competition type usually needs. Every tab stays available; nothing is hidden.
+const TYPE_HINTS = {
+  pageant:
+    'Pageant setup: create rounds like Talent, Evening Gown, and Q&A — then give each round its own criteria (on the Criteria page).',
+  dance:
+    'Dance setup: create rounds (e.g. Preliminary → Final) with dance criteria; use Divisions for solo vs team.',
+  singing:
+    'Singing setup: add your criteria (Pitch, Tone, Performance). Add rounds only if you run heats and a final.',
+  talent:
+    'Talent setup: add flat criteria (Skill, Creativity, Presentation). Rounds are optional.',
+  simple:
+    'Simple setup: just add contestants and criteria — no rounds, divisions, or categories needed.',
 }
 
-function ScoringStep({ foundation, reload, onNext, onPrev }) {
+function TypeHint({ type }) {
+  const hint = type && TYPE_HINTS[type]
+  if (!hint) return null
+  return (
+    <div className="rounded-lg border border-v-border bg-v-surface-elevated/50 px-4 py-2.5 text-xs text-v-text-muted">
+      {hint}
+    </div>
+  )
+}
+
+// Phase 4 (W1/W3/W4) — progressive readiness so the organizer sees what's
+// missing DURING setup, not only when they hit Start. Mirrors the backend
+// pre-flight (contestants ≥1, active judges ≥1, criteria total 100% — per round
+// when rounds carry their own criteria, else event-wide).
+function SetupReadiness({ foundation }) {
+  if (!foundation) return null
+  const contestants = foundation.contestants ?? []
+  const judges = (foundation.judges ?? []).filter((j) => j.isActive !== false)
+  const criteria = foundation.criteria ?? []
+  const rounds = foundation.rounds ?? []
+  const usesRoundCriteria = rounds.some((r) => (r.criteriaIds ?? []).length > 0)
+
+  let criteriaOk
+  if (usesRoundCriteria) {
+    criteriaOk = rounds.every((r) => {
+      const ids = r.criteriaIds ?? []
+      if (!ids.length) return true
+      const total = criteria
+        .filter((c) => ids.includes(c.id))
+        .reduce((s, c) => s + Number(c.percentage ?? 0), 0)
+      return Math.abs(total - 100) < 0.1
+    })
+  } else {
+    const total = criteria.reduce((s, c) => s + Number(c.percentage ?? 0), 0)
+    criteriaOk = criteria.length > 0 && Math.abs(total - 100) < 0.1
+  }
+
+  const checks = [
+    { label: 'At least one contestant', ok: contestants.length > 0 },
+    { label: 'At least one active judge', ok: judges.length > 0 },
+    {
+      label: usesRoundCriteria ? "Each round's criteria total 100%" : 'Criteria total 100%',
+      ok: criteriaOk,
+    },
+  ]
+  const allOk = checks.every((c) => c.ok)
+
+  return (
+    <div
+      className={`rounded-lg border px-4 py-3 ${
+        allOk ? 'border-v-success/30 bg-v-success-bg' : 'border-v-border bg-v-surface'
+      }`}
+    >
+      <p className={`mb-2 text-xs font-semibold ${allOk ? 'text-v-success' : 'text-v-text-muted'}`}>
+        {allOk ? '✓ Ready to open scoring' : 'Setup checklist'}
+      </p>
+      <ul className="grid gap-1 sm:grid-cols-3">
+        {checks.map((c) => (
+          <li key={c.label} className="flex items-center gap-1.5 text-xs">
+            <span className={c.ok ? 'text-v-success' : 'text-amber-400'}>{c.ok ? '✓' : '○'}</span>
+            <span className={c.ok ? 'text-v-text-muted' : 'text-v-text'}>{c.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function ScoringTab({ foundation, reload }) {
   const { eventId } = useParams()
-  const cfg = foundation?.scoringConfig ?? foundation?.event?.scoring_config ?? {}
-  const rounds = foundation?.rounds ?? []
-
-  const [scoreType, setScoreType] = useState(cfg.scoreType ?? 'range_1_100')
-  const [calculationMethod, setCalculationMethod] = useState(cfg.calculationMethod ?? 'weighted_average')
-  const [decimalPlaces, setDecimalPlaces] = useState(cfg.decimalPlaces ?? 2)
-  const [customMin, setCustomMin] = useState(cfg.customMin ?? 0)
-  const [customMax, setCustomMax] = useState(cfg.customMax ?? 100)
-  const [dropHighest, setDropHighest] = useState(cfg.dropHighest ?? 0)
-  const [dropLowest, setDropLowest] = useState(cfg.dropLowest ?? 0)
-  const [tieBreaker, setTieBreaker] = useState(cfg.tieBreaker ?? 'none')
-  const [tieBreakRoundId, setTieBreakRoundId] = useState(cfg.tieBreakRoundId ?? '')
-  const [judgeWeightingEnabled, setJudgeWeightingEnabled] = useState(Boolean(cfg.judgeWeightingEnabled))
+  const config = foundation?.scoringConfig ?? {}
+  const [scoreType, setScoreType] = useState(config.scoreType ?? 'range_1_100')
+  const [calculationMethod, setCalculationMethod] = useState(
+    config.calculationMethod ?? 'weighted_average',
+  )
+  const [decimalPlaces, setDecimalPlaces] = useState(config.decimalPlaces ?? 2)
+  const [customMin, setCustomMin] = useState(config.customMin ?? 0)
+  const [customMax, setCustomMax] = useState(config.customMax ?? 100)
+  const [dropHighest, setDropHighest] = useState(config.dropHighest ?? 0)
+  const [dropLowest, setDropLowest] = useState(config.dropLowest ?? 0)
+  const [includeOverallRanking, setIncludeOverallRanking] = useState(config.includeOverallRanking ?? false)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [error, setError] = useState(null)
-
-  const usesTrim = calculationMethod === 'trimmed_average' || calculationMethod === 'lowest_removal'
+  const [saved, setSaved] = useState(false)
 
   const save = async (e) => {
     e.preventDefault()
@@ -956,212 +816,340 @@ function ScoringStep({ foundation, reload, onNext, onPrev }) {
         customMax: Number(customMax),
         dropHighest: Number(dropHighest),
         dropLowest: Number(dropLowest),
-        tieBreaker,
-        tieBreakRoundId: tieBreaker === 'highest_round' ? tieBreakRoundId || null : null,
-        judgeWeightingEnabled,
+        includeOverallRanking: Boolean(includeOverallRanking),
       })
       setSaved(true)
-      await reload()
+      reload()
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save scoring config')
+      setError(err.response?.data?.message || 'Failed to save config')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <form onSubmit={save} className="space-y-5">
-      <div className="grid gap-4 rounded-xl border border-v-border bg-v-surface p-5 sm:grid-cols-2">
-        <div>
-          <label className={LABEL_CLASS}>Score scale judges use</label>
-          <select className={INPUT_CLASS} value={scoreType} onChange={(e) => setScoreType(e.target.value)}>
-            <option value="range_1_10">1–10</option>
-            <option value="range_1_100">1–100</option>
-            <option value="decimal">Decimal (0–10)</option>
-            <option value="custom_range">Custom range</option>
-          </select>
-        </div>
-        <div>
-          <label className={LABEL_CLASS}>How scores are combined</label>
-          <select
-            className={INPUT_CLASS}
-            value={calculationMethod}
-            onChange={(e) => setCalculationMethod(e.target.value)}
-          >
-            <option value="average">Average</option>
-            <option value="weighted_average">Weighted average</option>
-            <option value="sum">Sum</option>
-            <option value="trimmed_average">Trimmed average</option>
-            <option value="rank_based">Rank-based</option>
-            <option value="percentile">Percentile-normalized</option>
-          </select>
-          <p className={HELPER_TEXT}>{METHOD_DESC[calculationMethod]}</p>
-        </div>
-
-        {scoreType === 'custom_range' && (
-          <>
-            <div>
-              <label className={LABEL_CLASS}>Custom min</label>
-              <input type="number" className={INPUT_CLASS} value={customMin} onChange={(e) => setCustomMin(e.target.value)} />
-            </div>
-            <div>
-              <label className={LABEL_CLASS}>Custom max</label>
-              <input type="number" className={INPUT_CLASS} value={customMax} onChange={(e) => setCustomMax(e.target.value)} />
-            </div>
-          </>
-        )}
-
-        {usesTrim && (
-          <>
-            <div>
-              <label className={LABEL_CLASS}>Drop highest N</label>
-              <input type="number" min={0} className={INPUT_CLASS} value={dropHighest} onChange={(e) => setDropHighest(e.target.value)} />
-            </div>
-            <div>
-              <label className={LABEL_CLASS}>Drop lowest N</label>
-              <input type="number" min={0} className={INPUT_CLASS} value={dropLowest} onChange={(e) => setDropLowest(e.target.value)} />
-            </div>
-          </>
-        )}
-
-        <div>
-          <label className={LABEL_CLASS}>Decimal places</label>
-          <input type="number" min={0} max={6} className={INPUT_CLASS} value={decimalPlaces} onChange={(e) => setDecimalPlaces(e.target.value)} />
-        </div>
+    <form onSubmit={save} className="grid gap-4 v-card p-6 sm:grid-cols-2">
+      <div>
+        <label className={LABEL_CLASS}>Score type</label>
+        <select
+          className={INPUT_CLASS}
+          value={scoreType}
+          onChange={(e) => setScoreType(e.target.value)}
+        >
+          <option value="range_1_10">1–10</option>
+          <option value="range_1_100">1–100</option>
+          <option value="decimal">Decimal (0–10)</option>
+          <option value="custom_range">Custom range</option>
+        </select>
       </div>
-
-      <div className="grid gap-4 rounded-xl border border-v-border bg-v-surface p-5 sm:grid-cols-2">
-        <div>
-          <label className={LABEL_CLASS}>Tie-break rule</label>
-          <select className={INPUT_CLASS} value={tieBreaker} onChange={(e) => setTieBreaker(e.target.value)}>
-            <option value="none">Share the rank (standard)</option>
-            <option value="highest_criterion">Higher best criterion</option>
-            <option value="highest_round">Higher score in a chosen round</option>
-            <option value="countback">Won more criteria head-to-head</option>
-            <option value="judges_majority">More judges scored them higher</option>
-            <option value="manual">Organizer decides live</option>
-          </select>
-          <p className={HELPER_TEXT}>{TIEBREAK_DESC[tieBreaker]}</p>
-        </div>
-        {tieBreaker === 'highest_round' && (
-          <div>
-            <label className={LABEL_CLASS}>Which round decides?</label>
-            <select className={INPUT_CLASS} value={tieBreakRoundId} onChange={(e) => setTieBreakRoundId(e.target.value)}>
-              <option value="">Each contestant’s best round</option>
-              {rounds.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+      <div>
+        <label className={LABEL_CLASS}>Calculation method</label>
+        <select
+          className={INPUT_CLASS}
+          value={calculationMethod}
+          onChange={(e) => setCalculationMethod(e.target.value)}
+        >
+          <option value="average">Average</option>
+          <option value="weighted_average">Weighted average</option>
+          <option value="sum">Sum</option>
+          <option value="highest_score">Highest score</option>
+          <option value="lowest_removal">Lowest-score removal</option>
+        </select>
       </div>
-
-      <div className="rounded-xl border border-v-border bg-v-surface p-5">
-        <label className="flex items-start gap-3">
+      <div>
+        <label className={LABEL_CLASS}>Decimal places</label>
+        <input
+          type="number"
+          min={0}
+          max={6}
+          className={INPUT_CLASS}
+          value={decimalPlaces}
+          onChange={(e) => setDecimalPlaces(e.target.value)}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={LABEL_CLASS}>Custom min</label>
           <input
-            type="checkbox"
-            checked={judgeWeightingEnabled}
-            onChange={(e) => setJudgeWeightingEnabled(e.target.checked)}
-            className="mt-1"
+            type="number"
+            className={INPUT_CLASS}
+            value={customMin}
+            onChange={(e) => setCustomMin(e.target.value)}
+            disabled={scoreType !== 'custom_range'}
           />
-          <span>
-            <span className="block font-medium text-v-text">Weight judges differently</span>
-            <span className="text-sm text-v-text-subtle">
-              Off = every judge counts equally. On = set each judge’s weight on the Judges page (weights
-              should total 100%).
-            </span>
-          </span>
-        </label>
+        </div>
+        <div>
+          <label className={LABEL_CLASS}>Custom max</label>
+          <input
+            type="number"
+            className={INPUT_CLASS}
+            value={customMax}
+            onChange={(e) => setCustomMax(e.target.value)}
+            disabled={scoreType !== 'custom_range'}
+          />
+        </div>
       </div>
+      <div>
+        <label className={LABEL_CLASS}>Drop highest N</label>
+        <input
+          type="number"
+          min={0}
+          className={INPUT_CLASS}
+          value={dropHighest}
+          onChange={(e) => setDropHighest(e.target.value)}
+        />
+      </div>
+      <div>
+        <label className={LABEL_CLASS}>Drop lowest N</label>
+        <input
+          type="number"
+          min={0}
+          className={INPUT_CLASS}
+          value={dropLowest}
+          onChange={(e) => setDropLowest(e.target.value)}
+        />
+      </div>
+      
+      {foundation?.event?.divisions_enabled && (
+        <div className="sm:col-span-2 v-card p-4 border border-v-primary/30">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={Boolean(includeOverallRanking)}
+              onChange={(e) => setIncludeOverallRanking(e.target.checked)}
+              disabled={saving}
+            />
+            <div>
+              <span className="block font-medium text-v-text">Enable Overall Rankings</span>
+              <span className="text-sm text-v-text-subtle">
+                When divisions are enabled, this displays a combined ranking of all contestants alongside division rankings.
+              </span>
+            </div>
+          </label>
+        </div>
+      )}
 
-      <div className="flex items-center justify-between">
+      <div className="sm:col-span-2 flex items-center justify-between">
         <div>
           {error && <p className="text-sm text-v-danger">{error}</p>}
           {saved && <p className="text-sm text-v-success">Saved.</p>}
         </div>
-        <button type="submit" disabled={saving} className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-50">
-          {saving ? 'Saving…' : 'Save scoring rules'}
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-60"
+        >
+          Save scoring config
         </button>
       </div>
-
-      <FooterNav onPrev={onPrev} onNext={onNext} nextLabel="Next: Review & Lock →" />
     </form>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Step 6 — Review & Lock
-// ---------------------------------------------------------------------------
-function ReviewStep({ foundation, onPrev }) {
-  const stages = (foundation?.categories ?? []).filter((c) => c.isStage)
-  const rounds = foundation?.rounds ?? []
-  const criteria = foundation?.criteria ?? []
+function DivisionsTab({ foundation, reload }) {
+  const { eventId } = useParams()
+  const divisionsEnabled = foundation?.event?.divisions_enabled ?? false
   const divisions = foundation?.divisions ?? []
-  const cfg = foundation?.scoringConfig ?? {}
 
-  const issues = []
-  if (stages.length) {
-    const st = stages.reduce((s, x) => s + Number(x.weight ?? 0), 0)
-    if (!pct100(st)) issues.push(`Stage weights add up to ${pctShow(st)}%, not 100%.`)
-    for (const stage of stages) {
-      const sr = rounds.filter((r) => r.categoryId === stage.id)
-      const rt = sr.reduce((s, r) => s + Number(r.weight ?? 0), 0)
-      if (!sr.length) issues.push(`Stage "${stage.name}" has no rounds.`)
-      else if (!pct100(rt)) issues.push(`Stage "${stage.name}" round weights add up to ${pctShow(rt)}%, not 100%.`)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const toggleEnabled = async () => {
+    setSaving(true)
+    try {
+      await pageantService.setDivisionsEnabled(eventId, !divisionsEnabled)
+      reload()
+    } finally {
+      setSaving(false)
     }
-  } else {
-    const ew = rounds.filter((r) => !r.categoryId)
-    const rt = ew.reduce((s, r) => s + Number(r.weight ?? 0), 0)
-    if (!ew.length) issues.push('Add at least one round.')
-    else if (!pct100(rt)) issues.push(`Round weights add up to ${pctShow(rt)}%, not 100%.`)
   }
-  for (const r of rounds) {
-    const ids = r.criteriaIds ?? []
-    const t = criteria.filter((c) => ids.includes(c.id)).reduce((s, c) => s + Number(c.percentage ?? 0), 0)
-    if (!ids.length) issues.push(`Round "${r.name}" has no criteria.`)
-    else if (!pct100(t)) issues.push(`Round "${r.name}" criteria add up to ${pctShow(t)}%, not 100%.`)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await pageantService.createDivision(eventId, { name, description })
+      setName('')
+      setDescription('')
+      reload()
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-v-border bg-v-surface p-5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-v-text-muted">Structure</p>
-        <p className="mt-1 text-sm text-v-text">
-          {stages.length
-            ? `${stages.length} stage(s): ${stages.map((s) => `${s.name} (${s.weight}%)`).join(', ')}`
-            : 'Single stage'}
-          {' · '}
-          {rounds.length} round(s) · {criteria.length} criteria
-        </p>
-        {divisions.length > 0 && (
-          <p className="mt-1 text-sm text-v-text-subtle">
-            Divisions: {divisions.map((d) => d.name).join(', ')}
+    <div className="space-y-6">
+      <div className="v-card p-6 flex flex-wrap items-center justify-between gap-4 border border-v-primary/30 bg-v-primary/5">
+        <div>
+          <h3 className="text-lg font-semibold text-v-text">Enable Divisions</h3>
+          <p className="text-sm text-v-text-subtle mt-1">
+            Group contestants by category (e.g., Male, Female, Junior, Senior) to compute separate rankings.
           </p>
-        )}
-        <p className="mt-1 text-sm text-v-text-subtle">
-          Scoring: {cfg.calculationMethod ?? 'weighted_average'} · tie-break: {cfg.tieBreaker ?? 'none'}
-          {cfg.judgeWeightingEnabled ? ' · weighted judges' : ''}
-        </p>
+        </div>
+        <button
+          onClick={toggleEnabled}
+          disabled={saving}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${
+            divisionsEnabled 
+              ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' 
+              : 'bg-v-primary text-white hover:bg-v-primary/90'
+          }`}
+        >
+          {divisionsEnabled ? 'Disable Divisions' : 'Enable Divisions'}
+        </button>
       </div>
 
-      {issues.length ? (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-5">
-          <p className="text-sm font-semibold text-amber-300">Fix these before scoring can open:</p>
-          <ul className="mt-2 list-disc pl-5 text-sm text-amber-200">
-            {issues.map((i, idx) => (
-              <li key={idx}>{i}</li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-5">
-          <p className="text-sm font-semibold text-emerald-300">
-            ✓ Structure checks out. Add contestants and judges, then start scoring from Live Control.
-          </p>
-        </div>
-      )}
+      {divisionsEnabled && (
+        <>
+          <form onSubmit={submit} className="grid gap-4 v-card p-6 sm:grid-cols-[1fr_2fr_auto]">
+            <div>
+              <label className={LABEL_CLASS}>Division name</label>
+              <input
+                className={INPUT_CLASS}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Senior"
+                required
+              />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>Description (Optional)</label>
+              <input
+                className={INPUT_CLASS}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. Contestants aged 18 and above"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={saving || !name.trim()}
+                className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-60"
+              >
+                Add division
+              </button>
+            </div>
+          </form>
 
-      <FooterNav onPrev={onPrev} />
+          <ul className="space-y-2">
+            {divisions.map((div) => (
+              <DivisionRow key={div.id} division={div} eventId={eventId} reload={reload} />
+            ))}
+            {divisions.length === 0 && (
+              <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
+                No divisions added yet. Add a division above to group your contestants.
+              </li>
+            )}
+          </ul>
+        </>
+      )}
     </div>
+  )
+}
+
+function DivisionRow({ division, eventId, reload }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState({
+    name: division.name,
+    description: division.description || '',
+    isActive: division.isActive,
+  })
+
+  const save = async () => {
+    await pageantService.updateDivision(eventId, division.id, draft)
+    setEditing(false)
+    reload()
+  }
+
+  const remove = async () => {
+    if (!window.confirm('Delete this division? This will only work if it has no data associated with it.')) return
+    try {
+      await pageantService.deleteDivision(eventId, division.id)
+      reload()
+    } catch (err) {
+      if (err.response?.status === 409) {
+        if (window.confirm('This division contains data and cannot be deleted. Deactivate it instead?')) {
+          await pageantService.updateDivision(eventId, division.id, { isActive: false })
+          reload()
+        }
+      } else {
+        alert(err.message)
+      }
+    }
+  }
+
+  if (editing) {
+    return (
+      <li className="flex items-end gap-3 rounded-lg border border-v-border bg-v-surface p-4">
+        <div className="flex-1">
+          <label className="text-xs text-v-text-subtle mb-1 block">Name</label>
+          <input
+            className={INPUT_CLASS}
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-xs text-v-text-subtle mb-1 block">Description</label>
+          <input
+            className={INPUT_CLASS}
+            value={draft.description}
+            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+          />
+        </div>
+        <label className="flex items-center gap-2 pb-2">
+          <input
+            type="checkbox"
+            checked={draft.isActive}
+            onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
+          />
+          <span className="text-sm text-v-text">Active</span>
+        </label>
+        <button
+          onClick={save}
+          className="rounded-lg bg-v-primary px-3 py-2 text-sm text-white hover:bg-opacity-90"
+        >
+          Save
+        </button>
+        <button
+          onClick={() => setEditing(false)}
+          className="rounded-lg border border-v-border px-3 py-2 text-sm text-v-text-muted hover:text-v-text"
+        >
+          Cancel
+        </button>
+      </li>
+    )
+  }
+
+  return (
+    <li className="flex items-center justify-between rounded-lg border border-v-border bg-v-surface p-4">
+      <div className={!division.isActive ? 'opacity-50' : ''}>
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-v-text">{division.name}</span>
+          {!division.isActive && (
+            <span className="rounded-full bg-v-border px-2 py-0.5 text-xs text-v-text-muted">
+              Inactive
+            </span>
+          )}
+        </div>
+        {division.description && <p className="text-sm text-v-text-subtle">{division.description}</p>}
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setEditing(true)}
+          className="rounded-lg px-3 py-1.5 text-sm text-v-primary hover:bg-v-primary/10"
+        >
+          Edit
+        </button>
+        <button
+          onClick={remove}
+          className="rounded-lg px-3 py-1.5 text-sm text-red-400 hover:bg-red-400/10"
+        >
+          Delete
+        </button>
+      </div>
+    </li>
   )
 }

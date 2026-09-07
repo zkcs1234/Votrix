@@ -88,16 +88,6 @@ export const competitionSessionService = {
     return api.post(`${BASE}/events/${eventId}/session/finalize-round`, { roundId, overrides, force })
   },
 
-  /** GET /api/organizer/competition/events/:eventId/stages/:categoryId/advancement-preview */
-  previewStageAdvancement(eventId, categoryId) {
-    return api.get(`${BASE}/events/${eventId}/stages/${categoryId}/advancement-preview`)
-  },
-
-  /** POST /api/organizer/competition/events/:eventId/session/finalize-stage */
-  finalizeStage(eventId, stageId, overrides = null, force = false) {
-    return api.post(`${BASE}/events/${eventId}/session/finalize-stage`, { stageId, overrides, force })
-  },
-
   /** POST /api/organizer/competition/events/:eventId/session/resync-scores */
   resyncRankingStore(eventId) {
     return api.post(`${BASE}/events/${eventId}/session/resync-scores`, {})
