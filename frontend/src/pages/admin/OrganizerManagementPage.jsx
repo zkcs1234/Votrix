@@ -6,6 +6,7 @@ import { adminService } from '@/services/admin.service'
 import CreateOrganizerModal from '@/components/admin/CreateOrganizerModal'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import FormAlert from '@/components/ui/FormAlert'
 import Badge from '@/components/ui/Badge'
 import SearchInput from '@/components/ui/SearchInput'
 import StatCard from '@/components/ui/StatCard'
@@ -287,17 +288,8 @@ export default function OrganizerManagementPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-v-danger bg-v-danger-bg px-4 py-3 text-sm text-v-danger">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="rounded-xl border border-v-success bg-v-success-bg px-4 py-3 text-sm text-v-success">
-          {success}
-        </div>
-      )}
+      {error && <FormAlert variant="error">{error}</FormAlert>}
+      {success && <FormAlert variant="success">{success}</FormAlert>}
 
       <Card padding="sm">
         {filteredOrganizers.length === 0 ? (

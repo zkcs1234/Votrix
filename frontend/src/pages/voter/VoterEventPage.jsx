@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import FormAlert from '@/components/ui/FormAlert'
 import ElectionPositionSection from '@/components/voter/election/ElectionPositionSection'
 import Button from '@/components/ui/Button'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
@@ -310,7 +311,7 @@ export default function VoterEventPage() {
                 })}
               </div>
 
-              {error && <p className="text-sm text-v-danger">{error}</p>}
+              {error && <FormAlert variant="error">{error}</FormAlert>}
             </div>
           ) : (
             <>
@@ -324,7 +325,7 @@ export default function VoterEventPage() {
                 />
               ))}
 
-              {error && <p className="text-sm text-v-danger">{error}</p>}
+              {error && <FormAlert variant="error">{error}</FormAlert>}
             </>
           )}
         </div>

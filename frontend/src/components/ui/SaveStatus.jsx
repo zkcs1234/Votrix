@@ -21,7 +21,7 @@ export default function SaveStatus({ status, lastSavedAt }) {
 
       {status === 'saved' && (
         <>
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+          <CheckCircle2 className="h-3.5 w-3.5 text-v-success" />
           <span className="text-v-text-subtle">
             Saved {lastSavedAt ? formatTime(lastSavedAt) : ''}
           </span>
@@ -37,7 +37,7 @@ export default function SaveStatus({ status, lastSavedAt }) {
 
       {status === 'idle' && lastSavedAt && (
         <>
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 opacity-50" />
+          <CheckCircle2 className="h-3.5 w-3.5 text-v-success opacity-50" />
           <span className="text-v-text-subtle opacity-70">
             Saved {formatTime(lastSavedAt)}
           </span>

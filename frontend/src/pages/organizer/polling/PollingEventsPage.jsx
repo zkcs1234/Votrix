@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Edit2 } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
+import { useToast } from '@/hooks/useToast'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import useDraft from '@/hooks/useDraft'
@@ -11,6 +13,7 @@ export default function PollingEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const { hasDraft, draft, deleteDraft } = useDraft('polling')
+  const { success, error: toastError } = useToast()
 
   const load = () => {
     pollingService
@@ -32,11 +35,13 @@ export default function PollingEventsPage() {
   })
 
   const toggle = async (event) => {
+    const opening = !event.pollingEnabled
     try {
-      await pollingService.setPollOpen(event.id, !event.pollingEnabled)
+      await pollingService.setPollOpen(event.id, opening)
       load()
+      success(opening ? `"${event.title}" is now open for responses` : `"${event.title}" is now closed`)
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed')
+      toastError(getErrorMessage(err))
     }
   }
 

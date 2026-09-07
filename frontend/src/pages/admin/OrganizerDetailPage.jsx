@@ -6,6 +6,7 @@ import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
+import FormAlert from '@/components/ui/FormAlert'
 
 const ACTION_TONES = {
   CREATE: 'success', INSERT: 'success',
@@ -108,7 +109,7 @@ export default function OrganizerDetailPage() {
           </div>
 
           {error && (
-            <div className="rounded-xl border border-v-danger bg-v-danger-bg px-4 py-3 text-sm text-v-danger">{error}</div>
+            <FormAlert variant="error">{error}</FormAlert>
           )}
 
           {loading ? (

@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
-import { X, UserPlus, CheckCircle, AlertCircle, Mail } from 'lucide-react'
+import { X, UserPlus, Mail } from 'lucide-react'
+import FormAlert from '@/components/ui/FormAlert'
 import { createOrganizerSchema } from '@/schemas/auth.schemas'
 import { adminService } from '@/services/admin.service'
 import AuthFormField from '@/components/auth/AuthFormField'
@@ -96,18 +97,8 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess }) {
             <input id="password" type="password" className={INPUT_CLASS} {...register('password')} />
           </AuthFormField>
 
-          {error && (
-            <p className="flex items-center gap-2 rounded-lg border border-v-danger bg-v-danger-bg px-3 py-2 text-sm text-v-danger">
-              <AlertCircle className="h-4 w-4 shrink-0" strokeWidth={2} />
-              {error}
-            </p>
-          )}
-          {success && (
-            <p className="flex items-center gap-2 rounded-lg border border-v-success bg-v-success-bg px-3 py-2 text-sm text-v-success">
-              <CheckCircle className="h-4 w-4 shrink-0" strokeWidth={2} />
-              {success}
-            </p>
-          )}
+          {error && <FormAlert variant="error">{error}</FormAlert>}
+          {success && <FormAlert variant="success">{success}</FormAlert>}
           {emailStatus && (
             <p className="flex items-center gap-2 rounded-lg border border-v-border-strong bg-v-surface-elevated/50 px-3 py-2 text-sm text-v-text-muted">
               <Mail className="h-4 w-4 shrink-0" strokeWidth={1.5} />

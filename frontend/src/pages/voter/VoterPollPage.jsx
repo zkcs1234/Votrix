@@ -4,6 +4,7 @@ import { pollingService } from '@/services/polling.service'
 import { validatePollAnswers } from '@/utils/pollValidation'
 import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import FormAlert from '@/components/ui/FormAlert'
 import Button from '@/components/ui/Button'
 import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
 import PollQuestionField from '@/components/voter/polling/PollQuestionField'
@@ -118,8 +119,8 @@ export default function VoterPollPage() {
 
   if (done) {
     return (
-      <div className="mx-auto max-w-lg rounded-2xl border border-emerald-900/50 bg-emerald-950/30 p-8 text-center">
-        <p className="text-lg font-semibold text-emerald-300">Response submitted</p>
+      <div className="mx-auto max-w-lg rounded-2xl border border-v-success/30 bg-v-success-bg p-8 text-center">
+        <p className="text-lg font-semibold text-v-success">Response submitted</p>
         <p className="mt-2 text-sm text-v-text-subtle">
           Thank you for completing {poll?.event?.title}.
         </p>
@@ -241,7 +242,7 @@ export default function VoterPollPage() {
             />
           ))}
 
-          {error && <p className="text-sm text-v-danger">{error}</p>}
+          {error && <FormAlert variant="error">{error}</FormAlert>}
         </div>
       </div>
 

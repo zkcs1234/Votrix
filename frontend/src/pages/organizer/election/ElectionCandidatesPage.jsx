@@ -94,7 +94,7 @@ function ElectionCandidatesPageContent() {
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [filterPositionId, setFilterPositionId] = useState('')
-  const { error: showError } = useToast()
+  const { success: showSuccess, error: showError } = useToast()
 
   const showLoader = useDelayedLoading(loading, 300)
 
@@ -174,6 +174,7 @@ function ElectionCandidatesPageContent() {
 
       setForm(EMPTY_FORM)
       setPhotoFile(null)
+      showSuccess(`${form.name} added`)
     } catch (err) {
       setCandidates((prev) => prev.filter((c) => c.id !== tempId))
       showError(err.response?.data?.message || 'Failed to create candidate')
@@ -188,6 +189,7 @@ function ElectionCandidatesPageContent() {
 
     try {
       await electionService.deleteCandidate(eventId, id)
+      showSuccess('Candidate removed')
     } catch (err) {
       setCandidates(previousCandidates)
       showError(err.response?.data?.message || 'Failed to delete candidate')

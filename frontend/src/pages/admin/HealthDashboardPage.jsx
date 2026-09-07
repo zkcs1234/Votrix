@@ -4,6 +4,7 @@ import { RefreshCw, CheckCircle2, XCircle, AlertCircle, Database, Cloud, Mail } 
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import FormAlert from '@/components/ui/FormAlert'
 
 const SERVICE_ICONS = {
   database: Database,
@@ -57,7 +58,7 @@ export default function HealthDashboardPage() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-v-danger bg-v-danger-bg px-4 py-3 text-sm text-v-danger">{error}</div>
+        <FormAlert variant="error">{error}</FormAlert>
       )}
 
       {health && (

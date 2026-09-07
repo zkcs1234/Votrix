@@ -4,6 +4,8 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 
 import { pageantService } from '@/services/pageant.service'
+import { useToast } from '@/hooks/useToast'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
@@ -634,6 +636,7 @@ function RoundsTab({ foundation, reload }) {
 }
 
 function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, reload }) {
+  const { success, error: toastError } = useToast()
   const assignedContestantIds = new Set(round.contestantIds ?? [])
   const assignedCriteriaIds = new Set(round.criteriaIds ?? [])
 
@@ -670,8 +673,9 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
         scorePolicy,
       })
       reload()
+      success('Advancement settings saved')
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to save advancement settings')
+      toastError(getErrorMessage(err))
     } finally {
       setSavingAdv(false)
     }
@@ -1134,6 +1138,7 @@ function DivisionsTab({ foundation, reload }) {
 }
 
 function DivisionRow({ division, eventId, reload }) {
+  const { success, error: toastError } = useToast()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState({
     name: division.name,
@@ -1152,14 +1157,20 @@ function DivisionRow({ division, eventId, reload }) {
     try {
       await pageantService.deleteDivision(eventId, division.id)
       reload()
+      success('Division deleted')
     } catch (err) {
       if (err.response?.status === 409) {
         if (window.confirm('This division contains data and cannot be deleted. Deactivate it instead?')) {
-          await pageantService.updateDivision(eventId, division.id, { isActive: false })
-          reload()
+          try {
+            await pageantService.updateDivision(eventId, division.id, { isActive: false })
+            reload()
+            success('Division deactivated')
+          } catch (deactivateErr) {
+            toastError(getErrorMessage(deactivateErr))
+          }
         }
       } else {
-        alert(err.message)
+        toastError(getErrorMessage(err))
       }
     }
   }

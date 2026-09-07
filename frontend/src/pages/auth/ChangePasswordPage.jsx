@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Lock, ShieldCheck, AlertCircle, ArrowRight, SkipForward } from 'lucide-react'
+import { Lock, ShieldCheck, ArrowRight, SkipForward } from 'lucide-react'
+import FormAlert from '@/components/ui/FormAlert'
 import { changePasswordSchema } from '@/schemas/auth.schemas'
 import { authService } from '@/services/auth.service'
 import { useAuth } from '@/hooks/useAuth'
@@ -133,12 +134,7 @@ export default function ChangePasswordPage() {
           />
         </AuthFormField>
 
-        {error && (
-          <p className="flex items-center gap-2 rounded-lg border border-v-danger bg-v-danger-bg px-3 py-2 text-sm text-v-danger">
-            <AlertCircle className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-            {error}
-          </p>
-        )}
+        {error && <FormAlert variant="error">{error}</FormAlert>}
 
         <SubmitButton loading={loading}>
           <ShieldCheck className="h-4 w-4" strokeWidth={2} />

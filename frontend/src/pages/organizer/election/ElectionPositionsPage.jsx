@@ -19,7 +19,7 @@ export default function ElectionPositionsPage() {
   const [maxVote, setMaxVote] = useState(1)
   const [displayOrder, setDisplayOrder] = useState('')
   const [saving, setSaving] = useState(false)
-  const { error: showError } = useToast()
+  const { success: showSuccess, error: showError } = useToast()
 
   const load = () => {
     electionService
@@ -60,6 +60,7 @@ export default function ElectionPositionsPage() {
       resetForm()
       setLoading(true)
       load()
+      showSuccess(`Position "${name}" added`)
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to create position')
     } finally {
@@ -72,6 +73,7 @@ export default function ElectionPositionsPage() {
     try {
       await electionService.deletePosition(eventId, id)
       load()
+      showSuccess('Position deleted')
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to delete position')
     }
@@ -137,6 +139,17 @@ export default function ElectionPositionsPage() {
         </div>
 
         <div>
+          <label className="mb-1 block text-sm text-v-text-muted">Max votes</label>
+          <input
+            type="number"
+            min={1}
+            className={`${inputClass} w-full`}
+            value={maxVote}
+            onChange={(e) => setMaxVote(e.target.value)}
+          />
+        </div>
+
+        <div>
           <label className="mb-1 block text-sm text-v-text-muted">Display order</label>
           <input
             type="number"
@@ -145,20 +158,6 @@ export default function ElectionPositionsPage() {
             placeholder="Auto"
             value={displayOrder}
             onChange={(e) => setDisplayOrder(e.target.value)}
-          />
-        </div>
-
-        <div>
-          {/* Min votes field removed */}
-        </div>
-        <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Max votes</label>
-          <input
-            type="number"
-            min={1}
-            className={`${inputClass} w-full`}
-            value={maxVote}
-            onChange={(e) => setMaxVote(e.target.value)}
           />
         </div>
 

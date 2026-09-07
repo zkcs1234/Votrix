@@ -4,6 +4,7 @@ import { CSRF_HEADER, getCsrfToken, setCsrfToken } from '@/utils/csrf'
 
 import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 let lastToastAt = 0
 
@@ -15,10 +16,7 @@ function maybeToastError(error) {
   if (now - lastToastAt < 800) return
   lastToastAt = now
 
-  const message =
-    error.response?.data?.message ||
-    (status >= 500 ? 'Server error. Please try again.' : 'Request failed.')
-  useToastStore.getState().error(message)
+  useToastStore.getState().error(getErrorMessage(error))
 }
 
 const api = axios.create({

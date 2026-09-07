@@ -6,6 +6,7 @@ import { isConnected } from '@/services/socket.service'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
+import FormAlert from '@/components/ui/FormAlert'
 import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
 import CompetitionScoringForm from '@/components/voter/competition/CompetitionScoringForm'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
@@ -517,14 +518,14 @@ export default function JudgeScoringPage() {
     <div className="mx-auto max-w-4xl space-y-6 pb-24">
       {/* Retry error banner (Requirement 15.3, 15.4) - Task 13.3 */}
       {showRetryBanner && (
-        <div className="border border-red-500/50 bg-red-950/30 rounded-lg p-4">
+        <div className="rounded-lg border border-v-warning/30 bg-v-warning-bg p-4">
           <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-v-warning" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-red-300">
-                Failed to submit scores. Will retry automatically when connection is restored.
+              <p className="text-sm font-medium text-v-warning">
+                Couldn't save your scores yet. They'll be submitted automatically when your connection is restored.
               </p>
-              <p className="mt-1 text-xs text-red-400/80">
+              <p className="mt-1 text-xs text-v-warning/80">
                 {submissionQueue.length} score{submissionQueue.length !== 1 ? 's' : ''} pending submission
               </p>
             </div>
@@ -532,7 +533,7 @@ export default function JudgeScoringPage() {
               size="sm"
               variant="outline"
               onClick={handleManualRetry}
-              className="flex-shrink-0 border-red-500/50 text-red-300 hover:bg-red-950/50"
+              className="shrink-0 border-v-warning/40 text-v-warning hover:bg-v-warning/10"
               disabled={submissionQueue.length === 0}
             >
               <RotateCcw className="h-4 w-4 mr-1" />
@@ -550,9 +551,9 @@ export default function JudgeScoringPage() {
 
       {/* Connection error banner */}
       {connectionError && (
-        <div className="rounded-xl border border-red-500/50 bg-red-950/30 px-4 py-3">
+        <div className="rounded-xl border border-v-danger/30 bg-v-danger-bg px-4 py-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-red-300">{connectionError}</p>
+            <p className="text-sm text-v-danger">{connectionError}</p>
             {reconnectAttempts >= 3 && (
               <Button 
                 size="sm" 
@@ -691,11 +692,7 @@ export default function JudgeScoringPage() {
         sessionState={sessionState}
       />
 
-      {error && (
-        <div className="rounded-xl border border-red-500/50 bg-red-950/30 px-4 py-3">
-          <p className="text-sm text-red-300">{error}</p>
-        </div>
-      )}
+      {error && <FormAlert variant="error">{error}</FormAlert>}
 
       {/* Live mode scoring instructions */}
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-center">
@@ -704,17 +701,19 @@ export default function JudgeScoringPage() {
         </p>
       </div>
       
-      {/* Success confirmation toast (Requirement 14) */}
+      {/* Success confirmation — matches the top-center toast design system */}
       {showConfirmation && (
-        <div className="fixed bottom-4 right-4 z-50 bg-emerald-500 text-white shadow-2xl rounded-xl px-6 py-4 animate-slide-up">
-          <div className="flex items-start gap-3">
-            <CheckCircle className="h-6 w-6 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="font-bold text-white">Scores Submitted!</p>
-              <p className="mt-1 text-sm text-white">
-                {lastSavedName || sheet?.contestants?.find(c => c.id === activeContestantId)?.name}
+        <div
+          className="v-toast-enter pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4 sm:top-6"
+          role="status"
+        >
+          <div className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-lg border border-v-success/25 bg-v-success-bg px-4 py-3 text-sm text-v-success shadow-v-shadow-md">
+            <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            <div className="flex-1 leading-snug">
+              <p className="font-semibold">Scores submitted</p>
+              <p className="mt-0.5 opacity-90">
+                {lastSavedName || sheet?.contestants?.find(c => c.id === activeContestantId)?.name} — scores are locked
               </p>
-              <p className="mt-1 text-xs text-white/80">Your scores are locked</p>
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import Input from '@/components/ui/Input'
 import PasswordInput from '@/components/ui/PasswordInput'
 import SubmitButton from '@/components/auth/SubmitButton'
 import Card from '@/components/ui/Card'
+import FormAlert from '@/components/ui/FormAlert'
 
 export default function LoginForm({
   title,
@@ -53,11 +54,7 @@ export default function LoginForm({
             )}
           </div>
 
-          {error && (
-            <p className="rounded-lg border border-v-danger bg-v-danger-bg px-3 py-2.5 text-sm text-v-danger">
-              {error}
-            </p>
-          )}
+          {error && <FormAlert variant="error">{error}</FormAlert>}
 
           <SubmitButton loading={loading} className="w-full">
             <LogIn className="h-4 w-4" strokeWidth={2} />

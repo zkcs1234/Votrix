@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Save, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Save, Loader2, CheckCircle2 } from 'lucide-react'
+import FormAlert from '@/components/ui/FormAlert'
 import { voterService } from '@/services/voter.service'
 
 /**
@@ -144,19 +145,9 @@ export default function ParticipantInformationForm({
           </div>
         ))}
 
-        {error && (
-          <div className="flex items-center gap-2 rounded-lg bg-v-danger/10 p-3">
-            <AlertCircle className="h-4 w-4 text-v-danger" />
-            <p className="text-sm text-v-danger">{error}</p>
-          </div>
-        )}
+        {error && <FormAlert variant="error">{error}</FormAlert>}
 
-        {success && (
-          <div className="flex items-center gap-2 rounded-lg bg-v-success/10 p-3">
-            <CheckCircle2 className="h-4 w-4 text-v-success" />
-            <p className="text-sm text-v-success">Information saved successfully!</p>
-          </div>
-        )}
+        {success && <FormAlert variant="success">Information saved successfully!</FormAlert>}
 
         <button
           type="submit"

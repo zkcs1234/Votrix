@@ -5,6 +5,8 @@ import {
 } from 'lucide-react'
 import { competitionSessionService } from '@/services/competition-session.service.js'
 import { pageantService } from '@/services/pageant.service.js'
+import { useToast } from '@/hooks/useToast'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -20,6 +22,7 @@ const SESSION_STATUS = {
 
 export default function CompetitionLiveControlPage() {
   const { eventId } = useParams()
+  const { success, error: toastError } = useToast()
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
@@ -81,7 +84,7 @@ export default function CompetitionLiveControlPage() {
       await competitionSessionService.setStageGroup(eventId, ids)
       await loadSession()
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update stage group')
+      toastError(getErrorMessage(err))
     } finally {
       setActionLoading(null)
     }
@@ -122,8 +125,15 @@ export default function CompetitionLiveControlPage() {
       }
       await actions[action]()
       await loadSession()
+      const successMessages = {
+        start: 'Scoring session started',
+        pause: 'Session paused',
+        resume: 'Session resumed',
+        complete: 'Session completed',
+      }
+      if (successMessages[action]) success(successMessages[action])
     } catch (err) {
-      alert(err.response?.data?.message || `Failed to ${actionName}`)
+      toastError(getErrorMessage(err))
     } finally {
       setActionLoading(null)
     }
@@ -134,8 +144,9 @@ export default function CompetitionLiveControlPage() {
     try {
       await competitionSessionService.setActiveRound(eventId, roundId)
       await loadSession()
+      success('Active round updated')
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to set active round')
+      toastError(getErrorMessage(err))
     } finally {
       setActionLoading(null)
     }
@@ -154,7 +165,7 @@ export default function CompetitionLiveControlPage() {
       await competitionSessionService.setActiveCriteria(eventId, nextActive)
       await loadSession()
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update active criteria')
+      toastError(getErrorMessage(err))
     } finally {
       setActionLoading(null)
     }
@@ -167,7 +178,7 @@ export default function CompetitionLiveControlPage() {
       await competitionSessionService.setActiveContestant(eventId, contestantId)
       await loadSession()
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to select contestant')
+      toastError(getErrorMessage(err))
     } finally {
       setActionLoading(null)
     }
@@ -179,7 +190,7 @@ export default function CompetitionLiveControlPage() {
       await competitionSessionService.setActiveDivision(eventId, divisionId)
       await loadSession()
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to set active division')
+      toastError(getErrorMessage(err))
     } finally {
       setActionLoading(null)
     }
@@ -195,7 +206,7 @@ export default function CompetitionLiveControlPage() {
       setFinalizePreview(data)
       setFinalizeChecked(new Set(data.standing.filter((s) => s.qualified).map((s) => s.contestantId)))
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to load advancement preview')
+      toastError(getErrorMessage(err))
       setFinalizeRoundId(null)
     } finally {
       setFinalizeLoading(false)
@@ -238,14 +249,14 @@ export default function CompetitionLiveControlPage() {
       )
       closeFinalize()
       await loadSession()
-      alert(
+      success(
         isRecompute
           ? `Round "${data.roundName}" standings recomputed with the current scores.`
           : `Round "${data.roundName}" finalized. ${data.qualifiers.length} qualifier(s)` +
               (data.nextRoundName ? ` seeded into "${data.nextRoundName}".` : '.'),
       )
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to finalize round')
+      toastError(getErrorMessage(err))
     } finally {
       setFinalizeSubmitting(false)
     }

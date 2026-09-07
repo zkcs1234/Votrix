@@ -26,4 +26,5 @@ export { default as ProgressBar, ProgressBarWithStats, IndeterminateProgressBar 
 export { default as PageLoader } from '@/components/ui/PageLoader'
 export { default as ThemeToggle } from '@/components/ui/ThemeToggle'
 export { default as ToastContainer } from '@/components/ui/ToastContainer'
+export { default as FormAlert } from '@/components/ui/FormAlert'
 export { default as LoadingSpinner } from '@/components/ui/LoadingSpinner'

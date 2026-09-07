@@ -1105,7 +1105,7 @@
     }
   }
 
-  /* Toast slide-in from bottom-right. */
+  /* Toast slide-down from top-center. */
   .v-toast-enter {
     animation: v-toast-in var(--duration-normal) var(--ease-out) both;
   }
@@ -1113,11 +1113,11 @@
   @keyframes v-toast-in {
     from {
       opacity: 0;
-      transform: translateX(20px) translateY(4px);
+      transform: translateY(-12px) scale(0.98);
     }
     to {
       opacity: 1;
-      transform: translateX(0) translateY(0);
+      transform: translateY(0) scale(1);
     }
   }
 

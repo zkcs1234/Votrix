@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Building2, User, Briefcase, Edit3, LogOut, X, Check, AlertCircle, ClipboardList } from 'lucide-react'
+import { Building2, User, Briefcase, Edit3, LogOut, X, Check, ClipboardList } from 'lucide-react'
+import FormAlert from '@/components/ui/FormAlert'
 import { organizerProfileService } from '@/services/organizer-profile.service'
 import { authService } from '@/services/auth.service'
 import { useAuth } from '@/hooks/useAuth'
@@ -290,12 +291,7 @@ export default function ProfileCard({ onClose }) {
                 </div>
 
                 {/* Error */}
-                {error && (
-                  <div className="flex items-center gap-2 rounded-lg border border-v-danger bg-v-danger-bg px-3 py-2 text-sm text-v-danger">
-                    <AlertCircle className="h-4 w-4 shrink-0" strokeWidth={2} />
-                    {error}
-                  </div>
-                )}
+                {error && <FormAlert variant="error">{error}</FormAlert>}
 
                 {/* Actions */}
                 <div className="flex gap-2">

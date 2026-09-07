@@ -9,6 +9,7 @@ import {
 import StatCard from '@/components/ui/StatCard'
 import VoterEventCard from '@/components/voter/VoterEventCard'
 import Card from '@/components/ui/Card'
+import FormAlert from '@/components/ui/FormAlert'
 import Badge from '@/components/ui/Badge'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -152,7 +153,7 @@ export default function VoterDashboardPage() {
   }
 
   if (error) {
-    return <p className="text-sm text-v-danger">{error}</p>
+    return <FormAlert variant="error">{error}</FormAlert>
   }
 
   const stats = data?.stats ?? { total: 0, active: 0, assigned: 0, completed: 0 }

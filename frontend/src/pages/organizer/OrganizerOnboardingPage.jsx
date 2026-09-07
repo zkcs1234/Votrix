@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Building2, User, Briefcase, ClipboardList, AlertCircle, ArrowRight } from 'lucide-react'
+import { Building2, User, Briefcase, ClipboardList, ArrowRight } from 'lucide-react'
+import FormAlert from '@/components/ui/FormAlert'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
 import { organizerProfileService } from '@/services/organizer-profile.service'
@@ -189,12 +190,7 @@ export default function OrganizerOnboardingPage() {
           </div>
 
           {/* Error */}
-          {apiError && (
-            <div className="flex items-center gap-2 rounded-lg border border-v-danger bg-v-danger-bg px-3 py-2 text-sm text-v-danger">
-              <AlertCircle className="h-4 w-4 shrink-0" strokeWidth={2} />
-              {apiError}
-            </div>
-          )}
+          {apiError && <FormAlert variant="error">{apiError}</FormAlert>}
 
           {/* Submit */}
           <button

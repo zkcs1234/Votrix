@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
+import { useToast } from '@/hooks/useToast'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
@@ -10,6 +12,7 @@ const inputClass = INPUT_CLASS
 
 export default function CompetitionContestantsPage() {
   const { eventId } = useParams()
+  const { success, error: toastError } = useToast()
   const [list, setList] = useState([])
   const [foundation, setFoundation] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -67,7 +70,7 @@ export default function CompetitionContestantsPage() {
       }
       await load()
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update round assignment')
+      toastError(getErrorMessage(err))
     } finally {
       setRoundBusy(null)
     }
@@ -85,7 +88,7 @@ export default function CompetitionContestantsPage() {
     if (!targets.length) return
     setRoundBusy('bulk')
     try {
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         targets.map((c) =>
           mode === 'add'
             ? pageantService.addRoundContestant(eventId, selectedRoundId, c.id)
@@ -93,8 +96,20 @@ export default function CompetitionContestantsPage() {
         ),
       )
       await load()
-    } catch {
-      alert('Bulk update failed — some contestants may not have been updated.')
+
+      const failed = results.filter((r) => r.status === 'rejected').length
+      const roundName = selectedRound?.name ?? 'the round'
+      if (failed) {
+        toastError(
+          `${targets.length - failed} of ${targets.length} updated — ${failed} couldn't be saved. Please try again.`,
+        )
+      } else if (mode === 'add') {
+        success(`Added ${targets.length} contestant${targets.length === 1 ? '' : 's'} to ${roundName}`)
+      } else {
+        success(`Removed ${targets.length} contestant${targets.length === 1 ? '' : 's'} from ${roundName}`)
+      }
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Bulk update failed. Some contestants may not have been updated.'))
     } finally {
       setRoundBusy(null)
     }
@@ -131,19 +146,25 @@ export default function CompetitionContestantsPage() {
       contestantNumber: Number(number),
       divisionId: divisionId || null,
     }
-    const { data } = editingContestant
-      ? await pageantService.updateContestant(eventId, editingContestant.id, payload)
-      : await pageantService.createContestant(eventId, payload)
-    if (photoFile && data.contestant?.id) {
-      await pageantService.uploadContestantPhoto(eventId, data.contestant.id, photoFile)
+    const wasEditing = Boolean(editingContestant)
+    try {
+      const { data } = wasEditing
+        ? await pageantService.updateContestant(eventId, editingContestant.id, payload)
+        : await pageantService.createContestant(eventId, payload)
+      if (photoFile && data.contestant?.id) {
+        await pageantService.uploadContestantPhoto(eventId, data.contestant.id, photoFile)
+      }
+      setName('')
+      setDivisionId('')
+      setPhotoFile(null)
+      setEditingContestant(null)
+      setLoading(true)
+      await load()
+      await refreshNextNumber(divisionId || null)
+      success(wasEditing ? `${payload.name} updated` : `${payload.name} added`)
+    } catch (err) {
+      toastError(getErrorMessage(err, `Couldn't ${wasEditing ? 'update' : 'add'} the contestant.`))
     }
-    setName('')
-    setDivisionId('')
-    setPhotoFile(null)
-    setEditingContestant(null)
-    setLoading(true)
-    await load()
-    await refreshNextNumber(divisionId || null)
   }
 
   const startEditing = (contestant) => {
@@ -351,11 +372,16 @@ export default function CompetitionContestantsPage() {
                   type="button"
                   className="text-v-danger"
                   onClick={async () => {
-                    if (confirm('Delete?')) {
-                      await pageantService.deleteContestant(eventId, c.id)
-                      await load()
-                      if (!editingContestant) {
-                        await refreshNextNumber(divisionId || null)
+                    if (confirm(`Delete contestant "${c.name}"? This can't be undone.`)) {
+                      try {
+                        await pageantService.deleteContestant(eventId, c.id)
+                        await load()
+                        if (!editingContestant) {
+                          await refreshNextNumber(divisionId || null)
+                        }
+                        success(`${c.name} deleted`)
+                      } catch (err) {
+                        toastError(getErrorMessage(err, "Couldn't delete the contestant."))
                       }
                     }
                   }}

@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link } from 'react-router-dom'
-import { Mail, Send, CheckCircle2, AlertCircle, ArrowLeft } from 'lucide-react'
+import { Mail, Send, ArrowLeft } from 'lucide-react'
+import FormAlert from '@/components/ui/FormAlert'
 import { forgotPasswordSchema } from '@/schemas/auth.schemas'
 import { authService } from '@/services/auth.service'
 import AuthFormField from '@/components/auth/AuthFormField'
@@ -55,18 +56,8 @@ export default function ForgotPasswordPage() {
           </div>
         </AuthFormField>
 
-        {error && (
-          <p className="flex items-center gap-2 rounded-lg border border-v-danger bg-v-danger-bg px-3 py-2 text-sm text-v-danger">
-            <AlertCircle className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-            {error}
-          </p>
-        )}
-        {message && (
-          <p className="flex items-center gap-2 rounded-lg border border-emerald-900/50 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-300">
-            <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-            {message}
-          </p>
-        )}
+        {error && <FormAlert variant="error">{error}</FormAlert>}
+        {message && <FormAlert variant="success">{message}</FormAlert>}
 
         <SubmitButton loading={loading}>
           <Send className="h-4 w-4" strokeWidth={2} />

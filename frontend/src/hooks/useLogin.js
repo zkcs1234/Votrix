@@ -5,6 +5,7 @@ import { getRoleDashboardPath, getSafeVoterDestination } from '@/utils/auth'
 import { useToast } from '@/hooks/useToast'
 import { voterService } from '@/services/voter.service'
 import { USER_ROLES } from '@/utils/constants'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 
 export function useLogin(loginFn) {
@@ -13,7 +14,7 @@ export function useLogin(loginFn) {
   const { setSession, clearSession } = useAuth()
 
 
-  const { success, error: toastError } = useToast()
+  const { success } = useToast()
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -69,9 +70,10 @@ export function useLogin(loginFn) {
         navigate(getRoleDashboardPath(data.user.role), { replace: true })
       }
     } catch (err) {
-      const message = err.response?.data?.message || 'Login failed. Please try again.'
-      setError(message)
-      toastError(message)
+      // Show the reason inline in the form (where the user is looking).
+      // The backend returns specific reasons (e.g. "Invalid email or
+      // password", "Your account has been suspended") which we surface as-is.
+      setError(getErrorMessage(err, "We couldn't sign you in. Please try again."))
     } finally {
       setLoading(false)
     }

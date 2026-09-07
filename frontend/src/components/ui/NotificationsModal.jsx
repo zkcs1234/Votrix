@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { X } from 'lucide-react'
 import { notificationsService } from '@/services/notifications.service'
 import Card from '@/components/ui/Card'
+import FormAlert from '@/components/ui/FormAlert'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import SearchInput from '@/components/ui/SearchInput'
@@ -213,9 +214,7 @@ export default function NotificationsModal({ onClose }) {
             {loading || showLoader ? (
               <NotificationSkeleton />
             ) : error ? (
-              <div className="rounded-xl border border-v-danger bg-v-danger-bg px-4 py-3 text-sm text-v-danger">
-                {error}
-              </div>
+              <FormAlert variant="error">{error}</FormAlert>
             ) : filteredNotifications.length === 0 ? (
               <Card className="p-6 text-center">
                 <p className="text-sm text-v-text-muted">No notifications match your filters.</p>
