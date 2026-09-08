@@ -3,6 +3,7 @@ import { Settings, ToggleLeft, Hash, Save, ShieldAlert } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import FormAlert from '@/components/ui/FormAlert'
 import Badge from '@/components/ui/Badge'
 import StatCard from '@/components/ui/StatCard'
 import { INPUT_CLASS } from '@/utils/uiClasses'
@@ -269,8 +270,8 @@ export default function SystemSettingsPage() {
             ))}
           </div>
 
-          {error && <p className="text-sm text-v-danger">{error}</p>}
-          {success && <p className="text-sm text-emerald-500">{success}</p>}
+          {error && <FormAlert variant="error">{error}</FormAlert>}
+          {success && <FormAlert variant="success">{success}</FormAlert>}
 
           <div className="flex justify-end border-t border-v-border pt-4">
             <Button type="submit" loading={saving}>

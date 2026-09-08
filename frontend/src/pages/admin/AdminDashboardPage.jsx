@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import Card from '@/components/ui/Card'
+import FormAlert from '@/components/ui/FormAlert'
 import StatCard from '@/components/ui/StatCard'
 import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
@@ -117,7 +118,7 @@ export default function AdminDashboardPage() {
   }
 
   if (error) {
-    return <p className="text-sm text-v-danger">{error}</p>
+    return <FormAlert variant="error" title="Couldn't load the dashboard">{error}</FormAlert>
   }
 
   const stats = dashboard?.stats
