@@ -37,19 +37,16 @@ export function validateChangePassword(body) {
 }
 
 export function validateCreateOrganizer(body) {
-  const { email, password } = body ?? {}
+  const { email } = body ?? {}
 
-  if (!email?.trim() || !password) {
-    throw new ApiError(400, 'Email and password are required')
+  if (!email?.trim()) {
+    throw new ApiError(400, 'Email is required')
   }
 
   if (!EMAIL_RE.test(email.trim())) {
     throw new ApiError(400, 'Invalid email format')
   }
 
-  if (password.length < 8) {
-    throw new ApiError(400, 'Temporary password must be at least 8 characters')
-  }
-
-  return { email: sanitizeEmail(email), password }
+  // Password is auto-generated server-side — admins never choose it.
+  return { email: sanitizeEmail(email) }
 }

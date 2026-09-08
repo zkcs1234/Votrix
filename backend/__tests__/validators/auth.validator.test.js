@@ -95,29 +95,30 @@ describe('Auth Validators', () => {
   })
 
   describe('validateCreateOrganizer', () => {
-    test('should return sanitized data for valid input', () => {
+    // The temporary password is generated server-side, so the validator only
+    // accepts and sanitizes the email — any client-supplied password is ignored.
+    test('should return only the sanitized email for valid input', () => {
       const result = validateCreateOrganizer({
         email: '  ORGANIZER@Example.COM  ',
+      })
+      expect(result).toEqual({ email: 'organizer@example.com' })
+    })
+
+    test('should ignore any client-supplied password', () => {
+      const result = validateCreateOrganizer({
+        email: 'organizer@example.com',
         password: TEST_CREDENTIALS.password,
       })
-      expect(result).toEqual({ email: 'organizer@example.com', password: TEST_CREDENTIALS.password })
+      expect(result).toEqual({ email: 'organizer@example.com' })
     })
 
     test('should throw error when email is missing', () => {
-      expect(() => validateCreateOrganizer({ password: TEST_CREDENTIALS.password })).toThrow(ApiError)
-    })
-
-    test('should throw error when password is less than 8 characters', () => {
-      expect(() => validateCreateOrganizer({
-        email: 'test@example.com',
-        password: TEST_CREDENTIALS.shortPassword,
-      })).toThrow(ApiError)
+      expect(() => validateCreateOrganizer({})).toThrow(ApiError)
     })
 
     test('should throw error for invalid email format', () => {
       expect(() => validateCreateOrganizer({
         email: 'invalid-email',
-        password: TEST_CREDENTIALS.password,
       })).toThrow(ApiError)
     })
   })

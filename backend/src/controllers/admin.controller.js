@@ -71,7 +71,8 @@ export const createOrganizerAccount = asyncHandler(async (req, res) => {
   const payload = validateCreateOrganizer(req.body)
   const { user, email } = await createOrganizer({
     email: payload.email,
-    password: payload.password,
+    // Password is auto-generated inside createOrganizer and emailed to the
+    // organizer — the admin never sets or sees it.
     mustChangePassword: true,
     sendInvitationEmail: req.body?.sendEmail !== false,
   })

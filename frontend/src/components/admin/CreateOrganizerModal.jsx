@@ -81,20 +81,12 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess }) {
           <h2 className="v-page-title">Add Organizer</h2>
         </div>
         <p className="v-caption mt-1">
-          New organizer accounts start in pending review, and the organizer must change this password on first login.
+          New organizer accounts start in pending review. A temporary password is generated automatically and emailed to the organizer, who must change it on first login.
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
           <AuthFormField label="Email" id="email" error={errors.email?.message}>
             <input id="email" type="email" className={INPUT_CLASS} {...register('email')} />
-          </AuthFormField>
-
-          <AuthFormField
-            label="Temporary password"
-            id="password"
-            error={errors.password?.message}
-          >
-            <input id="password" type="password" className={INPUT_CLASS} {...register('password')} />
           </AuthFormField>
 
           {error && <FormAlert variant="error">{error}</FormAlert>}

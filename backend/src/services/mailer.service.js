@@ -15,6 +15,7 @@ import {
   participantEventUrl,
   competitionScoreUrl,
   passwordResetUrl,
+  forgotPasswordUrl,
 } from '../utils/urls.js'
 
 /**
@@ -45,7 +46,12 @@ export async function sendWorkflowEmail({ to, subject, html }) {
 
 export async function sendOrganizerInvitationEmail({ email, temporaryPassword }) {
   const loginUrl = organizerLoginUrl()
-  const html = organizerInvitationTemplate({ email, temporaryPassword, loginUrl })
+  const html = organizerInvitationTemplate({
+    email,
+    temporaryPassword,
+    loginUrl,
+    forgotPasswordUrl: forgotPasswordUrl(),
+  })
 
   return sendWorkflowEmail({
     to: email,
@@ -79,6 +85,7 @@ export async function sendVoterInvitationEmail({
     eventLink: link,
     eventTitle,
     loginUrl: voterLoginUrl(),
+    forgotPasswordUrl: forgotPasswordUrl(),
   })
 
   return sendWorkflowEmail({
@@ -133,6 +140,7 @@ export async function sendJudgeInvitationEmail({
     eventLink: link,
     eventTitle,
     loginUrl: voterLoginUrl(),
+    forgotPasswordUrl: forgotPasswordUrl(),
   })
 
   return sendWorkflowEmail({

@@ -5,6 +5,7 @@ import { db, wrap } from '../foundation/db.js'
 import { conflict, notFound } from '../foundation/errors.js'
 import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
 import { hashPassword } from '../utils/password.js'
+import { generateTemporaryPassword } from '../utils/crypto.js'
 import { sanitizeUser } from '../utils/userMapper.js'
 
 export async function findUserByUsername(username) {
@@ -53,7 +54,11 @@ export async function createOrganizer({
     throw conflict('An account with this email already exists')
   }
 
-  const passwordHash = await hashPassword(password)
+  // Auto-generate a temporary password when the caller doesn't supply one, so
+  // no human (admin included) ever sees or chooses the organizer's initial
+  // credential — it is emailed and must be changed on first login.
+  const temporaryPassword = password || generateTemporaryPassword()
+  const passwordHash = await hashPassword(temporaryPassword)
 
   const data = wrap(
     await db()
@@ -77,7 +82,7 @@ export async function createOrganizer({
     const { sendOrganizerInvitationEmail } = await import('./mailer.service.js')
     emailResult = await sendOrganizerInvitationEmail({
       email: normalizedEmail,
-      temporaryPassword: password,
+      temporaryPassword,
     })
   }
 

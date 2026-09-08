@@ -41,3 +41,7 @@ export function competitionScoreUrl(eventId) {
 export function passwordResetUrl(token) {
   return `${base}/reset-password?token=${encodeURIComponent(token)}`
 }
+
+export function forgotPasswordUrl() {
+  return `${base}/forgot-password`
+}

@@ -6,6 +6,7 @@ export function voterInvitationTemplate({
   eventLink,
   eventTitle,
   loginUrl,
+  forgotPasswordUrl,
 }) {
   const bodyHtml = `
     <h1 style="margin:0 0 12px;font-size:20px;color:#fff;">You're invited to vote</h1>
@@ -19,9 +20,12 @@ export function voterInvitationTemplate({
     <p style="margin:8px 0 16px;font-size:13px;color:#94a3b8;">
       Or sign in first: <a href="${escapeHtml(loginUrl)}" style="color:#818cf8;">${escapeHtml(loginUrl)}</a>
     </p>
-    <p style="margin:0;font-size:13px;color:#94a3b8;">
+    <p style="margin:0 0 16px;font-size:13px;color:#94a3b8;">
       Event link: <a href="${escapeHtml(eventLink)}" style="color:#818cf8;">${escapeHtml(eventLink)}</a>
     </p>
+    ${forgotPasswordUrl ? `<p style="margin:0;font-size:12px;color:#64748b;">
+      This temporary password replaces any earlier one — always use your most recent invitation email. Lost it? <a href="${escapeHtml(forgotPasswordUrl)}" style="color:#818cf8;">Set a new password</a>.
+    </p>` : ''}
   `
 
   return emailLayout({

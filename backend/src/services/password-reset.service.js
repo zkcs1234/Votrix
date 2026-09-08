@@ -80,7 +80,11 @@ export async function resetPasswordWithToken({ token, newPassword }) {
     throw new ApiError(400, 'Invalid or expired reset token')
   }
 
-  await updateUserPassword(row.user_id, newPassword, { clearMustChange: false })
+  // Setting a real password via the reset link fully replaces the account
+  // password — including any temporary one from an invitation — so clear the
+  // must_change_password flag. Otherwise an invited voter/judge who recovers
+  // through this flow would still be force-prompted to change it on first login.
+  await updateUserPassword(row.user_id, newPassword, { clearMustChange: true })
   await incrementTokenVersion(row.user_id)
 
   await getClient()

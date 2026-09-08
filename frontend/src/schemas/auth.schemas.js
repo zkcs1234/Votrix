@@ -20,7 +20,6 @@ export const changePasswordSchema = z
 
 export const createOrganizerSchema = z.object({
   email: z.string().email('Enter a valid email'),
-  password: z.string().min(8, 'Temporary password must be at least 8 characters'),
 })
 
 export const forgotPasswordSchema = z.object({
