@@ -13,6 +13,16 @@ const FORM_WIZARD_STAGES = {
   polling: ['details', 'branding', 'settings', 'information-form'],
 }
 
+// Last setup stage of each module. These pages render their own StageFooter in
+// every state — a "Finish & Publish" action while the event is still a draft,
+// and the normal "Next" navigation footer once published — so the layout must
+// not add a second footer here. The stepper still renders for these stages.
+const PAGE_OWNS_FOOTER = {
+  election: ['voters'],
+  competition: ['judges'],
+  polling: ['respondents'],
+}
+
 /**
  * Wraps module page content with the EventStepper (top) and StageFooter
  * (bottom) so every page of a module shows the stage navigation, not just the
@@ -26,6 +36,7 @@ export default function ModuleStageLayout({ module, children }) {
 
   const currentKey = stageKeyFromPath(module, location.pathname)
   const isFormWizard = currentKey && (FORM_WIZARD_STAGES[module] ?? []).includes(currentKey)
+  const pageOwnsFooter = currentKey && (PAGE_OWNS_FOOTER[module] ?? []).includes(currentKey)
 
   const enabled = Boolean(eventId && eventId !== 'new' && currentKey && !isFormWizard)
 
@@ -46,7 +57,9 @@ export default function ModuleStageLayout({ module, children }) {
         completedKeys={completedKeys}
       />
       {children}
-      <StageFooter module={module} currentKey={currentKey} eventId={eventId} />
+      {!pageOwnsFooter && (
+        <StageFooter module={module} currentKey={currentKey} eventId={eventId} />
+      )}
     </div>
   )
 }

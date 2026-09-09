@@ -2,7 +2,21 @@ import multer from 'multer'
 import { ApiError } from '../utils/ApiError.js'
 
 const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
-const CSV_MIME_TYPES = new Set(['text/csv', 'application/csv', 'application/vnd.ms-excel'])
+
+// Participant lists may arrive as CSV/TSV text or as an Excel workbook — the
+// import parser reads all of them by sniffing the file content, so the gate
+// here is intentionally lenient (browsers report inconsistent MIME types for
+// spreadsheets, e.g. a .csv opened by Excel becomes application/vnd.ms-excel).
+const SPREADSHEET_MIME_TYPES = new Set([
+  'text/csv',
+  'application/csv',
+  'text/plain',
+  'text/tab-separated-values',
+  'application/vnd.ms-excel', // legacy .xls, and .csv on machines with Excel
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+  'application/octet-stream', // some browsers send this for .xlsx/.csv
+])
+const SPREADSHEET_EXTENSIONS = ['.csv', '.tsv', '.txt', '.xlsx', '.xls']
 
 const storage = multer.memoryStorage()
 
@@ -16,12 +30,12 @@ function imageFileFilter(_req, file, cb) {
 
 function csvFileFilter(_req, file, cb) {
   const name = (file.originalname || '').toLowerCase()
-  const hasCsvExtension = name.endsWith('.csv')
-  if (CSV_MIME_TYPES.has(file.mimetype) || hasCsvExtension) {
+  const hasSpreadsheetExtension = SPREADSHEET_EXTENSIONS.some((ext) => name.endsWith(ext))
+  if (SPREADSHEET_MIME_TYPES.has(file.mimetype) || hasSpreadsheetExtension) {
     cb(null, true)
     return
   }
-  cb(new ApiError(400, 'Invalid file type. Upload a CSV file.'))
+  cb(new ApiError(400, 'Invalid file type. Upload a CSV or Excel (.xlsx) file.'))
 }
 
 export const imageUpload = multer({

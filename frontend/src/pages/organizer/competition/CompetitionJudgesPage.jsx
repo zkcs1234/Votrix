@@ -8,6 +8,7 @@ import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTa
 import JudgeAssignmentPanel from '@/components/organizer/competition/JudgeAssignmentPanel'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function downloadCsv(filename, headers, rows) {
   const csvContent = [
@@ -208,7 +209,7 @@ export default function CompetitionJudgesPage() {
       setCsvPreview(data)
     } catch (err) {
       const details = err.response?.data?.details?.errors
-      const msg = details?.join(', ') || err.response?.data?.message || 'Preview failed'
+      const msg = details?.length ? details.join(', ') : getErrorMessage(err, 'Preview failed')
       setError(msg)
       showError(msg)
     }
@@ -228,7 +229,8 @@ export default function CompetitionJudgesPage() {
       // Refresh the assignment panel's foundation too, so imported judges appear there.
       await Promise.all([load(), loadFoundation()])
     } catch (err) {
-      const msg = err.response?.data?.message || 'Registration failed'
+      const details = err.response?.data?.details?.errors
+      const msg = details?.length ? details.join(', ') : getErrorMessage(err, 'Registration failed')
       setError(msg)
       showError(msg)
     } finally {
@@ -343,13 +345,13 @@ export default function CompetitionJudgesPage() {
         <div className="v-card-sm">
           <h3 className="v-label">CSV Upload</h3>
           <p className="v-helper-text mb-3">
-            Upload a CSV with email column. Passwords are auto-generated.
+            Upload a CSV or Excel (.xlsx) file with an email column. Passwords are auto-generated.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv"
+              accept=".csv,.tsv,.xlsx,.xls"
               className="v-caption"
               onChange={handleCsvPreview}
             />
@@ -434,17 +436,22 @@ export default function CompetitionJudgesPage() {
         </div>
       )}
 
-      {isSetup && (
-        <StageFooter
-          module="competition"
-          currentKey="judges"
-          eventId={eventId}
-          saving={publishing}
-          onNext={handlePublish}
-          nextLabel="Finish & Publish"
-          nextDisabled={!publishReady}
-        />
-      )}
+      {/* This page owns its footer in every state (the layout suppresses its
+          own for this stage). While the competition is a draft it publishes;
+          once published it acts as the normal stage-navigation footer. */}
+      <StageFooter
+        module="competition"
+        currentKey="judges"
+        eventId={eventId}
+        {...(isSetup
+          ? {
+              saving: publishing,
+              onNext: handlePublish,
+              nextLabel: 'Finish & Publish',
+              nextDisabled: !publishReady,
+            }
+          : {})}
+      />
     </div>
   )
 }

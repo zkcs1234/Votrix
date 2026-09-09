@@ -7,6 +7,7 @@ import StageFooter from '@/components/ui/StageFooter'
 import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function downloadCsv(filename, headers, rows) {
   const csvContent = [
@@ -195,7 +196,7 @@ export default function ElectionVotersPage() {
       setCsvPreview(data)
     } catch (err) {
       const details = err.response?.data?.details?.errors
-      const message = details?.join(', ') || err.response?.data?.message || 'Preview failed'
+      const message = details?.length ? details.join(', ') : getErrorMessage(err, 'Preview failed')
       setError(message)
       showError(message)
     }
@@ -219,7 +220,7 @@ export default function ElectionVotersPage() {
       await reload()
     } catch (err) {
       const details = err.response?.data?.details?.errors
-      const message = details?.join(', ') || err.response?.data?.message || 'Registration failed'
+      const message = details?.length ? details.join(', ') : getErrorMessage(err, 'Registration failed')
       setError(message)
       showError(message)
     } finally {
@@ -346,12 +347,12 @@ export default function ElectionVotersPage() {
         <div className="v-card-sm">
           <h3 className="v-label">CSV Upload</h3>
           <p className="v-helper-text mb-3">
-            Upload a CSV with email column. Passwords are auto-generated.
+            Upload a CSV or Excel (.xlsx) file with an email column. Passwords are auto-generated.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <input
               type="file"
-              accept=".csv"
+              accept=".csv,.tsv,.xlsx,.xls"
               className="v-caption"
               onChange={handleCsvPreview}
             />
@@ -431,17 +432,22 @@ export default function ElectionVotersPage() {
         </div>
       )}
 
-      {isSetup && (
-        <StageFooter
-          module="election"
-          currentKey="voters"
-          eventId={eventId}
-          saving={publishing}
-          onNext={handlePublish}
-          nextLabel="Finish & Publish"
-          nextDisabled={!publishReady}
-        />
-      )}
+      {/* This page owns its footer in every state (the layout suppresses its
+          own for this stage). While the election is a draft it publishes; once
+          published it acts as the normal stage-navigation footer. */}
+      <StageFooter
+        module="election"
+        currentKey="voters"
+        eventId={eventId}
+        {...(isSetup
+          ? {
+              saving: publishing,
+              onNext: handlePublish,
+              nextLabel: 'Finish & Publish',
+              nextDisabled: !publishReady,
+            }
+          : {})}
+      />
     </div>
   )
 }
