@@ -1401,6 +1401,14 @@ const { count: totalSubmissions } = await getClient()
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
 
+  // Enrolled respondents — the denominator for "Total respondents" and the
+  // response-rate stat on the analytics dashboard.
+  const { count: enrolledRespondents } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+
   // Compute average completion time (in seconds) for submissions that have started_at
   const { data: completionTimes, error: ctErr } = await getClient()
     .from(DB_TABLES.POLL_SUBMISSIONS)
@@ -1453,6 +1461,7 @@ const { count: totalSubmissions } = await getClient()
 
   return {
     totalSubmissions: totalSubmissions ?? 0,
+    enrolledRespondents: enrolledRespondents ?? 0,
     pollAnonymous: anonymous,
     averageCompletionTimeSeconds,
     questions: questionAnalytics,

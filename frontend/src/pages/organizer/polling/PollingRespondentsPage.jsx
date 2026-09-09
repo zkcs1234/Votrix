@@ -365,7 +365,7 @@ const handleCsvPreview = async (e) => {
         loading={loading}
         search={search}
         onSearchChange={setSearch}
-        statusKey="hasVoted"
+        statusKey="hasResponded"
         statusLabel={{ active: 'Pending', done: 'Responded' }}
         renderActions={renderActions}
         emptyMessage={search ? 'No respondents found matching your search' : 'No respondents yet'}

@@ -2009,36 +2009,54 @@ export async function getPageantAnalytics(eventId, organizerId) {
 export async function getCompetitionAnalytics(eventId, organizerId) {
   const rankings = await getLiveRankings(eventId, organizerId)
 
-  const [contestantsRes, criteriaRes, scoresRes] = await Promise.all([
-    getClient().from(DB_TABLES.CONTESTANTS).select('id').eq('event_id', eventId),
-    getClient().from(DB_TABLES.CRITERIA).select('id, name').eq('event_id', eventId),
-    getClient()
-      .from(DB_TABLES.JUDGE_SCORES)
-      .select('score, criteria_id, competition_criteria!inner(event_id)')
-      .eq('competition_criteria.event_id', eventId),
-  ])
+  const [contestantsRes, criteriaRes, categoriesRes, roundsRes, scoresRes, judgesRes] =
+    await Promise.all([
+      getClient().from(DB_TABLES.CONTESTANTS).select('id').eq('event_id', eventId),
+      getClient().from(DB_TABLES.CRITERIA).select('id, name').eq('event_id', eventId),
+      getClient().from(DB_TABLES.COMPETITION_CATEGORIES).select('id').eq('event_id', eventId),
+      getClient()
+        .from(DB_TABLES.COMPETITION_ROUNDS)
+        .select('id, name, display_order')
+        .eq('event_id', eventId)
+        .order('display_order', { ascending: true }),
+      getClient()
+        .from(DB_TABLES.JUDGE_SCORES)
+        .select('score, criteria_id, contestant_id, round_id, judge_id, competition_criteria!inner(event_id)')
+        .eq('competition_criteria.event_id', eventId),
+      getClient()
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
+        .select('user_id, display_name, first_name, last_name, users (email)')
+        .eq('event_id', eventId)
+        .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
+    ])
 
   if (contestantsRes.error) throw new ApiError(500, contestantsRes.error.message)
   if (criteriaRes.error) throw new ApiError(500, criteriaRes.error.message)
+  if (categoriesRes.error) throw new ApiError(500, categoriesRes.error.message)
+  if (roundsRes.error) throw new ApiError(500, roundsRes.error.message)
   if (scoresRes.error) throw new ApiError(500, scoresRes.error.message)
+  if (judgesRes.error) throw new ApiError(500, judgesRes.error.message)
+
+  const scores = scoresRes.data ?? []
+  const totalContestants = (contestantsRes.data ?? []).length
 
   const criteriaMap = new Map(
     (criteriaRes.data ?? []).map((criteria) => [criteria.id, criteria.name]),
   )
 
   const grouped = new Map()
-  for (const scoreRow of scoresRes.data ?? []) {
+  for (const scoreRow of scores) {
     const key = scoreRow.criteria_id
     if (!grouped.has(key)) grouped.set(key, [])
     grouped.get(key).push(Number(scoreRow.score))
   }
 
   const criteriaAnalytics = Array.from(criteriaMap.entries()).map(([criteriaId, criteriaName]) => {
-    const scores = grouped.get(criteriaId) ?? []
-    const total = scores.reduce((sum, score) => sum + score, 0)
-    const averageScore = scores.length ? Math.round((total / scores.length) * 100) / 100 : 0
-    const highestScore = scores.length ? Math.max(...scores) : 0
-    const lowestScore = scores.length ? Math.min(...scores) : 0
+    const critScores = grouped.get(criteriaId) ?? []
+    const total = critScores.reduce((sum, score) => sum + score, 0)
+    const averageScore = critScores.length ? Math.round((total / critScores.length) * 100) / 100 : 0
+    const highestScore = critScores.length ? Math.max(...critScores) : 0
+    const lowestScore = critScores.length ? Math.min(...critScores) : 0
 
     return {
       criteriaId,
@@ -2049,16 +2067,81 @@ export async function getCompetitionAnalytics(eventId, organizerId) {
     }
   })
 
+  // Judge turnout — judges who have submitted any score vs. the full roster.
   const totalJudges = rankings.judges.total ?? 0
   const submittedJudges = rankings.judges.submitted ?? 0
+  const pendingJudges = Math.max(totalJudges - submittedJudges, 0)
+  const judgeCompletionRate =
+    totalJudges > 0 ? Math.round((submittedJudges / totalJudges) * 10000) / 100 : 0
+
+  // Per-category leaderboards — invert each contestant's per-category sub-score
+  // into { category → contestants[] }, sorted high-to-low within the category.
+  const categoryAgg = new Map()
+  for (const row of rankings.rankings ?? []) {
+    for (const cat of row.perCategory ?? []) {
+      if (!categoryAgg.has(cat.categoryId)) {
+        categoryAgg.set(cat.categoryId, {
+          categoryId: cat.categoryId,
+          categoryName: cat.categoryName,
+          contestants: [],
+        })
+      }
+      categoryAgg.get(cat.categoryId).contestants.push({
+        contestantId: row.contestantId,
+        contestantName: row.contestantName,
+        weightedScore: Number(cat.value ?? 0),
+      })
+    }
+  }
+  const categoryRankings = Array.from(categoryAgg.values()).map((cat) => ({
+    ...cat,
+    contestants: cat.contestants.sort((a, b) => b.weightedScore - a.weightedScore),
+  }))
+
+  // Per-judge activity — how many distinct contestants each judge has scored.
+  const contestantsByJudge = new Map()
+  for (const s of scores) {
+    if (!s.judge_id || !s.contestant_id) continue
+    if (!contestantsByJudge.has(s.judge_id)) contestantsByJudge.set(s.judge_id, new Set())
+    contestantsByJudge.get(s.judge_id).add(s.contestant_id)
+  }
+  const judgeActivity = (judgesRes.data ?? []).map((j) => ({
+    judgeId: j.user_id,
+    judgeName: resolveDisplayName(j.first_name, j.last_name, j.users?.email ?? null),
+    email: j.users?.email ?? null,
+    submittedCount: contestantsByJudge.get(j.user_id)?.size ?? 0,
+    totalAssigned: totalContestants,
+  }))
+
+  // Per-round submitted-score counts.
+  const scoresByRound = new Map()
+  for (const s of scores) {
+    if (!s.round_id) continue
+    scoresByRound.set(s.round_id, (scoresByRound.get(s.round_id) ?? 0) + 1)
+  }
+  const rounds = (roundsRes.data ?? []).map((r) => ({
+    roundId: r.id,
+    name: r.name,
+    submittedCount: scoresByRound.get(r.id) ?? 0,
+  }))
 
   return {
-    totalContestants: (contestantsRes.data ?? []).length,
+    totalContestants,
     totalJudges,
-    scoresSubmitted: (scoresRes.data ?? []).length,
-    judgeCompletionRate:
-      totalJudges > 0 ? Math.round((submittedJudges / totalJudges) * 10000) / 100 : 0,
+    totalCategories: (categoriesRes.data ?? []).length,
+    totalRounds: (roundsRes.data ?? []).length,
+    scoresSubmitted: scores.length,
+    judgeCompletionRate,
+    judgeTurnout: {
+      totalJudges,
+      submittedCount: submittedJudges,
+      pendingCount: pendingJudges,
+      turnoutPercentage: judgeCompletionRate,
+    },
     rankings: rankings.rankings,
+    categoryRankings,
+    judgeActivity,
+    rounds,
     criteriaAnalytics,
   }
 }
