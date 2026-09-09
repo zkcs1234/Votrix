@@ -24,10 +24,6 @@ export const electionService = {
     return api.patch(`${base}/events/${eventId}`, payload)
   },
 
-  setVoting(eventId, votingEnabled) {
-    return api.patch(`${base}/events/${eventId}/voting`, { votingEnabled })
-  },
-
   uploadBanner(eventId, file) {
     const form = new FormData()
     form.append('banner', file)

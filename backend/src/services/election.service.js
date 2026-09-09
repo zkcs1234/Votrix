@@ -265,69 +265,6 @@ export async function updateElectionEvent(eventId, organizerId, payload) {
   return mapEvent(data)
 }
 
-export async function setEventVoting(eventId, organizerId, votingEnabled) {
-  await assertOrganizerOwnsEvent(eventId, organizerId)
-
-  if (votingEnabled) {
-    const { data: positions, error: posErr } = await getClient()
-      .from(DB_TABLES.POSITIONS)
-      .select('id')
-      .eq('event_id', eventId)
-
-    if (posErr) throw new ApiError(500, posErr.message)
-    if (!positions?.length) {
-      throw new ApiError(400, 'Add at least one position before opening voting')
-    }
-
-    const positionIds = positions.map((p) => p.id)
-    const { data: candidates, error: candErr } = await getClient()
-      .from(DB_TABLES.CANDIDATES)
-      .select('position_id')
-      .in('position_id', positionIds)
-
-    if (candErr) throw new ApiError(500, candErr.message)
-
-    const positionsWithCandidates = new Set((candidates ?? []).map((c) => c.position_id))
-    const missing = positions.filter((p) => !positionsWithCandidates.has(p.id))
-    if (missing.length) {
-      throw new ApiError(
-        400,
-        'Every position must have at least one candidate before opening voting',
-      )
-    }
-  }
-
-  const updates = {
-    voting_enabled: Boolean(votingEnabled),
-    status: votingEnabled ? 'active' : 'scheduled',
-  }
-
-  const { data, error } = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .update(updates)
-    .eq('id', eventId)
-    .select('*')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
-  
-  emitToEvent(eventId, 'election:voting-toggled', {
-    eventId,
-    votingEnabled: Boolean(votingEnabled),
-  })
-
-  await recordAudit({
-    userId: organizerId,
-    action: votingEnabled ? 'election.voting.enable' : 'election.voting.disable',
-    entity: 'events',
-    entityId: eventId,
-    details: { title: data.title, votingEnabled: Boolean(votingEnabled) },
-  })
-
-  invalidateDashboardCache(organizerId)
-  return mapEvent(data)
-}
-
 export async function getElectionEvent(eventId, organizerId) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
   if (event.event_type !== EVENT_TYPES.ELECTION) {

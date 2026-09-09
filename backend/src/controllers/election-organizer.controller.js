@@ -8,7 +8,6 @@ import {
   validateUpdateEvent,
   validatePosition,
   validateCandidate,
-  validateVotingToggle,
 } from '../validators/election.validator.js'
 import { validateInviteVoter } from '../validators/email.validator.js'
 import { registerVoterToEvent, registerExistingVoter as registerExistingVoterService, sendVoterInvitation, sendAllPendingInvitations } from '../services/invitation.service.js'
@@ -44,12 +43,6 @@ export const updateEvent = asyncHandler(async (req, res) => {
     req.user.id,
     payload,
   )
-  res.json({ success: true, event })
-})
-
-export const setVoting = asyncHandler(async (req, res) => {
-  const enabled = validateVotingToggle(req.body)
-  const event = await electionService.setEventVoting(req.params.eventId, req.user.id, enabled)
   res.json({ success: true, event })
 })
 

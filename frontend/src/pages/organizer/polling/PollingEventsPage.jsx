@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Edit2 } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
-import { useToast } from '@/hooks/useToast'
-import { getErrorMessage } from '@/utils/getErrorMessage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import useDraft from '@/hooks/useDraft'
@@ -13,7 +11,6 @@ export default function PollingEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const { hasDraft, draft, deleteDraft } = useDraft('polling')
-  const { success, error: toastError } = useToast()
 
   const load = () => {
     pollingService
@@ -33,17 +30,6 @@ export default function PollingEventsPage() {
       )
     )
   })
-
-  const toggle = async (event) => {
-    const opening = !event.pollingEnabled
-    try {
-      await pollingService.setPollOpen(event.id, opening)
-      load()
-      success(opening ? `"${event.title}" is now open for responses` : `"${event.title}" is now closed`)
-    } catch (err) {
-      toastError(getErrorMessage(err))
-    }
-  }
 
   if (loading) {
     return (
@@ -92,21 +78,13 @@ export default function PollingEventsPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            {event.status === 'draft' ? (
+            {event.status === 'draft' && (
               <Link
                 to={`/organizer/polling/events/${event.id}/builder`}
                 className="rounded-lg border border-v-primary bg-v-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-v-primary-hover"
               >
                 Continue setup
               </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => toggle(event)}
-                className="rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted"
-              >
-                {event.pollingEnabled ? 'Close poll' : 'Open poll'}
-              </button>
             )}
             <Link
               to={`/organizer/polling/events/${event.id}/edit`}

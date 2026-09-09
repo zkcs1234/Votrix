@@ -133,10 +133,3 @@ export function validateBallot(body) {
   // disabled the nonce check. `null` when the client sends no nonce (legacy).
   return { selections: normalized, votingNonce: body?.votingNonce ?? null }
 }
-
-export function validateVotingToggle(body) {
-  if (typeof body?.votingEnabled !== 'boolean') {
-    throw new ApiError(400, 'votingEnabled must be a boolean')
-  }
-  return body.votingEnabled
-}

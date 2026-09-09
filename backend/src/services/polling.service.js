@@ -665,36 +665,6 @@ export async function updatePollEvent(eventId, organizerId, payload) {
   return mapPollEvent(data)
 }
 
-export async function setPollOpen(eventId, organizerId, pollingEnabled) {
-  await assertPollingEvent(eventId, organizerId)
-
-  const { data, error } = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .update({
-      polling_enabled: Boolean(pollingEnabled),
-      status: pollingEnabled ? 'active' : 'scheduled',
-    })
-    .eq('id', eventId)
-    .select('*')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
-
-  emitToEvent(eventId, 'poll:polling-toggled', {
-    eventId,
-    pollingEnabled: Boolean(pollingEnabled),
-  })
-
-  recordEventActivity({
-    eventId,
-    action: pollingEnabled ? 'polling.poll.open' : 'polling.poll.close',
-    userId: organizerId,
-    module: 'polling',
-  })
-
-  return mapPollEvent(data)
-}
-
 export async function getPollSettings(eventId, organizerId) {
   const event = await assertPollingEvent(eventId, organizerId)
   return mapPollEvent(event)

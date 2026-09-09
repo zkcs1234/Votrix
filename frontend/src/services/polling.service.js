@@ -36,10 +36,6 @@ export const pollingService = {
     return api.get(`${org}/events/${eventId}/settings`)
   },
 
-  setPollOpen(eventId, pollingEnabled) {
-    return api.patch(`${org}/events/${eventId}/open`, { pollingEnabled })
-  },
-
   // Publish a fully-built setup (draft) poll: releases it to the schedule.
   publishEvent(eventId) {
     return api.post(`${org}/events/${eventId}/publish`)

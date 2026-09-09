@@ -90,18 +90,8 @@ function BallotPreviewModal({ eventId, onClose }) {
   )
 }
 
-function EventCard({ event, onToggleVoting, onDuplicate, onPreview }) {
-  const [toggling, setToggling] = useState(false)
+function EventCard({ event, onDuplicate, onPreview }) {
   const [duplicating, setDuplicating] = useState(false)
-
-  const handleToggle = async () => {
-    setToggling(true)
-    try {
-      await onToggleVoting(event)
-    } finally {
-      setToggling(false)
-    }
-  }
 
   const handleDuplicate = async () => {
     setDuplicating(true)
@@ -148,32 +138,13 @@ function EventCard({ event, onToggleVoting, onDuplicate, onPreview }) {
           <Copy className="h-3.5 w-3.5" strokeWidth={2} />
           {duplicating ? 'Copying...' : 'Duplicate'}
         </button>
-        {event.status === 'draft' ? (
+        {event.status === 'draft' && (
           <Link
             to={`/organizer/election/events/${event.id}/positions`}
             className="rounded-lg border border-v-primary bg-v-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-v-primary-hover"
           >
             Continue setup
           </Link>
-        ) : (
-          <button
-            type="button"
-            onClick={handleToggle}
-            disabled={toggling}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-              event.votingEnabled
-                ? 'border border-red-800 text-v-danger hover:bg-red-950/40'
-                : 'border border-emerald-800 text-emerald-300 hover:bg-emerald-950/40'
-            } disabled:opacity-50`}
-          >
-            {toggling
-              ? event.votingEnabled
-                ? 'Closing...'
-                : 'Opening...'
-              : event.votingEnabled
-                ? 'Close voting'
-                : 'Open voting'}
-          </button>
         )}
         <Link
           to={`/organizer/election/events/${event.id}/edit`}
@@ -236,26 +207,6 @@ export default function ElectionEventsPage() {
       )
     )
   })
-
-  const handleToggleVoting = useCallback(
-    async (event) => {
-      const previousEvents = [...events]
-
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === event.id ? { ...e, votingEnabled: !e.votingEnabled } : e
-        )
-      )
-
-      try {
-        await electionService.setVoting(event.id, !event.votingEnabled)
-      } catch (err) {
-        setEvents(previousEvents)
-        showError(err.response?.data?.message || 'Failed to update voting status')
-      }
-    },
-    [events, showError]
-  )
 
   const handleDuplicate = async (eventId) => {
     try {
@@ -322,7 +273,6 @@ export default function ElectionEventsPage() {
           <EventCard
             key={event.id}
             event={event}
-            onToggleVoting={handleToggleVoting}
             onDuplicate={handleDuplicate}
             onPreview={setPreviewEventId}
           />

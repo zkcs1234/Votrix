@@ -424,7 +424,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             <div className="v-date-row">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
-                  Start Date <span className="text-v-danger">*</span>
+                  Start Date and Time <span className="text-v-danger">*</span>
                 </label>
                 <Controller
                   control={control}
@@ -448,7 +448,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
 
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="endDate">
-                  End Date <span className="text-v-danger">*</span>
+                  End Date and Time <span className="text-v-danger">*</span>
                 </label>
                 <Controller
                   control={control}

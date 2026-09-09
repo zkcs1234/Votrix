@@ -147,8 +147,16 @@ export default function VoterPollPage() {
         {poll?.event?.startDate && poll?.event?.endDate && (
           <p className="mt-2 text-sm text-v-text-subtle">
             This poll was open from{' '}
-            {new Date(poll.event.startDate).toLocaleDateString()} to{' '}
-            {new Date(poll.event.endDate).toLocaleDateString()}.
+            {new Date(poll.event.startDate).toLocaleString(undefined, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}{' '}
+            to{' '}
+            {new Date(poll.event.endDate).toLocaleString(undefined, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}
+            .
           </p>
         )}
 

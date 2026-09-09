@@ -40,12 +40,6 @@ export const getSettings = asyncHandler(async (req, res) => {
   res.json({ success: true, settings })
 })
 
-export const setPollOpen = asyncHandler(async (req, res) => {
-  const { open } = req.body
-  const event = await pollingService.setPollOpen(req.params.eventId, req.user.id, open)
-  res.json({ success: true, event })
-})
-
 export const publishEvent = asyncHandler(async (req, res) => {
   const event = await pollingService.publishPollEvent(req.params.eventId, req.user.id)
   res.json({ success: true, event })

@@ -13,7 +13,6 @@ router.get('/events', ctrl.listEvents)
 router.post('/events', ctrl.createEvent)
 router.get('/events/:eventId', ctrl.getEvent)
 router.patch('/events/:eventId', ctrl.updateEvent)
-router.patch('/events/:eventId/voting', ctrl.setVoting)
 router.post('/events/:eventId/banner', uploadLimiter, uploadImage('banner'), ctrl.uploadBanner)
 
 router.get('/events/:eventId/positions', ctrl.listPositions)
