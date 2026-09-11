@@ -1732,6 +1732,10 @@ export async function listJudgeCompetitionEvents(judgeId) {
     .filter((r) => COMPETITION_SCORING_EVENT_TYPES.has(r.events?.event_type))
     .map((r) => ({
       ...mapEvent(r.events),
+      // mapEvent omits scoring_enabled, but the voter dashboard classifies a
+      // competition as "Scoring open" from it (set true by startSession) — so it
+      // must travel through, or the event stays stuck on "Waiting to open".
+      scoringEnabled: Boolean(r.events?.scoring_enabled),
       hasScored: r.has_scored,
     }))
 }
