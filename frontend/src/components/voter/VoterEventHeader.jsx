@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { ArrowLeft, Building2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -16,22 +17,29 @@ function getInitials(name) {
 }
 
 export default function VoterEventHeader({ event, eyebrow, children }) {
-  const hasBanner = Boolean(event?.banner?.trim?.())
+  const bannerUrl = event?.banner?.trim?.() || ''
   const organization = event?.organization
   const organizationName = organization?.name || organization?.organizationName
   const fallbackGradient = TYPE_GRADIENT[event?.eventType] ?? TYPE_GRADIENT.election
+
+  // Fall back to the type gradient when there is no banner OR the banner URL
+  // fails to load (e.g. a stale/invalid value) — never leave a broken image box.
+  const [bannerFailed, setBannerFailed] = useState(false)
+  useEffect(() => setBannerFailed(false), [bannerUrl])
+  const showBanner = Boolean(bannerUrl) && !bannerFailed
 
   return (
     <section className="overflow-hidden rounded-xl border border-v-border bg-v-surface">
       <div
         className="relative flex min-h-[180px] flex-col justify-between gap-8 px-5 py-5 sm:px-6"
-        style={hasBanner ? undefined : { background: fallbackGradient }}
+        style={showBanner ? undefined : { background: fallbackGradient }}
       >
-        {hasBanner && (
+        {showBanner && (
           <img
-            src={event.banner}
+            src={bannerUrl}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setBannerFailed(true)}
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/35" />
