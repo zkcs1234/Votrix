@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
-import { useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
-import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/hooks/useToast'
 import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
 import { HELPER_TEXT, INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
@@ -30,7 +28,9 @@ function resolveScaleBounds(scoringConfig) {
   }
 }
 
-// Score type lives on each MINOR criterion now (not the criterion / event).
+// Score type lives on each MINOR criterion (not the criterion / event). This is
+// the single source of truth for the range a judge types; the event-level
+// scoring config only carries how scores COMBINE (calc method, decimals, drops).
 const SCORE_TYPE_OPTIONS = [
   { value: 'range_1_100', label: '1–100' },
   { value: 'range_1_10', label: '1–10' },
@@ -56,9 +56,17 @@ function minorBoundsLabel(m) {
 // percentage (equal weight within the criterion) and each owns its score type.
 function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
   const minors = criterion.minorCriteria ?? []
+  // A3: default the next minor's score type to the last one added on this
+  // criterion, so the organizer isn't re-picking the same scale each time.
+  const lastScoreType = minors.length ? minors[minors.length - 1].scoreType ?? 'range_1_100' : 'range_1_100'
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ name: '', scoreType: 'range_1_100', customMin: '', customMax: '' })
+  const [form, setForm] = useState({ name: '', scoreType: lastScoreType, customMin: '', customMax: '' })
   const [busy, setBusy] = useState(false)
+
+  const openAdd = () => {
+    setForm({ name: '', scoreType: lastScoreType, customMin: '', customMax: '' })
+    setAdding(true)
+  }
 
   const add = async (e) => {
     e.preventDefault()
@@ -78,7 +86,7 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
     setBusy(true)
     try {
       await pageantService.createMinorCriteria(eventId, criterion.id, payload)
-      setForm({ name: '', scoreType: 'range_1_100', customMin: '', customMax: '' })
+      setForm({ name: '', scoreType: form.scoreType, customMin: '', customMax: '' })
       setAdding(false)
       onChanged()
     } catch (err) {
@@ -189,7 +197,7 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
         <button
           type="button"
           className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-v-border px-2.5 py-1.5 text-xs text-v-text-muted hover:text-v-text"
-          onClick={() => setAdding(true)}
+          onClick={openAdd}
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
           Add minor criterion
@@ -199,44 +207,34 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
   )
 }
 
-// Round-aware Criteria page. When the event has rounds (defined in Structure &
-// Scoring), you pick a round and configure the criteria that belong to it — each
-// round's criteria total 100% within that round. With no rounds, it's a flat
-// event-wide criteria list (simple competitions). Each criterion holds minor
-// criteria; judges score the minor criteria and the score type lives on each.
-export default function CompetitionCriteriaPage() {
-  const { eventId } = useParams()
-  const [foundation, setFoundation] = useState(null)
-  const [list, setList] = useState([]) // all event criteria
-  const [rounds, setRounds] = useState([])
-  const [selectedRoundId, setSelectedRoundId] = useState(null)
-  const [loading, setLoading] = useState(true)
+// Round-aware criteria editor, embedded as the workspace's Criteria tab. When the
+// event has rounds, pick a round and configure the criteria that belong to it —
+// each round's criteria total 100% within that round. With no rounds, it's a flat
+// event-wide criteria list. Each criterion holds minor criteria; judges score the
+// minor criteria and the score type lives on each.
+//
+// Consumes the already-loaded `foundation` and the parent's `reload` — it does not
+// fetch its own data, so it stays in sync with the rest of the workspace.
+export default function CriteriaManager({ eventId, foundation, reload }) {
+  const list = foundation?.criteria ?? [] // all event criteria
+  const rounds = foundation?.rounds ?? []
+  const roundIdsKey = rounds.map((r) => r.id).join(',')
+
+  const [selectedRoundId, setSelectedRoundId] = useState(() => rounds[0]?.id ?? null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', percentage: '', divisionId: '' })
   const [attachId, setAttachId] = useState('')
   const { error: showError } = useToast()
 
-  const load = useCallback(() => {
-    pageantService
-      .getFoundation(eventId)
-      .then(({ data }) => {
-        const f = data.foundation
-        setFoundation(f)
-        setList(f.criteria ?? [])
-        const rs = f.rounds ?? []
-        setRounds(rs)
-        setSelectedRoundId((cur) => {
-          if (!rs.length) return null
-          if (cur && rs.some((r) => r.id === cur)) return cur
-          return rs[0].id
-        })
-      })
-      .finally(() => setLoading(false))
-  }, [eventId])
-
+  // Keep the selected round valid as rounds change (added/removed elsewhere).
   useEffect(() => {
-    load()
-  }, [load])
+    setSelectedRoundId((cur) => {
+      if (!rounds.length) return null
+      if (cur && rounds.some((r) => r.id === cur)) return cur
+      return rounds[0].id
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundIdsKey])
 
   const divisionsEnabled = foundation?.event?.divisions_enabled
   const divisions = foundation?.divisions ?? []
@@ -275,8 +273,7 @@ export default function CompetitionCriteriaPage() {
         await pageantService.addRoundCriteria(eventId, selectedRoundId, created.id)
       }
       setForm({ name: '', percentage: '', divisionId: '' })
-      setLoading(true)
-      load()
+      reload()
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to add criteria')
     } finally {
@@ -287,7 +284,7 @@ export default function CompetitionCriteriaPage() {
   const removeFromRound = async (criteriaId) => {
     try {
       await pageantService.removeRoundCriteria(eventId, selectedRoundId, criteriaId)
-      load()
+      reload()
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to remove from round')
     }
@@ -298,7 +295,7 @@ export default function CompetitionCriteriaPage() {
     try {
       await pageantService.addRoundCriteria(eventId, selectedRoundId, attachId)
       setAttachId('')
-      load()
+      reload()
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to attach criteria')
     }
@@ -307,18 +304,10 @@ export default function CompetitionCriteriaPage() {
   const deleteCriterion = async (criteriaId) => {
     try {
       await pageantService.deleteCriteria(eventId, criteriaId)
-      load()
+      reload()
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to delete criteria')
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-20">
-        <LoadingSpinner />
-      </div>
-    )
   }
 
   return (
@@ -380,8 +369,8 @@ export default function CompetitionCriteriaPage() {
                 })}
               </div>
               <p className={HELPER_TEXT}>
-                Rounds are created in <strong>Structure &amp; Scoring → Rounds</strong>. Configure each
-                round&apos;s criteria here.
+                Rounds are created in the <strong>Rounds</strong> tab. Configure each round&apos;s
+                criteria here.
               </p>
             </div>
           )}
@@ -547,7 +536,7 @@ export default function CompetitionCriteriaPage() {
                 <MinorCriteriaManager
                   eventId={eventId}
                   criterion={c}
-                  onChanged={load}
+                  onChanged={reload}
                   showError={showError}
                 />
               </li>

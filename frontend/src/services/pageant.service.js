@@ -273,8 +273,10 @@ export const pageantService = {
     return api.get(`${judge}/events/${eventId}/score`, { params })
   },
 
-  getSessionView(eventId) {
-    return api.get(`${judge}/events/${eventId}/session-view`)
+  getSessionView(eventId, { divisionId } = {}) {
+    return api.get(`${judge}/events/${eventId}/session-view`, {
+      params: divisionId ? { divisionId } : undefined,
+    })
   },
 
   getActiveSession(eventId) {

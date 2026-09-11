@@ -189,13 +189,24 @@ export const getJudgeProgress = asyncHandler(async (req, res) => {
   res.json({ success: true, ...progress })
 })
 
+/** POST /api/organizer/competition/events/:eventId/session/unlock-score */
+export const unlockScore = asyncHandler(async (req, res) => {
+  const result = await sessionService.unlockSessionScore(req.params.eventId, req.user.id, {
+    contestantId: req.body?.contestantId,
+    judgeId: req.body?.judgeId || null,
+  })
+  res.json({ success: true, ...result })
+})
+
 // ---------------------------------------------------------------------------
 // Judge (voter) session endpoints
 // ---------------------------------------------------------------------------
 
 /** GET /api/voter/competition/events/:eventId/session-view */
 export const getJudgeSessionView = asyncHandler(async (req, res) => {
-  const view = await sessionService.getJudgeSessionView(req.params.eventId, req.user.id)
+  const view = await sessionService.getJudgeSessionView(req.params.eventId, req.user.id, {
+    divisionId: req.query.divisionId || null,
+  })
   res.json({ success: true, ...view })
 })
 

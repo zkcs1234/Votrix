@@ -16,11 +16,11 @@ export const EVENT_STAGES = {
     { key: 'details', label: 'Details', path: 'edit' },
     { key: 'branding', label: 'Branding', path: 'branding' },
     { key: 'information-form', label: 'Information Form', path: 'form' },
-    // Setup — Structure & Scoring defines rounds; Contestants and Criteria are
-    // added then assigned to rounds on their own pages; Judges are added + assigned.
+    // Setup — Structure & Scoring holds rounds, criteria (with minor criteria +
+    // score types), divisions and scoring rules; Contestants are added then
+    // assigned to rounds on their own page; Judges are added + assigned.
     { key: 'workspace', label: 'Structure & Scoring', path: 'workspace' },
     { key: 'contestants', label: 'Contestants', path: 'contestants' },
-    { key: 'criteria', label: 'Criteria', path: 'criteria' },
     { key: 'judges', label: 'Judges', path: 'judges' },
     // Run
     { key: 'live', label: 'Live Control', path: 'live' },

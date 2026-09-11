@@ -80,6 +80,10 @@ router.post('/session/set-division', sessionCtrl.setActiveDivision)
 // Judge progress (organizer view)
 router.get('/session/judge-progress', sessionCtrl.getJudgeProgress)
 
+// Organizer unlock a locked score (B5) — reopen for a contestant (all judges,
+// or one judge when judgeId is supplied). Audited.
+router.post('/session/unlock-score', sessionCtrl.unlockScore)
+
 // Round finalize & advancement (Phase 6)
 router.get('/rounds/:roundId/advancement-preview', sessionCtrl.previewRoundAdvancement)
 router.post('/session/finalize-round', sessionCtrl.finalizeRound)

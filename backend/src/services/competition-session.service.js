@@ -1224,12 +1224,14 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores, contes
     throw new ApiError(400, 'No active contestant to score')
   }
 
-  // Resolve the target contestant. In stage-group mode multiple contestants are
-  // on stage; the judge must say which one this submission is for. Without a
-  // group, it defaults to the single active contestant (back-compat).
+  // Resolve the target contestant. Round-driven: the whole round's field is on
+  // stage, so any contestant in the round order can be scored (each submission
+  // names its contestantId). An explicit stage-group subset still narrows it.
+  // This must mirror getJudgeSessionView's stage set, or valid submissions for
+  // non-primary contestants would be rejected.
   const onStage = session.activeContestantIds?.length
     ? session.activeContestantIds
-    : [session.activeContestantId]
+    : (session.contestantOrder ?? [])
   const targetContestantId = contestantId ?? onStage[0]
   if (!onStage.includes(targetContestantId)) {
     throw new ApiError(400, 'That contestant is not currently on stage')
@@ -1379,7 +1381,7 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores, contes
 // ---------------------------------------------------------------------------
 // Get judge's scoring view for the active session
 // ---------------------------------------------------------------------------
-export async function getJudgeSessionView(eventId, judgeId) {
+export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {}) {
   const enrollment = await assertJudgeEnrolled(eventId, judgeId)
   const event = await getEventById(eventId)
 
@@ -1412,10 +1414,26 @@ export async function getJudgeSessionView(eventId, judgeId) {
     }
   }
 
-  // Stage contestants: the group when set, else just the single active one.
-  const stageIds = session.activeContestantIds?.length
+  // Round-driven scoring: the WHOLE round's field is on stage, so a judge scores
+  // every contestant in the round from one scoresheet. A stage-group subset is
+  // still honoured if one was explicitly set (legacy); otherwise the full
+  // contestant order is scorable at once.
+  let stageIds = session.activeContestantIds?.length
     ? session.activeContestantIds
-    : [session.activeContestantId]
+    : (session.contestantOrder ?? [])
+
+  // Optional division filter (judge-side): narrow the field to one division.
+  if (divisionId) {
+    const divisionOrder = await buildContestantOrder(eventId, session.currentRoundId, divisionId)
+    const divSet = new Set(divisionOrder)
+    stageIds = stageIds.filter((id) => divSet.has(id))
+  }
+
+  // Safety net: never end up with an empty field when a single active contestant
+  // is known (e.g. order not yet built).
+  if (!stageIds.length && session.activeContestantId) {
+    stageIds = [session.activeContestantId]
+  }
 
   const { data: stageRows } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
@@ -1482,9 +1500,11 @@ export async function getJudgeSessionView(eventId, judgeId) {
     contestant: primary ? { id: primary.id, name: primary.name, photo: primary.photo, contestantNumber: primary.contestantNumber } : null,
     existingScores: primary?.existingScores ?? {},
     hasSubmitted: primary?.hasSubmitted ?? false,
-    // Stage group: every on-stage contestant, each scored individually.
-    stageGroup: Boolean(session.activeContestantIds?.length),
+    // Round-driven: more than one on-stage contestant means the judge scores the
+    // whole field from one sheet (also true for an explicit stage-group subset).
+    stageGroup: stageContestants.length > 1,
     stageContestants,
+    divisionsEnabled: Boolean(event.divisions_enabled),
     roundName,
     roundId: session.currentRoundId ?? null,
     criteria,
@@ -1544,31 +1564,100 @@ export async function getJudgeProgress(eventId, organizerId) {
     return { judges: [] }
   }
 
-  // Get submitted scores for this contestant in this round
+  // Round-driven progress: judges score the WHOLE field, so progress is a
+  // contestant × judge matrix. Pull every locked submission for this round.
   const { data: submittedScores } = await getClient()
     .from('competition_session_judge_scores')
-    .select('judge_id, is_locked, scores')
+    .select('judge_id, contestant_id, locked_at')
     .eq('session_id', session.id)
     .eq('round_id', session.currentRoundId)
-    .eq('contestant_id', session.activeContestantId)
     .eq('is_locked', true)
 
-  const submittedJudgeIds = new Set((submittedScores ?? []).map(s => s.judge_id))
+  // The round's contestants, in order, with display info for the grid.
+  const order = session.contestantOrder ?? []
+  let contestants = []
+  if (order.length) {
+    const { data: contestantRows } = await getClient()
+      .from(DB_TABLES.CONTESTANTS)
+      .select('id, name, contestant_number')
+      .in('id', order)
+    const byId = new Map((contestantRows ?? []).map((c) => [c.id, c]))
+    contestants = order
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .map((c) => ({ id: c.id, name: c.name, contestantNumber: c.contestant_number }))
+  }
+
+  const submitted = (submittedScores ?? []).map((s) => ({
+    judgeId: s.judge_id,
+    contestantId: s.contestant_id,
+    submittedAt: s.locked_at ?? null,
+  }))
 
   return {
-    contestantId: session.activeContestantId,
     roundId: session.currentRoundId,
     divisionId: session.currentDivisionId,
-    judges: eligibleJudges.map(j => ({
+    // Back-compat: the previously-active contestant id (unused by the grid).
+    contestantId: session.activeContestantId,
+    judges: eligibleJudges.map((j) => ({
       judgeId: j.user_id,
       judgeRowId: j.id,
       displayName: j.display_name,
       role: j.judge_role ?? 'judge',
-      hasSubmitted: submittedJudgeIds.has(j.user_id),
     })),
+    contestants,
+    // Flat list of locked (judge, contestant) submissions; the UI builds the grid.
+    submitted,
     totalJudges: eligibleJudges.length,
-    submittedCount: submittedJudgeIds.size,
   }
+}
+
+// ---------------------------------------------------------------------------
+// B5 — Organizer unlock: reopen a locked score so a judge can revise it.
+// Unlocks one contestant's submissions in the current round — all judges by
+// default, or a single judge when `judgeId` is given. Audited; judges are
+// notified so their now-reopened row becomes editable again.
+// ---------------------------------------------------------------------------
+export async function unlockSessionScore(eventId, organizerId, { contestantId, judgeId } = {}) {
+  const session = await assertActiveSession(eventId, organizerId)
+
+  if (!contestantId) {
+    throw new ApiError(400, 'contestantId is required')
+  }
+  if (!session.contestantOrder.includes(contestantId)) {
+    throw new ApiError(400, 'Contestant is not in the current round')
+  }
+
+  let query = getClient()
+    .from('competition_session_judge_scores')
+    .update({ is_locked: false, locked_at: null })
+    .eq('session_id', session.id)
+    .eq('round_id', session.currentRoundId)
+    .eq('contestant_id', contestantId)
+    .eq('is_locked', true)
+
+  if (judgeId) query = query.eq('judge_id', judgeId)
+
+  const { data, error } = await query.select('judge_id, contestant_id')
+  if (error) throw new ApiError(500, error.message)
+
+  const unlockedCount = data?.length ?? 0
+
+  recordAudit({
+    userId: organizerId,
+    action: 'competition.score.unlocked',
+    entity: 'competition_session',
+    entityId: session.id,
+    details: { eventId, roundId: session.currentRoundId, contestantId, judgeId: judgeId ?? null, unlockedCount },
+  })
+
+  // Judges reload their sheet; the reopened contestant becomes editable again.
+  emitToEvent(eventId, 'session:contestant-changed', {
+    session,
+    previousContestantId: session.activeContestantId,
+  })
+
+  return { success: true, unlockedCount, contestantId, judgeId: judgeId ?? null }
 }
 
 // ---------------------------------------------------------------------------

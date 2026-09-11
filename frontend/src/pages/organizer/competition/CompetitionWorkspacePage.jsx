@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 
 import { pageantService } from '@/services/pageant.service'
@@ -8,26 +8,34 @@ import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import CriteriaManager from '@/components/organizer/competition/CriteriaManager'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 import { stagePath } from '@/utils/eventStages'
 
 // The Structure & Scoring workspace walks through its tabs like the event form's
-// stages: Rounds → Divisions → Scoring config → (Continue to Contestants).
-const WORKSPACE_TAB_FLOW = ['rounds', 'divisions', 'scoring']
+// stages: Rounds → Criteria → Divisions → Scoring rules → (Continue to Contestants).
+const WORKSPACE_TAB_FLOW = ['rounds', 'criteria', 'divisions', 'scoring']
 const WORKSPACE_TAB_LABEL = {
   rounds: 'Rounds',
+  criteria: 'Criteria',
   divisions: 'Divisions',
-  scoring: 'Scoring config',
+  scoring: 'Scoring rules',
 }
+// Tabs that can be deep-linked via ?tab= (e.g. from a round's criteria summary).
+const WORKSPACE_TABS = ['rounds', 'criteria', 'divisions', 'scoring', 'structure']
 
 // Phase 4 — Competition Scoring Foundation workspace.
 // Single page that exposes the dynamic structure of an event:
 // categories, rounds, criteria, contestants, judges, and scoring config.
 export default function CompetitionWorkspacePage() {
   const { eventId } = useParams()
+  const [searchParams] = useSearchParams()
   const [foundation, setFoundation] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('rounds')
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = searchParams.get('tab')
+    return WORKSPACE_TABS.includes(t) ? t : 'rounds'
+  })
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   const load = () => {
@@ -65,9 +73,6 @@ export default function CompetitionWorkspacePage() {
           <SubNav to={`/organizer/competition/events/${eventId}/contestants`}>
             Contestants
           </SubNav>
-          <SubNav to={`/organizer/competition/events/${eventId}/criteria`}>
-            Criteria
-          </SubNav>
           <SubNav to={`/organizer/competition/events/${eventId}/judges`}>Judges</SubNav>
           <SubNav to={`/organizer/competition/events/${eventId}/rankings`}>
             Rankings
@@ -83,8 +88,9 @@ export default function CompetitionWorkspacePage() {
             // weighted buckets) — only shown when revealed or already in use.
             const tabs = [
               { id: 'rounds', label: 'Rounds' },
+              { id: 'criteria', label: 'Criteria' },
               { id: 'divisions', label: 'Divisions' },
-              { id: 'scoring', label: 'Scoring config' },
+              { id: 'scoring', label: 'Scoring rules' },
               ...(showAdvanced || hasCategories ? [{ id: 'structure', label: 'Categories' }] : []),
             ]
             return tabs.map((tab) => (
@@ -124,6 +130,9 @@ export default function CompetitionWorkspacePage() {
       {activeTab === 'structure' && <StructureTab foundation={foundation} reload={load} />}
       {activeTab === 'divisions' && <DivisionsTab foundation={foundation} reload={load} />}
       {activeTab === 'rounds' && <RoundsTab foundation={foundation} reload={load} />}
+      {activeTab === 'criteria' && (
+        <CriteriaManager eventId={eventId} foundation={foundation} reload={load} />
+      )}
       {activeTab === 'scoring' && <ScoringTab foundation={foundation} reload={load} />}
 
       <WorkspaceStageFooter eventId={eventId} activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -141,7 +150,7 @@ function WorkspaceStageFooter({ eventId, activeTab, setActiveTab }) {
   if (activeTab === 'structure') {
     // Categories is an advanced side-tab, not part of the linear flow.
     back = { label: 'Back: Rounds', onClick: () => setActiveTab('rounds') }
-    next = { label: 'Next: Scoring config', onClick: () => setActiveTab('scoring') }
+    next = { label: 'Next: Scoring rules', onClick: () => setActiveTab('scoring') }
   } else {
     back =
       idx <= 0
@@ -703,7 +712,7 @@ function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, rel
               : 'None yet'}
           </p>
           <p className="mt-0.5 text-[11px] text-v-text-subtle">
-            Configure on the <strong>Criteria</strong> page.
+            Configure in the <strong>Criteria</strong> tab.
           </p>
         </div>
       </div>
@@ -876,13 +885,14 @@ function SetupReadiness({ foundation }) {
 function ScoringTab({ foundation, reload }) {
   const { eventId } = useParams()
   const config = foundation?.scoringConfig ?? {}
-  const [scoreType, setScoreType] = useState(config.scoreType ?? 'range_1_100')
+  // Score type / range is no longer set here — it lives on each MINOR criterion
+  // (Criteria tab), the single source of truth. This tab owns only how scores
+  // COMBINE. The stored scoreType is preserved as a fallback via the backend's
+  // partial merge (setScoringConfig), so we simply don't send it.
   const [calculationMethod, setCalculationMethod] = useState(
     config.calculationMethod ?? 'weighted_average',
   )
   const [decimalPlaces, setDecimalPlaces] = useState(config.decimalPlaces ?? 2)
-  const [customMin, setCustomMin] = useState(config.customMin ?? 0)
-  const [customMax, setCustomMax] = useState(config.customMax ?? 100)
   const [dropHighest, setDropHighest] = useState(config.dropHighest ?? 0)
   const [dropLowest, setDropLowest] = useState(config.dropLowest ?? 0)
   const [includeOverallRanking, setIncludeOverallRanking] = useState(config.includeOverallRanking ?? false)
@@ -897,11 +907,8 @@ function ScoringTab({ foundation, reload }) {
     setSaved(false)
     try {
       await pageantService.setScoringConfig(eventId, {
-        scoreType,
         calculationMethod,
         decimalPlaces: Number(decimalPlaces),
-        customMin: Number(customMin),
-        customMax: Number(customMax),
         dropHighest: Number(dropHighest),
         dropLowest: Number(dropLowest),
         includeOverallRanking: Boolean(includeOverallRanking),
@@ -917,18 +924,10 @@ function ScoringTab({ foundation, reload }) {
 
   return (
     <form onSubmit={save} className="grid gap-4 v-card p-6 sm:grid-cols-2">
-      <div>
-        <label className={LABEL_CLASS}>Score type</label>
-        <select
-          className={INPUT_CLASS}
-          value={scoreType}
-          onChange={(e) => setScoreType(e.target.value)}
-        >
-          <option value="range_1_10">1–10</option>
-          <option value="range_1_100">1–100</option>
-          <option value="decimal">Decimal (0–10)</option>
-          <option value="custom_range">Custom range</option>
-        </select>
+      <div className="sm:col-span-2 rounded-lg border border-v-border bg-v-surface-elevated/50 px-4 py-2.5 text-xs text-v-text-muted">
+        These rules control how judges&apos; scores <strong>combine</strong> into a result. The{' '}
+        <strong>score type / range</strong> a judge types is set per <strong>minor criterion</strong>{' '}
+        in the <strong>Criteria</strong> tab.
       </div>
       <div>
         <label className={LABEL_CLASS}>Calculation method</label>
@@ -954,28 +953,6 @@ function ScoringTab({ foundation, reload }) {
           value={decimalPlaces}
           onChange={(e) => setDecimalPlaces(e.target.value)}
         />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className={LABEL_CLASS}>Custom min</label>
-          <input
-            type="number"
-            className={INPUT_CLASS}
-            value={customMin}
-            onChange={(e) => setCustomMin(e.target.value)}
-            disabled={scoreType !== 'custom_range'}
-          />
-        </div>
-        <div>
-          <label className={LABEL_CLASS}>Custom max</label>
-          <input
-            type="number"
-            className={INPUT_CLASS}
-            value={customMax}
-            onChange={(e) => setCustomMax(e.target.value)}
-            disabled={scoreType !== 'custom_range'}
-          />
-        </div>
       </div>
       <div>
         <label className={LABEL_CLASS}>Drop highest N</label>

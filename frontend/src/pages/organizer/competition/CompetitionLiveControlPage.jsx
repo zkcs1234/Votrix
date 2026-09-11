@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
-  Play, Pause, SkipForward, SkipBack, Square, RefreshCw, Users, Star, CheckCircle, Clock,
+  Play, Pause, Square, RefreshCw, Users, Star, CheckCircle, Clock, LockOpen,
 } from 'lucide-react'
 import { competitionSessionService } from '@/services/competition-session.service.js'
 import { pageantService } from '@/services/pageant.service.js'
@@ -26,7 +26,8 @@ export default function CompetitionLiveControlPage() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
-  const [judgeProgress, setJudgeProgress] = useState([])
+  // Whole-round progress matrix: { judges, contestants, submitted:[{judgeId,contestantId,submittedAt}] }
+  const [judgeProgress, setJudgeProgress] = useState(null)
   const [event, setEvent] = useState(null)
   const [eventStatus, setEventStatus] = useState(null)
   const [foundation, setFoundation] = useState(null)
@@ -37,10 +38,6 @@ export default function CompetitionLiveControlPage() {
   const [finalizeChecked, setFinalizeChecked] = useState(() => new Set())
   const [finalizeLoading, setFinalizeLoading] = useState(false)
   const [finalizeSubmitting, setFinalizeSubmitting] = useState(false)
-
-  // Stage-group builder (simultaneous multi-contestant scoring). Selection is
-  // seeded from whatever group is currently on stage.
-  const [stageSel, setStageSel] = useState(() => new Set())
 
   const showLoader = useDelayedLoading(loading, 300)
 
@@ -59,7 +56,7 @@ export default function CompetitionLiveControlPage() {
 
       if (sessionData.session?.status === SESSION_STATUS.ACTIVE || sessionData.session?.status === SESSION_STATUS.PAUSED) {
         const { data: progressData } = await competitionSessionService.getJudgeProgress(eventId)
-        setJudgeProgress(progressData.judges ?? [])
+        setJudgeProgress(progressData)
       }
     } catch {
       setSession(null)
@@ -72,28 +69,10 @@ export default function CompetitionLiveControlPage() {
     loadSession()
   }, [loadSession])
 
-  const stageGroupKey = (session?.stageContestants ?? []).map((c) => c.id).join(',')
-  useEffect(() => {
-    setStageSel(new Set((session?.stageContestants ?? []).map((c) => c.id)))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageGroupKey])
-
-  const applyStageGroup = async (ids) => {
-    setActionLoading('stageGroup')
-    try {
-      await competitionSessionService.setStageGroup(eventId, ids)
-      await loadSession()
-    } catch (err) {
-      toastError(getErrorMessage(err))
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
   const refreshJudgeProgress = useCallback(async () => {
     try {
       const { data } = await competitionSessionService.getJudgeProgress(eventId)
-      setJudgeProgress(data.judges ?? [])
+      setJudgeProgress(data)
     } catch {
       /* progress refresh is best-effort */
     }
@@ -120,8 +99,6 @@ export default function CompetitionLiveControlPage() {
         pause: () => competitionSessionService.pauseSession(eventId),
         resume: () => competitionSessionService.resumeSession(eventId),
         complete: () => competitionSessionService.completeSession(eventId),
-        nextContestant: () => competitionSessionService.nextContestant(eventId),
-        prevContestant: () => competitionSessionService.previousContestant(eventId),
       }
       await actions[action]()
       await loadSession()
@@ -171,12 +148,13 @@ export default function CompetitionLiveControlPage() {
     }
   }
 
-  const selectContestant = async (contestantId) => {
-    if (!contestantId) return
-    setActionLoading('setContestant')
+  // B5 — reopen a locked contestant so judges can revise (all judges, or one).
+  const unlockContestant = async (contestantId, judgeId = null) => {
+    setActionLoading(`unlock:${contestantId}:${judgeId ?? 'all'}`)
     try {
-      await competitionSessionService.setActiveContestant(eventId, contestantId)
-      await loadSession()
+      await competitionSessionService.unlockScore(eventId, contestantId, judgeId)
+      await refreshJudgeProgress()
+      success('Score reopened for editing')
     } catch (err) {
       toastError(getErrorMessage(err))
     } finally {
@@ -492,167 +470,46 @@ export default function CompetitionLiveControlPage() {
           </div>
         </div>
 
-        {/* Current Contestant */}
+        {/* Round field — the whole round is on stage; judges score every
+            contestant from one sheet. Read-only roster (no per-contestant
+            control: the organizer drives rounds & criteria, not contestants). */}
         <div className="rounded-xl border border-v-border bg-v-surface p-6">
-          <h3 className="mb-1 text-sm font-medium text-v-text-muted uppercase tracking-wider">Current Contestant</h3>
-          {session.activeContestant ? (
-            <div className="flex items-center gap-4">
-              {session.activeContestant.photo && (
-                <img src={session.activeContestant.photo} alt="" className="h-16 w-16 rounded-xl object-cover" />
-              )}
-              <div>
-                <p className="text-xl font-bold text-v-text">
-                  #{session.activeContestant.contestantNumber} {session.activeContestant.name}
-                </p>
-                <p className="text-sm text-v-text-subtle">
-                  {session.activeContestantIndex + 1} of {session.roundContestants?.length ?? 0}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-v-text-muted">No contestant selected</p>
-          )}
-
-          {/* Navigation */}
-          <div className="mt-4 flex gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => performAction('prevContestant', 'prevContestant')}
-              disabled={session.activeContestantIndex <= 0}
-              loading={actionLoading === 'prevContestant'}
-            >
-              <SkipBack className="h-4 w-4 mr-1" /> Previous
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => performAction('nextContestant', 'nextContestant')}
-              disabled={session.activeContestantIndex >= (session.roundContestants?.length ?? 1) - 1}
-              loading={actionLoading === 'nextContestant'}
-            >
-              Next <SkipForward className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-
-          {/* Jump directly to any contestant in the order. */}
+          <h3 className="mb-1 text-sm font-medium text-v-text-muted uppercase tracking-wider">
+            On stage this round
+          </h3>
+          <p className="mb-3 text-sm text-v-text-subtle">
+            {(session.roundContestants?.length ?? 0) > 0
+              ? `All ${session.roundContestants.length} contestants in ${session.activeRound?.name ?? 'this round'} are on judges’ scoresheets.`
+              : 'No contestants assigned to this round yet.'}
+          </p>
           {session.roundContestants?.length > 0 && (
-            <div className="mt-3">
-              <label htmlFor="jump-contestant" className="mb-1 block text-xs text-v-text-subtle">
-                Or jump to contestant:
-              </label>
-              <select
-                id="jump-contestant"
-                value={session.activeContestant?.id ?? ''}
-                disabled={actionLoading === 'setContestant'}
-                onChange={(e) => selectContestant(e.target.value)}
-                className="w-full rounded-lg border border-v-border bg-v-surface px-3 py-2 text-sm text-v-text focus:border-v-primary focus:outline-none disabled:opacity-50"
-              >
-                <option value="" disabled>Select a contestant…</option>
-                {session.roundContestants.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    #{c.contestantNumber} {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Stage group — put several contestants on stage at once (paired
-              pageant / head-to-head). Only offered when divisions are enabled
-              (e.g. Male + Female on stage together); solo events stay single. */}
-          {foundation?.event?.divisions_enabled && session.roundContestants?.length > 1 && (
-            <details className="mt-3 rounded-lg border border-v-border bg-v-surface-elevated/40 px-3 py-2">
-              <summary className="cursor-pointer text-xs font-medium text-v-text-muted">
-                Stage group — score several at once
-                {session.stageContestants?.length > 0 && ` (${session.stageContestants.length} on stage)`}
-              </summary>
-              <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
-                {session.roundContestants.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 text-sm text-v-text">
-                    <input
-                      type="checkbox"
-                      checked={stageSel.has(c.id)}
-                      onChange={(e) => {
-                        setStageSel((prev) => {
-                          const next = new Set(prev)
-                          if (e.target.checked) next.add(c.id)
-                          else next.delete(c.id)
-                          return next
-                        })
-                      }}
-                    />
-                    #{c.contestantNumber} {c.name}
-                  </label>
-                ))}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={actionLoading === 'stageGroup' || stageSel.size < 2}
-                  onClick={() => applyStageGroup([...stageSel])}
-                  className="rounded-lg bg-v-primary px-3 py-1.5 text-xs font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
+            <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+              {session.roundContestants.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-center gap-3 rounded-lg border border-v-border bg-v-surface-elevated/40 px-3 py-2"
                 >
-                  {actionLoading === 'stageGroup' ? 'Applying…' : `Put ${stageSel.size || ''} on stage`}
-                </button>
-                {session.stageContestants?.length > 0 && (
-                  <button
-                    type="button"
-                    disabled={actionLoading === 'stageGroup'}
-                    onClick={() => applyStageGroup([])}
-                    className="rounded-lg border border-v-border px-3 py-1.5 text-xs font-medium text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
-                  >
-                    Clear group (single mode)
-                  </button>
-                )}
-              </div>
-              <p className="mt-1 text-[11px] text-v-text-subtle">
-                Pick 2+ contestants. Judges will see all of them and score each individually.
-              </p>
-            </details>
+                  <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-v-surface px-1.5 text-sm font-bold tabular-nums text-v-text border border-v-border">
+                    #{c.contestantNumber}
+                  </span>
+                  {c.photo && (
+                    <img src={c.photo} alt="" className="h-8 w-8 rounded-lg object-cover" />
+                  )}
+                  <span className="min-w-0 truncate text-sm font-medium text-v-text">{c.name}</span>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>
 
-      {/* Judge Progress */}
-      <div className="rounded-xl border border-v-border bg-v-surface p-6">
-        <h3 className="mb-4 text-sm font-medium text-v-text-muted uppercase tracking-wider">Judge Progress</h3>
-        {judgeProgress.length === 0 ? (
-          <p className="text-sm text-v-text-subtle">No judges have scored yet for this contestant.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-v-border">
-                  <th className="py-2 pr-4 text-left text-v-text-muted font-medium">Judge</th>
-                  <th className="py-2 pr-4 text-left text-v-text-muted font-medium">Status</th>
-                  <th className="py-2 text-left text-v-text-muted font-medium">Submitted At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {judgeProgress.map((judge) => (
-                  <tr key={judge.judgeId} className="border-b border-v-border/50">
-                    <td className="py-2 pr-4 text-v-text">{judge.displayName || judge.email}</td>
-                    <td className="py-2 pr-4">
-                      {judge.hasSubmittedCurrent ? (
-                        <span className="inline-flex items-center gap-1 text-v-success">
-                          <CheckCircle className="h-4 w-4" /> Submitted
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-v-text-muted">
-                          <Clock className="h-4 w-4" /> Waiting
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2 text-v-text-subtle">
-                      {judge.submittedAt ? new Date(judge.submittedAt).toLocaleTimeString() : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* Judge Progress — whole-round contestant × judge matrix. A locked cell
+          can be reopened (B5) so the judge can revise; every unlock is audited. */}
+      <JudgeProgressGrid
+        progress={judgeProgress}
+        onUnlock={unlockContestant}
+        actionLoading={actionLoading}
+      />
 
 
       {/* Phase 6 — finalize round & advancement review modal */}
@@ -737,6 +594,113 @@ export default function CompetitionLiveControlPage() {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+// Whole-round progress: rows = contestants, columns = judges. A locked cell
+// shows a check + an unlock control; an empty cell means that judge still owes a
+// score for that contestant. A row-level "Reopen" unlocks every judge at once.
+function JudgeProgressGrid({ progress, onUnlock, actionLoading }) {
+  const judges = progress?.judges ?? []
+  const contestants = progress?.contestants ?? []
+  const submitted = progress?.submitted ?? []
+
+  const lockedSet = new Set(submitted.map((s) => `${s.judgeId}:${s.contestantId}`))
+  const totalCells = judges.length * contestants.length
+  const lockedCount = submitted.length
+
+  return (
+    <div className="rounded-xl border border-v-border bg-v-surface p-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium text-v-text-muted uppercase tracking-wider">Judge Progress</h3>
+        {totalCells > 0 && (
+          <span className="text-xs text-v-text-subtle">
+            {lockedCount}/{totalCells} scores locked
+          </span>
+        )}
+      </div>
+
+      {judges.length === 0 || contestants.length === 0 ? (
+        <p className="text-sm text-v-text-subtle">
+          {judges.length === 0
+            ? 'No eligible judges for the current round/division yet.'
+            : 'No contestants in the current round yet.'}
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-v-border">
+                <th className="sticky left-0 z-10 bg-v-surface py-2 pr-4 text-left font-medium text-v-text-muted">
+                  Contestant
+                </th>
+                {judges.map((j) => (
+                  <th key={j.judgeId} className="px-2 py-2 text-center font-medium text-v-text-muted">
+                    <span className="block max-w-24 truncate">{j.displayName || 'Judge'}</span>
+                  </th>
+                ))}
+                <th className="py-2 pl-2 text-right font-medium text-v-text-muted">Done</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contestants.map((c) => {
+                const rowLocked = judges.filter((j) => lockedSet.has(`${j.judgeId}:${c.id}`)).length
+                const rowBusy = actionLoading === `unlock:${c.id}:all`
+                return (
+                  <tr key={c.id} className="border-b border-v-border/50">
+                    <td className="sticky left-0 z-10 bg-v-surface py-2 pr-4 text-v-text">
+                      <span className="font-medium tabular-nums">#{c.contestantNumber}</span> {c.name}
+                    </td>
+                    {judges.map((j) => {
+                      const locked = lockedSet.has(`${j.judgeId}:${c.id}`)
+                      const cellBusy = actionLoading === `unlock:${c.id}:${j.judgeId}`
+                      return (
+                        <td key={j.judgeId} className="px-2 py-2 text-center">
+                          {locked ? (
+                            <button
+                              type="button"
+                              onClick={() => onUnlock(c.id, j.judgeId)}
+                              disabled={cellBusy || rowBusy}
+                              title="Locked — click to reopen this judge's score"
+                              className="group inline-flex items-center justify-center rounded-md p-1 text-v-success hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50"
+                            >
+                              <CheckCircle className="h-4 w-4 group-hover:hidden" />
+                              <LockOpen className="hidden h-4 w-4 group-hover:block" />
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center justify-center text-v-text-subtle" title="Waiting">
+                              <Clock className="h-4 w-4" />
+                            </span>
+                          )}
+                        </td>
+                      )
+                    })}
+                    <td className="py-2 pl-2 text-right">
+                      <span className={rowLocked === judges.length ? 'text-v-success' : 'text-v-text-subtle'}>
+                        {rowLocked}/{judges.length}
+                      </span>
+                      {rowLocked > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => onUnlock(c.id, null)}
+                          disabled={rowBusy}
+                          className="ml-2 rounded-md border border-v-border px-2 py-0.5 text-[11px] text-v-text-muted hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50"
+                        >
+                          {rowBusy ? '…' : 'Reopen'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <p className="mt-3 text-[11px] text-v-text-subtle">
+            Reopening a locked score is audited and lets that judge revise and re-submit.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function PageHeader({ eventId, title }) {
   return (

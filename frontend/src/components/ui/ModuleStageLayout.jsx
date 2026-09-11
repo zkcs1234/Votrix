@@ -19,7 +19,10 @@ const FORM_WIZARD_STAGES = {
 // not add a second footer here. The stepper still renders for these stages.
 const PAGE_OWNS_FOOTER = {
   election: ['voters'],
-  competition: ['judges'],
+  // 'workspace' (Structure & Scoring) renders its own tab-aware footer
+  // (WorkspaceStageFooter) into #stage-footer-portal, so the layout must not
+  // add a second one — otherwise two footers stack in the portal.
+  competition: ['judges', 'workspace'],
   polling: ['respondents'],
 }
 

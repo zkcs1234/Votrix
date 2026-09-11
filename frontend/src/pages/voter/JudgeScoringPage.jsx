@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { CheckCircle, AlertTriangle, RotateCcw, AlertCircle } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
@@ -35,7 +35,8 @@ export default function JudgeScoringPage() {
   const [activeContestantId, setActiveContestantId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
-  const [autoSaving, setAutoSaving] = useState(false)
+  // Which contestant is currently being submitted (per-row Submit & lock).
+  const [submittingId, setSubmittingId] = useState(null)
   // The shared WS client (socket.service) may already be open before this page
   // mounts (Bootstrap connects on auth), so seed from its live state.
   const [socketConnected, setSocketConnected] = useState(() => isConnected())
@@ -50,9 +51,6 @@ export default function JudgeScoringPage() {
   // Confirmation toast state
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [lastSavedName, setLastSavedName] = useState('')
-
-  // Check if session is active
-  const isSessionActive = sessionState?.status === 'active'
 
   // Helper functions for retry queue localStorage persistence (Requirement 15.2)
   const getRetryQueueKey = useCallback(() => {
@@ -278,116 +276,73 @@ export default function JudgeScoringPage() {
     setReconnectAttempts((prev) => prev + 1)
   }, [])
 
-  // Auto-save score when changed in live session
-  const autoSaveTimeouts = useRef({})
-  
-  const setScore = useCallback((contestantId, criteriaId, value) => {
-    const key = `${contestantId}:${criteriaId}`
-    
-    setScores(prev => ({ ...prev, [key]: value }))
+  // Update a single score cell in local state. No auto-save — the judge commits
+  // each contestant explicitly with "Submit & lock" (B3), which is fairness-safe
+  // and, because each submit reads only its own row, records every contestant.
+  const onScoreChange = useCallback((contestantId, targetId, value) => {
+    setScores((prev) => ({ ...prev, [`${contestantId}:${targetId}`]: value }))
+  }, [])
 
-    // Auto-save for any ON-STAGE contestant (a stage group has several; single
-    // mode has just the active one).
-    const onStageIds = sheet?.stageGroup
-      ? (sheet.stageContestants ?? []).map((c) => c.id)
-      : [activeContestantId]
-    if (!isSessionActive || !onStageIds.includes(contestantId) || !sheet?.criteria) {
-      return
-    }
-    
-    // Clear existing timeout for this contestant
-    const contestantTimeoutKey = `contestant_${contestantId}`
-    if (autoSaveTimeouts.current[contestantTimeoutKey]) {
-      clearTimeout(autoSaveTimeouts.current[contestantTimeoutKey])
-    }
-    
-    // Debounce the auto-save to avoid too many API calls
-    autoSaveTimeouts.current[contestantTimeoutKey] = setTimeout(async () => {
-      // Build scores object for current contestant, keyed by MINOR criterion id
-      // (judges score minors; a criterion with no minors is scored directly).
-      let contestantScores = {}
-      let allScored = true
-
-      outer: for (const criteria of sheet.criteria) {
+  // Build one contestant's payload from the CURRENT scores, validating each open
+  // criterion/minor against its own bounds. Reads live state (not a debounced
+  // closure), so scoring several contestants records every one.
+  const buildContestantPayload = useCallback(
+    (contestantId) => {
+      const scoreMap = {}
+      for (const criteria of sheet?.criteria ?? []) {
         const targets =
           criteria.minors && criteria.minors.length
             ? criteria.minors
-            : [{ id: criteria.id, minScore: criteria.minScore, maxScore: criteria.maxScore }]
+            : [{ id: criteria.id, name: criteria.name, minScore: criteria.minScore, maxScore: criteria.maxScore }]
         for (const t of targets) {
-          const scoreKey = `${contestantId}:${t.id}`
-          const score = scores[scoreKey]
-
-          if (score === undefined || score === '' || score === null) {
-            allScored = false
-            break outer
+          const raw = scores[`${contestantId}:${t.id}`]
+          if (raw === undefined || raw === '' || raw === null) {
+            return { ok: false, error: 'Fill in every score before submitting.' }
           }
-
-          // Validate against the minor's own bounds (fall back to event scale).
-          const boundMin = t.minScore ?? sheet?.scoreBounds?.min
-          const boundMax = t.maxScore ?? sheet?.scoreBounds?.max
-          const numValue = Number(score)
-          if (isNaN(numValue) || numValue < boundMin || numValue > boundMax) {
-            allScored = false
-            break outer
+          const num = Number(raw)
+          const min = t.minScore ?? sheet?.scoreBounds?.min
+          const max = t.maxScore ?? sheet?.scoreBounds?.max
+          if (Number.isNaN(num) || num < min || num > max) {
+            return { ok: false, error: `A score is out of range (${min}–${max}).` }
           }
-
-          contestantScores[t.id] = numValue
+          scoreMap[t.id] = num
         }
       }
-      
+      return { ok: true, scoreMap }
+    },
+    [sheet?.criteria, sheet?.scoreBounds, scores],
+  )
+
+  const submitContestant = useCallback(
+    async (contestantId) => {
+      const { ok, scoreMap, error: buildError } = buildContestantPayload(contestantId)
+      if (!ok) {
+        setError(buildError)
+        return
+      }
+      setError(null)
+      setSubmittingId(contestantId)
       try {
-        setAutoSaving(true)
-        
-        // Only submit if all criteria are scored for this contestant
-        if (allScored) {
-          await pageantService.submitSessionScore(eventId, contestantScores, contestantId)
-          console.log(`[Auto-save] Submitted scores for contestant ${contestantId}`)
-
-          // Name the contestant that was actually just saved (matters in a
-          // stage group where more than one contestant is scored).
-          const savedName =
-            (sheet?.stageContestants ?? sheet?.contestants ?? []).find((c) => c.id === contestantId)?.name || ''
-          setLastSavedName(savedName)
-
-          // Show confirmation toast
-          setShowConfirmation(true)
-          
-          // Auto-dismiss after 3 seconds
-          setTimeout(() => {
-            setShowConfirmation(false)
-          }, 3000)
-        }
-        
+        await pageantService.submitSessionScore(eventId, scoreMap, contestantId)
+        const savedName = (sheet?.contestants ?? []).find((c) => c.id === contestantId)?.name || ''
+        setLastSavedName(savedName)
+        setShowConfirmation(true)
+        setTimeout(() => setShowConfirmation(false), 3000)
+        // Refresh so the row flips to locked (hasSubmitted) with its saved scores.
+        syncSessionView()
       } catch (err) {
-        console.error('[Auto-save] Failed:', err)
-        
-        // For network errors (no response), add to retry queue (Requirement 15.1)
-        if (!err.response && allScored) {
-          const submission = {
-            contestantId,
-            scores: contestantScores,
-            timestamp: Date.now()
-          }
-          addToRetryQueue(submission)
+        console.error('[Submit] Failed:', err)
+        if (!err.response) {
+          addToRetryQueue({ contestantId, scores: scoreMap, timestamp: Date.now() })
         } else {
-          // For validation errors or other server errors, just show error message
-          setError(err.response?.data?.message || 'Auto-save failed')
+          setError(err.response?.data?.message || 'Submit failed')
         }
       } finally {
-        setAutoSaving(false)
+        setSubmittingId(null)
       }
-      
-      // Clean up the timeout reference
-      delete autoSaveTimeouts.current[contestantTimeoutKey]
-    }, 2000) // 2 second debounce
-  }, [isSessionActive, sheet?.criteria, eventId, activeContestantId, scores])
-
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      Object.values(autoSaveTimeouts.current).forEach(clearTimeout)
-    }
-  }, [])
+    },
+    [buildContestantPayload, eventId, sheet, syncSessionView, addToRetryQueue],
+  )
 
   // Automatic retry on reconnection (Requirement 15.5, 15.6, 15.7)
   // Task 13.2: Add useEffect watching [socket.connected, submissionQueue]
@@ -515,7 +470,7 @@ export default function JudgeScoringPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 pb-24">
+    <div className="mx-auto max-w-6xl space-y-6 pb-24">
       {/* Retry error banner (Requirement 15.3, 15.4) - Task 13.3 */}
       {showRetryBanner && (
         <div className="rounded-lg border border-v-warning/30 bg-v-warning-bg p-4">
@@ -586,8 +541,8 @@ export default function JudgeScoringPage() {
               </p>
             )}
           </div>
-          {autoSaving && (
-            <span className="text-xs text-emerald-400">Saving...</span>
+          {submittingId && (
+            <span className="text-xs text-emerald-400">Saving…</span>
           )}
         </div>
       </div>
@@ -684,11 +639,9 @@ export default function JudgeScoringPage() {
       <CompetitionScoringForm
         sheet={sheet}
         scores={scores}
-        onScoreChange={setScore}
-        disabled={autoSaving}
-        liveMode={true}
-        activeContestantId={activeContestantId}
-        activeContestantIds={sheet?.stageGroup ? (sheet.stageContestants ?? []).map((c) => c.id) : null}
+        onScoreChange={onScoreChange}
+        submittingId={submittingId}
+        onSubmitContestant={submitContestant}
         sessionState={sessionState}
       />
 
@@ -697,7 +650,8 @@ export default function JudgeScoringPage() {
       {/* Live mode scoring instructions */}
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-center">
         <p className="text-sm text-v-text-muted">
-          Complete all criteria for {sheet?.stageGroup ? 'each contestant on stage' : 'the active contestant'} — scores auto-save when finished
+          Fill every criterion for a contestant, then press <strong>Submit &amp; lock</strong>. A
+          locked score can&apos;t be changed unless the organizer reopens it.
         </p>
       </div>
       

@@ -81,6 +81,11 @@ export const competitionSessionService = {
     return api.get(`${BASE}/events/${eventId}/session/judge-progress`)
   },
 
+  /** POST /api/organizer/competition/events/:eventId/session/unlock-score */
+  unlockScore(eventId, contestantId, judgeId = null) {
+    return api.post(`${BASE}/events/${eventId}/session/unlock-score`, { contestantId, judgeId })
+  },
+
   // --- Round finalize & advancement (Phase 6) ---
 
   /** GET /api/organizer/competition/events/:eventId/rounds/:roundId/advancement-preview */
