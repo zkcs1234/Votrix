@@ -1226,12 +1226,9 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores, contes
 
   // Resolve the target contestant. Round-driven: the whole round's field is on
   // stage, so any contestant in the round order can be scored (each submission
-  // names its contestantId). An explicit stage-group subset still narrows it.
-  // This must mirror getJudgeSessionView's stage set, or valid submissions for
-  // non-primary contestants would be rejected.
-  const onStage = session.activeContestantIds?.length
-    ? session.activeContestantIds
-    : (session.contestantOrder ?? [])
+  // names its contestantId). Mirrors getJudgeSessionView's stage set exactly, or
+  // valid submissions for non-primary contestants would be rejected.
+  const onStage = session.contestantOrder ?? []
   const targetContestantId = contestantId ?? onStage[0]
   if (!onStage.includes(targetContestantId)) {
     throw new ApiError(400, 'That contestant is not currently on stage')
@@ -1415,12 +1412,12 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
   }
 
   // Round-driven scoring: the WHOLE round's field is on stage, so a judge scores
-  // every contestant in the round from one scoresheet. A stage-group subset is
-  // still honoured if one was explicitly set (legacy); otherwise the full
-  // contestant order is scorable at once.
-  let stageIds = session.activeContestantIds?.length
-    ? session.activeContestantIds
-    : (session.contestantOrder ?? [])
+  // every contestant in the round from one scoresheet. Stage groups were removed
+  // (there is no UI to set or clear them), so we ALWAYS use the full round order.
+  // This also self-heals sessions started under the old per-contestant flow that
+  // still carry a stale active_contestant_ids subset — every contestant shows
+  // again with no session restart.
+  let stageIds = session.contestantOrder ?? []
 
   // Optional division filter (judge-side): narrow the field to one division.
   if (divisionId) {
