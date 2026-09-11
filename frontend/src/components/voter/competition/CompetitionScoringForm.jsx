@@ -57,7 +57,7 @@ export default function CompetitionScoringForm({
 
   const NumberBadge = ({ number, locked }) => (
     <span
-      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-base font-bold tabular-nums ${
+      className={`inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 text-sm font-bold tabular-nums ${
         locked ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-v-surface-elevated text-v-text border border-v-border'
       }`}
     >
@@ -77,7 +77,7 @@ export default function CompetitionScoringForm({
     const busy = submittingId === cont.id
     const complete = isComplete(cont.id)
     return (
-      <div className={block ? 'flex items-center justify-between gap-3' : 'inline-flex flex-col items-end gap-1'}>
+      <div className={block ? 'flex items-center justify-between gap-3' : 'inline-flex flex-col items-center gap-1'}>
         <span className="text-[11px] text-v-text-subtle tabular-nums">
           {doneCount(cont.id)}/{totalTargets}
         </span>
@@ -102,7 +102,7 @@ export default function CompetitionScoringForm({
           <thead>
             {/* Criterion group header — spans its minor columns. */}
             <tr className="border-b border-v-border bg-v-surface-elevated">
-              <th className="sticky left-0 z-20 bg-v-surface-elevated p-3 text-left v-caption" rowSpan={2}>
+              <th className="sticky left-0 z-20 w-60 min-w-[15rem] border-r border-v-border bg-v-surface-elevated p-3 text-left v-caption" rowSpan={2}>
                 Contestant
               </th>
               {critColumns.map(({ crit, minors }) => (
@@ -115,7 +115,7 @@ export default function CompetitionScoringForm({
                   <span className="v-caption block">{crit.percentage}%</span>
                 </th>
               ))}
-              <th className="border-l border-v-border p-3 text-right v-caption" rowSpan={2}>
+              <th className="sticky right-0 z-20 w-32 min-w-32 border-l border-v-border bg-v-surface-elevated p-3 text-center v-caption" rowSpan={2}>
                 Status
               </th>
             </tr>
@@ -147,13 +147,15 @@ export default function CompetitionScoringForm({
                   key={cont.id}
                   className={`border-b border-v-border/50 ${locked ? 'bg-emerald-950/10' : ''}`}
                 >
-                  <td className="sticky left-0 z-10 bg-v-surface p-3">
-                    <div className="flex items-center gap-3">
+                  <td className="sticky left-0 z-10 w-60 min-w-[15rem] border-r border-v-border bg-v-surface p-3">
+                    <div className="flex items-center gap-2.5">
                       <NumberBadge number={cont.contestantNumber} locked={locked} />
                       {cont.photo && (
-                        <img src={cont.photo} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                        <img src={cont.photo} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
                       )}
-                      <span className="font-medium text-v-text">{cont.name}</span>
+                      <span className="min-w-0 text-sm font-medium leading-tight text-v-text">
+                        {cont.name}
+                      </span>
                     </div>
                   </td>
                   {critColumns.flatMap(({ minors }) =>
@@ -170,7 +172,7 @@ export default function CompetitionScoringForm({
                       </td>
                     )),
                   )}
-                  <td className="border-l border-v-border p-3 text-right">
+                  <td className="sticky right-0 z-10 w-32 min-w-32 border-l border-v-border bg-v-surface p-3 text-center">
                     <RowAction cont={cont} />
                   </td>
                 </tr>
