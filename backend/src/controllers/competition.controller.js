@@ -133,8 +133,10 @@ export const setScoringConfig = asyncHandler(async (req, res) => {
 // Judge participants + assignments (Phase 6 API surface lives here too).
 // ---------------------------------------------------------------------------
 export const listJudgesV2 = asyncHandler(async (req, res) => {
-  const judges = await competitionService.listCompetitionJudges(req.params.eventId, req.user.id)
-  res.json({ success: true, judges })
+  // Return judges AND the information-form schema so the table can render a
+  // column per form field (e.g. Name) with each judge's answer from metadata.
+  const result = await competitionService.getCompetitionJudgesView(req.params.eventId, req.user.id)
+  res.json({ success: true, ...result })
 })
 
 export const inviteJudgeV2 = asyncHandler(async (req, res) => {

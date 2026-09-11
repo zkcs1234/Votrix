@@ -534,15 +534,22 @@ export async function assertScoringWeightsValid(eventId, organizerId) {
 // ---------------------------------------------------------------------------
 function mapJudge(row) {
   if (!row) return null
+  const scored = row.has_scored ?? row.has_submitted ?? false
   return {
     id: row.id,
     eventId: row.event_id,
     judgeId: row.user_id,
     email: row.users?.email ?? row.email ?? null,
+    firstName: row.first_name ?? null,
+    lastName: row.last_name ?? null,
     displayName: row.display_name,
     role: row.judge_role ?? row.role ?? JUDGE_ROLES.JUDGE,
     isActive: row.is_active,
-    hasSubmitted: row.has_scored ?? row.has_submitted ?? false,
+    hasScored: scored,
+    hasSubmitted: scored,
+    // Information-form answers (e.g. Name) live here; the judges table renders a
+    // column per form field and reads the value from this map.
+    metadata: row.metadata ?? {},
     invitationSent: row.invitation_sent ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -554,7 +561,7 @@ export async function listCompetitionJudges(eventId, organizerId) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id, event_id, user_id, first_name, last_name, has_scored, judge_role, display_name, is_active, created_at, updated_at, users!inner (id, email)')
+    .select('id, event_id, user_id, first_name, last_name, metadata, has_scored, judge_role, display_name, is_active, created_at, updated_at, users!inner (id, email)')
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .order('created_at', { ascending: false })
@@ -583,6 +590,24 @@ export async function listCompetitionJudges(eventId, organizerId) {
     display_name: row.display_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || row.users?.email || null,
     invitation_sent: invitationMap[row.user_id] ?? false,
   }))
+}
+
+// Judges + the event's information-form schema, in the shape the organizer
+// Judges table consumes. The table renders one column per form field and reads
+// each judge's answer from `metadata`, so the schema must travel with the list —
+// listCompetitionJudges stays a bare array for getCompetitionFoundation.
+export async function getCompetitionJudgesView(eventId, organizerId) {
+  const judges = await listCompetitionJudges(eventId, organizerId)
+  const { data: eventRow, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .select('information_form_schema')
+    .eq('id', eventId)
+    .single()
+  if (error) throw new ApiError(500, error.message)
+  return {
+    judges,
+    informationFormSchema: eventRow?.information_form_schema ?? { enabled: false, fields: [] },
+  }
 }
 
 export async function inviteCompetitionJudge(eventId, organizerId, payload) {
