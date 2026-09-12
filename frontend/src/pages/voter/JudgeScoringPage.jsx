@@ -11,8 +11,12 @@ import ParticipantInformationGate from '@/components/voter/ParticipantInformatio
 import CompetitionScoringForm from '@/components/voter/competition/CompetitionScoringForm'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
 
-// Build the flat scores map (keyed `contestantId:criteriaId`) that the scoring
-// form and auto-save use, from each on-stage contestant's existing scores.
+// Build the flat scores map (keyed `contestantId:minorId`) of a judge's SAVED
+// scores, from each contestant's existingScores. Callers MERGE this over the
+// current local state ({ ...prev, ...scoresFromSheet }) rather than replacing —
+// a live re-sync (after a per-row submit, or an organizer gate/round/criteria
+// change) must not wipe scores the judge has typed but not yet submitted for
+// other contestants.
 function scoresFromSheet(data) {
   const out = {}
   for (const c of data?.contestants ?? []) {
@@ -110,7 +114,7 @@ export default function JudgeScoringPage() {
       .then(({ data }) => {
         setSheet(data)
         // Initialize scores (per on-stage contestant) from existing submissions.
-        setScores(scoresFromSheet(data))
+        setScores((prev) => ({ ...prev, ...scoresFromSheet(data) }))
       })
       .catch((err) => {
         console.error('[Load session view]', err)
@@ -142,8 +146,8 @@ export default function JudgeScoringPage() {
       // Update sheet with filtered data
       setSheet(data)
       setSelectedDivisionId(divisionId)
-      setScores(scoresFromSheet(data))
-      
+      setScores((prev) => ({ ...prev, ...scoresFromSheet(data) }))
+
     } catch (err) {
       console.error('Division change error:', err)
       setError(err.response?.data?.message || 'Failed to load division data')
@@ -184,7 +188,7 @@ export default function JudgeScoringPage() {
       .getSessionView(eventId)
       .then(({ data }) => {
         setSheet(data)
-        setScores(scoresFromSheet(data))
+        setScores((prev) => ({ ...prev, ...scoresFromSheet(data) }))
         if (data.activeSession) {
           setSessionState(data.activeSession)
           setActiveContestantId(
@@ -212,7 +216,7 @@ export default function JudgeScoringPage() {
         .getSessionView(eventId)
         .then(({ data }) => {
           setSheet(data)
-          setScores(scoresFromSheet(data))
+          setScores((prev) => ({ ...prev, ...scoresFromSheet(data) }))
         })
         .catch((err) => console.error('[Judge] reload on session start failed:', err))
       setActiveContestantId(session.activeContestantId ?? null)
@@ -252,7 +256,7 @@ export default function JudgeScoringPage() {
           .getSessionView(eventId, { divisionId: session.currentDivisionId })
           .then(({ data }) => {
             setSheet(data)
-            setScores(scoresFromSheet(data))
+            setScores((prev) => ({ ...prev, ...scoresFromSheet(data) }))
           })
           .catch((err) => {
             console.error('[Division change] Failed to reload scoring sheet:', err)
