@@ -251,12 +251,20 @@ export default function CriteriaManager({ eventId, foundation, reload }) {
   const totalPct = activeCriteria.reduce((s, c) => s + Number(c.percentage), 0)
   const isComplete = Math.abs(totalPct - 100) < 0.1
   const previewTotalPct = totalPct + Number(form.percentage || 0)
+  // §1: weight budget. Block adding once the scope is full (100%).
+  const remaining = Math.max(0, 100 - totalPct)
+  const isFull = remaining <= 0.01
+  const scopeLabel = hasRounds ? 'this round' : 'the criteria budget'
 
   const handleCreate = async (e) => {
     e.preventDefault()
     const percentage = Number(form.percentage)
     if (!form.name.trim() || !Number.isFinite(percentage) || percentage <= 0) {
       showError('Enter a criteria name and a weight greater than 0')
+      return
+    }
+    if (percentage > remaining + 0.01) {
+      showError(`Only ${remaining.toFixed(2)}% left in ${scopeLabel}. Lower the weight to add this criterion.`)
       return
     }
     setSaving(true)
@@ -292,6 +300,13 @@ export default function CriteriaManager({ eventId, foundation, reload }) {
 
   const attachExisting = async () => {
     if (!attachId) return
+    const picked = list.find((c) => c.id === attachId)
+    if (picked && Number(picked.percentage) > remaining + 0.01) {
+      showError(
+        `Attaching “${picked.name}” (${Number(picked.percentage).toFixed(0)}%) would exceed 100% — only ${remaining.toFixed(2)}% left in ${scopeLabel}.`,
+      )
+      return
+    }
     try {
       await pageantService.addRoundCriteria(eventId, selectedRoundId, attachId)
       setAttachId('')
@@ -413,16 +428,18 @@ export default function CriteriaManager({ eventId, foundation, reload }) {
                 id="criteria-weight"
                 type="number"
                 min={0}
-                max={100}
+                max={remaining || 100}
                 step="0.01"
                 className={inputClass}
                 placeholder="e.g. 40"
                 value={form.percentage}
                 onChange={(e) => setForm({ ...form, percentage: e.target.value })}
+                disabled={isFull}
               />
               <p className={HELPER_TEXT}>
-                {hasRounds ? 'Within this round: ' : 'After adding: '}
-                {previewTotalPct.toFixed(1)}%.
+                {isFull
+                  ? `${scopeLabel[0].toUpperCase()}${scopeLabel.slice(1)} is full (100%).`
+                  : `${hasRounds ? 'Within this round: ' : 'After adding: '}${previewTotalPct.toFixed(1)}% · ${remaining.toFixed(1)}% left.`}
               </p>
             </div>
 
@@ -447,13 +464,14 @@ export default function CriteriaManager({ eventId, foundation, reload }) {
 
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || isFull}
+              title={isFull ? `${scopeLabel[0].toUpperCase()}${scopeLabel.slice(1)} already totals 100%` : undefined}
               className={`inline-flex items-center justify-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50 ${
                 !hasRounds && divisionsEnabled ? 'sm:col-span-3' : 'sm:col-span-2'
               }`}
             >
               <Plus className="h-4 w-4" strokeWidth={1.8} aria-hidden />
-              {saving ? 'Adding...' : hasRounds ? 'Add to round' : 'Add criteria'}
+              {saving ? 'Adding...' : isFull ? 'Full (100%)' : hasRounds ? 'Add to round' : 'Add criteria'}
             </button>
           </form>
 

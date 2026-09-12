@@ -764,6 +764,31 @@ export async function deleteMinorCriteria(eventId, organizerId, criteriaId, mino
 export async function createCriteria(eventId, organizerId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
 
+  // §F #1: for FLAT (no-round) events, event-wide criteria must total ≤ 100%.
+  // Round-based events are guarded per round when the criterion is attached
+  // (addCriteriaToRound), so the flat sum across rounds is skipped here.
+  if (Number(payload.percentage) > 0) {
+    const { count: roundCount } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUNDS)
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+    if (!roundCount) {
+      const { data: crits } = await getClient()
+        .from(DB_TABLES.CRITERIA)
+        .select('percentage')
+        .eq('event_id', eventId)
+      const total = (crits ?? []).reduce((s, c) => s + Number(c.percentage ?? 0), 0)
+      const projected = total + Number(payload.percentage)
+      if (projected > 100 + 0.01) {
+        const remaining = Math.max(0, 100 - total)
+        throw new ApiError(
+          400,
+          `Criteria weight would exceed 100% (currently ${total.toFixed(2)}%, ${remaining.toFixed(2)}% left).`,
+        )
+      }
+    }
+  }
+
   if (payload.divisionId) {
     const { data: div, error: divErr } = await getClient()
       .from(DB_TABLES.COMPETITION_DIVISIONS)

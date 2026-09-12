@@ -122,8 +122,33 @@ export async function listCategories(eventId, organizerId, filters = {}) {
   return (data ?? []).map(mapCategory)
 }
 
+// Weight budget guard (§F #1). Rejects a create/attach that would push a scope's
+// weight total over 100%. `currentTotal` is the scope's existing total; `addition`
+// is the incoming weight. Boundary uses a small epsilon so 100.00% is allowed.
+function assertWeightWithinBudget(currentTotal, addition, label) {
+  const current = Number(currentTotal) || 0
+  const projected = current + (Number(addition) || 0)
+  if (projected > 100 + 0.01) {
+    const remaining = Math.max(0, 100 - current)
+    throw new ApiError(
+      400,
+      `${label} would exceed 100% (currently ${current.toFixed(2)}%, ${remaining.toFixed(2)}% left).`,
+    )
+  }
+}
+
 export async function createCategory(eventId, organizerId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
+
+  // §F #1: category weights across the event must not exceed 100%.
+  if (Number(payload.weight) > 0) {
+    const { data: cats } = await getClient()
+      .from(DB_TABLES.COMPETITION_CATEGORIES)
+      .select('weight')
+      .eq('event_id', eventId)
+    const total = (cats ?? []).reduce((s, c) => s + Number(c.weight ?? 0), 0)
+    assertWeightWithinBudget(total, payload.weight, 'Category weight')
+  }
 
   // Validate division belongs to event if provided
   if (payload.divisionId) {
@@ -269,6 +294,16 @@ export async function listRounds(eventId, organizerId, filters = {}) {
 
 export async function createRound(eventId, organizerId, payload) {
   await assertCompetitionEvent(eventId, organizerId)
+
+  // §F #1: round weights across the event must not exceed 100%.
+  if (Number(payload.weight) > 0) {
+    const { data: rounds } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUNDS)
+      .select('weight')
+      .eq('event_id', eventId)
+    const total = (rounds ?? []).reduce((s, r) => s + Number(r.weight ?? 0), 0)
+    assertWeightWithinBudget(total, payload.weight, 'Round weight')
+  }
 
   if (payload.categoryId) {
     const { data: cat, error: catErr } = await getClient()
@@ -423,6 +458,25 @@ export async function removeContestantFromRound(eventId, organizerId, roundId, c
 
 export async function addCriteriaToRound(eventId, organizerId, roundId, criteriaId) {
   await assertCompetitionEvent(eventId, organizerId)
+
+  // §F #1: a round's assigned criteria must total ≤ 100%. Sum the round's current
+  // criteria plus the one being attached (skip if it's already attached).
+  const { data: existing } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
+    .select('criteria_id')
+    .eq('round_id', roundId)
+  const existingIds = (existing ?? []).map((r) => r.criteria_id)
+  if (!existingIds.includes(criteriaId)) {
+    const idsToPrice = [...existingIds, criteriaId]
+    const { data: crits } = await getClient()
+      .from(DB_TABLES.CRITERIA)
+      .select('id, percentage')
+      .in('id', idsToPrice)
+    const pctById = new Map((crits ?? []).map((c) => [c.id, Number(c.percentage ?? 0)]))
+    const currentTotal = existingIds.reduce((s, id) => s + (pctById.get(id) ?? 0), 0)
+    assertWeightWithinBudget(currentTotal, pctById.get(criteriaId) ?? 0, "This round's criteria weight")
+  }
+
   const { error } = await getClient()
     .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
     .insert({ round_id: roundId, criteria_id: criteriaId })
