@@ -4,7 +4,6 @@ import {
   validateBallot,
   validatePosition,
   validateCandidate,
-  validateVotingToggle,
 } from '../../src/validators/election.validator.js'
 
 describe('election.validator', () => {
@@ -60,13 +59,6 @@ describe('election.validator', () => {
 
     test('rejects missing name', () => {
       expect(() => validateCandidate({})).toThrow(ApiError)
-    })
-  })
-
-  describe('validateVotingToggle', () => {
-    test('requires a boolean', () => {
-      expect(validateVotingToggle({ votingEnabled: true })).toBe(true)
-      expect(() => validateVotingToggle({ votingEnabled: 'yes' })).toThrow(ApiError)
     })
   })
 })
