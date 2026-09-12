@@ -36,7 +36,6 @@ export default function CompetitionWorkspacePage() {
     const t = searchParams.get('tab')
     return WORKSPACE_TABS.includes(t) ? t : 'rounds'
   })
-  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const load = () => {
     pageantService
@@ -82,46 +81,29 @@ export default function CompetitionWorkspacePage() {
 
       <div className="flex items-center justify-between gap-2 border-b border-v-border text-sm">
         <div className="flex gap-2">
-          {(() => {
-            const hasCategories = (foundation?.categories ?? []).length > 0
-            // Rounds lead. Categories is an advanced layer (group rounds into
-            // weighted buckets) — only shown when revealed or already in use.
-            const tabs = [
-              { id: 'rounds', label: 'Rounds' },
-              { id: 'criteria', label: 'Criteria' },
-              { id: 'divisions', label: 'Divisions' },
-              { id: 'scoring', label: 'Scoring rules' },
-              ...(showAdvanced || hasCategories ? [{ id: 'structure', label: 'Categories' }] : []),
-            ]
-            return tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`-mb-px border-b-2 px-3 py-2 ${
-                  activeTab === tab.id
-                    ? 'border-v-primary text-v-text'
-                    : 'border-transparent text-v-text-subtle hover:text-v-text-muted'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))
-          })()}
+          {/* Categories (grouping rounds into weighted buckets) are hidden for now —
+              rounds already carry their own weight. The tab/StructureTab and the
+              backend/engine are left intact so the feature can be re-enabled later. */}
+          {[
+            { id: 'rounds', label: 'Rounds' },
+            { id: 'criteria', label: 'Criteria' },
+            { id: 'divisions', label: 'Divisions' },
+            { id: 'scoring', label: 'Scoring rules' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`-mb-px border-b-2 px-3 py-2 ${
+                activeTab === tab.id
+                  ? 'border-v-primary text-v-text'
+                  : 'border-transparent text-v-text-subtle hover:text-v-text-muted'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
-        {!showAdvanced && (foundation?.categories ?? []).length === 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              setShowAdvanced(true)
-              setActiveTab('structure')
-            }}
-            className="text-xs text-v-text-subtle hover:text-v-text-muted"
-            title="Categories group rounds into higher-level weighted buckets. Most competitions don't need this."
-          >
-            + Advanced (Categories)
-          </button>
-        )}
       </div>
 
       <TypeHint type={foundation?.event?.competition_type} />
@@ -445,8 +427,12 @@ function CategoryRow({ cat, eventId, reload, divisionsEnabled, divisions }) {
 
 function RoundsTab({ foundation, reload }) {
   const { eventId } = useParams()
+  const { error: toastError } = useToast()
   const divisionsEnabled = foundation?.event?.divisions_enabled
   const divisions = foundation?.divisions ?? []
+  // Categories are hidden by default; only surface the round→category picker for
+  // events that already have categories from before.
+  const hasCategories = (foundation?.categories ?? []).length > 0
 
   const [name, setName] = useState('')
   const [weight, setWeight] = useState(0)
@@ -459,9 +445,16 @@ function RoundsTab({ foundation, reload }) {
     () => (foundation?.rounds ?? []).reduce((s, r) => s + Number(r.weight), 0),
     [foundation],
   )
+  // §1: round weight budget across the event.
+  const remaining = Math.max(0, 100 - totalWeight)
+  const isFull = remaining <= 0.01
 
   const submit = async (e) => {
     e.preventDefault()
+    if (Number(weight) > remaining + 0.01) {
+      toastError(`Only ${remaining.toFixed(2)}% of round weight left. Lower the weight to add this round.`)
+      return
+    }
     setSaving(true)
     try {
       await pageantService.createRound(eventId, {
@@ -475,6 +468,8 @@ function RoundsTab({ foundation, reload }) {
       setCategoryId('')
       setDivisionId('')
       reload()
+    } catch (err) {
+      toastError(getErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -489,7 +484,13 @@ function RoundsTab({ foundation, reload }) {
     <div className="space-y-6">
       <form
         onSubmit={submit}
-        className={`grid gap-4 v-card p-6 ${divisionsEnabled ? 'sm:grid-cols-[1fr_120px_1fr_1fr_auto]' : 'sm:grid-cols-[1fr_120px_1fr_auto]'}`}
+        className={`grid gap-4 v-card p-6 ${
+          divisionsEnabled && hasCategories
+            ? 'sm:grid-cols-[1fr_120px_1fr_1fr_auto]'
+            : divisionsEnabled || hasCategories
+              ? 'sm:grid-cols-[1fr_120px_1fr_auto]'
+              : 'sm:grid-cols-[1fr_120px_auto]'
+        }`}
       >
         <div>
           <label className={LABEL_CLASS}>Round name</label>
@@ -510,24 +511,27 @@ function RoundsTab({ foundation, reload }) {
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
             min={0}
-            max={100}
+            max={remaining || 100}
+            disabled={isFull}
           />
         </div>
-        <div>
-          <label className={LABEL_CLASS}>Category (optional)</label>
-          <select
-            className={INPUT_CLASS}
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-          >
-            <option value="">— Event-wide —</option>
-            {(foundation?.categories ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {hasCategories && (
+          <div>
+            <label className={LABEL_CLASS}>Category (optional)</label>
+            <select
+              className={INPUT_CLASS}
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+            >
+              <option value="">— Event-wide —</option>
+              {(foundation?.categories ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {divisionsEnabled && (
           <div>
             <label className={LABEL_CLASS}>Division (optional)</label>
@@ -548,10 +552,11 @@ function RoundsTab({ foundation, reload }) {
         <div className="flex items-end">
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || isFull}
+            title={isFull ? 'Round weights already total 100%' : undefined}
             className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-60"
           >
-            Add round
+            {isFull ? 'Full (100%)' : 'Add round'}
           </button>
         </div>
       </form>
