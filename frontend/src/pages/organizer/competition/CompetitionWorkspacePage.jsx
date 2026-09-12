@@ -425,6 +425,26 @@ function CategoryRow({ cat, eventId, reload, divisionsEnabled, divisions }) {
   )
 }
 
+// #5 — a short label for a round's elimination rule, so it's visible on the row
+// (previously buried inside the assignment expander). Returns null when the round
+// keeps everyone, so only eliminating rounds get a badge.
+function advancementLabel(round) {
+  const v = round.advancementValue
+  const policy = round.scorePolicy === 'cumulative' ? ' · cumulative' : ''
+  switch (round.advancementType) {
+    case 'top_n':
+      return `Top ${v ?? '?'} advance${policy}`
+    case 'top_percent':
+      return `Top ${v ?? '?'}% advance${policy}`
+    case 'threshold':
+      return `Score ≥ ${v ?? '?'} advances${policy}`
+    case 'manual':
+      return `Manual pick${policy}`
+    default:
+      return null
+  }
+}
+
 function RoundsTab({ foundation, reload }) {
   const { eventId } = useParams()
   const { error: toastError } = useToast()
@@ -580,15 +600,34 @@ function RoundsTab({ foundation, reload }) {
             >
               {/* Round header row */}
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                <div className="flex items-start gap-3">
+                <div className="flex flex-wrap items-start gap-2">
                   <div>
-                    <p className="font-medium text-v-text">{round.name}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-v-text">{round.name}</p>
+                      {(() => {
+                        const label = advancementLabel(round)
+                        return label ? (
+                          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-300">
+                            {label}
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-v-surface-elevated px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-v-text-subtle">
+                            No elimination
+                          </span>
+                        )
+                      })()}
+                      {round.finalizedAt && (
+                        <span className="rounded-full bg-v-success/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-v-success">
+                          Finalized
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-v-text-subtle mt-0.5">
                       {round.weight}% · {round.contestantIds?.length ?? 0} contestants ·{' '}
-                      {round.criteriaIds?.length ?? 0} criteria ·{' '}
+                      {round.criteriaIds?.length ?? 0} criteria
                       {round.categoryId
-                        ? foundation?.categories?.find((c) => c.id === round.categoryId)?.name ?? 'Category'
-                        : 'Event-wide'}
+                        ? ` · ${foundation?.categories?.find((c) => c.id === round.categoryId)?.name ?? 'Category'}`
+                        : ''}
                     </p>
                   </div>
                   {divisionsEnabled && divisionName && (

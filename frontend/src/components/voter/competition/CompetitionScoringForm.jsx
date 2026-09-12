@@ -25,19 +25,21 @@ export default function CompetitionScoringForm({
       crit.minors && crit.minors.length
         ? crit.minors
         : [{ id: crit.id, name: crit.name, minScore: crit.minScore, maxScore: crit.maxScore }]
-    return { crit, minors }
+    // #4 show-but-lock: a criterion the organizer hasn't opened renders disabled.
+    return { crit, minors, open: crit.open !== false }
   })
   const boundsFor = (minor) => ({
     min: minor.minScore ?? scaleBounds?.min ?? 1,
     max: minor.maxScore ?? scaleBounds?.max ?? 100,
   })
 
-  // Every scorable target across all criteria (used for per-row completeness).
-  const allTargets = critColumns.flatMap(({ minors }) => minors)
-  const totalTargets = allTargets.length
+  // Completeness counts only OPEN criteria — a judge can't fill closed ones, so
+  // they must not block "Submit & lock".
+  const openTargets = critColumns.filter((c) => c.open).flatMap(({ minors }) => minors)
+  const totalTargets = openTargets.length
 
   const doneCount = (cid) =>
-    allTargets.filter((t) => {
+    openTargets.filter((t) => {
       const s = scores[`${cid}:${t.id}`]
       return s !== undefined && s !== '' && s !== null
     }).length
@@ -65,12 +67,19 @@ export default function CompetitionScoringForm({
     </span>
   )
 
-  // Shared per-row action: Locked pill, Saving state, or Submit & lock.
+  // Shared per-row action: Locked pill, waiting-for-organizer, Saving, or Submit.
   const RowAction = ({ cont, block = false }) => {
     if (cont.hasSubmitted) {
       return (
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-300">
           <Lock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> Locked
+        </span>
+      )
+    }
+    if (cont.open === false) {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-v-surface-elevated px-3 py-1.5 text-xs font-medium text-v-text-subtle">
+          <Lock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> Waiting
         </span>
       )
     }
@@ -105,14 +114,16 @@ export default function CompetitionScoringForm({
               <th className="sticky left-0 z-20 w-60 min-w-[15rem] border-r border-v-border bg-v-surface-elevated p-3 text-left v-caption" rowSpan={2}>
                 Contestant
               </th>
-              {critColumns.map(({ crit, minors }) => (
+              {critColumns.map(({ crit, minors, open }) => (
                 <th
                   key={crit.id}
                   colSpan={minors.length}
-                  className="border-l border-v-border p-2 text-center"
+                  className={`border-l border-v-border p-2 text-center ${open ? '' : 'opacity-50'}`}
                 >
                   <span className="text-v-text-muted">{crit.name}</span>
-                  <span className="v-caption block">{crit.percentage}%</span>
+                  <span className="v-caption block">
+                    {open ? `${crit.percentage}%` : 'Not open yet'}
+                  </span>
                 </th>
               ))}
               <th className="sticky right-0 z-20 w-32 min-w-32 border-l border-v-border bg-v-surface-elevated p-3 text-center v-caption" rowSpan={2}>
@@ -142,10 +153,11 @@ export default function CompetitionScoringForm({
           <tbody>
             {orderedContestants.map((cont) => {
               const locked = Boolean(cont.hasSubmitted)
+              const closed = cont.open === false
               return (
                 <tr
                   key={cont.id}
-                  className={`border-b border-v-border/50 ${locked ? 'bg-emerald-950/10' : ''}`}
+                  className={`border-b border-v-border/50 ${locked ? 'bg-emerald-950/10' : closed ? 'opacity-60' : ''}`}
                 >
                   <td className="sticky left-0 z-10 w-60 min-w-[15rem] border-r border-v-border bg-v-surface p-3">
                     <div className="flex items-center gap-2.5">
@@ -158,7 +170,7 @@ export default function CompetitionScoringForm({
                       </span>
                     </div>
                   </td>
-                  {critColumns.flatMap(({ minors }) =>
+                  {critColumns.flatMap(({ minors, open: critOpen }) =>
                     minors.map((m, i) => (
                       <td key={m.id} className={`p-2 ${i === 0 ? 'border-l border-v-border' : ''}`}>
                         <ScoreInputComponent
@@ -167,7 +179,7 @@ export default function CompetitionScoringForm({
                           bounds={boundsFor(m)}
                           scores={scores}
                           onScoreChange={onScoreChange}
-                          disabled={locked || submittingId === cont.id}
+                          disabled={locked || closed || !critOpen || submittingId === cont.id}
                         />
                       </td>
                     )),
@@ -186,10 +198,11 @@ export default function CompetitionScoringForm({
       <div className="space-y-4 md:hidden">
         {orderedContestants.map((cont) => {
           const locked = Boolean(cont.hasSubmitted)
+          const closed = cont.open === false
           return (
             <article
               key={cont.id}
-              className={`v-card p-6 ${locked ? 'ring-1 ring-emerald-500/30 bg-emerald-950/10' : ''}`}
+              className={`v-card p-6 ${locked ? 'ring-1 ring-emerald-500/30 bg-emerald-950/10' : closed ? 'opacity-70' : ''}`}
             >
               <div className="flex items-center gap-3">
                 <NumberBadge number={cont.contestantNumber} locked={locked} />
@@ -197,17 +210,24 @@ export default function CompetitionScoringForm({
                   <img src={cont.photo} alt="" className="h-12 w-12 rounded-lg object-cover" />
                 )}
                 <h4 className="v-section-title">{cont.name}</h4>
-                {locked && (
+                {locked ? (
                   <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">
                     <CheckCircle className="h-3.5 w-3.5" /> Locked
                   </span>
-                )}
+                ) : closed ? (
+                  <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-v-surface-elevated px-3 py-1 text-xs font-medium text-v-text-subtle">
+                    <Lock className="h-3.5 w-3.5" /> Waiting
+                  </span>
+                ) : null}
               </div>
               <div className="mt-4 space-y-4">
-                {critColumns.map(({ crit, minors }) => (
-                  <div key={crit.id} className="rounded-lg border border-v-border/70 p-3">
+                {critColumns.map(({ crit, minors, open: critOpen }) => (
+                  <div key={crit.id} className={`rounded-lg border border-v-border/70 p-3 ${critOpen ? '' : 'opacity-50'}`}>
                     <p className="mb-2 text-xs font-medium text-v-text-muted">
-                      {crit.name} <span className="text-v-text-subtle">· {crit.percentage}%</span>
+                      {crit.name}{' '}
+                      <span className="text-v-text-subtle">
+                        · {critOpen ? `${crit.percentage}%` : 'Not open yet'}
+                      </span>
                     </p>
                     <div className="space-y-3">
                       {minors.map((m) => {
@@ -226,7 +246,7 @@ export default function CompetitionScoringForm({
                               bounds={b}
                               scores={scores}
                               onScoreChange={onScoreChange}
-                              disabled={locked || submittingId === cont.id}
+                              disabled={locked || closed || !critOpen || submittingId === cont.id}
                               size="md"
                             />
                           </div>

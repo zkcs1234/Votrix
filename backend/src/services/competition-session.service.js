@@ -97,7 +97,7 @@ async function loadRoundCriteriaIds(eventId, roundId) {
 // pre-existing sessions and events keep working. A criterion with no minors
 // (deploy window / not-yet-migrated) is returned with an empty `minors` array
 // and its own bounds, and the callers score it directly by criterion id.
-async function loadActiveScoringCriteria(eventId, session, fallbackBounds) {
+async function loadActiveScoringCriteria(eventId, session, fallbackBounds, { includeClosed = false } = {}) {
   // Fetch the current round's criteria (full rows), else event-wide criteria.
   let crits = []
   let orderedIds = []
@@ -124,11 +124,14 @@ async function loadActiveScoringCriteria(eventId, session, fallbackBounds) {
     orderedIds = crits.map((c) => c.id)
   }
 
-  // Apply the live active-criteria gate (empty = all open).
+  // The live active-criteria gate (empty = all open). With includeClosed the
+  // judge sheet keeps EVERY scope criterion and each carries an `open` flag
+  // (show-but-lock); otherwise closed criteria are dropped (submit path).
   const active = Array.isArray(session.activeCriteriaIds) ? session.activeCriteriaIds : []
-  if (active.length) {
-    const set = new Set(active)
-    crits = crits.filter((c) => set.has(c.id))
+  const activeSet = new Set(active)
+  const isOpen = (id) => active.length === 0 || activeSet.has(id)
+  if (!includeClosed && active.length) {
+    crits = crits.filter((c) => isOpen(c.id))
   }
   if (!crits.length) return []
 
@@ -154,6 +157,9 @@ async function loadActiveScoringCriteria(eventId, session, fallbackBounds) {
       eventId: c.event_id,
       name: c.name,
       percentage: Number(c.percentage),
+      // show-but-lock: judges see closed criteria disabled, so the sheet needs
+      // to know which are open. Empty gate = all open.
+      open: isOpen(c.id),
       minScore: fallbackBounds?.min ?? Number(c.min_score),
       maxScore: fallbackBounds?.max ?? Number(c.max_score),
       minors: (minorsByCrit.get(c.id) ?? []).map((m) => {
@@ -254,7 +260,14 @@ export async function getActiveSessionDetailed(eventId) {
       })
     }
   }
-  const roundContestants = order.map((id) => contestantsById.get(id)).filter(Boolean)
+  // #4: mark each contestant open/closed from the gate (null = all open) so Live
+  // Control can render per-contestant toggles.
+  const contestantGate = Array.isArray(session.activeContestantIds) ? session.activeContestantIds : null
+  const contestantGateSet = contestantGate ? new Set(contestantGate) : null
+  const roundContestants = order
+    .map((id) => contestantsById.get(id))
+    .filter(Boolean)
+    .map((c) => ({ ...c, open: !contestantGateSet || contestantGateSet.has(c.id) }))
 
   // Criteria control for Live Control — works with OR WITHOUT rounds. When a
   // round is active it's that round's criteria; for criteria-only events (no
@@ -789,6 +802,54 @@ export async function setStageGroup(eventId, organizerId, contestantIds) {
 }
 
 // ---------------------------------------------------------------------------
+// #4 — Contestant gate. Set WHICH contestants judges may score right now. The
+// full field is always shown to judges; closed ones render locked (show-but-lock).
+//   contestantIds = array (incl. []) → exactly those are open ([] = none open)
+//   contestantIds = null            → gate off, every contestant open (default)
+// ---------------------------------------------------------------------------
+export async function setOpenContestants(eventId, organizerId, contestantIds) {
+  const session = await assertActiveSession(eventId, organizerId)
+
+  let gate = null
+  if (Array.isArray(contestantIds)) {
+    gate = [...new Set(contestantIds)]
+    for (const id of gate) {
+      if (!session.contestantOrder.includes(id)) {
+        throw new ApiError(400, 'A selected contestant is not in the current round')
+      }
+    }
+  }
+
+  const { data, error } = await getClient()
+    .from('competition_sessions')
+    // null = all open; [] = none open; [...] = only those open.
+    .update({ active_contestant_ids: gate })
+    .eq('id', session.id)
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+
+  const updated = mapSession(data)
+
+  // Judges reload their sheet so the newly (un)locked rows update immediately.
+  emitToEvent(eventId, 'session:contestant-changed', {
+    session: updated,
+    previousContestantId: session.activeContestantId,
+  })
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.session.set_open_contestants',
+    userId: organizerId,
+    module: 'competition',
+    details: { sessionId: session.id, open: gate },
+  })
+
+  return updated
+}
+
+// ---------------------------------------------------------------------------
 // Change round (advance to next round or set a specific one)
 // ---------------------------------------------------------------------------
 export async function setActiveRound(eventId, organizerId, roundId) {
@@ -820,6 +881,9 @@ export async function setActiveRound(eventId, organizerId, roundId) {
       current_contestant_order: 0,
       contestant_order: contestantOrder,
       active_criteria_ids: activeCriteriaIds,
+      // #4: reset the contestant gate to all-open when the round changes (the new
+      // round has a different field). Organizer can then close individual ones.
+      active_contestant_ids: null,
     })
     .eq('id', session.id)
     .select('*')
@@ -1239,6 +1303,13 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores, contes
     throw new ApiError(400, 'Active contestant is not in the current round')
   }
 
+  // #4 contestant gate: if the organizer has opened a subset, reject scores for
+  // any contestant not currently open (empty/null gate = all open).
+  const openGate = Array.isArray(session.activeContestantIds) ? session.activeContestantIds : null
+  if (openGate && !openGate.includes(targetContestantId)) {
+    throw new ApiError(400, 'This contestant is not open for scoring yet')
+  }
+
   // Phase 6: a finalized round is locked — no further score edits allowed.
   if (session.currentRoundId) {
     const { data: roundRow } = await getClient()
@@ -1412,12 +1483,15 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
   }
 
   // Round-driven scoring: the WHOLE round's field is on stage, so a judge scores
-  // every contestant in the round from one scoresheet. Stage groups were removed
-  // (there is no UI to set or clear them), so we ALWAYS use the full round order.
-  // This also self-heals sessions started under the old per-contestant flow that
-  // still carry a stale active_contestant_ids subset — every contestant shows
-  // again with no session restart.
+  // every contestant in the round from one scoresheet. The organizer may gate
+  // WHICH contestants are open for scoring via active_contestant_ids (#4):
+  //   null  → gate off, every contestant open (default, backward compatible)
+  //   [...] → only these are open; the rest show but are locked (show-but-lock)
+  // The full field is always returned so judges SEE everyone.
   let stageIds = session.contestantOrder ?? []
+  const contestantGate = Array.isArray(session.activeContestantIds) ? session.activeContestantIds : null
+  const contestantGateSet = contestantGate ? new Set(contestantGate) : null
+  const isContestantOpen = (id) => !contestantGateSet || contestantGateSet.has(id)
 
   // Optional division filter (judge-side): narrow the field to one division.
   if (divisionId) {
@@ -1443,10 +1517,10 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
   const scoringConfig = mergeScoringConfig(event.scoring_config)
   const eventBounds = resolveScoreBounds(scoringConfig)
 
-  // Criteria the judge scores: current round, gated by the live active-criteria
-  // set, each with its minor criteria and their own bounds. Closed criteria are
-  // omitted entirely (hidden until opened).
-  const criteria = await loadActiveScoringCriteria(eventId, session, eventBounds)
+  // Criteria the judge scores: current round, each with its minor criteria and
+  // bounds. show-but-lock (#4): return EVERY scope criterion with an `open` flag
+  // so closed ones render disabled rather than disappearing.
+  const criteria = await loadActiveScoringCriteria(eventId, session, eventBounds, { includeClosed: true })
 
   // This judge's existing session scores for every on-stage contestant.
   const { data: existingRows } = await getClient()
@@ -1480,6 +1554,8 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
         ...mapContestant(c),
         existingScores: ex?.scores ?? {},
         hasSubmitted: !!(ex && ex.is_locked),
+        // #4 show-but-lock: closed contestants render disabled on the sheet.
+        open: isContestantOpen(c.id),
       }
     })
 
@@ -1762,12 +1838,16 @@ async function computeRoundStanding(eventId, round, scoringConfig, { divisionId 
   })
 
   const divisionById = new Map((contestants ?? []).map((c) => [c.id, c.division_id ?? null]))
+  // `score` is the ranking value (becomes cumulative below when the policy is
+  // cumulative). `roundScore` always stays this round's own score so THRESHOLD
+  // advancement is per-round even under a cumulative policy (#5).
   let standing = rankings.map((r) => ({
     contestantId: r.contestantId,
     contestantName: r.contestantName,
     contestantNumber: r.contestantNumber,
     divisionId: divisionById.get(r.contestantId) ?? null,
     score: r.finalScore,
+    roundScore: r.finalScore,
   }))
 
   // Cumulative policy: add the sum of prior finalized rounds' snapshot scores.

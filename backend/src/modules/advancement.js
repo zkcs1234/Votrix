@@ -34,8 +34,13 @@ export function selectQualifiers(standing, advancementType, advancementValue) {
       break
 
     case ADVANCEMENT_TYPES.THRESHOLD: {
+      // Threshold is always per-round (#5): compare this round's own score, not
+      // the cumulative running total. Falls back to `score` when roundScore is absent.
       if (Number.isNaN(val)) break
-      for (const s of standing) if (Number(s.score) >= val) qualified.add(s.contestantId)
+      for (const s of standing) {
+        const basis = s.roundScore ?? s.score
+        if (Number(basis) >= val) qualified.add(s.contestantId)
+      }
       break
     }
 

@@ -290,6 +290,8 @@ export default function JudgeScoringPage() {
     (contestantId) => {
       const scoreMap = {}
       for (const criteria of sheet?.criteria ?? []) {
+        // #4 show-but-lock: closed criteria can't be scored, so don't require them.
+        if (criteria.open === false) continue
         const targets =
           criteria.minors && criteria.minors.length
             ? criteria.minors
@@ -315,6 +317,12 @@ export default function JudgeScoringPage() {
 
   const submitContestant = useCallback(
     async (contestantId) => {
+      // #4: closed contestants aren't scorable (the organizer hasn't opened them).
+      const target = (sheet?.contestants ?? []).find((c) => c.id === contestantId)
+      if (target && target.open === false) {
+        setError('This contestant is not open for scoring yet.')
+        return
+      }
       const { ok, scoreMap, error: buildError } = buildContestantPayload(contestantId)
       if (!ok) {
         setError(buildError)
@@ -588,49 +596,26 @@ export default function JudgeScoringPage() {
 
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-sm">
         {(() => {
-          // On-stage contestants: the whole stage group, or the single active one.
-          const onStage = sheet?.stageGroup
-            ? (sheet.stageContestants ?? [])
-            : (activeContestantId
-                ? [sheet?.contestants?.find((c) => c.id === activeContestantId)].filter(Boolean)
-                : [])
-          if (!onStage.length) {
-            return <p className="text-v-text-muted">Waiting for organizer to select contestant...</p>
+          // Round-driven: the whole field is on the sheet. The organizer gates
+          // which contestants/criteria are open (#4); summarize what's scorable.
+          const field = sheet?.contestants ?? []
+          if (!field.length) {
+            return <p className="text-v-text-muted">Waiting for the organizer to open scoring…</p>
           }
-          // Count MINOR criteria (what judges actually score); a criterion with
-          // no minors counts as one scorable item.
-          const scoreTargets = (sheet?.criteria ?? []).flatMap((crit) =>
-            crit.minors && crit.minors.length ? crit.minors : [{ id: crit.id }],
-          )
-          const critCount = scoreTargets.length
-          const doneFor = (cid) =>
-            scoreTargets.filter((t) => {
-              const s = scores[`${cid}:${t.id}`]
-              return s !== undefined && s !== '' && s !== null
-            }).length
+          const openContestants = field.filter((c) => c.open !== false)
+          const openCrit = (sheet?.criteria ?? []).filter((c) => c.open !== false)
           return (
-            <>
-              <p className="text-v-text-muted">
-                Scoring{' '}
-                {onStage.length > 1 ? (
-                  <strong className="text-white">{onStage.length} contestants on stage</strong>
-                ) : (
-                  <>contestant: <strong className="text-white">{onStage[0].name}</strong></>
-                )}{' '}
-                on <strong className="text-white">{critCount}</strong> criteria
-              </p>
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-v-text-subtle">
-                {onStage.map((c) => {
-                  const done = doneFor(c.id)
-                  const complete = done === critCount && critCount > 0
-                  return (
-                    <span key={c.id} className={complete ? 'text-emerald-400' : ''}>
-                      {c.name}: {done}/{critCount}{complete ? ' ✓' : ''}
-                    </span>
-                  )
-                })}
-              </div>
-            </>
+            <p className="text-v-text-muted">
+              Scoring{' '}
+              <strong className="text-white">
+                {openContestants.length} of {field.length}
+              </strong>{' '}
+              contestant{field.length === 1 ? '' : 's'} on{' '}
+              <strong className="text-white">{openCrit.length}</strong> open criteri
+              {openCrit.length === 1 ? 'on' : 'a'}.
+              {openContestants.length < field.length &&
+                ' Locked contestants open when the organizer says so.'}
+            </p>
           )
         })()}
       </div>

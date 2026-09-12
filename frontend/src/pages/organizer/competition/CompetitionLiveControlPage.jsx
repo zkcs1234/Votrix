@@ -174,6 +174,45 @@ export default function CompetitionLiveControlPage() {
     }
   }
 
+  // #4 contestant gate — control which contestants judges may score. Judges still
+  // SEE everyone; closed contestants render locked on their sheet. `ids` = the new
+  // open set, or null to open everyone.
+  const applyOpenContestants = async (ids, key = 'gate') => {
+    setActionLoading(`openContestants:${key}`)
+    try {
+      await competitionSessionService.setOpenContestants(eventId, ids)
+      await loadSession()
+    } catch (err) {
+      toastError(getErrorMessage(err))
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const toggleContestantOpen = (contestantId) => {
+    const roster = session?.roundContestants ?? []
+    const openIds = roster.filter((c) => c.open).map((c) => c.id)
+    const next = openIds.includes(contestantId)
+      ? openIds.filter((id) => id !== contestantId)
+      : [...openIds, contestantId]
+    return applyOpenContestants(next, contestantId)
+  }
+
+  // #5 — close/reopen the active round. A round must be CLOSED before it can be
+  // finalized (the backend rejects finalizing an open round).
+  const setRoundOpen = async (roundId, isOpen) => {
+    setActionLoading('roundOpen')
+    try {
+      await pageantService.updateRound(eventId, roundId, { isOpen })
+      await loadSession()
+      success(isOpen ? 'Round reopened for scoring' : 'Round closed — ready to finalize')
+    } catch (err) {
+      toastError(getErrorMessage(err))
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   // Phase 6 — open the finalize review modal for a round.
   const openFinalize = async (roundId) => {
     setFinalizeRoundId(roundId)
@@ -448,10 +487,27 @@ export default function CompetitionLiveControlPage() {
                 standings snapshot (e.g. after a scoring fix). */}
             {session.activeRound?.id && (
               <div className="space-y-1">
+                {/* #5: a round must be closed before finalizing. Offer the close
+                    step inline so the organizer isn't blocked at finalize time. */}
+                {!session.activeRound.finalized && session.activeRound.isOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setRoundOpen(session.activeRound.id, false)}
+                    disabled={actionLoading === 'roundOpen'}
+                    className="w-full rounded-lg border border-v-border bg-v-surface-elevated/60 px-3 py-2 text-xs font-medium text-v-text-muted transition hover:bg-v-surface-elevated disabled:opacity-50"
+                  >
+                    {actionLoading === 'roundOpen' ? 'Closing…' : 'Close round for finalizing'}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => openFinalize(session.activeRound.id)}
-                  disabled={finalizeLoading}
+                  disabled={finalizeLoading || (!session.activeRound.finalized && session.activeRound.isOpen)}
+                  title={
+                    !session.activeRound.finalized && session.activeRound.isOpen
+                      ? 'Close the round first'
+                      : undefined
+                  }
                   className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 transition hover:bg-amber-500/20 disabled:opacity-50"
                 >
                   {finalizeLoading
@@ -463,44 +519,96 @@ export default function CompetitionLiveControlPage() {
                 <p className="text-[11px] text-v-text-subtle">
                   {session.activeRound.finalized
                     ? 'This round is finalized. Recompute to refresh its saved standings with the current scores.'
-                    : "Snapshots this round's standing and seeds qualifiers into the next round. Review before confirming."}
+                    : session.activeRound.isOpen
+                      ? 'Close the round, then finalize to snapshot its standing and seed qualifiers into the next round.'
+                      : "Snapshots this round's standing and seeds qualifiers into the next round. Review before confirming."}
                 </p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Round field — the whole round is on stage; judges score every
-            contestant from one sheet. Read-only roster (no per-contestant
-            control: the organizer drives rounds & criteria, not contestants). */}
-        <div className="rounded-xl border border-v-border bg-v-surface p-6">
-          <h3 className="mb-1 text-sm font-medium text-v-text-muted uppercase tracking-wider">
-            On stage this round
-          </h3>
-          <p className="mb-3 text-sm text-v-text-subtle">
-            {(session.roundContestants?.length ?? 0) > 0
-              ? `All ${session.roundContestants.length} contestants in ${session.activeRound?.name ?? 'this round'} are on judges’ scoresheets.`
-              : 'No contestants assigned to this round yet.'}
-          </p>
-          {session.roundContestants?.length > 0 && (
-            <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
-              {session.roundContestants.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex items-center gap-3 rounded-lg border border-v-border bg-v-surface-elevated/40 px-3 py-2"
-                >
-                  <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-v-surface px-1.5 text-sm font-bold tabular-nums text-v-text border border-v-border">
-                    #{c.contestantNumber}
-                  </span>
-                  {c.photo && (
-                    <img src={c.photo} alt="" className="h-8 w-8 rounded-lg object-cover" />
-                  )}
-                  <span className="min-w-0 truncate text-sm font-medium text-v-text">{c.name}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        {/* Round field — every contestant is on judges' sheets. The organizer
+            gates WHICH are open for scoring (#4); closed ones show locked to
+            judges. Judges never lose sight of the full field. */}
+        {(() => {
+          const roster = session.roundContestants ?? []
+          const openCount = roster.filter((c) => c.open).length
+          const allOpen = roster.length > 0 && openCount === roster.length
+          const gateBusy = String(actionLoading || '').startsWith('openContestants:')
+          return (
+            <div className="rounded-xl border border-v-border bg-v-surface p-6">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-medium text-v-text-muted uppercase tracking-wider">
+                  Scoring control{session.hasRounds ? ' — this round' : ''}
+                </h3>
+                {roster.length > 0 && (
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      disabled={gateBusy || allOpen}
+                      onClick={() => applyOpenContestants(null, 'all')}
+                      className="rounded-md border border-v-border px-2 py-1 text-[11px] font-medium text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-40"
+                    >
+                      Open all
+                    </button>
+                    <button
+                      type="button"
+                      disabled={gateBusy || openCount === 0}
+                      onClick={() => applyOpenContestants([], 'none')}
+                      className="rounded-md border border-v-border px-2 py-1 text-[11px] font-medium text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-40"
+                    >
+                      Close all
+                    </button>
+                  </div>
+                )}
+              </div>
+              <p className="mb-3 text-sm text-v-text-subtle">
+                {roster.length === 0
+                  ? session.hasRounds
+                    ? 'No contestants assigned to this round yet.'
+                    : 'No contestants added yet.'
+                  : allOpen
+                    ? `All ${roster.length} contestants are open — judges can score everyone.`
+                    : `${openCount} of ${roster.length} open for scoring. Tap a contestant to open or lock them; judges still see all.`}
+              </p>
+              {roster.length > 0 && (
+                <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+                  {roster.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        disabled={gateBusy}
+                        onClick={() => toggleContestantOpen(c.id)}
+                        title={c.open ? 'Open for scoring — click to lock' : 'Locked — click to open'}
+                        className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition disabled:opacity-60 ${
+                          c.open
+                            ? 'border-emerald-500/40 bg-emerald-500/10'
+                            : 'border-v-border bg-v-surface-elevated/40 hover:bg-v-surface-elevated'
+                        }`}
+                      >
+                        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-v-surface px-1.5 text-sm font-bold tabular-nums text-v-text border border-v-border">
+                          #{c.contestantNumber}
+                        </span>
+                        {c.photo && (
+                          <img src={c.photo} alt="" className="h-8 w-8 rounded-lg object-cover" />
+                        )}
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-v-text">{c.name}</span>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            c.open ? 'bg-emerald-500/20 text-emerald-300' : 'bg-v-surface text-v-text-subtle border border-v-border'
+                          }`}
+                        >
+                          {c.open ? 'Open' : 'Locked'}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Judge Progress — whole-round contestant × judge matrix. A locked cell

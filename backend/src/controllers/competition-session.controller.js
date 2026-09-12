@@ -80,6 +80,24 @@ export const setStageGroup = asyncHandler(async (req, res) => {
   res.json({ success: true, session })
 })
 
+/** POST /api/organizer/competition/events/:eventId/session/open-contestants
+ *  #4 contestant gate. Body: { contestantIds: string[] } to open exactly those
+ *  ([] = none open), or { openAll: true } to clear the gate (all open). */
+export const setOpenContestants = asyncHandler(async (req, res) => {
+  const { contestantIds, openAll } = req.body
+  if (!openAll && !Array.isArray(contestantIds)) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'Provide contestantIds (array) or openAll: true' })
+  }
+  const session = await sessionService.setOpenContestants(
+    req.params.eventId,
+    req.user.id,
+    openAll ? null : contestantIds,
+  )
+  res.json({ success: true, session })
+})
+
 /** POST /api/organizer/competition/events/:eventId/session/set-round */
 export const setActiveRound = asyncHandler(async (req, res) => {
   const { roundId } = req.body
