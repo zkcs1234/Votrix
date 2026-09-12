@@ -199,3 +199,55 @@ A, B, C, D(#2) are independent and safely shippable on their own. #4 spans D + E
 
 - **Category vs round-weight validation mismatch** (§C / [competition.service.js:481](backend/src/services/competition.service.js:481)) — global round-weight check contradicts the engine's per-category grouping. **Deferred** with the feature (Option A hides categories); revisit if categories are re-enabled.
 - **Threshold under cumulative policy** (§F #5) — compares the running total, not the per-round score. **Being fixed** as part of #5 (threshold → per-round).
+
+---
+
+## 8. Item #6 — Per-criterion locking (follow-up to #4)
+
+**Why:** #4's lock is per **contestant** — "Submit & lock" freezes the whole row across every open
+criterion. That clashes with progressively opening criteria over time (score Talent now, Q&A later,
+same contestant): once locked, the later criterion can't be scored without an organizer unlock. #6
+moves the lock to the **criterion** level so a judge commits one criterion at a time and newly opened
+criteria stay scorable.
+
+**Decisions (confirmed 2026-09-12):** per-contestant "Submit open criteria" button · criterion-level
+granularity · per-criterion unlock in Live Control included.
+
+### Data model (one additive, reversible migration)
+- Add `locked_criteria JSONB NOT NULL DEFAULT '[]'` to `competition_session_judge_scores` — the set of
+  **criterion ids** locked for that (judge, session, round, contestant) row.
+- `is_locked` becomes **derived**: `true` when `locked_criteria` covers all the round's criteria (kept
+  for compat + fast "fully done" queries).
+- Backfill: for existing `is_locked = true` rows, set `locked_criteria` to the criteria they already
+  have scores for. Down migration drops the column.
+
+### Backend ([competition-session.service.js](backend/src/services/competition-session.service.js))
+- **`submitJudgeSessionScore`**: submit only the *open, not-yet-locked* criteria; **merge** minor scores
+  into `scores` (today it replaces); append those criterion ids to `locked_criteria`; recompute
+  `is_locked`. Reject re-scoring an already-locked criterion.
+- **`getJudgeSessionView`**: return a per-criterion `locked` flag per (contestant, criterion) alongside
+  the existing `open` flag and prefilled scores.
+- **`unlockSessionScore` (B5)**: accept an optional `criteriaId` to reopen a single criterion; no id =
+  clear the whole contestant (today's behavior).
+- **`getJudgeProgress`**: report partial progress (locked/total criteria) instead of submitted/waiting.
+- Verify **`bridgeSessionScoresToRankingStore`** mirrors the merged full scores, not just the subset.
+
+### Frontend
+- **[CompetitionScoringForm.jsx](frontend/src/components/voter/competition/CompetitionScoringForm.jsx)**:
+  each cell is **locked** (committed, read-only) / **open** (scorable) / **waiting** (not opened). Row
+  action = **"Submit open criteria"** (locks just those); row shows `locked/total`, fully "Locked" only
+  when all criteria are in.
+- **[JudgeScoringPage.jsx](frontend/src/pages/voter/JudgeScoringPage.jsx)**: payload builder submits only
+  open-and-unlocked criteria; consume per-criterion `locked` flags.
+- **[CompetitionLiveControlPage.jsx](frontend/src/pages/organizer/competition/CompetitionLiveControlPage.jsx)**:
+  progress grid shows per-criterion locked counts; unlock offers "one criterion" vs "whole contestant."
+
+### Verification
+- [ ] Judge scores criterion A, submits → A locks, B/C stay scorable.
+- [ ] Organizer opens criterion B later → judge scores & submits B without any unlock.
+- [ ] Row shows "Locked" only when every round criterion is committed.
+- [ ] Per-criterion unlock reopens exactly one criterion; whole-contestant unlock still works.
+- [ ] Rankings reflect the merged scores; existing (pre-migration) locked rows still rank.
+
+> **Note:** #6 is the first item that needs a DB migration — the "no DB changes" note in the header
+> applies to items #1–#5 only.
