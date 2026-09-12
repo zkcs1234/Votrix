@@ -2127,18 +2127,38 @@ export async function getCompetitionAnalytics(eventId, organizerId) {
     contestants: cat.contestants.sort((a, b) => b.weightedScore - a.weightedScore),
   }))
 
-  // Per-judge activity — how many distinct contestants each judge has scored.
+  // Per-judge activity — how many contestants each judge has FULLY scored.
+  // A contestant only counts once the judge has locked every one of its criteria
+  // (#6: competition_session_judge_scores.is_locked is derived = all criteria in),
+  // so partially-scored contestants don't inflate the count. Batch-scored events
+  // have no live-session rows, so we fall back to distinct contestants that have
+  // any score in the ranking store.
   const contestantsByJudge = new Map()
   for (const s of scores) {
     if (!s.judge_id || !s.contestant_id) continue
     if (!contestantsByJudge.has(s.judge_id)) contestantsByJudge.set(s.judge_id, new Set())
     contestantsByJudge.get(s.judge_id).add(s.contestant_id)
   }
+
+  const { data: sessionScoreRows } = await getClient()
+    .from('competition_session_judge_scores')
+    .select('judge_id, contestant_id, is_locked')
+    .eq('event_id', eventId)
+  const hasSessionRows = (sessionScoreRows ?? []).length > 0
+  const fullyLockedByJudge = new Map()
+  for (const r of sessionScoreRows ?? []) {
+    if (!r.is_locked || !r.judge_id || !r.contestant_id) continue
+    if (!fullyLockedByJudge.has(r.judge_id)) fullyLockedByJudge.set(r.judge_id, new Set())
+    fullyLockedByJudge.get(r.judge_id).add(r.contestant_id)
+  }
+
   const judgeActivity = (judgesRes.data ?? []).map((j) => ({
     judgeId: j.user_id,
     judgeName: resolveDisplayName(j.first_name, j.last_name, j.users?.email ?? null),
     email: j.users?.email ?? null,
-    submittedCount: contestantsByJudge.get(j.user_id)?.size ?? 0,
+    submittedCount: hasSessionRows
+      ? fullyLockedByJudge.get(j.user_id)?.size ?? 0
+      : contestantsByJudge.get(j.user_id)?.size ?? 0,
     totalAssigned: totalContestants,
   }))
 
