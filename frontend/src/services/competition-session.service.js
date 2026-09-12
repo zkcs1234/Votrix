@@ -89,9 +89,10 @@ export const competitionSessionService = {
     return api.get(`${BASE}/events/${eventId}/session/judge-progress`)
   },
 
-  /** POST /api/organizer/competition/events/:eventId/session/unlock-score */
-  unlockScore(eventId, contestantId, judgeId = null) {
-    return api.post(`${BASE}/events/${eventId}/session/unlock-score`, { contestantId, judgeId })
+  /** POST /session/unlock-score — reopen a locked score. Pass criteriaId to
+   *  reopen a single criterion (#6); omit it to reopen the whole contestant. */
+  unlockScore(eventId, contestantId, judgeId = null, criteriaId = null) {
+    return api.post(`${BASE}/events/${eventId}/session/unlock-score`, { contestantId, judgeId, criteriaId })
   },
 
   // --- Round finalize & advancement (Phase 6) ---

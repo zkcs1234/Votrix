@@ -1322,34 +1322,47 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores, contes
     }
   }
 
-  // Check if judge already submitted for this contestant in this round
+  // Existing row for this (judge, round, contestant): its prior scores + per-
+  // criterion lock set (#6). A judge commits one criterion at a time, so this
+  // submission ADDS to whatever was already locked rather than replacing it.
   const { data: existing } = await getClient()
     .from('competition_session_judge_scores')
-    .select('id, is_locked')
+    .select('id, is_locked, scores, locked_criteria')
     .eq('session_id', session.id)
     .eq('judge_id', judgeId)
     .eq('round_id', session.currentRoundId)
     .eq('contestant_id', targetContestantId)
     .maybeSingle()
 
-  if (existing && existing.is_locked) {
-    throw new ApiError(409, 'You have already submitted scores for this contestant')
-  }
+  const priorScores = existing?.scores ?? {}
+  const priorLocked = Array.isArray(existing?.locked_criteria) ? existing.locked_criteria : []
+  const lockedSet = new Set(priorLocked)
 
-  // Criteria the judge may score right now: the current round's criteria, gated
-  // by the live active-criteria set, each with its minor criteria. Judges score
-  // MINOR criteria, each validated against ITS OWN score type/bounds. A criterion
-  // with no minors (deploy window / not-yet-migrated) is scored directly against
-  // the event scale, exactly as before.
+  // Criteria the judge may score right now: the current round's OPEN criteria,
+  // each with its minor criteria. Skip any criterion already locked (#6) — what
+  // remains is exactly what this submission commits. Judges score MINOR criteria,
+  // each validated against its own bounds; a criterion with no minors is scored
+  // directly against the event scale.
   const scoringConfig = mergeScoringConfig(event.scoring_config)
   const eventBounds = resolveScoreBounds(scoringConfig)
-  const activeCriteria = await loadActiveScoringCriteria(eventId, session, eventBounds)
-  if (!activeCriteria.length) {
+  // All of the round's criteria (open + closed) in one read, so we can both submit
+  // the open, not-yet-locked ones AND derive whether the row is now FULLY locked.
+  const allScopeCriteria = await loadActiveScoringCriteria(eventId, session, eventBounds, { includeClosed: true })
+  if (!allScopeCriteria.length) {
+    throw new ApiError(400, 'No criteria are configured for scoring')
+  }
+  const openCriteria = allScopeCriteria.filter((c) => c.open)
+  if (!openCriteria.length) {
     throw new ApiError(400, 'No criteria are currently open for scoring')
+  }
+  const toSubmit = openCriteria.filter((c) => !lockedSet.has(c.id))
+  if (!toSubmit.length) {
+    throw new ApiError(409, 'You have already submitted every open criterion for this contestant')
   }
 
   const scoreMap = {}
-  for (const crit of activeCriteria) {
+  const submittedCriteriaIds = []
+  for (const crit of toSubmit) {
     const targets = crit.minors.length
       ? crit.minors
       : [{ id: crit.id, name: crit.name, minScore: eventBounds.min, maxScore: eventBounds.max }]
@@ -1370,80 +1383,81 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores, contes
       }
       scoreMap[t.id] = num
     }
+    submittedCriteriaIds.push(crit.id)
   }
 
+  // Merge into the row; is_locked is DERIVED — true once every one of the round's
+  // criteria is locked. locked_at marks when the row became fully locked.
+  const mergedScores = { ...priorScores, ...scoreMap }
+  const mergedLocked = [...new Set([...priorLocked, ...submittedCriteriaIds])]
+  const roundCriteriaIds = allScopeCriteria.map((c) => c.id)
+  const fullyLocked = roundCriteriaIds.length > 0 && roundCriteriaIds.every((id) => mergedLocked.includes(id))
   const now = new Date().toISOString()
 
-  if (existing) {
-    // Update existing (unlocked) record
-    const { data, error } = await getClient()
-      .from('competition_session_judge_scores')
-      .update({
-        scores: scoreMap,
-        is_locked: true,
-        locked_at: now,
-      })
-      .eq('id', existing.id)
-      .select('*')
-      .single()
-
-    if (error) throw new ApiError(500, error.message)
-
-    // Phase 3 (§7.1): mirror into the ranking store so live scores rank.
-    await bridgeSessionScoresToRankingStore(session, judgeId, scoreMap, targetContestantId)
-
-    // M3: audit the score submission (fire-and-forget; recordAudit never throws).
-    recordAudit({
-      userId: judgeId,
-      action: 'competition.score.submitted',
-      entity: 'competition_session',
-      entityId: session.id,
-      details: { eventId, roundId: session.currentRoundId, contestantId: targetContestantId },
-    })
-
-    // Notify organizer that a judge submitted
-    emitToEventOrganizer(eventId, 'session:judge-score-submitted', {
-      sessionId: session.id,
-      roundId: session.currentRoundId,
-      contestantId: targetContestantId,
-      judgeId,
-      locked: true,
-    })
-
-    return { success: true, locked: true, message: 'Scores submitted and locked' }
+  const rowPayload = {
+    scores: mergedScores,
+    locked_criteria: mergedLocked,
+    is_locked: fullyLocked,
+    locked_at: fullyLocked ? now : null,
   }
 
-  // Insert new score record
-  const { data, error } = await getClient()
-    .from('competition_session_judge_scores')
-    .insert({
-      session_id: session.id,
-      event_id: eventId,
-      round_id: session.currentRoundId,
-      contestant_id: targetContestantId,
-      judge_id: judgeId,
-      scores: scoreMap,
-      is_locked: true,
-      locked_at: now,
-    })
-    .select('*')
-    .single()
+  if (existing) {
+    const { error } = await getClient()
+      .from('competition_session_judge_scores')
+      .update(rowPayload)
+      .eq('id', existing.id)
+    if (error) throw new ApiError(500, error.message)
+  } else {
+    const { error } = await getClient()
+      .from('competition_session_judge_scores')
+      .insert({
+        session_id: session.id,
+        event_id: eventId,
+        round_id: session.currentRoundId,
+        contestant_id: targetContestantId,
+        judge_id: judgeId,
+        ...rowPayload,
+      })
+    if (error) throw new ApiError(500, error.message)
+  }
 
-  if (error) throw new ApiError(500, error.message)
-
-  // Phase 3 (§7.1): mirror into the ranking store so live scores rank.
+  // Phase 3 (§7.1): mirror ONLY the newly submitted criteria into the ranking
+  // store — the bridge deletes+reinserts per criterion, so prior locked criteria
+  // keep their ranking rows and partial submits accumulate.
   await bridgeSessionScoresToRankingStore(session, judgeId, scoreMap, targetContestantId)
 
-  // Notify organizer
+  // M3: audit the score submission (fire-and-forget; recordAudit never throws).
+  recordAudit({
+    userId: judgeId,
+    action: 'competition.score.submitted',
+    entity: 'competition_session',
+    entityId: session.id,
+    details: {
+      eventId,
+      roundId: session.currentRoundId,
+      contestantId: targetContestantId,
+      criteriaIds: submittedCriteriaIds,
+      fullyLocked,
+    },
+  })
+
   emitToEventOrganizer(eventId, 'session:judge-score-submitted', {
     sessionId: session.id,
     roundId: session.currentRoundId,
     contestantId: targetContestantId,
     judgeId,
-    locked: true,
+    lockedCriteria: mergedLocked,
+    locked: fullyLocked,
   })
 
-  return { success: true, locked: true, message: 'Scores submitted and locked' }
+  return {
+    success: true,
+    locked: fullyLocked,
+    lockedCriteria: mergedLocked,
+    message: fullyLocked
+      ? 'All criteria submitted and locked for this contestant'
+      : 'Criteria submitted and locked',
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1522,10 +1536,11 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
   // so closed ones render disabled rather than disappearing.
   const criteria = await loadActiveScoringCriteria(eventId, session, eventBounds, { includeClosed: true })
 
-  // This judge's existing session scores for every on-stage contestant.
+  // This judge's existing session scores for every on-stage contestant, plus the
+  // per-criterion lock set (#6) so the sheet can lock committed criteria one by one.
   const { data: existingRows } = await getClient()
     .from('competition_session_judge_scores')
-    .select('contestant_id, scores, is_locked')
+    .select('contestant_id, scores, is_locked, locked_criteria')
     .eq('session_id', session.id)
     .eq('judge_id', judgeId)
     .eq('round_id', session.currentRoundId)
@@ -1554,6 +1569,9 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
         ...mapContestant(c),
         existingScores: ex?.scores ?? {},
         hasSubmitted: !!(ex && ex.is_locked),
+        // #6 per-criterion lock: the criterion ids this judge has committed for
+        // this contestant. The sheet locks each committed criterion individually.
+        lockedCriteria: Array.isArray(ex?.locked_criteria) ? ex.locked_criteria : [],
         // #4 show-but-lock: closed contestants render disabled on the sheet.
         open: isContestantOpen(c.id),
       }
@@ -1638,13 +1656,26 @@ export async function getJudgeProgress(eventId, organizerId) {
   }
 
   // Round-driven progress: judges score the WHOLE field, so progress is a
-  // contestant × judge matrix. Pull every locked submission for this round.
-  const { data: submittedScores } = await getClient()
+  // contestant × judge matrix. Pull every score row for this round (#6 tracks
+  // partial per-criterion locking, so include rows that aren't fully locked yet).
+  const { data: scoreRows } = await getClient()
     .from('competition_session_judge_scores')
-    .select('judge_id, contestant_id, locked_at')
+    .select('judge_id, contestant_id, locked_at, is_locked, locked_criteria')
     .eq('session_id', session.id)
     .eq('round_id', session.currentRoundId)
-    .eq('is_locked', true)
+  const submittedScores = (scoreRows ?? []).filter((s) => s.is_locked)
+  // Round criteria (denominator for partial progress + names for per-criterion unlock).
+  const roundCriteriaIds = await loadRoundCriteriaIds(eventId, session.currentRoundId)
+  const criteriaTotal = roundCriteriaIds.length
+  let criteriaList = []
+  if (roundCriteriaIds.length) {
+    const { data: critRows } = await getClient()
+      .from(DB_TABLES.CRITERIA)
+      .select('id, name')
+      .in('id', roundCriteriaIds)
+    const byId = new Map((critRows ?? []).map((c) => [c.id, c.name]))
+    criteriaList = roundCriteriaIds.map((id) => ({ id, name: byId.get(id) ?? 'Criterion' }))
+  }
 
   // The round's contestants, in order, with display info for the grid.
   const order = session.contestantOrder ?? []
@@ -1667,6 +1698,15 @@ export async function getJudgeProgress(eventId, organizerId) {
     submittedAt: s.locked_at ?? null,
   }))
 
+  // #6 partial progress: which criteria each (judge, contestant) has locked.
+  const progress = (scoreRows ?? []).map((s) => ({
+    judgeId: s.judge_id,
+    contestantId: s.contestant_id,
+    lockedCriteria: Array.isArray(s.locked_criteria) ? s.locked_criteria : [],
+    lockedCount: Array.isArray(s.locked_criteria) ? s.locked_criteria.length : 0,
+    fullyLocked: Boolean(s.is_locked),
+  }))
+
   return {
     roundId: session.currentRoundId,
     divisionId: session.currentDivisionId,
@@ -1679,8 +1719,12 @@ export async function getJudgeProgress(eventId, organizerId) {
       role: j.judge_role ?? 'judge',
     })),
     contestants,
-    // Flat list of locked (judge, contestant) submissions; the UI builds the grid.
+    // Flat list of fully-locked (judge, contestant) submissions; the UI builds the grid.
     submitted,
+    // Per-cell partial lock detail (#6) + the round's criteria (total + names).
+    progress,
+    criteria: criteriaList,
+    criteriaTotal,
     totalJudges: eligibleJudges.length,
   }
 }
@@ -1691,7 +1735,7 @@ export async function getJudgeProgress(eventId, organizerId) {
 // default, or a single judge when `judgeId` is given. Audited; judges are
 // notified so their now-reopened row becomes editable again.
 // ---------------------------------------------------------------------------
-export async function unlockSessionScore(eventId, organizerId, { contestantId, judgeId } = {}) {
+export async function unlockSessionScore(eventId, organizerId, { contestantId, judgeId, criteriaId } = {}) {
   const session = await assertActiveSession(eventId, organizerId)
 
   if (!contestantId) {
@@ -1701,27 +1745,55 @@ export async function unlockSessionScore(eventId, organizerId, { contestantId, j
     throw new ApiError(400, 'Contestant is not in the current round')
   }
 
-  let query = getClient()
+  // Fetch the affected rows so we can adjust their per-criterion lock set (#6).
+  let sel = getClient()
     .from('competition_session_judge_scores')
-    .update({ is_locked: false, locked_at: null })
+    .select('id, judge_id, is_locked, locked_criteria')
     .eq('session_id', session.id)
     .eq('round_id', session.currentRoundId)
     .eq('contestant_id', contestantId)
-    .eq('is_locked', true)
+  if (judgeId) sel = sel.eq('judge_id', judgeId)
+  const { data: rows, error: selErr } = await sel
+  if (selErr) throw new ApiError(500, selErr.message)
 
-  if (judgeId) query = query.eq('judge_id', judgeId)
-
-  const { data, error } = await query.select('judge_id, contestant_id')
-  if (error) throw new ApiError(500, error.message)
-
-  const unlockedCount = data?.length ?? 0
+  let unlockedCount = 0
+  for (const row of rows ?? []) {
+    const locked = Array.isArray(row.locked_criteria) ? row.locked_criteria : []
+    if (criteriaId) {
+      // Per-criterion unlock: drop just this criterion; row is no longer fully locked.
+      if (!locked.includes(criteriaId)) continue
+      const next = locked.filter((id) => id !== criteriaId)
+      const { error } = await getClient()
+        .from('competition_session_judge_scores')
+        .update({ locked_criteria: next, is_locked: false, locked_at: null })
+        .eq('id', row.id)
+      if (error) throw new ApiError(500, error.message)
+      unlockedCount++
+    } else {
+      // Whole-contestant unlock: clear the lock set so every criterion reopens.
+      if (!locked.length && row.is_locked !== true) continue
+      const { error } = await getClient()
+        .from('competition_session_judge_scores')
+        .update({ locked_criteria: [], is_locked: false, locked_at: null })
+        .eq('id', row.id)
+      if (error) throw new ApiError(500, error.message)
+      unlockedCount++
+    }
+  }
 
   recordAudit({
     userId: organizerId,
     action: 'competition.score.unlocked',
     entity: 'competition_session',
     entityId: session.id,
-    details: { eventId, roundId: session.currentRoundId, contestantId, judgeId: judgeId ?? null, unlockedCount },
+    details: {
+      eventId,
+      roundId: session.currentRoundId,
+      contestantId,
+      judgeId: judgeId ?? null,
+      criteriaId: criteriaId ?? null,
+      unlockedCount,
+    },
   })
 
   // Judges reload their sheet; the reopened contestant becomes editable again.

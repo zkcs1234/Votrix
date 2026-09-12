@@ -33,17 +33,31 @@ export default function CompetitionScoringForm({
     max: minor.maxScore ?? scaleBounds?.max ?? 100,
   })
 
-  // Completeness counts only OPEN criteria — a judge can't fill closed ones, so
-  // they must not block "Submit & lock".
-  const openTargets = critColumns.filter((c) => c.open).flatMap(({ minors }) => minors)
-  const totalTargets = openTargets.length
+  // #6 per-criterion locking. Each criterion is committed on its own; a cell is
+  // one of: LOCKED (already submitted), OPEN (scorable now), or WAITING (organizer
+  // hasn't opened it / contestant not open). "Submit open criteria" commits only
+  // the open, not-yet-locked criteria; the row is fully "Locked" once every
+  // criterion is in.
+  const allCritIds = critColumns.map(({ crit }) => crit.id)
+  const lockedSetOf = (cont) => new Set(cont.lockedCriteria ?? [])
+  const isCritLocked = (cont, critId) => lockedSetOf(cont).has(critId)
+  const fullyLocked = (cont) =>
+    Boolean(cont.hasSubmitted) ||
+    (allCritIds.length > 0 && allCritIds.every((id) => lockedSetOf(cont).has(id)))
 
-  const doneCount = (cid) =>
-    openTargets.filter((t) => {
-      const s = scores[`${cid}:${t.id}`]
+  // Criteria the judge can submit for this contestant right now.
+  const scorableCrits = (cont) =>
+    cont.open === false ? [] : critColumns.filter((c) => c.open && !isCritLocked(cont, c.crit.id))
+  const scorableTargets = (cont) => scorableCrits(cont).flatMap(({ minors }) => minors)
+  const doneCount = (cont) =>
+    scorableTargets(cont).filter((t) => {
+      const s = scores[`${cont.id}:${t.id}`]
       return s !== undefined && s !== '' && s !== null
     }).length
-  const isComplete = (cid) => totalTargets > 0 && doneCount(cid) === totalTargets
+  const isComplete = (cont) => {
+    const tt = scorableTargets(cont)
+    return tt.length > 0 && doneCount(cont) === tt.length
+  }
 
   // Order contestants by the session's contestant order when available, else by
   // number. No "active" emphasis — the whole field is equal (round-driven).
@@ -67,9 +81,16 @@ export default function CompetitionScoringForm({
     </span>
   )
 
-  // Shared per-row action: Locked pill, waiting-for-organizer, Saving, or Submit.
+  // Shared per-row action: Locked pill, waiting, or "Submit open criteria".
   const RowAction = ({ cont, block = false }) => {
-    if (cont.hasSubmitted) {
+    const total = allCritIds.length
+    const lockedCount = lockedSetOf(cont).size
+    const counter = (
+      <span className="text-[11px] text-v-text-subtle tabular-nums">
+        {lockedCount}/{total} locked
+      </span>
+    )
+    if (fullyLocked(cont)) {
       return (
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-300">
           <Lock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> Locked
@@ -83,21 +104,31 @@ export default function CompetitionScoringForm({
         </span>
       )
     }
+    // Contestant is open but nothing is scorable right now (remaining criteria not
+    // opened yet) — the judge waits for the organizer to open the next criterion.
+    if (scorableCrits(cont).length === 0) {
+      return (
+        <div className={block ? 'flex items-center justify-between gap-3' : 'inline-flex flex-col items-center gap-1'}>
+          {counter}
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-v-surface-elevated px-3 py-1.5 text-xs font-medium text-v-text-subtle">
+            <Lock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> Waiting
+          </span>
+        </div>
+      )
+    }
     const busy = submittingId === cont.id
-    const complete = isComplete(cont.id)
+    const complete = isComplete(cont)
     return (
       <div className={block ? 'flex items-center justify-between gap-3' : 'inline-flex flex-col items-center gap-1'}>
-        <span className="text-[11px] text-v-text-subtle tabular-nums">
-          {doneCount(cont.id)}/{totalTargets}
-        </span>
+        {counter}
         <Button
           size="sm"
           onClick={() => onSubmitContestant?.(cont.id)}
           disabled={busy || !complete}
           loading={busy}
-          title={complete ? 'Submit & lock this contestant' : 'Fill in every score first'}
+          title={complete ? 'Submit & lock the open criteria' : 'Fill in every open score first'}
         >
-          Submit &amp; lock
+          Submit open criteria
         </Button>
       </div>
     )
@@ -152,16 +183,16 @@ export default function CompetitionScoringForm({
           </thead>
           <tbody>
             {orderedContestants.map((cont) => {
-              const locked = Boolean(cont.hasSubmitted)
+              const rowFully = fullyLocked(cont)
               const closed = cont.open === false
               return (
                 <tr
                   key={cont.id}
-                  className={`border-b border-v-border/50 ${locked ? 'bg-emerald-950/10' : closed ? 'opacity-60' : ''}`}
+                  className={`border-b border-v-border/50 ${rowFully ? 'bg-emerald-950/10' : closed ? 'opacity-60' : ''}`}
                 >
                   <td className="sticky left-0 z-10 w-60 min-w-[15rem] border-r border-v-border bg-v-surface p-3">
                     <div className="flex items-center gap-2.5">
-                      <NumberBadge number={cont.contestantNumber} locked={locked} />
+                      <NumberBadge number={cont.contestantNumber} locked={rowFully} />
                       {cont.photo && (
                         <img src={cont.photo} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
                       )}
@@ -170,20 +201,25 @@ export default function CompetitionScoringForm({
                       </span>
                     </div>
                   </td>
-                  {critColumns.flatMap(({ minors, open: critOpen }) =>
-                    minors.map((m, i) => (
-                      <td key={m.id} className={`p-2 ${i === 0 ? 'border-l border-v-border' : ''}`}>
+                  {critColumns.flatMap(({ crit, minors, open: critOpen }) => {
+                    const critLocked = isCritLocked(cont, crit.id)
+                    return minors.map((m, i) => (
+                      <td
+                        key={m.id}
+                        className={`p-2 ${i === 0 ? 'border-l border-v-border' : ''} ${critLocked ? 'bg-emerald-950/10' : ''}`}
+                        title={critLocked ? 'Locked — committed' : !critOpen ? 'Not open yet' : undefined}
+                      >
                         <ScoreInputComponent
                           contestantId={cont.id}
                           target={m}
                           bounds={boundsFor(m)}
                           scores={scores}
                           onScoreChange={onScoreChange}
-                          disabled={locked || closed || !critOpen || submittingId === cont.id}
+                          disabled={critLocked || closed || !critOpen || submittingId === cont.id}
                         />
                       </td>
-                    )),
-                  )}
+                    ))
+                  })}
                   <td className="sticky right-0 z-10 w-32 min-w-32 border-l border-v-border bg-v-surface p-3 text-center">
                     <RowAction cont={cont} />
                   </td>
@@ -197,20 +233,20 @@ export default function CompetitionScoringForm({
       {/* Mobile: one card per contestant with a sticky Submit & lock footer. */}
       <div className="space-y-4 md:hidden">
         {orderedContestants.map((cont) => {
-          const locked = Boolean(cont.hasSubmitted)
+          const rowFully = fullyLocked(cont)
           const closed = cont.open === false
           return (
             <article
               key={cont.id}
-              className={`v-card p-6 ${locked ? 'ring-1 ring-emerald-500/30 bg-emerald-950/10' : closed ? 'opacity-70' : ''}`}
+              className={`v-card p-6 ${rowFully ? 'ring-1 ring-emerald-500/30 bg-emerald-950/10' : closed ? 'opacity-70' : ''}`}
             >
               <div className="flex items-center gap-3">
-                <NumberBadge number={cont.contestantNumber} locked={locked} />
+                <NumberBadge number={cont.contestantNumber} locked={rowFully} />
                 {cont.photo && (
                   <img src={cont.photo} alt="" className="h-12 w-12 rounded-lg object-cover" />
                 )}
                 <h4 className="v-section-title">{cont.name}</h4>
-                {locked ? (
+                {rowFully ? (
                   <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">
                     <CheckCircle className="h-3.5 w-3.5" /> Locked
                   </span>
@@ -221,42 +257,50 @@ export default function CompetitionScoringForm({
                 ) : null}
               </div>
               <div className="mt-4 space-y-4">
-                {critColumns.map(({ crit, minors, open: critOpen }) => (
-                  <div key={crit.id} className={`rounded-lg border border-v-border/70 p-3 ${critOpen ? '' : 'opacity-50'}`}>
-                    <p className="mb-2 text-xs font-medium text-v-text-muted">
-                      {crit.name}{' '}
-                      <span className="text-v-text-subtle">
-                        · {critOpen ? `${crit.percentage}%` : 'Not open yet'}
-                      </span>
-                    </p>
-                    <div className="space-y-3">
-                      {minors.map((m) => {
-                        const b = boundsFor(m)
-                        return (
-                          <div key={m.id} className="flex items-center justify-between gap-2">
-                            <label className="v-caption">
-                              {m.name}
-                              <span className="block text-xs text-v-text-subtle">
-                                {b.min}–{b.max}
-                              </span>
-                            </label>
-                            <ScoreInputComponent
-                              contestantId={cont.id}
-                              target={m}
-                              bounds={b}
-                              scores={scores}
-                              onScoreChange={onScoreChange}
-                              disabled={locked || closed || !critOpen || submittingId === cont.id}
-                              size="md"
-                            />
-                          </div>
-                        )
-                      })}
+                {critColumns.map(({ crit, minors, open: critOpen }) => {
+                  const critLocked = isCritLocked(cont, crit.id)
+                  return (
+                    <div key={crit.id} className={`rounded-lg border border-v-border/70 p-3 ${critOpen && !critLocked ? '' : 'opacity-60'}`}>
+                      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-v-text-muted">
+                        {crit.name}{' '}
+                        <span className="text-v-text-subtle">
+                          · {critOpen ? `${crit.percentage}%` : 'Not open yet'}
+                        </span>
+                        {critLocked && (
+                          <span className="ml-auto inline-flex items-center gap-1 text-emerald-300">
+                            <Lock className="h-3 w-3" /> Locked
+                          </span>
+                        )}
+                      </p>
+                      <div className="space-y-3">
+                        {minors.map((m) => {
+                          const b = boundsFor(m)
+                          return (
+                            <div key={m.id} className="flex items-center justify-between gap-2">
+                              <label className="v-caption">
+                                {m.name}
+                                <span className="block text-xs text-v-text-subtle">
+                                  {b.min}–{b.max}
+                                </span>
+                              </label>
+                              <ScoreInputComponent
+                                contestantId={cont.id}
+                                target={m}
+                                bounds={b}
+                                scores={scores}
+                                onScoreChange={onScoreChange}
+                                disabled={critLocked || closed || !critOpen || submittingId === cont.id}
+                                size="md"
+                              />
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
-              {!locked && (
+              {!rowFully && (
                 <div className="sticky bottom-2 mt-4">
                   <RowAction cont={cont} block />
                 </div>

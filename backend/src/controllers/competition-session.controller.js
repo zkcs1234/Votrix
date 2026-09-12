@@ -212,6 +212,7 @@ export const unlockScore = asyncHandler(async (req, res) => {
   const result = await sessionService.unlockSessionScore(req.params.eventId, req.user.id, {
     contestantId: req.body?.contestantId,
     judgeId: req.body?.judgeId || null,
+    criteriaId: req.body?.criteriaId || null,
   })
   res.json({ success: true, ...result })
 })

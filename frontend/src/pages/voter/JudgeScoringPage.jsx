@@ -288,10 +288,13 @@ export default function JudgeScoringPage() {
   // closure), so scoring several contestants records every one.
   const buildContestantPayload = useCallback(
     (contestantId) => {
+      // #6: submit only the OPEN, not-yet-locked criteria for this contestant.
+      const contestant = (sheet?.contestants ?? []).find((c) => c.id === contestantId)
+      const lockedSet = new Set(contestant?.lockedCriteria ?? [])
       const scoreMap = {}
       for (const criteria of sheet?.criteria ?? []) {
-        // #4 show-but-lock: closed criteria can't be scored, so don't require them.
-        if (criteria.open === false) continue
+        if (criteria.open === false) continue // closed — can't score yet
+        if (lockedSet.has(criteria.id)) continue // already committed
         const targets =
           criteria.minors && criteria.minors.length
             ? criteria.minors
@@ -299,7 +302,7 @@ export default function JudgeScoringPage() {
         for (const t of targets) {
           const raw = scores[`${contestantId}:${t.id}`]
           if (raw === undefined || raw === '' || raw === null) {
-            return { ok: false, error: 'Fill in every score before submitting.' }
+            return { ok: false, error: 'Fill in every open score before submitting.' }
           }
           const num = Number(raw)
           const min = t.minScore ?? sheet?.scoreBounds?.min
@@ -310,9 +313,12 @@ export default function JudgeScoringPage() {
           scoreMap[t.id] = num
         }
       }
+      if (!Object.keys(scoreMap).length) {
+        return { ok: false, error: 'No open criteria to submit right now.' }
+      }
       return { ok: true, scoreMap }
     },
-    [sheet?.criteria, sheet?.scoreBounds, scores],
+    [sheet?.criteria, sheet?.contestants, sheet?.scoreBounds, scores],
   )
 
   const submitContestant = useCallback(

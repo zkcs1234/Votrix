@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { Fragment, useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   Play, Pause, Square, RefreshCw, Users, Star, CheckCircle, Clock, LockOpen,
@@ -148,13 +148,14 @@ export default function CompetitionLiveControlPage() {
     }
   }
 
-  // B5 — reopen a locked contestant so judges can revise (all judges, or one).
-  const unlockContestant = async (contestantId, judgeId = null) => {
-    setActionLoading(`unlock:${contestantId}:${judgeId ?? 'all'}`)
+  // B5 / #6 — reopen a locked score so judges can revise. Scope narrows from
+  // broad to fine: all judges → one judge → one judge's single criterion.
+  const unlockContestant = async (contestantId, judgeId = null, criteriaId = null) => {
+    setActionLoading(`unlock:${contestantId}:${judgeId ?? 'all'}:${criteriaId ?? 'all'}`)
     try {
-      await competitionSessionService.unlockScore(eventId, contestantId, judgeId)
+      await competitionSessionService.unlockScore(eventId, contestantId, judgeId, criteriaId)
       await refreshJudgeProgress()
-      success('Score reopened for editing')
+      success(criteriaId ? 'Criterion reopened for editing' : 'Score reopened for editing')
     } catch (err) {
       toastError(getErrorMessage(err))
     } finally {
@@ -703,17 +704,25 @@ export default function CompetitionLiveControlPage() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-// Whole-round progress: rows = contestants, columns = judges. A locked cell
-// shows a check + an unlock control; an empty cell means that judge still owes a
-// score for that contestant. A row-level "Reopen" unlocks every judge at once.
+// Whole-round progress: rows = contestants, columns = judges. Each cell shows a
+// judge's per-criterion lock progress for that contestant (#6): a green check
+// when fully locked, an amber "n/total" when partial, a clock when nothing yet.
+// Clicking a cell reopens that judge's whole score; a row "Reopen" reopens every
+// judge; and "Per criterion" expands a panel to reopen a single locked criterion.
 function JudgeProgressGrid({ progress, onUnlock, actionLoading }) {
   const judges = progress?.judges ?? []
   const contestants = progress?.contestants ?? []
   const submitted = progress?.submitted ?? []
+  const perCell = progress?.progress ?? []
+  const criteria = progress?.criteria ?? []
+  const criteriaTotal = progress?.criteriaTotal ?? 0
 
+  const [expanded, setExpanded] = useState(null) // contestantId with the panel open
+
+  const cellByKey = new Map(perCell.map((p) => [`${p.judgeId}:${p.contestantId}`, p]))
   const lockedSet = new Set(submitted.map((s) => `${s.judgeId}:${s.contestantId}`))
   const totalCells = judges.length * contestants.length
-  const lockedCount = submitted.length
+  const fullyLockedCount = submitted.length
 
   return (
     <div className="rounded-xl border border-v-border bg-v-surface p-6">
@@ -721,7 +730,7 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading }) {
         <h3 className="text-sm font-medium text-v-text-muted uppercase tracking-wider">Judge Progress</h3>
         {totalCells > 0 && (
           <span className="text-xs text-v-text-subtle">
-            {lockedCount}/{totalCells} scores locked
+            {fullyLockedCount}/{totalCells} fully locked
           </span>
         )}
       </div>
@@ -751,52 +760,117 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading }) {
             <tbody>
               {contestants.map((c) => {
                 const rowLocked = judges.filter((j) => lockedSet.has(`${j.judgeId}:${c.id}`)).length
-                const rowBusy = actionLoading === `unlock:${c.id}:all`
+                const rowBusy = actionLoading === `unlock:${c.id}:all:all`
+                const isExpanded = expanded === c.id
                 return (
-                  <tr key={c.id} className="border-b border-v-border/50">
-                    <td className="sticky left-0 z-10 bg-v-surface py-2 pr-4 text-v-text">
-                      <span className="font-medium tabular-nums">#{c.contestantNumber}</span> {c.name}
-                    </td>
-                    {judges.map((j) => {
-                      const locked = lockedSet.has(`${j.judgeId}:${c.id}`)
-                      const cellBusy = actionLoading === `unlock:${c.id}:${j.judgeId}`
-                      return (
-                        <td key={j.judgeId} className="px-2 py-2 text-center">
-                          {locked ? (
-                            <button
-                              type="button"
-                              onClick={() => onUnlock(c.id, j.judgeId)}
-                              disabled={cellBusy || rowBusy}
-                              title="Locked — click to reopen this judge's score"
-                              className="group inline-flex items-center justify-center rounded-md p-1 text-v-success hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50"
-                            >
-                              <CheckCircle className="h-4 w-4 group-hover:hidden" />
-                              <LockOpen className="hidden h-4 w-4 group-hover:block" />
-                            </button>
-                          ) : (
-                            <span className="inline-flex items-center justify-center text-v-text-subtle" title="Waiting">
-                              <Clock className="h-4 w-4" />
-                            </span>
-                          )}
-                        </td>
-                      )
-                    })}
-                    <td className="py-2 pl-2 text-right">
-                      <span className={rowLocked === judges.length ? 'text-v-success' : 'text-v-text-subtle'}>
-                        {rowLocked}/{judges.length}
-                      </span>
-                      {rowLocked > 0 && (
+                  <Fragment key={c.id}>
+                    <tr className="border-b border-v-border/50">
+                      <td className="sticky left-0 z-10 bg-v-surface py-2 pr-4 text-v-text">
+                        <span className="font-medium tabular-nums">#{c.contestantNumber}</span> {c.name}
+                      </td>
+                      {judges.map((j) => {
+                        const cell = cellByKey.get(`${j.judgeId}:${c.id}`)
+                        const count = cell?.lockedCount ?? 0
+                        const full = Boolean(cell?.fullyLocked)
+                        const cellBusy = actionLoading === `unlock:${c.id}:${j.judgeId}:all`
+                        return (
+                          <td key={j.judgeId} className="px-2 py-2 text-center">
+                            {full ? (
+                              <button
+                                type="button"
+                                onClick={() => onUnlock(c.id, j.judgeId)}
+                                disabled={cellBusy || rowBusy}
+                                title="Fully locked — click to reopen this judge's whole score"
+                                className="group inline-flex items-center justify-center rounded-md p-1 text-v-success hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50"
+                              >
+                                <CheckCircle className="h-4 w-4 group-hover:hidden" />
+                                <LockOpen className="hidden h-4 w-4 group-hover:block" />
+                              </button>
+                            ) : count > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => onUnlock(c.id, j.judgeId)}
+                                disabled={cellBusy || rowBusy}
+                                title="Partially locked — click to reopen this judge's whole score"
+                                className="inline-flex items-center justify-center rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+                              >
+                                {count}/{criteriaTotal}
+                              </button>
+                            ) : (
+                              <span className="inline-flex items-center justify-center text-v-text-subtle" title="Waiting">
+                                <Clock className="h-4 w-4" />
+                              </span>
+                            )}
+                          </td>
+                        )
+                      })}
+                      <td className="py-2 pl-2 text-right whitespace-nowrap">
+                        <span className={rowLocked === judges.length ? 'text-v-success' : 'text-v-text-subtle'}>
+                          {rowLocked}/{judges.length}
+                        </span>
+                        {criteriaTotal > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setExpanded(isExpanded ? null : c.id)}
+                            className="ml-2 rounded-md border border-v-border px-2 py-0.5 text-[11px] text-v-text-muted hover:bg-v-surface-elevated"
+                          >
+                            {isExpanded ? 'Hide' : 'Per criterion'}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => onUnlock(c.id, null)}
                           disabled={rowBusy}
                           className="ml-2 rounded-md border border-v-border px-2 py-0.5 text-[11px] text-v-text-muted hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50"
                         >
-                          {rowBusy ? '…' : 'Reopen'}
+                          {rowBusy ? '…' : 'Reopen all'}
                         </button>
-                      )}
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="border-b border-v-border/50 bg-v-surface-elevated/30">
+                        <td colSpan={judges.length + 2} className="px-4 py-3">
+                          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-v-text-muted">
+                            Reopen a single locked criterion — #{c.contestantNumber} {c.name}
+                          </p>
+                          <div className="space-y-2">
+                            {judges.map((j) => {
+                              const cell = cellByKey.get(`${j.judgeId}:${c.id}`)
+                              const locked = new Set(cell?.lockedCriteria ?? [])
+                              return (
+                                <div key={j.judgeId} className="flex flex-wrap items-center gap-2">
+                                  <span className="w-28 shrink-0 truncate text-xs text-v-text-muted">
+                                    {j.displayName || 'Judge'}
+                                  </span>
+                                  {locked.size === 0 ? (
+                                    <span className="text-[11px] text-v-text-subtle">Nothing locked</span>
+                                  ) : (
+                                    criteria
+                                      .filter((cr) => locked.has(cr.id))
+                                      .map((cr) => {
+                                        const busy = actionLoading === `unlock:${c.id}:${j.judgeId}:${cr.id}`
+                                        return (
+                                          <button
+                                            key={cr.id}
+                                            type="button"
+                                            onClick={() => onUnlock(c.id, j.judgeId, cr.id)}
+                                            disabled={busy}
+                                            title="Reopen this criterion for this judge"
+                                            className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300 hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-300 disabled:opacity-50"
+                                          >
+                                            <LockOpen className="h-3 w-3" /> {cr.name}
+                                          </button>
+                                        )
+                                      })
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 )
               })}
             </tbody>
