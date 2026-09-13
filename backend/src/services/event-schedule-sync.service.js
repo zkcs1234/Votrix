@@ -20,7 +20,7 @@ const PUBLISH_GATED_EVENT_TYPES = new Set([
   ...COMPETITION_SCORING_EVENT_TYPES,
 ])
 
-function getDesiredState(event, now) {
+function getDesiredState(event, now, liveEventIds) {
   if (event.status === 'draft' && PUBLISH_GATED_EVENT_TYPES.has(event.event_type)) {
     return null
   }
@@ -39,13 +39,20 @@ function getDesiredState(event, now) {
   }
 
   if (COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)) {
+    // Competition scoring follows the LIVE SESSION, not the calendar: the
+    // organizer opens/closes it from Live Control (startSession/completeSession).
+    // So an active or paused session means scoring is open, regardless of the
+    // planned start/end dates — otherwise a past-end (or not-yet-started) event
+    // would have its running session forced off within a minute. Deriving from
+    // the session here also self-heals events whose scoring_enabled drifted.
+    const hasLiveSession = liveEventIds.has(event.id)
+    if (hasLiveSession) {
+      return { scoring_enabled: true, status: 'active' }
+    }
     if (pastEnd) {
       return { scoring_enabled: false, status: 'completed' }
     }
-    if (withinSchedule || event.status === 'active') {
-      return { scoring_enabled: true, status: 'active' }
-    }
-    return { scoring_enabled: false, status: 'scheduled' }
+    return { scoring_enabled: false, status: withinSchedule || event.status === 'active' ? 'active' : 'scheduled' }
   }
 
   if (event.event_type === EVENT_TYPES.POLLING) {
@@ -62,8 +69,8 @@ function getDesiredState(event, now) {
   return null
 }
 
-async function reconcileEvent(event, now) {
-  const desiredState = getDesiredState(event, now)
+async function reconcileEvent(event, now, liveEventIds) {
+  const desiredState = getDesiredState(event, now, liveEventIds)
   if (!desiredState) return false
 
   const updates = {}
@@ -127,9 +134,32 @@ export async function syncEventSchedules() {
 
     if (error) throw error
 
-    for (const event of data ?? []) {
+    // Competition scoring is session-driven: fetch the events that currently have
+    // an active/paused live session so getDesiredState can keep their scoring open
+    // regardless of the calendar (and close it once the session ends).
+    const { data: liveSessions } = await db()
+      .from('competition_sessions')
+      .select('event_id')
+      .in('status', ['active', 'paused'])
+    const liveEventIds = new Set((liveSessions ?? []).map((s) => s.event_id))
+
+    // A live session can outlive the planned end date, which the schedule may have
+    // already marked 'completed' — excluding it from the query above. Pull those
+    // back in so their scoring is re-opened to match the running session.
+    const events = [...(data ?? [])]
+    const knownIds = new Set(events.map((e) => e.id))
+    const missingLiveIds = [...liveEventIds].filter((id) => !knownIds.has(id))
+    if (missingLiveIds.length) {
+      const { data: extra } = await db()
+        .from(DB_TABLES.EVENTS)
+        .select('id, event_type, status, start_date, end_date, voting_enabled, scoring_enabled, polling_enabled, poll_expires_at')
+        .in('id', missingLiveIds)
+      for (const e of extra ?? []) events.push(e)
+    }
+
+    for (const event of events) {
       try {
-        const changed = await reconcileEvent(event, now)
+        const changed = await reconcileEvent(event, now, liveEventIds)
         if (changed) updated += 1
       } catch (err) {
         console.error('[event-schedule-sync] Failed to reconcile event', event.id, err.message)

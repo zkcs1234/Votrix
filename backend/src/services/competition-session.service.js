@@ -1113,6 +1113,19 @@ export async function completeSession(eventId, organizerId) {
 
   emitToEvent(eventId, 'session:status-changed', { session: updated })
 
+  // Ending the session closes scoring: flip scoring_enabled = false so the voter
+  // dashboard moves the event out of "Scoring open" immediately (the schedule
+  // sync would also do this within a minute, but do it now for a clean handoff).
+  const { error: scoringOffError } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({ scoring_enabled: false })
+    .eq('id', eventId)
+  if (scoringOffError) {
+    console.warn('[completeSession] Failed to disable scoring:', scoringOffError.message)
+  } else {
+    emitToEvent(eventId, 'competition:scoring-toggled', { eventId, scoringEnabled: false })
+  }
+
   // Phase 3 (§7.1) safety net: bridge any live-session scores for this event
   // that predate the write-through (or that failed to mirror) into the ranking
   // store before we recompute rankings. Best-effort — never block completion.
@@ -1527,9 +1540,20 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
 
   const { data: stageRows } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
-    .select('id, event_id, name, photo, contestant_number')
+    .select('id, event_id, name, photo, contestant_number, division_id')
     .in('id', stageIds)
   const stageById = new Map((stageRows ?? []).map((c) => [c.id, c]))
+
+  // Division names so the judge sheet can group + label contestants by division
+  // (contestant numbers repeat across divisions, e.g. Male #1 and Female #1).
+  const divisionNameById = new Map()
+  if (event.divisions_enabled) {
+    const { data: divisionRows } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id, name')
+      .eq('event_id', eventId)
+    for (const d of divisionRows ?? []) divisionNameById.set(d.id, d.name)
+  }
 
   // §8C: the event scale is the fallback range for any criterion that has no
   // minors (deploy window). Minors carry their own bounds (see below).
@@ -1572,6 +1596,9 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
       const ex = existingByContestant.get(c.id)
       return {
         ...mapContestant(c),
+        // Division so the sheet can group + label (numbers repeat across divisions).
+        divisionId: c.division_id ?? null,
+        divisionName: c.division_id ? divisionNameById.get(c.division_id) ?? null : null,
         existingScores: ex?.scores ?? {},
         hasSubmitted: !!(ex && ex.is_locked),
         // #6 per-criterion lock: the criterion ids this judge has committed for
