@@ -16,6 +16,8 @@ import useDraft from '@/hooks/useDraft'
 import useSilentDraftAutosave from '@/hooks/useSilentDraftAutosave'
 import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
+import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
+import { isReadOnlyEventStatus } from '@/utils/constants'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
@@ -51,6 +53,8 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   // navigation and draft restore.
   const [templates, setTemplates] = useState([])
   const [competitionType, setCompetitionType] = useState(null)
+  const [eventStatus, setEventStatus] = useState(null)
+  const readOnly = isReadOnlyEventStatus(eventStatus)
 
 const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'competition',
@@ -185,6 +189,7 @@ useEffect(() => {
     if (isNew) return
     pageantService.getEvent(eventId)
       .then(({ data }) => {
+        setEventStatus(data.event.status ?? null)
         reset({
           title: data.event.title || '',
           description: data.event.description || '',
@@ -362,10 +367,12 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             completedKeys={completedKeys}
           />
 
+          {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="competition" />}
+
           <div className="w-full">
             <header>
               <h2 className="v-page-title mb-2">
-                {isNew ? 'Create Competition Scoring Event' : 'Edit Competition Scoring Event'}
+                {isNew ? 'Create Competition Scoring Event' : readOnly ? 'View Competition Scoring Event' : 'Edit Competition Scoring Event'}
               </h2>
               <p className="v-helper-text">
                 Fill out the event basics, branding, and optional information form. Use the stepper or sidebar
@@ -376,6 +383,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
 
           <div className="w-full">
             <Card padding="md">
+            <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 m-0">
             {step === 'details' && (
           <form className="space-y-4" onSubmit={handleSubmitDetails}>
             {isNew && (
@@ -492,7 +500,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               variant="banner"
               currentUrl={banner}
               onFileSelect={setBannerFile}
-              disabled={saving}
+              disabled={saving || readOnly}
             />
 
             {error && <p className="v-error-text">{error}</p>}
@@ -521,9 +529,10 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             )}
           </div>
         )}
+        </fieldset>
       </Card>
-      
-        {step === 'details' && (
+
+        {!readOnly && step === 'details' && (
             <StageFooter
               module="competition"
               currentKey="details"
@@ -537,7 +546,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             />
         )}
         
-        {step === 'branding' && (
+        {!readOnly && step === 'branding' && (
             <StageFooter
               module="competition"
               currentKey="branding"
@@ -550,7 +559,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             />
         )}
         
-        {step === 'information-form' && (
+        {!readOnly && step === 'information-form' && (
             <StageFooter
               module="competition"
               currentKey="information-form"

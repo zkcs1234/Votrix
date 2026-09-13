@@ -35,6 +35,18 @@ export const EVENT_STATUS = {
   CANCELLED: 'cancelled',
 }
 
+// Terminal states an organizer can no longer edit: the event is done (or
+// called off) so its setup/details are locked and the UI shows a read-only
+// "View" instead of "Edit". The backend enforces the same lock on mutations.
+export const READ_ONLY_EVENT_STATUSES = new Set([
+  EVENT_STATUS.COMPLETED,
+  EVENT_STATUS.CANCELLED,
+])
+
+export function isReadOnlyEventStatus(status) {
+  return READ_ONLY_EVENT_STATUSES.has(status)
+}
+
 export const EVENT_TYPES = {
   ELECTION: 'election',
   PAGEANT: 'pageant',

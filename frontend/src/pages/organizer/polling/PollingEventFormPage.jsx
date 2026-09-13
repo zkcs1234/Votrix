@@ -21,6 +21,8 @@ import useDraft from '@/hooks/useDraft'
 import useSilentDraftAutosave from '@/hooks/useSilentDraftAutosave'
 import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
+import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
+import { isReadOnlyEventStatus } from '@/utils/constants'
 
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 
@@ -51,6 +53,8 @@ const { eventId } = useParams()
   const [infoFormSchema, setInfoFormSchema] = useState(null)
   const [infoFormLoading, setInfoFormLoading] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
+  const [eventStatus, setEventStatus] = useState(null)
+  const readOnly = isReadOnlyEventStatus(eventStatus)
 
   const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'polling',
@@ -189,6 +193,7 @@ useEffect(() => {
       .getSettings(eventId)
       .then(({ data }) => {
         const e = data.settings || data.event
+        setEventStatus(e.status ?? null)
         reset({
           title: e.title || '',
           description: e.description || '',
@@ -405,6 +410,8 @@ const stepperEventId = isNew ? 'new' : eventId
             completedKeys={completedKeys}
           />
 
+          {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="poll" />}
+
           <div className="w-full">
             <header>
               <h2 className="v-page-title mb-2">
@@ -419,6 +426,7 @@ const stepperEventId = isNew ? 'new' : eventId
 
           <div className="w-full">
             <Card padding="md">
+            <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 m-0">
             {step === 'details' && (
           <form className="space-y-4" onSubmit={handleNextDetails}>
             <div className="v-form-field">
@@ -508,7 +516,7 @@ const stepperEventId = isNew ? 'new' : eventId
               variant="banner"
               currentUrl={banner}
               onFileSelect={setBannerFile}
-              disabled={saving}
+              disabled={saving || readOnly}
             />
 
             {error && <p className="v-error-text">{error}</p>}
@@ -565,9 +573,10 @@ const stepperEventId = isNew ? 'new' : eventId
             )}
           </div>
         )}
+        </fieldset>
       </Card>
-      
-        {step === 'details' && (
+
+        {!readOnly && step === 'details' && (
             <StageFooter
               module="polling"
               currentKey="details"
@@ -581,7 +590,7 @@ const stepperEventId = isNew ? 'new' : eventId
             />
         )}
         
-        {step === 'branding' && (
+        {!readOnly && step === 'branding' && (
             <StageFooter
               module="polling"
               currentKey="branding"
@@ -594,7 +603,7 @@ const stepperEventId = isNew ? 'new' : eventId
             />
         )}
         
-        {step === 'settings' && (
+        {!readOnly && step === 'settings' && (
             <StageFooter
               module="polling"
               currentKey="settings"
@@ -607,7 +616,7 @@ const stepperEventId = isNew ? 'new' : eventId
             />
         )}
         
-        {step === 'information-form' && (
+        {!readOnly && step === 'information-form' && (
             <StageFooter
               module="polling"
               currentKey="information-form"

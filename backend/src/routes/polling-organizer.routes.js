@@ -4,9 +4,12 @@ import { uploadLimiter, csvImportLimiter, emailLimiter } from '../middleware/rat
 import * as ctrl from '../controllers/polling-organizer.controller.js'
 import * as draftCtrl from '../controllers/draft.controller.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
+import { requireEditableEvent } from '../middleware/eventGuards.js'
 
 const router = Router()
 router.use(validateRouteUUIDParams)
+// Lock editing once an event is completed/cancelled (read-only View).
+router.use('/events/:eventId', requireEditableEvent)
 
 router.get('/dashboard', ctrl.getDashboard)
 router.get('/events', ctrl.listEvents)

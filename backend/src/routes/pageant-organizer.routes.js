@@ -5,9 +5,15 @@ import * as ctrl from '../controllers/pageant-organizer.controller.js'
 import * as draftCtrl from '../controllers/draft.controller.js'
 import competitionRoutes from './competition-organizer.routes.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
+import { requireEditableEvent } from '../middleware/eventGuards.js'
 
 const router = Router()
 router.use(validateRouteUUIDParams)
+// Lock editing once an event is completed/cancelled (read-only View). Placed
+// before the event routes and the competition sub-router mount below so it
+// guards event-detail edits AND the competition setup sub-resources; the
+// live-session controls under /session/ are exempt (see requireEditableEvent).
+router.use('/events/:eventId', requireEditableEvent)
 
 router.get('/dashboard', ctrl.getDashboard)
 router.get('/templates', ctrl.listTemplates)

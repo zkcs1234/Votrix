@@ -152,12 +152,20 @@ export async function getVoterDashboard(voterId) {
 
 /**
  * Get the redirect path for a voter after login.
- * Returns the first active event, or first assigned event, or null.
+ *
+ * Only an ACTIVE event auto-opens its event page (election ballot, poll, or
+ * judge scoring). An event is "active" per its own scheduler: elections/polls
+ * by their voting/polling window, competitions by a live scoring session (see
+ * classifyCompetition — its bucket follows scoring_enabled, which the schedule
+ * sync keeps aligned to the session). Assigned-but-not-open events are NOT
+ * auto-opened; returning null lands the voter on their dashboard (callers fall
+ * back to '/voter'). The participant information form is a modal gate on each
+ * event page, so routing to an active event naturally shows it, then keeps the
+ * voter on the event page once it's filled.
  */
 export async function getVoterLoginRedirect(voterId) {
   const dashboard = await getVoterDashboard(voterId)
 
-  // Priority: active events first
   if (dashboard.active.length > 0) {
     const event = dashboard.active[0]
     return {
@@ -167,16 +175,6 @@ export async function getVoterLoginRedirect(voterId) {
     }
   }
 
-  // If no active events, go to first assigned event
-  if (dashboard.assigned.length > 0) {
-    const event = dashboard.assigned[0]
-    return {
-      path: event.actionPath,
-      type: event.eventType,
-      title: event.title,
-    }
-  }
-
-  // No events at all
+  // No active event → send the voter to their dashboard.
   return null
 }

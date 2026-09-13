@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Edit2, Copy, Eye } from 'lucide-react'
+import { Plus, Edit2, Eye } from 'lucide-react'
 import { electionService } from '@/services/election.service'
+import { isReadOnlyEventStatus } from '@/utils/constants'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
-import { useToast } from '@/hooks/useToast'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -90,18 +90,7 @@ function BallotPreviewModal({ eventId, onClose }) {
   )
 }
 
-function EventCard({ event, onDuplicate, onPreview }) {
-  const [duplicating, setDuplicating] = useState(false)
-
-  const handleDuplicate = async () => {
-    setDuplicating(true)
-    try {
-      await onDuplicate(event.id)
-    } finally {
-      setDuplicating(false)
-    }
-  }
-
+function EventCard({ event, onPreview }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-border bg-v-surface p-5">
       <div>
@@ -129,15 +118,6 @@ function EventCard({ event, onDuplicate, onPreview }) {
           <Eye className="h-3.5 w-3.5" strokeWidth={2} />
           Preview
         </button>
-        <button
-          type="button"
-          onClick={handleDuplicate}
-          disabled={duplicating}
-          className="inline-flex items-center gap-1 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated disabled:opacity-50"
-        >
-          <Copy className="h-3.5 w-3.5" strokeWidth={2} />
-          {duplicating ? 'Copying...' : 'Duplicate'}
-        </button>
         {event.status === 'draft' && (
           <Link
             to={`/organizer/election/events/${event.id}/positions`}
@@ -150,8 +130,17 @@ function EventCard({ event, onDuplicate, onPreview }) {
           to={`/organizer/election/events/${event.id}/edit`}
           className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated"
         >
-          <Edit2 className="h-3.5 w-3.5" strokeWidth={2} />
-          Edit
+          {isReadOnlyEventStatus(event.status) ? (
+            <>
+              <Eye className="h-3.5 w-3.5" strokeWidth={2} />
+              View
+            </>
+          ) : (
+            <>
+              <Edit2 className="h-3.5 w-3.5" strokeWidth={2} />
+              Edit
+            </>
+          )}
         </Link>
       </div>
     </div>
@@ -177,7 +166,6 @@ export default function ElectionEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [previewEventId, setPreviewEventId] = useState(null)
-  const { success, error: showError } = useToast()
   const { hasDraft, draft, deleteDraft } = useDraft('election')
 
   // Use delayed loading
@@ -207,16 +195,6 @@ export default function ElectionEventsPage() {
       )
     )
   })
-
-  const handleDuplicate = async (eventId) => {
-    try {
-      const { data } = await electionService.duplicateEvent(eventId)
-      success(`Duplicated event as "${data.event.title}"`)
-      load()
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to duplicate event')
-    }
-  }
 
   if (loading && !showLoader) {
     return null
@@ -273,7 +251,6 @@ export default function ElectionEventsPage() {
           <EventCard
             key={event.id}
             event={event}
-            onDuplicate={handleDuplicate}
             onPreview={setPreviewEventId}
           />
         ))}

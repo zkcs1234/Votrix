@@ -597,10 +597,13 @@ export async function startSession(eventId, organizerId) {
 
   // ===== END PRE-FLIGHT VALIDATION =====
 
-  // Auto-enable scoring when starting a live session
+  // Auto-enable scoring when starting a live session. Competition status is
+  // session-driven, so move the event to 'active' now for an immediate, clean
+  // handoff to the admin/global views (the schedule sync would converge here
+  // within a minute anyway).
   const { error: scoringError } = await getClient()
     .from(DB_TABLES.EVENTS)
-    .update({ scoring_enabled: true })
+    .update({ scoring_enabled: true, status: 'active' })
     .eq('id', eventId)
 
   if (scoringError) {
@@ -1113,12 +1116,14 @@ export async function completeSession(eventId, organizerId) {
 
   emitToEvent(eventId, 'session:status-changed', { session: updated })
 
-  // Ending the session closes scoring: flip scoring_enabled = false so the voter
-  // dashboard moves the event out of "Scoring open" immediately (the schedule
-  // sync would also do this within a minute, but do it now for a clean handoff).
+  // Ending the session closes scoring AND completes the event: competition
+  // status is session-driven, so flip scoring_enabled = false and mark the
+  // event 'completed' immediately (the voter dashboard leaves "Scoring open" at
+  // once, and the admin/global views reflect completion without waiting for the
+  // schedule sync, which converges to the same state).
   const { error: scoringOffError } = await getClient()
     .from(DB_TABLES.EVENTS)
-    .update({ scoring_enabled: false })
+    .update({ scoring_enabled: false, status: 'completed' })
     .eq('id', eventId)
   if (scoringOffError) {
     console.warn('[completeSession] Failed to disable scoring:', scoringOffError.message)
