@@ -81,15 +81,17 @@ export default function CompetitionScoringForm({
     </span>
   )
 
-  // Shared per-row action: Locked pill, waiting, or "Submit open criteria".
+  // Shared per-row action. Three genuinely different states:
+  //   • Locked   — fully committed (green pill).
+  //   • Waiting  — organizer hasn't opened this contestant / no criterion open yet.
+  //   • Scorable — OPEN and scorable NOW. This must look actionable, never greyed:
+  //     an incomplete row shows an outline button + fill progress (clicking
+  //     surfaces the missing scores); a complete row shows a solid primary button.
   const RowAction = ({ cont, block = false }) => {
     const total = allCritIds.length
     const lockedCount = lockedSetOf(cont).size
-    const counter = (
-      <span className="text-[11px] text-v-text-subtle tabular-nums">
-        {lockedCount}/{total} locked
-      </span>
-    )
+    const wrap = block ? 'flex items-center justify-between gap-3' : 'inline-flex flex-col items-center gap-1'
+
     if (fullyLocked(cont)) {
       return (
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-300">
@@ -108,8 +110,10 @@ export default function CompetitionScoringForm({
     // opened yet) — the judge waits for the organizer to open the next criterion.
     if (scorableCrits(cont).length === 0) {
       return (
-        <div className={block ? 'flex items-center justify-between gap-3' : 'inline-flex flex-col items-center gap-1'}>
-          {counter}
+        <div className={wrap}>
+          {lockedCount > 0 && (
+            <span className="text-[11px] tabular-nums text-emerald-300">{lockedCount}/{total} locked</span>
+          )}
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-v-surface-elevated px-3 py-1.5 text-xs font-medium text-v-text-subtle">
             <Lock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> Waiting
           </span>
@@ -118,17 +122,23 @@ export default function CompetitionScoringForm({
     }
     const busy = submittingId === cont.id
     const complete = isComplete(cont)
+    const filled = doneCount(cont)
+    const totalScorable = scorableTargets(cont).length
     return (
-      <div className={block ? 'flex items-center justify-between gap-3' : 'inline-flex flex-col items-center gap-1'}>
-        {counter}
+      <div className={wrap}>
+        <span className="text-[11px] tabular-nums text-v-text-subtle">
+          {lockedCount > 0 ? `${lockedCount}/${total} locked · ` : ''}
+          {filled}/{totalScorable} filled
+        </span>
         <Button
           size="sm"
+          variant={complete ? 'primary' : 'secondary'}
           onClick={() => onSubmitContestant?.(cont.id)}
-          disabled={busy || !complete}
+          disabled={busy}
           loading={busy}
-          title={complete ? 'Submit & lock the open criteria' : 'Fill in every open score first'}
+          title={complete ? 'Submit & lock the open criteria' : 'Fill in every open score, then submit'}
         >
-          Submit open criteria
+          {complete ? 'Submit & lock' : 'Submit open criteria'}
         </Button>
       </div>
     )
