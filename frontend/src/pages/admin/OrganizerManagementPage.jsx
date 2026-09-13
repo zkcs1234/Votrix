@@ -166,7 +166,8 @@ export default function OrganizerManagementPage() {
       const matchesSearch =
         !searchLower ||
         org.email?.toLowerCase().includes(searchLower) ||
-        org.organizations?.some((o) => o.organization_name?.toLowerCase().includes(searchLower))
+        org.organization_name?.toLowerCase().includes(searchLower) ||
+        org.organizer_name?.toLowerCase().includes(searchLower)
 
       const matchesStatus =
         statusFilter === 'all' || org.account_status === statusFilter
@@ -244,7 +245,7 @@ export default function OrganizerManagementPage() {
         <div>
           <h1 className="v-page-title">Organizer management</h1>
           <p className="v-caption">
-            Review organizer accounts, approve new access, and suspend accounts when needed.
+            Review organizer accounts, track onboarding, and suspend or restore access when needed.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

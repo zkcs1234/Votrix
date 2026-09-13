@@ -45,7 +45,7 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess }) {
     try {
       await ensureCsrfToken()
       const { data } = await adminService.createOrganizer({ ...values, sendEmail: true })
-      setSuccess(`Organizer created and pending approval: ${data.user.email}`)
+      setSuccess(`Organizer account created: ${data.user.email}`)
       if (data.email?.sent) {
         setEmailStatus('Invitation email sent successfully.')
       } else if (data.email?.skipped) {
@@ -81,7 +81,7 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess }) {
           <h2 className="v-page-title">Add Organizer</h2>
         </div>
         <p className="v-caption mt-1">
-          New organizer accounts start in pending review. A temporary password is generated automatically and emailed to the organizer, who must change it on first login.
+          The account is active immediately. A temporary password is generated automatically and emailed to the organizer, and on first login they&apos;ll be guided to complete their organization profile.
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>

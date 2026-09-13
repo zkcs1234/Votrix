@@ -113,7 +113,7 @@ export const updateOrganizerStatus = asyncHandler(async (req, res) => {
     title: 'Your organizer account status changed',
     message:
       accountStatus === 'active'
-        ? 'Your account has been approved. You can now access the organizer dashboard.'
+        ? 'Your account has been reactivated. You can now access the organizer dashboard.'
         : accountStatus === 'suspended'
           ? 'Your account has been suspended. Access is temporarily disabled.'
           : 'Your account status has been updated.',
