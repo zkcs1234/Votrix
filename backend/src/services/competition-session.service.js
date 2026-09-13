@@ -641,6 +641,11 @@ export async function startSession(eventId, organizerId) {
   // Broadcast to all judges and organizer
   emitToEvent(eventId, 'session:status-changed', { session })
   emitToEventOrganizer(eventId, 'session:status-changed', { session })
+  // Starting a session flips scoring_enabled = true, which moves the event from
+  // "Waiting to open" (assigned) to "Scoring open" (active) on the voter
+  // dashboard. Tell already-open dashboards to reload — otherwise a judge who
+  // had the dashboard open before the session started never sees it go active.
+  emitToEvent(eventId, 'competition:scoring-toggled', { eventId, scoringEnabled: true })
 
   recordEventActivity({
     eventId,
