@@ -280,6 +280,50 @@ export default function CompetitionLiveControlPage() {
     }
   }
 
+  // Division grouping for the roster. session.roundContestants carry no division,
+  // but foundation.contestants do — enrich, then group so the organizer can tell
+  // apart same-numbered contestants (Male #1 vs Female #1).
+  const divisionsEnabled = Boolean(foundation?.event?.divisions_enabled)
+  const groupRosterByDivision = (roster) => {
+    const nameById = new Map((foundation?.divisions ?? []).map((d) => [d.id, d.name]))
+    const divById = new Map((foundation?.contestants ?? []).map((c) => [c.id, c.divisionId ?? null]))
+    const enriched = roster.map((c) => {
+      const divisionId = divById.get(c.id) ?? null
+      return { ...c, divisionId, divisionName: divisionId ? nameById.get(divisionId) ?? null : null }
+    })
+    if (!divisionsEnabled) {
+      return { grouped: false, groups: [{ key: '__all__', divisionName: null, contestants: enriched }] }
+    }
+    const sorted = [...enriched].sort((a, b) => {
+      const da = a.divisionName ?? '~'
+      const db = b.divisionName ?? '~'
+      if (da !== db) return da.localeCompare(db)
+      return (a.contestantNumber ?? 0) - (b.contestantNumber ?? 0)
+    })
+    const groups = []
+    for (const c of sorted) {
+      const key = c.divisionId ?? '__none__'
+      const last = groups[groups.length - 1]
+      if (!last || last.key !== key) {
+        groups.push({ key, divisionName: c.divisionName ?? 'No division', contestants: [c] })
+      } else {
+        last.contestants.push(c)
+      }
+    }
+    return { grouped: groups.length > 1, groups }
+  }
+
+  // Flat contestant → division-name map for secondary views (the progress grid),
+  // so their bare "#N name" rows gain division context when numbers repeat.
+  const divisionLabelByContestantId = new Map(
+    (foundation?.contestants ?? []).map((c) => {
+      const name = c.divisionId
+        ? (foundation?.divisions ?? []).find((d) => d.id === c.divisionId)?.name ?? null
+        : null
+      return [c.id, name]
+    }),
+  )
+
   if (loading && !showLoader) return null
 
   if (loading || showLoader) {
@@ -573,40 +617,59 @@ export default function CompetitionLiveControlPage() {
                     ? `All ${roster.length} contestants are open — judges can score everyone.`
                     : `${openCount} of ${roster.length} open for scoring. Tap a contestant to open or lock them; judges still see all.`}
               </p>
-              {roster.length > 0 && (
-                <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
-                  {roster.map((c) => (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        disabled={gateBusy}
-                        onClick={() => toggleContestantOpen(c.id)}
-                        title={c.open ? 'Open for scoring — click to lock' : 'Locked — click to open'}
-                        className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition disabled:opacity-60 ${
-                          c.open
-                            ? 'border-emerald-500/40 bg-emerald-500/10'
-                            : 'border-v-border bg-v-surface-elevated/40 hover:bg-v-surface-elevated'
-                        }`}
-                      >
-                        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-v-surface px-1.5 text-sm font-bold tabular-nums text-v-text border border-v-border">
-                          #{c.contestantNumber}
-                        </span>
-                        {c.photo && (
-                          <img src={c.photo} alt="" className="h-8 w-8 rounded-lg object-cover" />
+              {roster.length > 0 && (() => {
+                const { grouped, groups } = groupRosterByDivision(roster)
+                return (
+                  <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
+                    {groups.map((group) => (
+                      <div key={group.key} className="space-y-1.5">
+                        {grouped && (
+                          <p className="sticky top-0 z-10 bg-v-surface pb-1 text-[11px] font-semibold uppercase tracking-wider text-v-primary">
+                            {group.divisionName}
+                            <span className="ml-1.5 font-normal normal-case text-v-text-subtle">
+                              {group.contestants.filter((c) => c.open).length}/{group.contestants.length} open
+                            </span>
+                          </p>
                         )}
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-v-text">{c.name}</span>
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                            c.open ? 'bg-emerald-500/20 text-emerald-300' : 'bg-v-surface text-v-text-subtle border border-v-border'
-                          }`}
-                        >
-                          {c.open ? 'Open' : 'Locked'}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                        <ul className="space-y-1.5">
+                          {group.contestants.map((c) => (
+                            <li key={c.id}>
+                              <button
+                                type="button"
+                                disabled={gateBusy}
+                                onClick={() => toggleContestantOpen(c.id)}
+                                title={c.open ? 'Open for scoring — click to lock' : 'Locked — click to open'}
+                                className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition disabled:opacity-60 ${
+                                  c.open
+                                    ? 'border-emerald-500/40 bg-emerald-500/10'
+                                    : 'border-v-border bg-v-surface-elevated/40 hover:bg-v-surface-elevated'
+                                }`}
+                              >
+                                <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-v-surface px-1.5 text-sm font-bold tabular-nums text-v-text border border-v-border">
+                                  #{c.contestantNumber}
+                                </span>
+                                {c.photo && (
+                                  <img src={c.photo} alt="" className="h-8 w-8 rounded-lg object-cover" />
+                                )}
+                                <span className="min-w-0 flex-1 truncate text-sm font-medium text-v-text">
+                                  {grouped ? `${group.divisionName} #${c.contestantNumber} · ${c.name}` : c.name}
+                                </span>
+                                <span
+                                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                                    c.open ? 'bg-emerald-500/20 text-emerald-300' : 'bg-v-surface text-v-text-subtle border border-v-border'
+                                  }`}
+                                >
+                                  {c.open ? 'Open' : 'Locked'}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
           )
         })()}
@@ -618,6 +681,7 @@ export default function CompetitionLiveControlPage() {
         progress={judgeProgress}
         onUnlock={unlockContestant}
         actionLoading={actionLoading}
+        divisionLabelById={divisionsEnabled ? divisionLabelByContestantId : null}
       />
 
 
@@ -709,7 +773,7 @@ export default function CompetitionLiveControlPage() {
 // when fully locked, an amber "n/total" when partial, a clock when nothing yet.
 // Clicking a cell reopens that judge's whole score; a row "Reopen" reopens every
 // judge; and "Per criterion" expands a panel to reopen a single locked criterion.
-function JudgeProgressGrid({ progress, onUnlock, actionLoading }) {
+function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelById = null }) {
   const judges = progress?.judges ?? []
   const contestants = progress?.contestants ?? []
   const submitted = progress?.submitted ?? []
@@ -766,6 +830,11 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading }) {
                   <Fragment key={c.id}>
                     <tr className="border-b border-v-border/50">
                       <td className="sticky left-0 z-10 bg-v-surface py-2 pr-4 text-v-text">
+                        {divisionLabelById?.get(c.id) && (
+                          <span className="mr-1.5 rounded bg-v-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-v-primary">
+                            {divisionLabelById.get(c.id)}
+                          </span>
+                        )}
                         <span className="font-medium tabular-nums">#{c.contestantNumber}</span> {c.name}
                       </td>
                       {judges.map((j) => {

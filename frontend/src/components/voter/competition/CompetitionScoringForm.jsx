@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { CheckCircle, Lock } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import ScoreInputBase from '@/components/ui/ScoreInput'
@@ -61,7 +62,7 @@ export default function CompetitionScoringForm({
 
   // Order contestants by the session's contestant order when available, else by
   // number. No "active" emphasis — the whole field is equal (round-driven).
-  const orderedContestants = (() => {
+  const baseOrdered = (() => {
     if (sessionState?.contestantOrder) {
       const orderMap = new Map(sessionState.contestantOrder.map((id, index) => [id, index]))
       return [...contestants].sort(
@@ -70,6 +71,39 @@ export default function CompetitionScoringForm({
     }
     return [...contestants].sort((a, b) => a.contestantNumber - b.contestantNumber)
   })()
+
+  // With divisions on, contestant numbers repeat across divisions (Male #1 vs
+  // Female #1). Group the field by division with section headers, and sort by
+  // (division, number) so identical numbers never sit adjacent unlabeled.
+  const divisionsEnabled = Boolean(sheet.divisionsEnabled)
+  const orderedContestants = divisionsEnabled
+    ? [...baseOrdered].sort((a, b) => {
+        const da = a.divisionName ?? ''
+        const db = b.divisionName ?? ''
+        if (da !== db) return da.localeCompare(db)
+        return (a.contestantNumber ?? 0) - (b.contestantNumber ?? 0)
+      })
+    : baseOrdered
+
+  // Group consecutive contestants by division for section headers. Only show
+  // headers when divisions are on AND more than one division is present.
+  const contestantGroups = (() => {
+    const groups = []
+    for (const c of orderedContestants) {
+      const key = c.divisionId ?? '__none__'
+      const last = groups[groups.length - 1]
+      if (!last || last.key !== key) {
+        groups.push({ key, divisionName: c.divisionName ?? 'No division', contestants: [c] })
+      } else {
+        last.contestants.push(c)
+      }
+    }
+    return groups
+  })()
+  const showDivisionHeaders = divisionsEnabled && contestantGroups.length > 1
+  // Total columns for a full-width division header row: contestant + minors + status.
+  const totalMinorCols = critColumns.reduce((s, { minors }) => s + minors.length, 0)
+  const totalColSpan = 1 + totalMinorCols + 1
 
   const NumberBadge = ({ number, locked }) => (
     <span
@@ -192,7 +226,21 @@ export default function CompetitionScoringForm({
             </tr>
           </thead>
           <tbody>
-            {orderedContestants.map((cont) => {
+            {contestantGroups.map((group) => (
+              <Fragment key={group.key}>
+                {showDivisionHeaders && (
+                  <tr className="bg-v-surface-elevated/70">
+                    <td colSpan={totalColSpan} className="border-y border-v-border p-0">
+                      <div className="sticky left-0 inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-v-primary">
+                        {group.divisionName}
+                        <span className="font-normal normal-case text-v-text-subtle">
+                          {group.contestants.length} contestant{group.contestants.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {group.contestants.map((cont) => {
               const rowFully = fullyLocked(cont)
               const closed = cont.open === false
               return (
@@ -235,14 +283,26 @@ export default function CompetitionScoringForm({
                   </td>
                 </tr>
               )
-            })}
+                })}
+              </Fragment>
+            ))}
           </tbody>
         </table>
       </div>
 
       {/* Mobile: one card per contestant with a sticky Submit & lock footer. */}
       <div className="space-y-4 md:hidden">
-        {orderedContestants.map((cont) => {
+        {contestantGroups.map((group) => (
+          <div key={group.key} className="space-y-4">
+            {showDivisionHeaders && (
+              <p className="pt-2 text-xs font-semibold uppercase tracking-wider text-v-primary">
+                {group.divisionName}
+                <span className="ml-2 font-normal normal-case text-v-text-subtle">
+                  {group.contestants.length} contestant{group.contestants.length !== 1 ? 's' : ''}
+                </span>
+              </p>
+            )}
+            {group.contestants.map((cont) => {
           const rowFully = fullyLocked(cont)
           const closed = cont.open === false
           return (
@@ -317,7 +377,9 @@ export default function CompetitionScoringForm({
               )}
             </article>
           )
-        })}
+            })}
+          </div>
+        ))}
       </div>
     </div>
   )
