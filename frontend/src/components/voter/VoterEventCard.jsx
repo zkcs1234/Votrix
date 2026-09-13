@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Vote, Trophy, BarChart2, ArrowRight, UserCheck, Eye } from 'lucide-react'
 import VoterStatusBadge from '@/components/voter/VoterStatusBadge'
@@ -36,7 +37,10 @@ const TYPE_GRADIENT = {
 export default function VoterEventCard({ event, showAction = true }) {
   const meta = EVENT_TYPE_META[event.eventType] ?? { label: event.eventType }
   const TypeIcon = TYPE_ICON[event.eventType] ?? Vote
-  const hasBanner = event.banner && event.banner.length > 0
+  // Fall back to the gradient when there is no banner OR the banner URL fails to
+  // load (e.g. a stale/removed image), so the card never shows a broken-image box.
+  const [bannerFailed, setBannerFailed] = useState(false)
+  const showBanner = Boolean(event.banner && event.banner.length > 0) && !bannerFailed
   const fallbackGradient = TYPE_GRADIENT[event.eventType] ?? TYPE_GRADIENT.election
 
   // Resolve participant type label from event data
@@ -51,13 +55,14 @@ export default function VoterEventCard({ event, showAction = true }) {
       {/* Banner Image or Fallback Gradient */}
       <div
         className="relative h-28 w-full overflow-hidden"
-        style={hasBanner ? {} : { background: fallbackGradient }}
+        style={showBanner ? {} : { background: fallbackGradient }}
       >
-        {hasBanner && (
+        {showBanner && (
           <img
             src={event.banner}
             alt=""
             className="h-full w-full object-cover"
+            onError={() => setBannerFailed(true)}
           />
         )}
         {/* Gradient overlay for text readability */}
