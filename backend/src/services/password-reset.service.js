@@ -3,6 +3,7 @@ import { ApiError } from '../utils/ApiError.js'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import { findUserByEmail } from './user.service.js'
 import { updateUserPassword, incrementTokenVersion } from './user.service.js'
+import { revokeAllSessionsForUser } from './session.service.js'
 import { sendPasswordResetEmail } from './mailer.service.js'
 import { env } from '../config/env.js'
 import { recordAudit } from '../foundation/audit.js'
@@ -86,6 +87,14 @@ export async function resetPasswordWithToken({ token, newPassword }) {
   // through this flow would still be force-prompted to change it on first login.
   await updateUserPassword(row.user_id, newPassword, { clearMustChange: true })
   await incrementTokenVersion(row.user_id)
+
+  // The token_version bump invalidated every existing token; drop the now-dead
+  // session rows so they don't linger as "active" in admin session management.
+  try {
+    await revokeAllSessionsForUser(row.user_id)
+  } catch {
+    // Best-effort cleanup — never block a password reset.
+  }
 
   await getClient()
     .from(TABLE)

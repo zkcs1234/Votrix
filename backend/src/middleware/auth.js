@@ -3,6 +3,7 @@ import { ApiError } from '../utils/ApiError.js'
 import { verifyAccessToken } from '../utils/jwt.js'
 import { env } from '../config/env.js'
 import { findUserById } from '../services/user.service.js'
+import { isSessionActive } from '../services/session.service.js'
 import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
 import { db } from '../foundation/db.js'
 
@@ -35,6 +36,12 @@ export async function authenticate(req, _res, next) {
       throw new ApiError(401, 'Session has been revoked')
     }
 
+    // Per-session revocation: if the token is bound to a session row that has
+    // since been deleted (admin revoke, or logout on another device), reject.
+    if (decoded.sid && !(await isSessionActive(decoded.sid))) {
+      throw new ApiError(401, 'Session has been revoked')
+    }
+
     req.user = {
       id: decoded.sub,
       role: decoded.role,
@@ -43,6 +50,7 @@ export async function authenticate(req, _res, next) {
       accountStatus: decoded.accountStatus,
       mustChangePassword: Boolean(decoded.mustChangePassword),
       tokenVersion: decoded.tokenVersion ?? 0,
+      sessionId: decoded.sid ?? null,
     }
     next()
   } catch (error) {

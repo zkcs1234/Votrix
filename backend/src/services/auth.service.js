@@ -10,6 +10,28 @@ import {
   sanitizeUser,
 } from './user.service.js'
 import { issueTokenPair } from './token.service.js'
+import { recordSession, touchSession, isSessionActive } from './session.service.js'
+
+/**
+ * Create a `user_sessions` row for a freshly issued token and return its id.
+ *
+ * Session tracking is best-effort: if the insert fails (e.g. table missing on
+ * an un-migrated environment) we return `null` so the token is issued without
+ * a session binding and login/refresh never break.
+ */
+async function createSession(user, { ip = null, userAgent = null } = {}) {
+  try {
+    const session = await recordSession({
+      userId: user.id,
+      tokenVersion: Number(user.token_version ?? 0),
+      ip,
+      userAgent,
+    })
+    return session?.id ?? null
+  } catch {
+    return null
+  }
+}
 
 function assertAccountActive(user) {
   if (user?.account_status === 'active') return
@@ -26,7 +48,7 @@ function assertAccountActive(user) {
 }
 
 // Unified login - works for admin, organizer, and voter by email
-export async function login({ email, password }) {
+export async function login({ email, password }, { ip = null, userAgent = null } = {}) {
   // Find user by email (any role)
   const user = await findUserByEmail(email)
 
@@ -41,10 +63,11 @@ export async function login({ email, password }) {
 
   assertAccountActive(user)
 
-  return issueTokenPair(user)
+  const sessionId = await createSession(user, { ip, userAgent })
+  return issueTokenPair(user, { sessionId })
 }
 
-export async function refreshSession(userId, tokenVersion) {
+export async function refreshSession(userId, tokenVersion, { sessionId = null, ip = null, userAgent = null } = {}) {
   const user = await findUserById(userId)
   if (!user) {
     throw new ApiError(401, 'User not found')
@@ -58,16 +81,32 @@ export async function refreshSession(userId, tokenVersion) {
   }
 
   assertAccountActive(user)
-  return issueTokenPair(user)
+
+  let sid = sessionId
+  if (sid) {
+    // A bound session that was revoked (row deleted) must block the refresh,
+    // so an admin revoke takes effect once the short-lived access token lapses.
+    if (!(await isSessionActive(sid))) {
+      throw new ApiError(401, 'Session has been revoked')
+    }
+    await touchSession(sid)
+  } else {
+    // Token pre-dates session tracking — start tracking from this refresh so
+    // already-signed-in users appear in the sessions list without re-login.
+    sid = await createSession(user, { ip, userAgent })
+  }
+
+  return issueTokenPair(user, { sessionId: sid })
 }
 
-export async function issueSessionForUser(userId) {
+export async function issueSessionForUser(userId, { ip = null, userAgent = null } = {}) {
   const user = await findUserById(userId)
   if (!user) {
     throw new ApiError(401, 'User not found')
   }
   assertAccountActive(user)
-  return issueTokenPair(user)
+  const sessionId = await createSession(user, { ip, userAgent })
+  return issueTokenPair(user, { sessionId })
 }
 
 export async function revokeSession(userId) {

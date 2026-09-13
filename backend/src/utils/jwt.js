@@ -20,6 +20,9 @@ export function signRefreshToken(payload) {
       sub: payload.sub,
       role: payload.role,
       tokenVersion: payload.tokenVersion ?? 0,
+      // Carry the session binding so a refresh re-issues an access token for
+      // the SAME session (and a revoked session blocks the refresh).
+      ...(payload.sid ? { sid: payload.sid } : {}),
       type: TOKEN_TYPES.REFRESH,
     },
     env.jwt.refreshSecret,

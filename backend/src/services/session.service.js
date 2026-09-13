@@ -15,7 +15,6 @@ function extractClientMeta(req) {
 export async function recordSession({
   userId,
   tokenVersion = 0,
-  refreshTokenId = null,
   ip = null,
   userAgent = null,
 } = {}) {
@@ -27,7 +26,6 @@ export async function recordSession({
     .insert({
       user_id: userId,
       token_version: tokenVersion,
-      refresh_token_id: refreshTokenId,
       ip_address: ip,
       user_agent: userAgent,
     })
@@ -47,6 +45,29 @@ export async function touchSession(sessionId) {
     return null
   }
   return true
+}
+
+/**
+ * Report whether a bound session row still exists.
+ *
+ * Returns `false` ONLY when we can positively confirm the row is gone — i.e.
+ * the session was revoked. On any infrastructure error we fail OPEN (return
+ * `true`) so a transient database issue on this table cannot lock every user
+ * out; the token_version check remains the hard security gate in that case.
+ */
+export async function isSessionActive(sessionId) {
+  if (!sessionId) return true
+  try {
+    const { data, error } = await db()
+      .from(DB_TABLES.USER_SESSIONS)
+      .select('id')
+      .eq('id', sessionId)
+      .maybeSingle()
+    if (error) return true
+    return Boolean(data)
+  } catch {
+    return true
+  }
 }
 
 export async function listAdminSessions({ limit = 100 } = {}) {

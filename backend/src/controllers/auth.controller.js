@@ -14,6 +14,11 @@ import {
 } from '../validators/email.validator.js'
 import * as passwordResetService from '../services/password-reset.service.js'
 import { createAuditLog } from '../services/admin.service.js'
+import {
+  revokeSession as deleteSessionRow,
+  revokeAllSessionsForUser,
+  sessionMeta,
+} from '../services/session.service.js'
 
 function sendAuthResponse(res, { accessToken, refreshToken, user }, { remember = false } = {}) {
   setAuthCookies(res, { accessToken, refreshToken }, { remember })
@@ -56,7 +61,8 @@ export const login = asyncHandler(async (req, res) => {
   const credentials = validateLogin(req.body)
 
   try {
-    const tokens = await authService.login(credentials)
+    const { ip, userAgent } = sessionMeta.extractClientMeta(req)
+    const tokens = await authService.login(credentials, { ip, userAgent })
 
     await writeAuthAudit({
       action: `${tokens.user.role.toUpperCase()}_LOGIN_SUCCESS`,
@@ -94,7 +100,12 @@ export const refresh = asyncHandler(async (req, res) => {
   }
 
   const decoded = verifyRefreshToken(token)
-  const tokens = await authService.refreshSession(decoded.sub, decoded.tokenVersion)
+  const { ip, userAgent } = sessionMeta.extractClientMeta(req)
+  const tokens = await authService.refreshSession(decoded.sub, decoded.tokenVersion, {
+    sessionId: decoded.sid ?? null,
+    ip,
+    userAgent,
+  })
   sendAuthResponse(res, tokens)
 })
 
@@ -106,11 +117,13 @@ export const logout = asyncHandler(async (_req, res) => {
       : null)
 
   let userId = null
+  let sessionId = null
 
   if (token) {
     try {
       const decoded = verifyAccessToken(token)
       userId = decoded.sub ?? null
+      sessionId = decoded.sid ?? null
       await writeAuthAudit({
         action: 'USER_LOGOUT',
         userId,
@@ -128,7 +141,15 @@ export const logout = asyncHandler(async (_req, res) => {
     }
   }
 
-  if (userId) {
+  if (sessionId) {
+    // End only THIS session; sessions on the user's other devices stay valid.
+    try {
+      await deleteSessionRow(sessionId)
+    } catch {
+      // The row may already be gone — still clear cookies below.
+    }
+  } else if (userId) {
+    // Legacy token with no session binding — fall back to a global revoke.
     try {
       await authService.revokeSession(userId)
     } catch {
@@ -162,7 +183,16 @@ export const changePassword = asyncHandler(async (req, res) => {
   const payload = validateChangePassword(req.body)
   const user = await authService.changePassword(req.user.id, payload)
 
-  const tokens = await authService.issueSessionForUser(user.id)
+  // The password change bumped token_version, invalidating every existing
+  // token; drop the now-dead session rows before starting a fresh session.
+  try {
+    await revokeAllSessionsForUser(user.id)
+  } catch {
+    // Best-effort cleanup — do not block the password change.
+  }
+
+  const { ip, userAgent } = sessionMeta.extractClientMeta(req)
+  const tokens = await authService.issueSessionForUser(user.id, { ip, userAgent })
 
   await writeAuthAudit({
     action: 'auth.password.change',
@@ -187,8 +217,19 @@ export const changePassword = asyncHandler(async (req, res) => {
 export const skipPasswordChange = asyncHandler(async (req, res) => {
   const user = await authService.skipPasswordChange(req.user.id)
 
+  // Replace the temporary-password session with a fresh one so the same
+  // browser doesn't leave a stray duplicate row; other devices are untouched.
+  if (req.user?.sessionId) {
+    try {
+      await deleteSessionRow(req.user.sessionId)
+    } catch {
+      // The row may already be gone — continue issuing the new session.
+    }
+  }
+
   // Issue new session tokens since must_change_password changed
-  const tokens = await authService.issueSessionForUser(user.id)
+  const { ip, userAgent } = sessionMeta.extractClientMeta(req)
+  const tokens = await authService.issueSessionForUser(user.id, { ip, userAgent })
 
   await writeAuthAudit({
     action: 'auth.password.change_skipped',
