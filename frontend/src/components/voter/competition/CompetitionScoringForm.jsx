@@ -14,8 +14,8 @@ export default function CompetitionScoringForm({
   sheet,
   scores,
   onScoreChange,
-  submittingId = null,
-  onSubmitContestant,
+  submittingKey = null,
+  onSubmitCriterion,
   sessionState = null,
 }) {
   const { contestants, criteria } = sheet
@@ -46,19 +46,17 @@ export default function CompetitionScoringForm({
     Boolean(cont.hasSubmitted) ||
     (allCritIds.length > 0 && allCritIds.every((id) => lockedSetOf(cont).has(id)))
 
-  // Criteria the judge can submit for this contestant right now.
-  const scorableCrits = (cont) =>
-    cont.open === false ? [] : critColumns.filter((c) => c.open && !isCritLocked(cont, c.crit.id))
-  const scorableTargets = (cont) => scorableCrits(cont).flatMap(({ minors }) => minors)
-  const doneCount = (cont) =>
-    scorableTargets(cont).filter((t) => {
-      const s = scores[`${cont.id}:${t.id}`]
-      return s !== undefined && s !== '' && s !== null
-    }).length
-  const isComplete = (cont) => {
-    const tt = scorableTargets(cont)
-    return tt.length > 0 && doneCount(cont) === tt.length
-  }
+  // A criterion is "complete" (lockable) once every one of its minors has a
+  // filled, in-range score for this contestant.
+  const critMinorsComplete = (cont, minors) =>
+    minors.length > 0 &&
+    minors.every((m) => {
+      const raw = scores[`${cont.id}:${m.id}`]
+      if (raw === undefined || raw === '' || raw === null) return false
+      const num = Number(raw)
+      const b = boundsFor(m)
+      return !Number.isNaN(num) && num >= b.min && num <= b.max
+    })
 
   // Order contestants by the session's contestant order when available, else by
   // number. No "active" emphasis — the whole field is equal (round-driven).
@@ -115,16 +113,44 @@ export default function CompetitionScoringForm({
     </span>
   )
 
-  // Shared per-row action. Three genuinely different states:
-  //   • Locked   — fully committed (green pill).
-  //   • Waiting  — organizer hasn't opened this contestant / no criterion open yet.
-  //   • Scorable — OPEN and scorable NOW. This must look actionable, never greyed:
-  //     an incomplete row shows an outline button + fill progress (clicking
-  //     surfaces the missing scores); a complete row shows a solid primary button.
-  const RowAction = ({ cont, block = false }) => {
+  // Per-criterion Lock control (#6). Each criterion commits on its own the moment
+  // the judge finishes it, so scores can't be revisited (fairness). States:
+  //   • Locked   — already committed (green chip).
+  //   • Waiting  — contestant/criterion not open yet (nothing shown; input greyed).
+  //   • Lockable — open + every minor filled in range → solid Lock button.
+  //   • Incomplete — open but not all minors filled → disabled Lock button.
+  const CritLock = ({ cont, crit, minors, critOpen, block = false }) => {
+    if (isCritLocked(cont, crit.id)) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-1 text-[11px] font-medium text-emerald-300">
+          <Lock className="h-3 w-3" strokeWidth={2} aria-hidden /> Locked
+        </span>
+      )
+    }
+    if (cont.open === false || !critOpen) return null
+    const busy = submittingKey === `${cont.id}:${crit.id}`
+    const complete = critMinorsComplete(cont, minors)
+    return (
+      <Button
+        size="sm"
+        variant={complete ? 'primary' : 'secondary'}
+        onClick={() => onSubmitCriterion?.(cont.id, crit.id)}
+        disabled={busy || !complete}
+        loading={busy}
+        className={block ? 'w-full' : ''}
+        title={complete ? 'Lock this criterion — you cannot change it after' : 'Fill in every score for this criterion first'}
+      >
+        <Lock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+        <span>Lock</span>
+      </Button>
+    )
+  }
+
+  // Per-contestant status summary (read-only). Submission is per-criterion now,
+  // so this column only reports progress, never triggers a submit.
+  const RowStatus = ({ cont }) => {
     const total = allCritIds.length
     const lockedCount = lockedSetOf(cont).size
-    const wrap = block ? 'flex items-center justify-between gap-3' : 'inline-flex flex-col items-center gap-1'
 
     if (fullyLocked(cont)) {
       return (
@@ -140,41 +166,10 @@ export default function CompetitionScoringForm({
         </span>
       )
     }
-    // Contestant is open but nothing is scorable right now (remaining criteria not
-    // opened yet) — the judge waits for the organizer to open the next criterion.
-    if (scorableCrits(cont).length === 0) {
-      return (
-        <div className={wrap}>
-          {lockedCount > 0 && (
-            <span className="text-[11px] tabular-nums text-emerald-300">{lockedCount}/{total} locked</span>
-          )}
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-v-surface-elevated px-3 py-1.5 text-xs font-medium text-v-text-subtle">
-            <Lock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> Waiting
-          </span>
-        </div>
-      )
-    }
-    const busy = submittingId === cont.id
-    const complete = isComplete(cont)
-    const filled = doneCount(cont)
-    const totalScorable = scorableTargets(cont).length
     return (
-      <div className={wrap}>
-        <span className="text-[11px] tabular-nums text-v-text-subtle">
-          {lockedCount > 0 ? `${lockedCount}/${total} locked · ` : ''}
-          {filled}/{totalScorable} filled
-        </span>
-        <Button
-          size="sm"
-          variant={complete ? 'primary' : 'secondary'}
-          onClick={() => onSubmitContestant?.(cont.id)}
-          disabled={busy}
-          loading={busy}
-          title={complete ? 'Submit & lock the open criteria' : 'Fill in every open score, then submit'}
-        >
-          {complete ? 'Submit & lock' : 'Submit open criteria'}
-        </Button>
-      </div>
+      <span className="text-[11px] tabular-nums text-v-text-subtle">
+        {lockedCount}/{total} locked
+      </span>
     )
   }
 
@@ -261,25 +256,32 @@ export default function CompetitionScoringForm({
                   </td>
                   {critColumns.flatMap(({ crit, minors, open: critOpen }) => {
                     const critLocked = isCritLocked(cont, crit.id)
+                    const busy = submittingKey === `${cont.id}:${crit.id}`
                     return minors.map((m, i) => (
                       <td
                         key={m.id}
-                        className={`p-2 ${i === 0 ? 'border-l border-v-border' : ''} ${critLocked ? 'bg-emerald-950/10' : ''}`}
+                        className={`p-2 align-top ${i === 0 ? 'border-l border-v-border' : ''} ${critLocked ? 'bg-emerald-950/10' : ''}`}
                         title={critLocked ? 'Locked — committed' : !critOpen ? 'Not open yet' : undefined}
                       >
-                        <ScoreInputComponent
-                          contestantId={cont.id}
-                          target={m}
-                          bounds={boundsFor(m)}
-                          scores={scores}
-                          onScoreChange={onScoreChange}
-                          disabled={critLocked || closed || !critOpen || submittingId === cont.id}
-                        />
+                        <div className="flex flex-col items-center gap-1.5">
+                          <ScoreInputComponent
+                            contestantId={cont.id}
+                            target={m}
+                            bounds={boundsFor(m)}
+                            scores={scores}
+                            onScoreChange={onScoreChange}
+                            disabled={critLocked || closed || !critOpen || busy}
+                          />
+                          {/* Lock control sits under the criterion's last minor. */}
+                          {i === minors.length - 1 && (
+                            <CritLock cont={cont} crit={crit} minors={minors} critOpen={critOpen} />
+                          )}
+                        </div>
                       </td>
                     ))
                   })}
                   <td className="sticky right-0 z-10 w-32 min-w-32 border-l border-v-border bg-v-surface p-3 text-center">
-                    <RowAction cont={cont} />
+                    <RowStatus cont={cont} />
                   </td>
                 </tr>
               )
@@ -329,6 +331,7 @@ export default function CompetitionScoringForm({
               <div className="mt-4 space-y-4">
                 {critColumns.map(({ crit, minors, open: critOpen }) => {
                   const critLocked = isCritLocked(cont, crit.id)
+                  const busy = submittingKey === `${cont.id}:${crit.id}`
                   return (
                     <div key={crit.id} className={`rounded-lg border border-v-border/70 p-3 ${critOpen && !critLocked ? '' : 'opacity-60'}`}>
                       <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-v-text-muted">
@@ -359,22 +362,23 @@ export default function CompetitionScoringForm({
                                 bounds={b}
                                 scores={scores}
                                 onScoreChange={onScoreChange}
-                                disabled={critLocked || closed || !critOpen || submittingId === cont.id}
+                                disabled={critLocked || closed || !critOpen || busy}
                                 size="md"
                               />
                             </div>
                           )
                         })}
                       </div>
+                      {/* Per-criterion Lock: commit this criterion on its own. */}
+                      {!critLocked && critOpen && !closed && (
+                        <div className="mt-3">
+                          <CritLock cont={cont} crit={crit} minors={minors} critOpen={critOpen} block />
+                        </div>
+                      )}
                     </div>
                   )
                 })}
               </div>
-              {!rowFully && (
-                <div className="sticky bottom-2 mt-4">
-                  <RowAction cont={cont} block />
-                </div>
-              )}
             </article>
           )
             })}

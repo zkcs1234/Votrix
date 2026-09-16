@@ -39,8 +39,9 @@ export default function JudgeScoringPage() {
   const [activeContestantId, setActiveContestantId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
-  // Which contestant is currently being submitted (per-row Submit & lock).
-  const [submittingId, setSubmittingId] = useState(null)
+  // Which criterion is currently being submitted, keyed `contestantId:criterionId`
+  // (per-criterion Lock). null when nothing is in flight.
+  const [submittingKey, setSubmittingKey] = useState(null)
   // The shared WS client (socket.service) may already be open before this page
   // mounts (Bootstrap connects on auth), so seed from its live state.
   const [socketConnected, setSocketConnected] = useState(() => isConnected())
@@ -287,66 +288,59 @@ export default function JudgeScoringPage() {
     setScores((prev) => ({ ...prev, [`${contestantId}:${targetId}`]: value }))
   }, [])
 
-  // Build one contestant's payload from the CURRENT scores, validating each open
-  // criterion/minor against its own bounds. Reads live state (not a debounced
-  // closure), so scoring several contestants records every one.
-  const buildContestantPayload = useCallback(
-    (contestantId) => {
-      // #6: submit only the OPEN, not-yet-locked criteria for this contestant.
-      const contestant = (sheet?.contestants ?? []).find((c) => c.id === contestantId)
-      const lockedSet = new Set(contestant?.lockedCriteria ?? [])
+  // Build ONE criterion's payload for a contestant from the CURRENT scores,
+  // validating each of that criterion's minors against its own bounds. The judge
+  // commits (and locks) a single criterion at a time for fairness (#6).
+  const buildCriterionPayload = useCallback(
+    (contestantId, criterionId) => {
+      const criteria = (sheet?.criteria ?? []).find((c) => c.id === criterionId)
+      if (!criteria) return { ok: false, error: 'That criterion is no longer available.' }
+      if (criteria.open === false) return { ok: false, error: 'This criterion is not open yet.' }
+      const targets =
+        criteria.minors && criteria.minors.length
+          ? criteria.minors
+          : [{ id: criteria.id, name: criteria.name, minScore: criteria.minScore, maxScore: criteria.maxScore }]
       const scoreMap = {}
-      for (const criteria of sheet?.criteria ?? []) {
-        if (criteria.open === false) continue // closed — can't score yet
-        if (lockedSet.has(criteria.id)) continue // already committed
-        const targets =
-          criteria.minors && criteria.minors.length
-            ? criteria.minors
-            : [{ id: criteria.id, name: criteria.name, minScore: criteria.minScore, maxScore: criteria.maxScore }]
-        for (const t of targets) {
-          const raw = scores[`${contestantId}:${t.id}`]
-          if (raw === undefined || raw === '' || raw === null) {
-            return { ok: false, error: 'Fill in every open score before submitting.' }
-          }
-          const num = Number(raw)
-          const min = t.minScore ?? sheet?.scoreBounds?.min
-          const max = t.maxScore ?? sheet?.scoreBounds?.max
-          if (Number.isNaN(num) || num < min || num > max) {
-            return { ok: false, error: `A score is out of range (${min}–${max}).` }
-          }
-          scoreMap[t.id] = num
+      for (const t of targets) {
+        const raw = scores[`${contestantId}:${t.id}`]
+        if (raw === undefined || raw === '' || raw === null) {
+          return { ok: false, error: 'Fill in every score for this criterion before locking.' }
         }
-      }
-      if (!Object.keys(scoreMap).length) {
-        return { ok: false, error: 'No open criteria to submit right now.' }
+        const num = Number(raw)
+        const min = t.minScore ?? sheet?.scoreBounds?.min
+        const max = t.maxScore ?? sheet?.scoreBounds?.max
+        if (Number.isNaN(num) || num < min || num > max) {
+          return { ok: false, error: `A score is out of range (${min}–${max}).` }
+        }
+        scoreMap[t.id] = num
       }
       return { ok: true, scoreMap }
     },
-    [sheet?.criteria, sheet?.contestants, sheet?.scoreBounds, scores],
+    [sheet?.criteria, sheet?.scoreBounds, scores],
   )
 
-  const submitContestant = useCallback(
-    async (contestantId) => {
+  const submitCriterion = useCallback(
+    async (contestantId, criterionId) => {
       // #4: closed contestants aren't scorable (the organizer hasn't opened them).
       const target = (sheet?.contestants ?? []).find((c) => c.id === contestantId)
       if (target && target.open === false) {
         setError('This contestant is not open for scoring yet.')
         return
       }
-      const { ok, scoreMap, error: buildError } = buildContestantPayload(contestantId)
+      const { ok, scoreMap, error: buildError } = buildCriterionPayload(contestantId, criterionId)
       if (!ok) {
         setError(buildError)
         return
       }
       setError(null)
-      setSubmittingId(contestantId)
+      setSubmittingKey(`${contestantId}:${criterionId}`)
       try {
         await pageantService.submitSessionScore(eventId, scoreMap, contestantId)
         const savedName = (sheet?.contestants ?? []).find((c) => c.id === contestantId)?.name || ''
         setLastSavedName(savedName)
         setShowConfirmation(true)
         setTimeout(() => setShowConfirmation(false), 3000)
-        // Refresh so the row flips to locked (hasSubmitted) with its saved scores.
+        // Refresh so this criterion flips to locked with its saved scores.
         syncSessionView()
       } catch (err) {
         console.error('[Submit] Failed:', err)
@@ -356,10 +350,10 @@ export default function JudgeScoringPage() {
           setError(err.response?.data?.message || 'Submit failed')
         }
       } finally {
-        setSubmittingId(null)
+        setSubmittingKey(null)
       }
     },
-    [buildContestantPayload, eventId, sheet, syncSessionView, addToRetryQueue],
+    [buildCriterionPayload, eventId, sheet, syncSessionView, addToRetryQueue],
   )
 
   // Automatic retry on reconnection (Requirement 15.5, 15.6, 15.7)
@@ -559,7 +553,7 @@ export default function JudgeScoringPage() {
               </p>
             )}
           </div>
-          {submittingId && (
+          {submittingKey && (
             <span className="text-xs text-emerald-400">Saving…</span>
           )}
         </div>
@@ -635,8 +629,8 @@ export default function JudgeScoringPage() {
         sheet={sheet}
         scores={scores}
         onScoreChange={onScoreChange}
-        submittingId={submittingId}
-        onSubmitContestant={submitContestant}
+        submittingKey={submittingKey}
+        onSubmitCriterion={submitCriterion}
         sessionState={sessionState}
       />
 
@@ -645,8 +639,8 @@ export default function JudgeScoringPage() {
       {/* Live mode scoring instructions */}
       <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-center">
         <p className="text-sm text-v-text-muted">
-          Fill every criterion for a contestant, then press <strong>Submit &amp; lock</strong>. A
-          locked score can&apos;t be changed unless the organizer reopens it.
+          Fill in a criterion&apos;s score, then press <strong>Lock</strong> to commit it. A locked
+          criterion can&apos;t be changed unless the organizer reopens it.
         </p>
       </div>
       

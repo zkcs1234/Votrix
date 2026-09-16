@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Bell, LogOut, ChevronLeft, ChevronRight, User } from 'lucide-react'
+import { Menu, Bell, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { authService } from '@/services/auth.service'
 import { notificationsService } from '@/services/notifications.service'
@@ -190,6 +190,7 @@ export default function AppShell({
   const navigate = useNavigate()
   const { user, clearSession } = useAuth()
   const profileDropdownRef = useRef(null)
+  const isOrganizer = user?.role === 'organizer'
 
   const closeMobile = () => setMobileOpen(false)
 
@@ -389,13 +390,18 @@ export default function AppShell({
                 <ProfileCard onClose={() => setProfileCardOpen(false)} />
               )}
             </div>
-            <ThemeToggle />
+            {/* Organizers get the theme toggle inside their profile card. */}
+            {!isOrganizer && <ThemeToggle />}
             <div className="relative" ref={profileDropdownRef}>
               <button
                 type="button"
-                onClick={() => setProfileDropdownOpen((prev) => !prev)}
+                onClick={() =>
+                  isOrganizer
+                    ? setProfileCardOpen((prev) => !prev)
+                    : setProfileDropdownOpen((prev) => !prev)
+                }
                 className="flex items-center gap-2 rounded-lg border border-v-border px-2 py-1.5 text-sm transition hover:bg-v-surface-elevated"
-                aria-expanded={profileDropdownOpen}
+                aria-expanded={isOrganizer ? profileCardOpen : profileDropdownOpen}
                 aria-haspopup="true"
                 aria-label="Open profile menu"
               >
@@ -414,19 +420,6 @@ export default function AppShell({
                     <p className="text-xs text-v-text-subtle mt-0.5">{user?.email || ''}</p>
                   </div>
                   <div className="py-1">
-                    {user?.role === 'organizer' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProfileDropdownOpen(false)
-                          setProfileCardOpen(true)
-                        }}
-                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-v-text hover:bg-v-surface-elevated transition-colors"
-                      >
-                        <User className="h-4 w-4" strokeWidth={1.5} />
-                        <span>Organizer Profile</span>
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => {

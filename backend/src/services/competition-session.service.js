@@ -1378,17 +1378,29 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores, contes
   if (!openCriteria.length) {
     throw new ApiError(400, 'No criteria are currently open for scoring')
   }
-  const toSubmit = openCriteria.filter((c) => !lockedSet.has(c.id))
-  if (!toSubmit.length) {
+  const targetsOf = (crit) =>
+    crit.minors.length
+      ? crit.minors
+      : [{ id: crit.id, name: crit.name, minScore: eventBounds.min, maxScore: eventBounds.max }]
+
+  // #6 per-criterion locking. The judge commits ONE criterion at a time, so this
+  // submission locks only the criteria the payload actually completed: an open,
+  // not-yet-locked criterion whose every target has a non-empty score in `scores`.
+  // (The legacy all-at-once path sends every target, so it still locks them all.)
+  const notLocked = openCriteria.filter((c) => !lockedSet.has(c.id))
+  if (!notLocked.length) {
     throw new ApiError(409, 'You have already submitted every open criterion for this contestant')
+  }
+  const hasValue = (v) => v !== undefined && v !== null && v !== ''
+  const toSubmit = notLocked.filter((crit) => targetsOf(crit).every((t) => hasValue(scores[t.id])))
+  if (!toSubmit.length) {
+    throw new ApiError(400, 'Provide a completed criterion before locking')
   }
 
   const scoreMap = {}
   const submittedCriteriaIds = []
   for (const crit of toSubmit) {
-    const targets = crit.minors.length
-      ? crit.minors
-      : [{ id: crit.id, name: crit.name, minScore: eventBounds.min, maxScore: eventBounds.max }]
+    const targets = targetsOf(crit)
     for (const t of targets) {
       const value = scores[t.id]
       if (value === undefined || value === null || value === '') {

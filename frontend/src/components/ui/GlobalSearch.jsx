@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Search, X, Command, Users, CalendarDays, Database } from 'lucide-react'
+import { Search, X, Users, CalendarDays, Database } from 'lucide-react'
 import { searchIndex } from '@/config/searchIndex'
 import { useAuth } from '@/hooks/useAuth'
 import { USER_ROLES } from '@/utils/constants'
@@ -226,25 +226,22 @@ export default function GlobalSearch() {
       {/* Desktop Toggle */}
       <button
         type="button"
-        className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-v-border bg-v-surface text-v-text-subtle hover:text-v-text hover:border-v-border-strong hover:bg-v-surface-elevated transition cursor-text w-64 text-left shadow-v-shadow-sm focus:outline-none focus:ring-2 focus:ring-v-primary/30"
+        className="hidden md:flex items-center gap-2.5 px-3.5 py-2 rounded-full border border-v-border bg-v-surface-elevated text-v-text-subtle hover:text-v-text hover:border-v-border-strong transition cursor-text w-64 text-left focus:outline-none focus:ring-2 focus:ring-v-primary/40 focus:border-v-primary/50"
         onClick={toggleOpen}
         aria-label="Search"
       >
-        <Search className="h-4 w-4" strokeWidth={1.5} />
-        <span className="text-sm flex-1 truncate">Search...</span>
-        <kbd className="hidden lg:inline-flex items-center gap-1 font-mono text-[10px] font-medium text-v-text-muted bg-v-bg border border-v-border px-1.5 py-0.5 rounded">
-          <Command className="h-3 w-3" />K
-        </kbd>
+        <Search className="h-4 w-4 shrink-0" strokeWidth={2} />
+        <span className="text-sm flex-1 truncate">Search…</span>
       </button>
 
       {/* Mobile Toggle */}
       <button
         type="button"
-        className="md:hidden rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated focus:outline-none focus:ring-2 focus:ring-v-primary/30 shadow-v-shadow-sm"
+        className="md:hidden rounded-full border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated focus:outline-none focus:ring-2 focus:ring-v-primary/40"
         onClick={toggleOpen}
         aria-label="Open global search"
       >
-        <Search className="h-5 w-5" strokeWidth={1.5} />
+        <Search className="h-5 w-5" strokeWidth={2} />
       </button>
 
       {/* Full-screen Modal / Overlay */}
@@ -256,14 +253,14 @@ export default function GlobalSearch() {
           />
 
           <div
-            className="relative w-full max-w-2xl bg-v-surface sm:rounded-xl shadow-v-shadow-xl flex flex-col overflow-hidden max-h-full sm:max-h-[80vh] border border-v-border"
+            className="relative w-full max-w-2xl bg-v-surface sm:rounded-2xl shadow-v-shadow-xl flex flex-col overflow-hidden max-h-full sm:max-h-[80vh] border border-v-border ring-1 ring-black/5"
             onKeyDown={handleKeyDown}
             role="dialog"
             aria-modal="true"
             aria-label="Global Search"
           >
-            <div className="flex items-center px-4 py-4 border-b border-v-border bg-v-surface">
-              <Search className="h-5 w-5 text-v-text-subtle mr-3 shrink-0" strokeWidth={1.5} />
+            <div className="flex items-center px-4 py-3.5 border-b border-v-border bg-v-surface">
+              <Search className="h-5 w-5 text-v-text-subtle mr-3 shrink-0" strokeWidth={2} />
               <input
                 ref={inputRef}
                 className="flex-1 bg-transparent border-none outline-none text-v-text text-base placeholder:text-v-text-subtle focus:ring-0 p-0"

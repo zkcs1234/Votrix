@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Building2, User, Briefcase, Edit3, LogOut, X, Check, ClipboardList } from 'lucide-react'
+import { Building2, User, Briefcase, Edit3, LogOut, X, Check, ClipboardList, Sun, Moon } from 'lucide-react'
 import FormAlert from '@/components/ui/FormAlert'
 import { organizerProfileService } from '@/services/organizer-profile.service'
 import { authService } from '@/services/auth.service'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
+import { useThemeStore } from '@/store/theme.store'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { profileSchema, ORGANIZATION_TYPE_OPTIONS } from '@/utils/organizerProfile'
@@ -47,6 +48,8 @@ export default function ProfileCard({ onClose }) {
   const navigate = useNavigate()
   const { user, clearSession, updateUser } = useAuth()
   const { success, error: toastError } = useToast()
+  const theme = useThemeStore((s) => s.theme)
+  const setTheme = useThemeStore((s) => s.setTheme)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -388,6 +391,40 @@ export default function ProfileCard({ onClose }) {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Settings — Appearance (light/dark). Bootstrap applies the theme
+              globally when the store changes, so setTheme is all that's needed. */}
+          <div className="border-t border-v-border px-4 py-3">
+            <p className="mb-2 text-[10px] uppercase tracking-wider text-v-text-subtle">Appearance</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setTheme('light')}
+                aria-pressed={theme === 'light'}
+                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                  theme === 'light'
+                    ? 'border-v-primary bg-v-primary/10 text-v-primary'
+                    : 'border-v-border text-v-text-muted hover:bg-v-surface-elevated'
+                }`}
+              >
+                <Sun className="h-4 w-4" strokeWidth={1.5} />
+                Light
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme('dark')}
+                aria-pressed={theme === 'dark'}
+                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                  theme === 'dark'
+                    ? 'border-v-primary bg-v-primary/10 text-v-primary'
+                    : 'border-v-border text-v-text-muted hover:bg-v-surface-elevated'
+                }`}
+              >
+                <Moon className="h-4 w-4" strokeWidth={1.5} />
+                Dark
+              </button>
+            </div>
           </div>
         </div>
       </div>
