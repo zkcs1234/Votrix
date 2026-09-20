@@ -5,6 +5,7 @@ import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
 import { findUserByEmail, findUserById, sanitizeUser } from './user.service.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
+import { assertParticipantsEditable } from '../utils/eventLifecycle.js'
 import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './mailer.service.js'
 import { createNotification } from './notification.service.js'
 import { registerParticipant } from './participant.service.js'
@@ -59,6 +60,7 @@ async function ensureVoterAccount(email, plainPassword, resetPasswordForExisting
 export async function inviteVoterToEvent({ eventId, email, organizerId, temporaryPassword }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
+  assertParticipantsEditable(event)
 
   const tempPassword = temporaryPassword || generateTemporaryPassword()
   // Existing voters keep their own password — never reset. isNew decides which email to send.
@@ -164,6 +166,7 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
 export async function inviteRegisteredVoter({ eventId, email, organizerId }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
+  assertParticipantsEditable(event)
 
   // Find voter by email
   const voter = await findUserByEmail(email.toLowerCase().trim())
@@ -228,6 +231,7 @@ export async function inviteRegisteredVoter({ eventId, email, organizerId }) {
 export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
+  assertParticipantsEditable(event)
 
   const voter = await findUserById(voterId)
   if (!voter || voter.role !== USER_ROLES.VOTER) {
@@ -343,6 +347,7 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
 export async function registerVoterToEvent({ eventId, email, organizerId, temporaryPassword, resetPasswordForExisting = false }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
+  assertParticipantsEditable(event)
 
   // Check if voter already exists
   const existingVoter = await findUserByEmail(email.toLowerCase().trim())
@@ -429,6 +434,7 @@ export async function registerVoterToEvent({ eventId, email, organizerId, tempor
 export async function registerExistingVoter({ eventId, email, organizerId }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
+  assertParticipantsEditable(event)
 
   // Find voter by email
   const voter = await findUserByEmail(email.toLowerCase().trim())
@@ -493,6 +499,7 @@ export async function registerExistingVoter({ eventId, email, organizerId }) {
 export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
+  assertParticipantsEditable(event)
 
   const voter = await findUserById(voterId)
   if (!voter || voter.role !== USER_ROLES.VOTER) {
@@ -617,6 +624,7 @@ export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
 export async function sendAllPendingInvitations({ eventId, organizerId }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
+  assertParticipantsEditable(event)
 
   // Get all voters with pending invitations (enrolled but invitation_sent = false)
   const { data: pendingVoters, error: pendingError } = await getClient()

@@ -1,6 +1,6 @@
 import { useParams, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, CalendarDays, Users, BarChart3, MapPin,
+  LayoutDashboard, CalendarDays, Users, BarChart3, MapPin, Rocket,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
@@ -15,6 +15,7 @@ const navItems = [
   { section: 'Setup' },
   { label: 'Positions', path: 'positions', icon: MapPin, scoped: true, basePath: BASE },
   { label: 'Candidates', path: 'candidates', icon: Users, scoped: true, basePath: BASE },
+  { label: 'Review & Publish', path: 'review', icon: Rocket, scoped: true, basePath: BASE },
   { label: 'Voters', path: 'voters', icon: Users, scoped: true, basePath: BASE },
 
   { section: 'Results' },

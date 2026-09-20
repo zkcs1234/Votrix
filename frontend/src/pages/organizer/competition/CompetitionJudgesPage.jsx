@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { Check, X } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { Lock } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import Button from '@/components/ui/Button'
-import StageFooter from '@/components/ui/StageFooter'
 import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
 import JudgeAssignmentPanel from '@/components/organizer/competition/JudgeAssignmentPanel'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
+import { isParticipantsLocked } from '@/utils/constants'
 
 function downloadCsv(filename, headers, rows) {
   const csvContent = [
@@ -81,7 +81,6 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
 
 export default function CompetitionJudgesPage() {
   const { eventId } = useParams()
-  const navigate = useNavigate()
   const [judges, setJudges] = useState([])
   const [formSchema, setFormSchema] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -91,16 +90,18 @@ export default function CompetitionJudgesPage() {
   const [sendingId, setSendingId] = useState(null)
   const [csvPreview, setCsvPreview] = useState(null)
   const [importResult, setImportResult] = useState(null)
-  const [search, setSearch] = useState('')
   const [error, setError] = useState(null)
   const [foundation, setFoundation] = useState(null)
-  // Publish readiness: a competition still in `draft` (setup) is published here.
+  // Roster edit-lock: register/invite stay open while draft or scheduled, and
+  // lock once scoring is live (active). Publishing itself now happens on the
+  // Review & Publish step, not here.
   const [eventStatus, setEventStatus] = useState(null)
-  const [publishing, setPublishing] = useState(false)
   const fileInputRef = useRef(null)
 
   const { success, error: showError } = useToast()
   const showLoader = useDelayedLoading(loading, 300)
+
+  const rosterLocked = isParticipantsLocked(eventStatus)
 
   const load = useCallback(async () => {
     try {
@@ -156,28 +157,6 @@ export default function CompetitionJudgesPage() {
   }, [load, loadFoundation, loadStatus])
 
   const pendingCount = judges.filter((j) => !j.invitationSent && j.judgeId).length
-
-  // Publish the fully-built setup competition. This does NOT start scoring — it
-  // hands the event to the schedule; scoring goes live later from Live Control.
-  // Requires ≥1 contestant, ≥1 judge, ≥1 criterion (enforced again on backend).
-  const isSetup = eventStatus === 'draft'
-  const contestantsCount = foundation?.contestants?.length ?? 0
-  const criteriaCount = foundation?.criteria?.length ?? 0
-  const publishReady = contestantsCount > 0 && judges.length > 0 && criteriaCount > 0
-
-  const handlePublish = async () => {
-    if (!publishReady) return
-    setPublishing(true)
-    try {
-      await pageantService.publishEvent(eventId)
-      success('Event published. Start scoring anytime from Live Control.')
-      navigate(`/organizer/competition/events/${eventId}/live`)
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to publish event')
-    } finally {
-      setPublishing(false)
-    }
-  }
 
   const handleRegister = async (e) => {
     e.preventDefault()
@@ -271,6 +250,8 @@ export default function CompetitionJudgesPage() {
 
   // Render custom action buttons (send invitation)
   const renderActions = (participant, type) => {
+    // Once scoring is live the roster is locked — no more invites or resends.
+    if (rosterLocked) return null
     if (type === 'toolbar') {
       return pendingCount > 0 ? (
         <Button onClick={handleSendAll} loading={sendingAll} disabled={sendingAll}>
@@ -332,6 +313,20 @@ export default function CompetitionJudgesPage() {
         Judges are voter accounts with scoring access for this competition event.
       </p>
 
+      {rosterLocked && (
+        <div className="flex items-center gap-3 rounded-2xl border border-v-border bg-v-surface-elevated p-4">
+          <div className="rounded-full bg-v-text-subtle/10 p-1.5 text-v-text-muted">
+            <Lock className="h-5 w-5" strokeWidth={2} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-v-text">Roster locked — scoring is live</p>
+            <p className="text-xs text-v-text-muted mt-0.5">
+              You can no longer register or invite judges. The list below is read-only.
+            </p>
+          </div>
+        </div>
+      )}
+
       {csvPreview && (
         <CsvPreviewModal
           data={csvPreview}
@@ -341,6 +336,7 @@ export default function CompetitionJudgesPage() {
         />
       )}
 
+{!rosterLocked && (
 <div className="grid gap-6">
         <div className="v-card-sm">
           <h3 className="v-label">CSV Upload</h3>
@@ -397,6 +393,7 @@ export default function CompetitionJudgesPage() {
           </form>
         </div>
       </div>
+      )}
 
       {error && <p className="v-error-text">{error}</p>}
 
@@ -404,13 +401,12 @@ export default function CompetitionJudgesPage() {
         participants={judges}
         formSchema={formSchema}
         loading={loading}
-        search={search}
-        onSearchChange={setSearch}
         statusKey="hasScored"
         statusLabel={{ active: 'Pending', done: 'Submitted' }}
         renderActions={renderActions}
-        emptyMessage={search ? 'No judges found matching your search' : 'No judges yet'}
-        searchPlaceholder="Search judges by email"
+        emptyMessage="No judges yet"
+        searchPlaceholder="Search judges by email or details"
+        noun="judges"
         onExportCsv
         exportLabel="Export CSV"
       />
@@ -420,54 +416,6 @@ export default function CompetitionJudgesPage() {
       <div className="border-t border-v-border pt-6">
         <JudgeAssignmentPanel foundation={foundation} reload={loadFoundation} />
       </div>
-
-      {isSetup && (
-        <div className="v-card-sm">
-          <h3 className="v-label mb-1">Ready to publish?</h3>
-          <p className="v-helper-text mb-3">
-            Publishing finishes setup and hands the event to its schedule. It does not start scoring —
-            you start the live scoring session from Live Control when you are ready.
-          </p>
-          <ul className="space-y-1.5">
-            <ReadinessItem ok={contestantsCount > 0} label="At least one contestant" />
-            <ReadinessItem ok={judges.length > 0} label="At least one judge" />
-            <ReadinessItem ok={criteriaCount > 0} label="At least one criterion" />
-          </ul>
-        </div>
-      )}
-
-      {/* This page owns its footer in every state (the layout suppresses its
-          own for this stage). While the competition is a draft it publishes;
-          once published it acts as the normal stage-navigation footer. */}
-      <StageFooter
-        module="competition"
-        currentKey="judges"
-        eventId={eventId}
-        {...(isSetup
-          ? {
-              saving: publishing,
-              onNext: handlePublish,
-              nextLabel: 'Finish & Publish',
-              nextDisabled: !publishReady,
-            }
-          : {})}
-      />
     </div>
-  )
-}
-
-function ReadinessItem({ ok, label }) {
-  return (
-    <li className="flex items-center gap-2 text-sm">
-      <span
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-          ok ? 'bg-emerald-500 text-white' : 'bg-v-danger/15 text-v-danger'
-        }`}
-        aria-hidden
-      >
-        {ok ? <Check className="h-3 w-3" strokeWidth={3} /> : <X className="h-3 w-3" strokeWidth={3} />}
-      </span>
-      <span className={ok ? 'text-v-text' : 'text-v-text-subtle'}>{label}</span>
-    </li>
   )
 }

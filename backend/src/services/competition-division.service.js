@@ -1,6 +1,7 @@
 import { db as getClient } from '../foundation/db.js'
 import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
+import { assertSetupEditable } from '../utils/eventLifecycle.js'
 import { recordEventActivity } from '../foundation/activity.js'
 
 /**
@@ -48,7 +49,7 @@ async function assertCompetitionEvent(eventId) {
  * @throws {Error} If organizer doesn't own the event
  */
 async function assertEventOwnership(eventId, organizerId) {
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  return assertOrganizerOwnsEvent(eventId, organizerId)
 }
 
 /**
@@ -108,7 +109,7 @@ export async function getDivisionById(divisionId, eventId) {
  */
 export async function createDivision(eventId, organizerId, payload) {
   await assertCompetitionEvent(eventId)
-  await assertEventOwnership(eventId, organizerId)
+  assertSetupEditable(await assertEventOwnership(eventId, organizerId))
 
   const { name, description, displayOrder, isActive = true } = payload
 
@@ -151,7 +152,7 @@ export async function createDivision(eventId, organizerId, payload) {
  */
 export async function updateDivision(eventId, divisionId, organizerId, payload) {
   await assertCompetitionEvent(eventId)
-  await assertEventOwnership(eventId, organizerId)
+  assertSetupEditable(await assertEventOwnership(eventId, organizerId))
 
   const existing = await getDivisionById(divisionId, eventId)
   if (!existing) {
@@ -214,7 +215,7 @@ export async function updateDivision(eventId, divisionId, organizerId, payload) 
  */
 export async function deleteDivision(eventId, divisionId, organizerId) {
   await assertCompetitionEvent(eventId)
-  await assertEventOwnership(eventId, organizerId)
+  assertSetupEditable(await assertEventOwnership(eventId, organizerId))
 
   const existing = await getDivisionById(divisionId, eventId)
   if (!existing) {
@@ -274,7 +275,7 @@ export async function deleteDivision(eventId, divisionId, organizerId) {
  */
 export async function setDivisionsEnabled(eventId, organizerId, enabled) {
   await assertCompetitionEvent(eventId)
-  await assertEventOwnership(eventId, organizerId)
+  assertSetupEditable(await assertEventOwnership(eventId, organizerId))
 
   const { data: updated, error } = await getClient()
     .from(DB_TABLES.EVENTS)

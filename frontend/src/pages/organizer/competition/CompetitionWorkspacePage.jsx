@@ -9,6 +9,8 @@ import { getErrorMessage } from '@/utils/getErrorMessage'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import CriteriaManager from '@/components/organizer/competition/CriteriaManager'
+import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
+import useEventStatus from '@/hooks/useEventStatus'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 import { stagePath } from '@/utils/eventStages'
 
@@ -30,6 +32,7 @@ const WORKSPACE_TABS = ['rounds', 'criteria', 'divisions', 'scoring', 'structure
 export default function CompetitionWorkspacePage() {
   const { eventId } = useParams()
   const [searchParams] = useSearchParams()
+  const { status, setupLocked, loading: statusLoading } = useEventStatus(pageantService, eventId)
   const [foundation, setFoundation] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState(() => {
@@ -105,6 +108,10 @@ export default function CompetitionWorkspacePage() {
           ))}
         </div>
       </div>
+
+      {!statusLoading && setupLocked && (
+        <ReadOnlyEventBanner status={status} noun="competition" />
+      )}
 
       <TypeHint type={foundation?.event?.competition_type} />
       <SetupReadiness foundation={foundation} />

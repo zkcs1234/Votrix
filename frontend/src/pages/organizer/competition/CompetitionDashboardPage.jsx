@@ -1,11 +1,11 @@
 ﻿import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Zap, Users, Star, CheckSquare, UserCheck, Percent, Plus } from 'lucide-react'
+import { CalendarDays, Zap, Users, Star, CheckSquare, Plus } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import StatCard from '@/components/ui/StatCard'
-import Card from '@/components/ui/Card'
 import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
+import EventStatsTable from '@/components/organizer/EventStatsTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
@@ -77,44 +77,24 @@ export default function CompetitionDashboardPage() {
         }
       />
 
+      {/* Counts aggregate cleanly; judge completion is per-event below. */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Events" value={data?.stats?.totalEvents ?? 0} icon={CalendarDays} />
         <StatCard label="Active sessions" value={data?.stats?.activeSessions ?? 0} icon={Zap} />
         <StatCard label="Total contestants" value={data?.stats?.totalContestants ?? 0} icon={Users} />
-        <StatCard label="Total judges" value={data?.stats?.totalJudges ?? 0} icon={Star} />
+        <StatCard label="Total judges" value={data?.stats?.totalJudges ?? 0} hint="Across all events" icon={Star} />
         <StatCard label="Scores submitted" value={data?.stats?.scoresSubmitted ?? 0} icon={CheckSquare} />
-        <StatCard label="Completed judges" value={data?.stats?.completedJudges ?? 0} icon={UserCheck} />
-        <StatCard label="Judge completion" value={`${data?.stats?.judgeCompletionRate ?? 0}%`} icon={Percent} />
       </div>
 
-      <Card padding={false}>
-        <div className="border-b border-v-border px-6 py-4">
-          <h3 className="font-medium text-v-text">Recent Competition Scoring events</h3>
-        </div>
-        <ul className="divide-y divide-v-border">
-          {(data?.events ?? []).slice(0, 5).map((e) => (
-            <li key={e.id}>
-              <Link
-                to={`/organizer/competition/events/${e.id}/contestants`}
-                className="flex justify-between px-6 py-4 transition hover:bg-v-surface-elevated"
-              >
-                <span className="text-v-text-muted">{e.title}</span>
-                <span className={e.sessionStatus === 'active' ? 'text-v-success text-xs' : 'text-v-text-subtle text-xs'}>
-                  {e.sessionStatus === 'active' ? 'Live session active' : 
-                   e.sessionStatus === 'paused' ? 'Session paused' : 
-                   e.sessionStatus === 'completed' ? 'Session ended' : 
-                   e.status}
-                </span>
-              </Link>
-            </li>
-          ))}
-          {!data?.events?.length && (
-            <li className="rounded-lg border border-dashed border-v-border px-4 py-8 text-center text-sm text-v-text-subtle">
-              No competition scoring events available. Create your first event to begin.
-            </li>
-          )}
-        </ul>
-      </Card>
+      <EventStatsTable
+        title="Judge completion by event"
+        events={data?.eventBreakdown ?? []}
+        linkFor={(e) => `/organizer/competition/events/${e.id}/contestants`}
+        registeredLabel="Judges"
+        participatedLabel="Submitted"
+        rateLabel="Completion"
+        emptyMessage="No competition scoring events available. Create your first event to begin."
+      />
     </div>
   )
 }

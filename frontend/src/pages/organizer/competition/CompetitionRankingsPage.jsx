@@ -3,8 +3,10 @@ import { Link, useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import { competitionSessionService } from '@/services/competition-session.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import SearchInput from '@/components/ui/SearchInput'
 
 import { useSocketEvent } from '@/hooks/useSocketEvent'
+import useTableFilter from '@/hooks/useTableFilter'
 import { subscribeRoom } from '@/services/socket.service'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 
@@ -58,6 +60,18 @@ export default function CompetitionRankingsPage() {
     }
   }, [eventId, divisionId, load])
 
+  const {
+    search,
+    setSearch,
+    filtered: rankingRows,
+    resultCount,
+    totalCount,
+    hasActiveFilters,
+  } = useTableFilter({
+    rows: data?.rankings ?? [],
+    searchKeys: ['contestantName', (r) => r.contestantNumber],
+  })
+
   if (loading && !data) {
     return (
       <div className="flex justify-center py-20">
@@ -73,7 +87,13 @@ export default function CompetitionRankingsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-semibold text-v-text">Live rankings</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <SearchInput
+            placeholder="Search contestant"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-[200px]"
+          />
           {divisionsEnabled && divisions.length > 0 && (
             <select
               className={`${INPUT_CLASS} py-1.5 text-sm w-auto`}
@@ -102,10 +122,11 @@ export default function CompetitionRankingsPage() {
 
       <p className="text-sm text-v-text-subtle">
         Judges submitted: {data?.judges?.submitted ?? 0} / {data?.judges?.total ?? 0}
+        {hasActiveFilters && ` · Showing ${resultCount} of ${totalCount} contestants`}
       </p>
 
       <div className="space-y-4">
-        {(data?.rankings ?? []).map((r) => (
+        {rankingRows.map((r) => (
           <div
             key={r.contestantId}
             className="flex gap-4 rounded-2xl border border-v-border bg-v-surface p-5"
@@ -165,8 +186,10 @@ export default function CompetitionRankingsPage() {
             </div>
           </div>
         ))}
-        {!data?.rankings?.length && (
-          <p className="text-v-text-subtle">No contestants or scores yet.</p>
+        {!rankingRows.length && (
+          <p className="text-v-text-subtle">
+            {hasActiveFilters ? 'No contestants match your search.' : 'No contestants or scores yet.'}
+          </p>
         )}
       </div>
 

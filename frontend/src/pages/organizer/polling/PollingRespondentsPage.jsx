@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { Check, X } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { Lock } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
 import Button from '@/components/ui/Button'
-import StageFooter from '@/components/ui/StageFooter'
 import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
+import { isParticipantsLocked } from '@/utils/constants'
 
 function downloadCsv(filename, headers, rows) {
   const csvContent = [
@@ -80,7 +80,6 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
 
 export default function PollingRespondentsPage() {
   const { eventId } = useParams()
-  const navigate = useNavigate()
   const [voters, setVoters] = useState([])
   const [formSchema, setFormSchema] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -91,15 +90,16 @@ export default function PollingRespondentsPage() {
   const [registering, setRegistering] = useState(false)
   const [sendingAll, setSendingAll] = useState(false)
   const [sendingId, setSendingId] = useState(null)
-const [search, setSearch] = useState('')
-  // Publish readiness: a poll still in `draft` (setup) is published from here.
+  // Roster edit-lock: register/invite stay open while draft or scheduled, and
+  // lock once the poll opens (active). Publishing itself now happens on the
+  // Review & Publish step, not here.
   const [eventStatus, setEventStatus] = useState(null)
-  const [questionsCount, setQuestionsCount] = useState(0)
-  const [publishing, setPublishing] = useState(false)
   const fileInputRef = useRef(null)
 
   const { success, error: showError } = useToast()
   const showLoader = useDelayedLoading(loading, 300)
+
+  const rosterLocked = isParticipantsLocked(eventStatus)
 
   const load = useCallback(async () => {
     try {
@@ -116,45 +116,19 @@ const [search, setSearch] = useState('')
 
   useEffect(() => { load() }, [load])
 
-  // Load publish-readiness context: the poll's status and how many questions
-  // exist. Used to decide whether the "Finish & Publish" action shows and
-  // whether it is enabled.
-  const reloadSetup = useCallback(async () => {
+  // Load the poll's status so we know whether the roster is still editable.
+  const reloadStatus = useCallback(async () => {
     try {
-      const [{ data: settings }, { data: q }] = await Promise.all([
-        pollingService.getSettings(eventId),
-        pollingService.listQuestions(eventId),
-      ])
+      const { data: settings } = await pollingService.getSettings(eventId)
       setEventStatus(settings.settings?.status ?? null)
-      setQuestionsCount(Array.isArray(q.questions) ? q.questions.length : 0)
     } catch (err) {
-      console.error('Failed to load publish readiness:', err)
+      console.error('Failed to load poll status:', err)
     }
   }, [eventId])
 
-  useEffect(() => { reloadSetup() }, [reloadSetup])
+  useEffect(() => { reloadStatus() }, [reloadStatus])
 
   const pendingCount = voters.filter((v) => !v.invitationSent).length
-
-  // Publish the fully-built setup poll. This does NOT open the poll — it hands
-  // the event to the schedule; the poll opens/closes purely on the start/end
-  // dates. Requires ≥1 question and ≥1 respondent (enforced again on backend).
-  const isSetup = eventStatus === 'draft'
-  const publishReady = questionsCount > 0 && voters.length > 0
-
-  const handlePublish = async () => {
-    if (!publishReady) return
-    setPublishing(true)
-    try {
-      await pollingService.publishEvent(eventId)
-      success('Poll published. It will open based on its schedule.')
-      navigate('/organizer/polling/events')
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to publish poll')
-    } finally {
-      setPublishing(false)
-    }
-  }
 
   const handleRegister = async (e) => {
     e.preventDefault()
@@ -231,6 +205,8 @@ const handleCsvPreview = async (e) => {
 
   // Render custom action buttons (send invitation)
   const renderActions = (participant, type) => {
+    // Once the poll is open the roster is locked — no more invites or resends.
+    if (rosterLocked) return null
     if (type === 'toolbar') {
       return pendingCount > 0 ? (
         <Button onClick={handleSendAll} loading={sendingAll} disabled={sendingAll}>
@@ -291,6 +267,20 @@ const handleCsvPreview = async (e) => {
         Register people to respond to this poll. Invitation emails can be sent later.
       </p>
 
+      {rosterLocked && (
+        <div className="flex items-center gap-3 rounded-2xl border border-v-border bg-v-surface-elevated p-4">
+          <div className="rounded-full bg-v-text-subtle/10 p-1.5 text-v-text-muted">
+            <Lock className="h-5 w-5" strokeWidth={2} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-v-text">Roster locked — the poll is open</p>
+            <p className="text-xs text-v-text-muted mt-0.5">
+              You can no longer register or invite respondents. The list below is read-only.
+            </p>
+          </div>
+        </div>
+      )}
+
       {csvPreview && (
         <CsvPreviewModal
           data={csvPreview}
@@ -300,6 +290,7 @@ const handleCsvPreview = async (e) => {
         />
       )}
 
+{!rosterLocked && (
 <div className="grid gap-6">
         <div className="v-card-sm">
           <h3 className="v-label">CSV Upload</h3>
@@ -356,6 +347,7 @@ const handleCsvPreview = async (e) => {
           </form>
         </div>
       </div>
+      )}
 
       {error && <p className="v-error-text">{error}</p>}
 
@@ -363,64 +355,17 @@ const handleCsvPreview = async (e) => {
         participants={voters}
         formSchema={formSchema}
         loading={loading}
-        search={search}
-        onSearchChange={setSearch}
         statusKey="hasResponded"
         statusLabel={{ active: 'Pending', done: 'Responded' }}
         renderActions={renderActions}
-        emptyMessage={search ? 'No respondents found matching your search' : 'No respondents yet'}
-        searchPlaceholder="Search by email"
+        emptyMessage="No respondents yet"
+        searchPlaceholder="Search respondents by email or details"
+        noun="respondents"
         onExportCsv
         exportLabel="Export CSV"
       />
 
-      {isSetup && (
-        <div className="v-card-sm">
-          <h3 className="v-label mb-1">Ready to publish?</h3>
-          <p className="v-helper-text mb-3">
-            Publishing finishes setup and hands the poll to its schedule. It does not open the poll
-            immediately — it opens and closes based on the start and end dates you set.
-          </p>
-          <ul className="space-y-1.5">
-            <ReadinessItem ok={questionsCount > 0} label="At least one question" />
-            <ReadinessItem ok={voters.length > 0} label="At least one registered respondent" />
-          </ul>
-        </div>
-      )}
-
-      {/* This page owns its footer in every state (the layout suppresses its
-          own for this stage). While the poll is a draft it publishes; once
-          published it acts as the normal stage-navigation footer. */}
-      <StageFooter
-        module="polling"
-        currentKey="respondents"
-        eventId={eventId}
-        {...(isSetup
-          ? {
-              saving: publishing,
-              onNext: handlePublish,
-              nextLabel: 'Finish & Publish',
-              nextDisabled: !publishReady,
-            }
-          : {})}
-      />
     </div>
-  )
-}
-
-function ReadinessItem({ ok, label }) {
-  return (
-    <li className="flex items-center gap-2 text-sm">
-      <span
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-          ok ? 'bg-emerald-500 text-white' : 'bg-v-danger/15 text-v-danger'
-        }`}
-        aria-hidden
-      >
-        {ok ? <Check className="h-3 w-3" strokeWidth={3} /> : <X className="h-3 w-3" strokeWidth={3} />}
-      </span>
-      <span className={ok ? 'text-v-text' : 'text-v-text-subtle'}>{label}</span>
-    </li>
   )
 }
 

@@ -6,6 +6,10 @@ import { getErrorMessage } from '@/utils/getErrorMessage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
+import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
+import FilterBar from '@/components/ui/FilterBar'
+import useEventStatus from '@/hooks/useEventStatus'
+import useTableFilter from '@/hooks/useTableFilter'
 
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
@@ -13,6 +17,7 @@ const inputClass = INPUT_CLASS
 export default function CompetitionContestantsPage() {
   const { eventId } = useParams()
   const { success, error: toastError } = useToast()
+  const { status, setupLocked } = useEventStatus(pageantService, eventId)
   const [list, setList] = useState([])
   const [foundation, setFoundation] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -21,7 +26,6 @@ export default function CompetitionContestantsPage() {
   const [number, setNumber] = useState(1)
   const [numberHint, setNumberHint] = useState('')
   const [divisionId, setDivisionId] = useState('')
-  const [filterDivisionId, setFilterDivisionId] = useState('')
   const [editingContestant, setEditingContestant] = useState(null)
   const [photoFile, setPhotoFile] = useState(null)
   // Round-aware assignment: pick a round, toggle which contestants are in it.
@@ -46,6 +50,30 @@ export default function CompetitionContestantsPage() {
   const divisions = foundation?.divisions ?? []
   const rounds = foundation?.rounds ?? []
   const hasRounds = rounds.length > 0
+
+  // Search by name/number, and (when enabled) facet by division with counts.
+  const contestantDivisionName = (c) => {
+    const id = c.divisionId ?? c.division_id
+    return id ? (divisions.find((d) => d.id === id)?.name ?? null) : null
+  }
+  const {
+    search,
+    setSearch,
+    activeFilters,
+    setFilter,
+    clearFilters,
+    filtered: visibleList,
+    facets,
+    resultCount,
+    totalCount,
+    hasActiveFilters,
+  } = useTableFilter({
+    rows: list,
+    searchKeys: ['name', (c) => c.contestantNumber ?? c.contestant_number],
+    facetFields: divisionsEnabled
+      ? [{ id: 'division', label: 'Division', accessor: contestantDivisionName }]
+      : [],
+  })
 
   useEffect(() => {
     const rs = foundation?.rounds ?? []
@@ -185,10 +213,6 @@ export default function CompetitionContestantsPage() {
     refreshNextNumber(divisionId || null)
   }
 
-  const visibleList = filterDivisionId
-    ? list.filter((contestant) => (contestant.divisionId ?? contestant.division_id) === filterDivisionId)
-    : list
-
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -200,20 +224,10 @@ export default function CompetitionContestantsPage() {
   return (
     <ManagementWorkspace
       title="Contestants"
-      headerActions={
-        divisionsEnabled && divisions.length > 0 && (
-          <select
-            className={`${inputClass} w-auto`}
-            value={filterDivisionId}
-            onChange={(e) => setFilterDivisionId(e.target.value)}
-            aria-label="Filter contestants by division"
-          >
-            <option value="">All divisions</option>
-            {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        )
-      }
       formPanel={
+        setupLocked ? (
+          <ReadOnlyEventBanner status={status} noun="competition" />
+        ) : (
         <>
         {/* W1: divisions-before-contestants dependency, surfaced (not blocked). */}
         {divisionsEnabled && divisions.length === 0 && (
@@ -270,12 +284,29 @@ export default function CompetitionContestantsPage() {
         )}
       </form>
         </>
+        )
       }
       recordsPanel={
         <>
+        <div className="mb-4">
+          <FilterBar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search by name or number"
+            facetFields={divisionsEnabled ? [{ id: 'division', label: 'Division' }] : []}
+            facets={facets}
+            activeFilters={activeFilters}
+            onFilterChange={setFilter}
+            onClear={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+            resultCount={resultCount}
+            totalCount={totalCount}
+            noun="contestants"
+          />
+        </div>
         {/* Round-aware assignment: rounds are created in Structure & Scoring;
             here you assign which contestants compete in the selected round. */}
-        {hasRounds && (
+        {hasRounds && !setupLocked && (
           <div className="mb-4 rounded-lg border border-v-border bg-v-surface px-4 py-3">
             <p className="mb-1.5 text-[11px] uppercase tracking-wider text-v-text-muted">
               Assign contestants to round
@@ -308,7 +339,7 @@ export default function CompetitionContestantsPage() {
                 onClick={() => bulkRound('add')}
                 className="rounded-lg border border-v-border px-2.5 py-1 text-xs font-medium text-v-text-muted hover:bg-v-primary/10 hover:text-v-primary disabled:opacity-50"
               >
-                {roundBusy === 'bulk' ? 'Working…' : `Add all ${filterDivisionId ? 'shown' : ''} to ${selectedRound?.name ?? 'round'}`}
+                {roundBusy === 'bulk' ? 'Working…' : `Add all ${hasActiveFilters ? 'shown' : ''} to ${selectedRound?.name ?? 'round'}`}
               </button>
               <button
                 type="button"
@@ -346,7 +377,7 @@ export default function CompetitionContestantsPage() {
                   </span>
                 )}
               </div>
-              {hasRounds && (
+              {hasRounds && !setupLocked && (
                 <div className="mt-3">
                   <button
                     type="button"
@@ -366,6 +397,7 @@ export default function CompetitionContestantsPage() {
                   </button>
                 </div>
               )}
+              {!setupLocked && (
               <div className="mt-auto flex gap-3 pt-3 text-sm">
                 <button type="button" className="text-v-primary" onClick={() => startEditing(c)}>Edit</button>
                 <button
@@ -389,10 +421,15 @@ export default function CompetitionContestantsPage() {
                   Delete
                 </button>
               </div>
+              )}
             </div>
           )
         })}
-        {!visibleList.length && <p className="text-sm text-v-text-subtle">No contestants match this division.</p>}
+        {!visibleList.length && (
+          <p className="text-sm text-v-text-subtle">
+            {hasActiveFilters ? 'No contestants match your search.' : 'No contestants yet.'}
+          </p>
+        )}
         </div>
         </>
       }

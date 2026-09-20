@@ -63,6 +63,11 @@ export const publishEvent = asyncHandler(async (req, res) => {
   res.json({ success: true, event })
 })
 
+export const unpublishEvent = asyncHandler(async (req, res) => {
+  const event = await pageantService.unpublishCompetitionEvent(req.params.eventId, req.user.id)
+  res.json({ success: true, event })
+})
+
 export const uploadBanner = asyncHandler(async (req, res) => {
   const result = await uploadImageFile(req.file, UPLOAD_KIND.BANNER, `competition-${req.params.eventId}`)
   const event = await pageantService.updateCompetitionEvent(req.params.eventId, req.user.id, {

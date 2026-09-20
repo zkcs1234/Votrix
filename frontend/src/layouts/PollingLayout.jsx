@@ -1,6 +1,6 @@
 import { useParams, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, CalendarDays, PenSquare, Settings2, Users, BarChart3,
+  LayoutDashboard, CalendarDays, PenSquare, Settings2, Users, BarChart3, Rocket,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
@@ -15,6 +15,7 @@ const navItems = [
   { section: 'Setup' },
   { label: 'Builder', path: 'builder', icon: PenSquare, scoped: true, basePath: BASE },
   { label: 'Settings', path: 'settings', icon: Settings2, scoped: true, basePath: BASE },
+  { label: 'Review & Publish', path: 'review', icon: Rocket, scoped: true, basePath: BASE },
   { label: 'Respondents', path: 'respondents', icon: Users, scoped: true, basePath: BASE },
 
   { section: 'Results' },

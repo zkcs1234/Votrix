@@ -141,7 +141,7 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total organizers" value={stats?.totalOrganizers ?? 0} icon={Users} />
         <StatCard label="Total events" value={stats?.totalEvents ?? 0} icon={CalendarDays} />
-        <StatCard label="Total voters" value={stats?.totalVoters ?? 0} icon={UserCheck} />
+        <StatCard label="Voter accounts" value={stats?.totalVoters ?? 0} hint="Voters, judges & respondents" icon={UserCheck} />
         <StatCard label="Active events" value={stats?.activeEvents ?? 0} icon={Zap} />
         <StatCard label="Votes cast" value={stats?.totalVotesCast ?? 0} icon={CheckSquare} />
       </div>

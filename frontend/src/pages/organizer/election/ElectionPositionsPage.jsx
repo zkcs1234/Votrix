@@ -4,6 +4,8 @@ import { electionService } from '@/services/election.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/hooks/useToast'
 import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
+import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
+import useEventStatus from '@/hooks/useEventStatus'
 
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
@@ -20,6 +22,7 @@ export default function ElectionPositionsPage() {
   const [displayOrder, setDisplayOrder] = useState('')
   const [saving, setSaving] = useState(false)
   const { success: showSuccess, error: showError } = useToast()
+  const { status, setupLocked } = useEventStatus(electionService, eventId)
 
   const load = () => {
     electionService
@@ -101,6 +104,9 @@ export default function ElectionPositionsPage() {
     <ManagementWorkspace
       title="Position Builder"
       formPanel={
+        setupLocked ? (
+          <ReadOnlyEventBanner status={status} noun="election" />
+        ) : (
         <form
           onSubmit={handleCreate}
           className="grid gap-4 v-card p-6 sm:grid-cols-2 mb-4"
@@ -169,6 +175,7 @@ export default function ElectionPositionsPage() {
           {saving ? 'Adding...' : 'Add position'}
         </button>
       </form>
+        )
       }
       recordsPanel={
         <ul className="space-y-3 pb-8">
@@ -189,6 +196,7 @@ export default function ElectionPositionsPage() {
                 Winners: {p.numberOfWinners ?? 1} · Vote up to {p.maxVote}
               </p>
             </div>
+            {!setupLocked && (
             <div className="flex shrink-0 items-center gap-2">
               <button
                 type="button"
@@ -214,6 +222,7 @@ export default function ElectionPositionsPage() {
                 Delete
               </button>
             </div>
+            )}
           </li>
         ))}
       </ul>

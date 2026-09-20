@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BarChart2, Zap, Send, Users, UserCheck, Percent, Plus } from 'lucide-react'
+import { BarChart2, Zap, Send, Plus } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
 import StatCard from '@/components/ui/StatCard'
-import Card from '@/components/ui/Card'
 import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
+import EventStatsTable from '@/components/organizer/EventStatsTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
@@ -62,40 +62,22 @@ export default function PollingDashboardPage() {
         }
       />
 
+      {/* Counts aggregate cleanly; participation is per-poll below. */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard label="Total polls" value={data?.stats?.totalPolls ?? 0} icon={BarChart2} />
         <StatCard label="Active polls" value={data?.stats?.activePolls ?? 0} icon={Zap} />
         <StatCard label="Responses submitted" value={data?.stats?.responsesSubmitted ?? 0} icon={Send} />
-        <StatCard label="Assigned users" value={data?.stats?.assignedUsers ?? 0} icon={Users} />
-        <StatCard label="Responded users" value={data?.stats?.respondedUsers ?? 0} icon={UserCheck} />
-        <StatCard label="Participation rate" value={`${data?.stats?.participationRate ?? 0}%`} icon={Percent} />
       </div>
 
-      <Card padding={false}>
-        <div className="border-b border-v-border px-6 py-4">
-          <h3 className="font-semibold text-v-text">Recent polls</h3>
-        </div>
-        <ul className="divide-y divide-v-border">
-          {(data?.events ?? []).slice(0, 5).map((e) => (
-            <li key={e.id}>
-              <Link
-                to={`/organizer/polling/events/${e.id}/builder`}
-                className="flex justify-between px-6 py-4 transition hover:bg-v-surface-elevated"
-              >
-                <span className="text-v-text-muted">{e.title}</span>
-                <span className="text-xs text-v-text-subtle">
-                  {e.pollingEnabled ? 'Open' : 'Closed'}
-                </span>
-              </Link>
-            </li>
-          ))}
-          {!data?.events?.length && (
-            <li className="rounded-lg border border-dashed border-v-border px-4 py-8 text-center text-sm text-v-text-subtle">
-              No events available. Create your first event to begin.
-            </li>
-          )}
-        </ul>
-      </Card>
+      <EventStatsTable
+        title="Participation by poll"
+        events={data?.eventBreakdown ?? []}
+        linkFor={(e) => `/organizer/polling/events/${e.id}/builder`}
+        registeredLabel="Respondents"
+        participatedLabel="Responded"
+        rateLabel="Participation"
+        emptyMessage="No events available. Create your first event to begin."
+      />
     </div>
   )
 }

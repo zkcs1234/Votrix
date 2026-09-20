@@ -41,6 +41,11 @@ export const pageantService = {
     return api.post(`${org}/events/${eventId}/publish`)
   },
 
+  // Pull a published (scheduled) competition back to draft so setup can be corrected.
+  unpublishEvent(eventId) {
+    return api.post(`${org}/events/${eventId}/unpublish`)
+  },
+
   uploadBanner(eventId, file) {
     const form = new FormData()
     form.append('banner', file)

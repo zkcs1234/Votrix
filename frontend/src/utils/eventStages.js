@@ -5,6 +5,9 @@ export const EVENT_STAGES = {
     { key: 'information-form', label: 'Information Form', path: 'form' },
     { key: 'positions', label: 'Positions', path: 'positions' },
     { key: 'candidates', label: 'Candidates', path: 'candidates' },
+    // Publishing happens here, before the roster. Setup (the stages above)
+    // locks on publish; Voters stays editable through `scheduled`.
+    { key: 'review', label: 'Review & Publish', path: 'review' },
     { key: 'voters', label: 'Voters', path: 'voters' },
     { key: 'analytics', label: 'Analytics', path: 'analytics' },
     { key: 'report', label: 'Report', path: null },
@@ -22,6 +25,9 @@ export const EVENT_STAGES = {
     { key: 'workspace', label: 'Structure & Scoring', path: 'workspace' },
     { key: 'contestants', label: 'Contestants', path: 'contestants' },
     { key: 'judges', label: 'Judges', path: 'judges' },
+    // Publishing happens here, before scoring goes live. Setup (structure,
+    // contestants) locks on publish; Judges stays editable through `scheduled`.
+    { key: 'review', label: 'Review & Publish', path: 'review' },
     // Run
     { key: 'live', label: 'Live Control', path: 'live' },
     // Results
@@ -35,6 +41,9 @@ export const EVENT_STAGES = {
     { key: 'settings', label: 'Settings', path: 'settings' },
     { key: 'information-form', label: 'Information Form', path: 'form' },
     { key: 'builder', label: 'Builder', path: 'builder' },
+    // Publishing happens here, before the roster. Setup (settings, builder)
+    // locks on publish; Respondents stays editable through `scheduled`.
+    { key: 'review', label: 'Review & Publish', path: 'review' },
     { key: 'respondents', label: 'Respondents', path: 'respondents' },
     { key: 'analytics', label: 'Analytics', path: 'analytics' },
     { key: 'report', label: 'Report', path: null },

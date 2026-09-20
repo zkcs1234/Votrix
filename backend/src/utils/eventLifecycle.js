@@ -21,3 +21,49 @@ export function assertEventUpdateAllowed(event, updates = {}) {
 
   throw new ApiError(400, 'This event cannot be edited because it is already active, completed, or cancelled')
 }
+
+// Staged edit-locking (see SYSTEM_ENHANCEMENTS_IMPLEMENTATION_PLAN.md, Point 1).
+// Setup content is editable only while the event is a `draft`; publishing locks
+// it (the organizer unpublishes back to draft to correct it). Participant
+// rosters stay editable through `scheduled` and lock once `active`.
+const SETUP_EDITABLE_STATUSES = new Set([EVENT_STATUS.DRAFT])
+const PARTICIPANTS_EDITABLE_STATUSES = new Set([
+  EVENT_STATUS.DRAFT,
+  EVENT_STATUS.SCHEDULED,
+])
+
+export function isSetupLocked(status) {
+  return !SETUP_EDITABLE_STATUSES.has(status)
+}
+
+export function isParticipantsLocked(status) {
+  return !PARTICIPANTS_EDITABLE_STATUSES.has(status)
+}
+
+export function canUnpublishEventStatus(status) {
+  return status === EVENT_STATUS.SCHEDULED
+}
+
+// Guard for setup mutations (positions, candidates, structure, questions,
+// details, branding, information form). Throws 409 once the event is published.
+export function assertSetupEditable(event) {
+  if (!event) return
+  if (isSetupLocked(event.status)) {
+    throw new ApiError(
+      409,
+      'This event is published. Unpublish it back to draft before editing its setup.',
+    )
+  }
+}
+
+// Guard for participant-roster mutations (register / invite / import / resend).
+// Throws 409 once voting or scoring is open.
+export function assertParticipantsEditable(event) {
+  if (!event) return
+  if (isParticipantsLocked(event.status)) {
+    throw new ApiError(
+      409,
+      'This event is active — the participant roster is locked and can no longer be changed.',
+    )
+  }
+}

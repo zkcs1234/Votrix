@@ -1,42 +1,48 @@
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
-import SearchInput from '@/components/ui/SearchInput'
+import FilterBar from '@/components/ui/FilterBar'
+import useTableFilter from '@/hooks/useTableFilter'
+
+// Read a participant's value for a schema field, trying label (legacy) then id.
+function readField(participant, field) {
+  const meta = participant.metadata || {}
+  return meta[field.label] ?? meta[field.id]
+}
 
 /**
  * DynamicParticipantTable
  *
- * A reusable table component for displaying event participants (voters, judges, respondents)
- * with dynamically rendered columns based on the event's information_form_schema.
+ * A reusable table for event participants (voters, judges, respondents) with
+ * columns derived from the event's information_form_schema. Search matches the
+ * email and every metadata column, and each dropdown/text field becomes a facet
+ * filter with live counts (answers "how many voters are BSCS?").
  *
  * Props:
  *   participants       - Array of participant objects (each with .email, .metadata, etc.)
  *   formSchema         - Object { enabled, fields } from the event's information_form_schema
  *   loading            - Boolean for skeleton state
- *   search             - Current search string (controlled)
- *   onSearchChange     - (value) => void
- *   onExportCsv        - () => void (optional)
+ *   onExportCsv        - truthy to show the export button
  *   exportLabel        - String for export button (default "Export CSV")
  *   statusKey          - Key in participant for status display: "hasVoted" | "hasScored" | "hasResponded"
  *   statusLabel        - { active: string, done: string } e.g. { active: "Pending", done: "Voted" }
- *   renderActions      - (participant) => JSX | null — custom action column content
- *   emptyMessage       - String when no participants match
+ *   renderActions      - (participant, 'row' | 'toolbar') => JSX | null — custom action content
+ *   emptyMessage       - String when there are no participants at all
  *   searchPlaceholder  - String for search input
- *   tableLabel         - String for table heading (optional)
+ *   noun               - Plural label for the "Showing X of Y" summary (default "participants")
  *   invitationKey      - Key in participant for invitation: "invitationSent" (default)
  */
 export default function DynamicParticipantTable({
   participants = [],
   formSchema = null,
   loading = false,
-  search = '',
-  onSearchChange,
   onExportCsv,
   exportLabel = 'Export CSV',
   statusKey = 'hasVoted',
   statusLabel = { active: 'Pending', done: 'Completed' },
   renderActions,
-  emptyMessage = 'No participants found',
-  searchPlaceholder = 'Search by email',
+  emptyMessage = 'No participants yet',
+  searchPlaceholder = 'Search by email or details',
+  noun = 'participants',
   invitationKey = 'invitationSent',
 }) {
   const [showSkeleton, setShowSkeleton] = useState(false)
@@ -44,10 +50,26 @@ export default function DynamicParticipantTable({
   // Derive dynamic columns from the form schema
   const customFields = formSchema?.enabled ? (Array.isArray(formSchema.fields) ? formSchema.fields : []) : []
 
-  // Filter by search
-  const filtered = participants.filter((p) =>
-    p.email?.toLowerCase().includes(search.toLowerCase()),
-  )
+  // Search matches email + every metadata value; each custom field is a facet.
+  const searchKeys = ['email', ...customFields.map((f) => (p) => readField(p, f))]
+  const facetFields = customFields.map((f) => ({
+    id: f.id,
+    label: f.label,
+    accessor: (p) => readField(p, f),
+  }))
+
+  const {
+    search,
+    setSearch,
+    activeFilters,
+    setFilter,
+    clearFilters,
+    filtered,
+    facets,
+    resultCount,
+    totalCount,
+    hasActiveFilters,
+  } = useTableFilter({ rows: participants, searchKeys, facetFields })
 
   // ─── Skeleton ────────────────────────────────────────────────────────────
   if (loading) {
@@ -86,11 +108,9 @@ export default function DynamicParticipantTable({
     return 'active'
   }
 
-  // ─── Get dynamic field value ─────────────────────────────────────────────
+  // ─── Get dynamic field value (for display) ───────────────────────────────
   function getFieldValue(participant, field) {
-    const meta = participant.metadata || {}
-    // Try by label (legacy) then by field id (current schema)
-    return meta[field.label] ?? meta[field.id] ?? '-'
+    return readField(participant, field) ?? '-'
   }
 
   // ─── Export CSV ──────────────────────────────────────────────────────────
@@ -104,25 +124,33 @@ export default function DynamicParticipantTable({
     downloadCsv(`participants.csv`, headers, rows)
   }
 
+  const noMatches = filtered.length === 0
+
   return (
     <div className="v-table-wrap">
       {/* Toolbar */}
-      <div className="p-4 border-b border-v-border flex flex-wrap gap-3 justify-between items-center">
-        <div className="flex flex-wrap items-center gap-3">
-          {onSearchChange && (
-            <SearchInput
-              placeholder={searchPlaceholder}
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="max-w-xs"
-            />
-          )}
-          {onExportCsv && filtered.length > 0 && (
-            <Button variant="secondary" size="sm" onClick={handleExportCsv}>
-              {exportLabel}
-            </Button>
-          )}
-        </div>
+      <div className="p-4 border-b border-v-border flex flex-wrap gap-3 justify-between items-start">
+        <FilterBar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder={searchPlaceholder}
+          facetFields={facetFields}
+          facets={facets}
+          activeFilters={activeFilters}
+          onFilterChange={setFilter}
+          onClear={clearFilters}
+          hasActiveFilters={hasActiveFilters}
+          resultCount={resultCount}
+          totalCount={totalCount}
+          noun={noun}
+          actions={
+            onExportCsv && filtered.length > 0 ? (
+              <Button variant="secondary" size="sm" onClick={handleExportCsv}>
+                {exportLabel}
+              </Button>
+            ) : null
+          }
+        />
         {renderActions && renderActions(participants, 'toolbar')}
       </div>
 
@@ -140,10 +168,10 @@ export default function DynamicParticipantTable({
           </tr>
         </thead>
         <tbody>
-          {filtered.length === 0 ? (
+          {noMatches ? (
             <tr>
               <td colSpan={customFields.length + 4} className="text-center v-caption py-8">
-                {emptyMessage}
+                {hasActiveFilters ? `No ${noun} match your search` : emptyMessage}
               </td>
             </tr>
           ) : (

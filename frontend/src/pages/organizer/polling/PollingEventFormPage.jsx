@@ -22,7 +22,7 @@ import useSilentDraftAutosave from '@/hooks/useSilentDraftAutosave'
 import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
-import { isReadOnlyEventStatus } from '@/utils/constants'
+import { isSetupLocked } from '@/utils/constants'
 
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 
@@ -54,7 +54,7 @@ const { eventId } = useParams()
   const [infoFormLoading, setInfoFormLoading] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
   const [eventStatus, setEventStatus] = useState(null)
-  const readOnly = isReadOnlyEventStatus(eventStatus)
+  const readOnly = isSetupLocked(eventStatus)
 
   const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'polling',

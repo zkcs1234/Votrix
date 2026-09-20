@@ -2,6 +2,7 @@ import { Readable } from 'stream'
 import csv from 'csv-parser'
 import { ApiError } from '../utils/ApiError.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
+import { assertParticipantsEditable } from '../utils/eventLifecycle.js'
 import { inviteJudge, registerJudge } from './pageant.service.js'
 
 function parseCsvBuffer(buffer) {
@@ -37,7 +38,7 @@ export async function importJudgesFromCsv(eventId, organizerId, fileBuffer) {
     throw new ApiError(400, 'Invalid file data')
   }
 
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  assertParticipantsEditable(await assertOrganizerOwnsEvent(eventId, organizerId))
 
   const rawRows = await parseCsvBuffer(fileBuffer)
   if (!rawRows.length) throw new ApiError(400, 'CSV file is empty')

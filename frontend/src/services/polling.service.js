@@ -36,9 +36,22 @@ export const pollingService = {
     return api.get(`${org}/events/${eventId}/settings`)
   },
 
+  // Normalized event accessor so shared hooks (useEventStatus) can read the
+  // poll's status via the same `{ data: { event } }` shape as other modules.
+  getEvent(eventId) {
+    return api
+      .get(`${org}/events/${eventId}/settings`)
+      .then((res) => ({ ...res, data: { ...res.data, event: res.data.settings } }))
+  },
+
   // Publish a fully-built setup (draft) poll: releases it to the schedule.
   publishEvent(eventId) {
     return api.post(`${org}/events/${eventId}/publish`)
+  },
+
+  // Pull a published (scheduled) poll back to draft so setup can be corrected.
+  unpublishEvent(eventId) {
+    return api.post(`${org}/events/${eventId}/unpublish`)
   },
 
   listQuestions(eventId) {

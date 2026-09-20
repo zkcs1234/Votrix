@@ -289,6 +289,14 @@ export const publishEvent = asyncHandler(async (req, res) => {
   res.json({ success: true, event })
 })
 
+export const unpublishEvent = asyncHandler(async (req, res) => {
+  const event = await electionService.unpublishElectionEvent(
+    req.params.eventId,
+    req.user.id,
+  )
+  res.json({ success: true, event })
+})
+
 // ——— Participant Information Form ———
 
 export const getInformationForm = asyncHandler(async (req, res) => {

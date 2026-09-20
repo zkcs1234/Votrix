@@ -47,6 +47,37 @@ export function isReadOnlyEventStatus(status) {
   return READ_ONLY_EVENT_STATUSES.has(status)
 }
 
+// Staged edit-locking (see SYSTEM_ENHANCEMENTS_IMPLEMENTATION_PLAN.md, Point 1).
+//
+// Setup — event details, branding, information form, positions/candidates,
+// competition structure, poll questions — is editable only while the event is
+// a `draft`. Publishing (draft → scheduled) locks setup; the organizer can
+// `unpublish` back to draft while still `scheduled` to make corrections.
+//
+// Participants — the registered/invited voters, judges, or respondents — stay
+// editable through `scheduled` so the organizer can invite in batches within
+// email resend limits. They lock once the event is `active` (voting/scoring is
+// open) and stay locked in the terminal states.
+const SETUP_EDITABLE_STATUSES = new Set([EVENT_STATUS.DRAFT])
+const PARTICIPANTS_EDITABLE_STATUSES = new Set([
+  EVENT_STATUS.DRAFT,
+  EVENT_STATUS.SCHEDULED,
+])
+
+export function isSetupLocked(status) {
+  return !SETUP_EDITABLE_STATUSES.has(status)
+}
+
+export function isParticipantsLocked(status) {
+  return !PARTICIPANTS_EDITABLE_STATUSES.has(status)
+}
+
+// An event can be pulled back to `draft` only while it is `scheduled` (published
+// but not yet started). Once `active` the schedule owns it and it is one-way.
+export function canUnpublishEventStatus(status) {
+  return status === EVENT_STATUS.SCHEDULED
+}
+
 export const EVENT_TYPES = {
   ELECTION: 'election',
   PAGEANT: 'pageant',

@@ -1,17 +1,20 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import { SkeletonGrid } from '@/components/ui/Skeleton'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import SearchInput from '@/components/ui/SearchInput'
+import FilterBar from '@/components/ui/FilterBar'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
+import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
+import useEventStatus from '@/hooks/useEventStatus'
+import useTableFilter from '@/hooks/useTableFilter'
 
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
 
-function CandidateCard({ candidate, positionName, onDelete }) {
+function CandidateCard({ candidate, positionName, onDelete, canDelete = true }) {
   const [deleting, setDeleting] = useState(false)
 
   const handleDelete = async () => {
@@ -49,14 +52,16 @@ function CandidateCard({ candidate, positionName, onDelete }) {
           <span className="font-medium text-v-text-muted">Platform:</span> {candidate.platform}
         </p>
       )}
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={deleting}
-        className="mt-3 text-sm text-v-danger disabled:opacity-50"
-      >
-        {deleting ? 'Deleting...' : 'Delete'}
-      </button>
+      {canDelete && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting}
+          className="mt-3 text-sm text-v-danger disabled:opacity-50"
+        >
+          {deleting ? 'Deleting...' : 'Delete'}
+        </button>
+      )}
     </div>
   )
 }
@@ -92,9 +97,26 @@ function ElectionCandidatesPageContent() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [photoFile, setPhotoFile] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [search, setSearch] = useState('')
-  const [filterPositionId, setFilterPositionId] = useState('')
   const { success: showSuccess, error: showError } = useToast()
+  const { status, setupLocked } = useEventStatus(electionService, eventId)
+
+  const positionNameOf = (c) => positions.find((p) => p.id === c.positionId)?.name ?? ''
+  const {
+    search,
+    setSearch,
+    activeFilters,
+    setFilter,
+    clearFilters,
+    filtered: filteredCandidates,
+    facets,
+    resultCount,
+    totalCount,
+    hasActiveFilters,
+  } = useTableFilter({
+    rows: candidates,
+    searchKeys: ['name', (c) => c.party ?? c.partylist, positionNameOf],
+    facetFields: [{ id: 'position', label: 'Position', accessor: positionNameOf }],
+  })
 
   const showLoader = useDelayedLoading(loading, 300)
 
@@ -120,28 +142,6 @@ function ElectionCandidatesPageContent() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
-
-  // Client-side search & position filter
-  const filteredCandidates = useMemo(() => {
-    return candidates.filter((c) => {
-      // Position filter
-      if (filterPositionId && c.positionId !== filterPositionId) return false
-      // Search text filter
-      if (search) {
-        const q = search.toLowerCase()
-        const positionName = positions.find((p) => p.id === c.positionId)?.name ?? ''
-        const party = (c.party ?? c.partylist ?? '').toLowerCase()
-        if (
-          !c.name.toLowerCase().includes(q) &&
-          !party.includes(q) &&
-          !positionName.toLowerCase().includes(q)
-        ) {
-          return false
-        }
-      }
-      return true
-    })
-  }, [candidates, search, filterPositionId, positions])
 
   // Optimistic UI - add candidate immediately
   const handleCreate = async (e) => {
@@ -216,6 +216,9 @@ function ElectionCandidatesPageContent() {
     <ManagementWorkspace
       title="Candidate Management"
       formPanel={
+        setupLocked ? (
+          <ReadOnlyEventBanner status={status} noun="election" />
+        ) : (
         <form onSubmit={handleCreate} className="space-y-4 v-card p-6 mb-4">
         <div>
           <label className="mb-1 block text-sm text-v-text-muted">Position</label>
@@ -282,34 +285,25 @@ function ElectionCandidatesPageContent() {
           {saving ? 'Adding...' : 'Add candidate'}
         </button>
       </form>
+        )
       }
       recordsPanel={
         <div className="space-y-4 pb-8">
           {/* Search & filter bar */}
-          <div className="flex flex-wrap items-center gap-3">
-            <SearchInput
-              placeholder="Search candidates by name, party, or position…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 min-w-[200px]"
-            />
-            <select
-              className={`${inputClass} w-auto`}
-              value={filterPositionId}
-              onChange={(e) => setFilterPositionId(e.target.value)}
-              aria-label="Filter by position"
-            >
-              <option value="">All positions</option>
-              {positions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            <span className="text-sm text-v-text-subtle whitespace-nowrap">
-              {filteredCandidates.length} of {candidates.length} candidates
-            </span>
-          </div>
+          <FilterBar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search candidates by name, party, or position…"
+            facetFields={[{ id: 'position', label: 'Position' }]}
+            facets={facets}
+            activeFilters={activeFilters}
+            onFilterChange={setFilter}
+            onClear={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+            resultCount={resultCount}
+            totalCount={totalCount}
+            noun="candidates"
+          />
 
           <div className="grid gap-4 sm:grid-cols-2">
             {filteredCandidates.map((c) => (
@@ -318,13 +312,14 @@ function ElectionCandidatesPageContent() {
                 candidate={c}
                 positionName={positionName(c.positionId)}
                 onDelete={handleDelete}
+                canDelete={!setupLocked}
               />
             ))}
           </div>
 
           {!filteredCandidates.length && (
             <p className="text-center text-v-text-subtle">
-              {search || filterPositionId ? 'No candidates match your filters.' : 'No candidates yet.'}
+              {hasActiveFilters ? 'No candidates match your filters.' : 'No candidates yet.'}
             </p>
           )}
         </div>

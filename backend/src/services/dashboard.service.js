@@ -348,7 +348,9 @@ export async function getOrganizerDashboardStats(organizerId) {
   ])
 
   const [
-    totalAssigned,
+    assignedVoters,
+    assignedJudges,
+    assignedRespondents,
     electionVotes,
     judgeScores,
     pollAnswers,
@@ -356,9 +358,33 @@ export async function getOrganizerDashboardStats(organizerId) {
     submittedJudges,
     respondedPoll,
   ] = await Promise.all([
-    events.length
+    // Registered participants counted BY TYPE and scoped to the matching event
+    // type — no more blending voters, judges, and respondents into one number.
+    electionEventIds.length
       ? countRows(
-          getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('*', { count: 'exact', head: true }).in('event_id', events.map((e) => e.id)),
+          getClient()
+            .from(DB_TABLES.EVENT_PARTICIPANTS)
+            .select('*', { count: 'exact', head: true })
+            .in('event_id', electionEventIds)
+            .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
+        )
+      : Promise.resolve(0),
+    competitionEventIds.length
+      ? countRows(
+          getClient()
+            .from(DB_TABLES.EVENT_PARTICIPANTS)
+            .select('*', { count: 'exact', head: true })
+            .in('event_id', competitionEventIds)
+            .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
+        )
+      : Promise.resolve(0),
+    pollingEventIds.length
+      ? countRows(
+          getClient()
+            .from(DB_TABLES.EVENT_PARTICIPANTS)
+            .select('*', { count: 'exact', head: true })
+            .in('event_id', pollingEventIds)
+            .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT),
         )
       : Promise.resolve(0),
     electionEventIds.length
@@ -434,7 +460,10 @@ return {
       totalElectionEvents: electionEventIds.length,
       totalPageantEvents: competitionEventIds.length,
       totalPollingEvents: pollingEventIds.length,
-      totalAssignedVoters: totalAssigned,
+      // Type-scoped registered participant counts (no cross-type blend).
+      assignedVoters,
+      assignedJudges,
+      assignedRespondents,
       totalVotesCast: electionVotes + judgeScores + pollAnswers,
       electionParticipants: votedElection,
       pageantParticipants: submittedJudges,

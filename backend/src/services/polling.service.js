@@ -29,7 +29,12 @@ import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './
 import { createNotification } from './notification.service.js'
 import { USER_ROLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
-import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
+import {
+  assertEventUpdateAllowed,
+  assertSetupEditable,
+  assertParticipantsEditable,
+  canUnpublishEventStatus,
+} from '../utils/eventLifecycle.js'
 import { deleteDraft } from './draft.service.js'
 import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
 import { recordEventActivity } from '../foundation/activity.js'
@@ -237,7 +242,7 @@ export async function listEventRespondents(eventId, organizerId, page = 1, limit
 }
 
 export async function registerRespondentToPoll({ eventId, email, organizerId, temporaryPassword, resetPasswordForExisting = false }) {
-  await assertPollingEvent(eventId, organizerId)
+  assertParticipantsEditable(await assertPollingEvent(eventId, organizerId))
 
   const tempPassword = temporaryPassword || generateTemporaryPassword()
   const { user, isNew } = await ensureRespondentAccount(email, tempPassword, resetPasswordForExisting)
@@ -273,7 +278,7 @@ export async function registerRespondentToPoll({ eventId, email, organizerId, te
 }
 
 export async function registerExistingRespondent({ eventId, email, organizerId }) {
-  await assertPollingEvent(eventId, organizerId)
+  assertParticipantsEditable(await assertPollingEvent(eventId, organizerId))
 
   const voter = await findUserByEmail(email.toLowerCase().trim())
   if (!voter) {
@@ -322,6 +327,7 @@ export async function registerExistingRespondent({ eventId, email, organizerId }
 export async function sendRespondentInvitation({ eventId, voterId, organizerId }) {
   await assertPollingEvent(eventId, organizerId)
   const event = await getEventById(eventId)
+  assertParticipantsEditable(event)
   const voter = await findUserById(voterId)
 
   if (!voter || voter.role !== USER_ROLES.VOTER) {
@@ -419,6 +425,7 @@ export async function sendRespondentInvitation({ eventId, voterId, organizerId }
 export async function sendAllPendingRespondentInvitations({ eventId, organizerId }) {
   await assertPollingEvent(eventId, organizerId)
   const event = await getEventById(eventId)
+  assertParticipantsEditable(event)
 
   const { data: pendingRespondents, error: pendingError } = await getClient()
     .from(DB_TABLES.INVITATIONS)
@@ -519,40 +526,57 @@ export async function getOrganizerDashboard(organizerId) {
   let assignedUsers = 0
   let respondedUsers = 0
   let responsesSubmitted = 0
+  // Per-poll participation so each poll's rate stands on its own rather than
+  // being blended into one number across every poll.
+  const perEvent = new Map(eventIds.map((id) => [id, { assigned: 0, responded: 0 }]))
 
   if (eventIds.length) {
-    const [assignedRes, respondedRes, answersRes] = await Promise.all([
+    const [respondentRowsRes, answersRes] = await Promise.all([
       getClient()
         .from(DB_TABLES.EVENT_PARTICIPANTS)
-        .select('*', { count: 'exact', head: true })
+        .select('event_id, has_responded')
         .in('event_id', eventIds)
         .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT),
-      getClient()
-        .from(DB_TABLES.EVENT_PARTICIPANTS)
-        .select('*', { count: 'exact', head: true })
-        .in('event_id', eventIds)
-        .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
-        .eq('has_responded', true),
       getClient()
         .from(DB_TABLES.POLL_ANSWERS)
         .select('id, poll_questions!inner(event_id)', { count: 'exact', head: true })
         .in('poll_questions.event_id', eventIds),
     ])
 
-    if (assignedRes.error) throw new ApiError(500, assignedRes.error.message)
-    if (respondedRes.error) throw new ApiError(500, respondedRes.error.message)
+    if (respondentRowsRes.error) throw new ApiError(500, respondentRowsRes.error.message)
     if (answersRes.error) throw new ApiError(500, answersRes.error.message)
 
-    assignedUsers = assignedRes.count ?? 0
-    respondedUsers = respondedRes.count ?? 0
+    for (const row of respondentRowsRes.data ?? []) {
+      const bucket = perEvent.get(row.event_id)
+      if (!bucket) continue
+      bucket.assigned += 1
+      assignedUsers += 1
+      if (row.has_responded) {
+        bucket.responded += 1
+        respondedUsers += 1
+      }
+    }
     responsesSubmitted = answersRes.count ?? 0
   }
 
   const participationRate = computeParticipationRate(respondedUsers, assignedUsers)
 
+  const eventBreakdown = (data ?? []).map((e) => {
+    const b = perEvent.get(e.id) ?? { assigned: 0, responded: 0 }
+    return {
+      id: e.id,
+      title: e.title,
+      status: e.status,
+      registered: b.assigned,
+      participated: b.responded,
+      rate: computeParticipationRate(b.responded, b.assigned),
+    }
+  })
+
   return {
     organization: mapOrganization(org),
     events: (data ?? []).map(mapPollEvent),
+    eventBreakdown,
     stats: {
       totalPolls: data?.length ?? 0,
       activePolls: data?.filter((e) => e.polling_enabled).length ?? 0,
@@ -619,6 +643,7 @@ export async function createPollEvent(organizerId, payload) {
 
 export async function updatePollEvent(eventId, organizerId, payload) {
   const event = await assertPollingEvent(eventId, organizerId)
+  assertSetupEditable(event)
   assertEventUpdateAllowed(event, payload)
 
   // Capture old image_asset_id before updating so we can clean it up if replaced
@@ -697,16 +722,8 @@ export async function publishPollEvent(eventId, organizerId) {
     throw new ApiError(400, 'Add at least one question before publishing.')
   }
 
-  const { count: respondentCount, error: respErr } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
-
-  if (respErr) throw new ApiError(500, respErr.message)
-  if (!respondentCount || respondentCount === 0) {
-    throw new ApiError(400, 'Register at least one respondent before publishing.')
-  }
+  // Respondents are no longer required at publish time — they are registered and
+  // invited after publishing, on the Respondents step, within email resend limits.
 
   const { error } = await getClient()
     .from(DB_TABLES.EVENTS)
@@ -732,6 +749,36 @@ export async function publishPollEvent(eventId, organizerId) {
   // Re-read so the returned status reflects any reconciliation the sync applied.
   const published = await getEventById(eventId)
   return mapPollEvent(published)
+}
+
+/**
+ * Pull a published poll back to `draft` so its setup can be corrected. Only
+ * allowed while the poll is still `scheduled` (published but not yet open).
+ */
+export async function unpublishPollEvent(eventId, organizerId) {
+  const event = await assertPollingEvent(eventId, organizerId)
+
+  if (!canUnpublishEventStatus(event.status)) {
+    throw new ApiError(400, 'Only a scheduled poll can be unpublished. It has already opened or is closed.')
+  }
+
+  const { error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({ status: 'draft', polling_enabled: false })
+    .eq('id', eventId)
+
+  if (error) throw new ApiError(500, error.message)
+
+  recordEventActivity({
+    eventId,
+    action: 'polling.event.unpublish',
+    userId: organizerId,
+    module: 'polling',
+    details: { title: event.title },
+  })
+
+  const reverted = await getEventById(eventId)
+  return mapPollEvent(reverted)
 }
 
 // ——— Questions & options ———
@@ -778,7 +825,7 @@ const { data, error } = await getClient()
 }
 
 export async function createQuestion(eventId, organizerId, payload) {
-  await assertPollingEvent(eventId, organizerId)
+  assertSetupEditable(await assertPollingEvent(eventId, organizerId))
 
   const orgId = await getPollingOrgId(organizerId)
   const typeDef = await requireQuestionType(orgId, payload.type)
@@ -820,7 +867,7 @@ type_config: typeConfig,
 }
 
 export async function updateQuestion(eventId, organizerId, questionId, payload) {
-  await assertPollingEvent(eventId, organizerId)
+  assertSetupEditable(await assertPollingEvent(eventId, organizerId))
 
   const orgId = await getPollingOrgId(organizerId)
   const registry = await loadQuestionTypeRegistry(orgId)
@@ -924,7 +971,7 @@ async function currentTypeKey(questionId) {
 }
 
 export async function deleteQuestion(eventId, organizerId, questionId) {
-  await assertPollingEvent(eventId, organizerId)
+  assertSetupEditable(await assertPollingEvent(eventId, organizerId))
 
   // Fetch question image_asset_id before deleting for cleanup
   const { data: questionData } = await getClient()
@@ -971,7 +1018,7 @@ export async function deleteQuestion(eventId, organizerId, questionId) {
 }
 
 export async function duplicateQuestion(eventId, organizerId, questionId) {
-  await assertPollingEvent(eventId, organizerId)
+  assertSetupEditable(await assertPollingEvent(eventId, organizerId))
   const orgId = await getPollingOrgId(organizerId)
   const registry = await loadQuestionTypeRegistry(orgId)
 
@@ -1071,8 +1118,8 @@ export async function duplicateQuestion(eventId, organizerId, questionId) {
 }
 
 export async function reorderQuestions(eventId, organizerId, orders) {
-  await assertPollingEvent(eventId, organizerId)
-  
+  assertSetupEditable(await assertPollingEvent(eventId, organizerId))
+
   if (!orders || !Array.isArray(orders) || orders.length === 0) return []
 
   const updates = orders.map((o) => ({

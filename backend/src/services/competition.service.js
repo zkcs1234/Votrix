@@ -10,6 +10,7 @@ import {
   PARTICIPANT_TYPES,
 } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
+import { assertSetupEditable, assertParticipantsEditable } from '../utils/eventLifecycle.js'
 import { listDivisions } from './competition-division.service.js'
 
 // ---------------------------------------------------------------------------
@@ -138,7 +139,7 @@ function assertWeightWithinBudget(currentTotal, addition, label) {
 }
 
 export async function createCategory(eventId, organizerId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
 
   // §F #1: category weights across the event must not exceed 100%.
   if (Number(payload.weight) > 0) {
@@ -187,7 +188,7 @@ export async function createCategory(eventId, organizerId, payload) {
 }
 
 export async function updateCategory(eventId, organizerId, categoryId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
 
   // Validate division if being updated
   if (payload.divisionId !== undefined && payload.divisionId !== null) {
@@ -229,7 +230,7 @@ export async function updateCategory(eventId, organizerId, categoryId, payload) 
 }
 
 export async function deleteCategory(eventId, organizerId, categoryId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
   const { error } = await getClient()
     .from(DB_TABLES.COMPETITION_CATEGORIES)
     .delete()
@@ -293,7 +294,7 @@ export async function listRounds(eventId, organizerId, filters = {}) {
 }
 
 export async function createRound(eventId, organizerId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
 
   // §F #1: round weights across the event must not exceed 100%.
   if (Number(payload.weight) > 0) {
@@ -355,7 +356,7 @@ export async function createRound(eventId, organizerId, payload) {
 }
 
 export async function updateRound(eventId, organizerId, roundId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
   
   if (payload.divisionId !== undefined && payload.divisionId !== null) {
     const { data: div, error: divErr } = await getClient()
@@ -403,7 +404,7 @@ export async function updateRound(eventId, organizerId, roundId, payload) {
 }
 
 export async function deleteRound(eventId, organizerId, roundId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
   const { error } = await getClient()
     .from(DB_TABLES.COMPETITION_ROUNDS)
     .delete()
@@ -781,7 +782,7 @@ export async function listJudgeAssignments(eventId, organizerId, judgeId) {
 }
 
 export async function createJudgeAssignment(eventId, organizerId, judgeId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
 
   if (!isValidAssignmentScope(payload.scope)) {
     throw new ApiError(400, `Invalid scope. Must be one of: ${Object.values(ASSIGNMENT_SCOPES).join(', ')}`)
@@ -833,7 +834,7 @@ export async function createJudgeAssignment(eventId, organizerId, judgeId, paylo
 }
 
 export async function deleteJudgeAssignment(eventId, organizerId, judgeId, assignmentId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
   await assertJudgeParticipant(eventId, judgeId)
 
   const { error } = await getClient()
@@ -868,7 +869,7 @@ export async function getScoringConfig(eventId, organizerId) {
 }
 
 export async function setScoringConfig(eventId, organizerId, partialConfig) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
   const current = await getClient()
     .from(DB_TABLES.EVENTS)
     .select('scoring_config')

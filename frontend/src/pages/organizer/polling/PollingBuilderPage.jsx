@@ -5,6 +5,8 @@ import { pollingService } from '@/services/polling.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
+import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
+import useEventStatus from '@/hooks/useEventStatus'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 import {
   DndContext,
@@ -91,7 +93,7 @@ function DragHandleIcon() {
   )
 }
 
-function SortableQuestionCard({ question, idx, types, onEdit, onDuplicate, onDelete }) {
+function SortableQuestionCard({ question, idx, types, onEdit, onDuplicate, onDelete, locked = false }) {
   const {
     attributes,
     listeners,
@@ -118,6 +120,7 @@ function SortableQuestionCard({ question, idx, types, onEdit, onDuplicate, onDel
     >
       <div className="flex justify-between gap-4">
         <div className="flex items-start gap-3">
+          {!locked && (
           <button
             type="button"
             className="mt-1 cursor-grab touch-none rounded p-1 hover:bg-v-surface-elevated active:cursor-grabbing"
@@ -127,6 +130,7 @@ function SortableQuestionCard({ question, idx, types, onEdit, onDuplicate, onDel
           >
             <DragHandleIcon />
           </button>
+          )}
           <div>
             <span className="text-xs text-v-text-subtle">Q{idx + 1}</span>
             <p className="font-medium text-v-text">{q.question}</p>
@@ -159,6 +163,7 @@ function SortableQuestionCard({ question, idx, types, onEdit, onDuplicate, onDel
             )}
           </div>
         </div>
+        {!locked && (
         <div className="flex shrink-0 gap-2">
           <button
             type="button"
@@ -182,6 +187,7 @@ function SortableQuestionCard({ question, idx, types, onEdit, onDuplicate, onDel
             Delete
           </button>
         </div>
+        )}
       </div>
     </li>
   )
@@ -189,6 +195,7 @@ function SortableQuestionCard({ question, idx, types, onEdit, onDuplicate, onDel
 
 export default function PollingBuilderPage() {
   const { eventId } = useParams()
+  const { status, setupLocked } = useEventStatus(pollingService, eventId)
   const [questions, setQuestions] = useState([])
   const [types, setTypes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -296,7 +303,7 @@ const handleTypeChange = (typeKey) => {
       } else {
         setForm({ ...form, imageUrl: data.url, imageAssetId: data.image_asset_id ?? null })
       }
-    } catch (err) {
+    } catch {
       setError('Failed to upload image')
     }
   }
@@ -399,6 +406,9 @@ const handleTypeChange = (typeKey) => {
     <ManagementWorkspace
       title="Poll builder"
       formPanel={
+        setupLocked ? (
+          <ReadOnlyEventBanner status={status} noun="poll" />
+        ) : (
         <form key={formKey} onSubmit={handleSubmit} className="v-card p-6 space-y-4 mb-4">
         <h3 className="text-sm font-medium text-v-text-muted">
           {editingId ? 'Edit question' : 'Add question'}
@@ -565,6 +575,7 @@ onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageU
           )}
         </div>
       </form>
+        )
       }
       recordsPanel={
         <div className="pb-8">
@@ -580,6 +591,7 @@ onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageU
                 onEdit={startEdit}
                 onDuplicate={handleDuplicate}
                 onDelete={handleDelete}
+                locked={setupLocked}
               />
             ))}
             {!questions.length && (

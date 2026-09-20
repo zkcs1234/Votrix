@@ -127,6 +127,11 @@ export const electionService = {
     return api.post(`${base}/events/${eventId}/publish`)
   },
 
+  // Pull a published (scheduled) event back to draft so setup can be corrected.
+  unpublishEvent(eventId) {
+    return api.post(`${base}/events/${eventId}/unpublish`)
+  },
+
   // ——— Participant Information Form ———
   getInformationForm(eventId) {
     return api.get(`${base}/events/${eventId}/information-form`)

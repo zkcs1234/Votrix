@@ -27,7 +27,12 @@ import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
 import { emitToEvent } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
-import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
+import {
+  assertEventUpdateAllowed,
+  assertSetupEditable,
+  assertParticipantsEditable,
+  canUnpublishEventStatus,
+} from '../utils/eventLifecycle.js'
 import { deleteDraft } from './draft.service.js'
 import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
 import { getActiveSession } from './competition-session.service.js'
@@ -117,24 +122,21 @@ export async function getOrganizerDashboard(organizerId) {
   let completedJudges = 0
   let scoresSubmitted = 0
   let activeSessions = 0
+  // Per-event judge participation so the dashboard shows completion per event
+  // instead of one blended rate across every competition.
+  const perEvent = new Map(eventIds.map((id) => [id, { judges: 0, completed: 0 }]))
 
   if (eventIds.length) {
-    const [contestantsRes, judgesRes, completedJudgesRes, scoresRes, sessionsRes] = await Promise.all([
+    const [contestantsRes, judgeRowsRes, scoresRes, sessionsRes] = await Promise.all([
       getClient()
         .from(DB_TABLES.CONTESTANTS)
         .select('*', { count: 'exact', head: true })
         .in('event_id', eventIds),
       getClient()
         .from(DB_TABLES.EVENT_PARTICIPANTS)
-        .select('*', { count: 'exact', head: true })
+        .select('event_id, has_scored')
         .in('event_id', eventIds)
         .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
-      getClient()
-        .from(DB_TABLES.EVENT_PARTICIPANTS)
-        .select('*', { count: 'exact', head: true })
-        .in('event_id', eventIds)
-        .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
-        .eq('has_scored', true),
       getClient()
         .from(DB_TABLES.JUDGE_SCORES)
         .select('id, competition_contestants!inner(event_id)', { count: 'exact', head: true })
@@ -147,16 +149,24 @@ export async function getOrganizerDashboard(organizerId) {
     ])
 
     if (contestantsRes.error) throw new ApiError(500, contestantsRes.error.message)
-    if (judgesRes.error) throw new ApiError(500, judgesRes.error.message)
-    if (completedJudgesRes.error) throw new ApiError(500, completedJudgesRes.error.message)
+    if (judgeRowsRes.error) throw new ApiError(500, judgeRowsRes.error.message)
     if (scoresRes.error) throw new ApiError(500, scoresRes.error.message)
     if (sessionsRes.error) throw new ApiError(500, sessionsRes.error.message)
 
     totalContestants = contestantsRes.count ?? 0
-    totalJudges = judgesRes.count ?? 0
-    completedJudges = completedJudgesRes.count ?? 0
     scoresSubmitted = scoresRes.count ?? 0
     activeSessions = sessionsRes.data?.length ?? 0
+
+    for (const row of judgeRowsRes.data ?? []) {
+      const bucket = perEvent.get(row.event_id)
+      if (!bucket) continue
+      bucket.judges += 1
+      totalJudges += 1
+      if (row.has_scored) {
+        bucket.completed += 1
+        completedJudges += 1
+      }
+    }
 
     // Add session status to each event
     const sessionsByEvent = new Map()
@@ -175,9 +185,22 @@ export async function getOrganizerDashboard(organizerId) {
   const judgeCompletionRate =
     totalJudges > 0 ? Math.round((completedJudges / totalJudges) * 10000) / 100 : 0
 
+  const eventBreakdown = (events ?? []).map((e) => {
+    const b = perEvent.get(e.id) ?? { judges: 0, completed: 0 }
+    return {
+      id: e.id,
+      title: e.title,
+      status: e.status,
+      registered: b.judges,
+      participated: b.completed,
+      rate: b.judges > 0 ? Math.round((b.completed / b.judges) * 10000) / 100 : 0,
+    }
+  })
+
   return {
     organization: mapOrganization(org),
     events: (events ?? []).map(mapEvent),
+    eventBreakdown,
     stats: {
       totalEvents: events?.length ?? 0,
       activeSessions,
@@ -263,6 +286,7 @@ export async function updatePageantEvent(eventId, organizerId, payload) {
 export async function updateCompetitionEvent(eventId, organizerId, payload) {
   const event = await assertCompetitionEvent(eventId, organizerId)
 
+  assertSetupEditable(event)
   assertEventUpdateAllowed(event, payload)
 
   // Capture old image_asset_id before updating so we can clean it up if replaced
@@ -431,6 +455,37 @@ export async function publishCompetitionEvent(eventId, organizerId) {
   return mapEvent(published)
 }
 
+/**
+ * Pull a published competition back to `draft` so its setup can be corrected.
+ * Only allowed while still `scheduled` (published but scoring has not gone
+ * live). Once a live session makes it `active` this is one-way.
+ */
+export async function unpublishCompetitionEvent(eventId, organizerId) {
+  const event = await assertCompetitionEvent(eventId, organizerId)
+
+  if (!canUnpublishEventStatus(event.status)) {
+    throw new ApiError(400, 'Only a scheduled event can be unpublished. Scoring has already gone live or the event is closed.')
+  }
+
+  const { error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({ status: 'draft', scoring_enabled: false })
+    .eq('id', eventId)
+
+  if (error) throw new ApiError(500, error.message)
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.event.unpublish',
+    userId: organizerId,
+    module: 'competition',
+    details: { title: event.title },
+  })
+
+  const reverted = await getEventById(eventId)
+  return mapEvent(reverted)
+}
+
 // ——— Contestants ———
 
 export async function listContestants(eventId, organizerId, filters = {}) {
@@ -452,7 +507,7 @@ export async function listContestants(eventId, organizerId, filters = {}) {
 }
 
 export async function createContestant(eventId, organizerId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
 
   if (payload.divisionId) {
     const { data: div, error: divErr } = await getClient()
@@ -499,7 +554,7 @@ export async function createContestant(eventId, organizerId, payload) {
 }
 
 export async function updateContestant(eventId, organizerId, contestantId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
 
   if (payload.divisionId !== undefined && payload.divisionId !== null) {
     const { data: div, error: divErr } = await getClient()
@@ -559,7 +614,7 @@ export async function updateContestant(eventId, organizerId, contestantId, paylo
 }
 
 export async function deleteContestant(eventId, organizerId, contestantId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
 
   // Fetch contestant image_asset_id before deleting for cleanup
   const { data: contestantData } = await getClient()
@@ -683,7 +738,7 @@ async function assertCriteriaInEvent(eventId, criteriaId) {
 }
 
 export async function createMinorCriteria(eventId, organizerId, criteriaId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
   await assertCriteriaInEvent(eventId, criteriaId)
 
   const { data, error } = await getClient()
@@ -712,7 +767,7 @@ export async function createMinorCriteria(eventId, organizerId, criteriaId, payl
 }
 
 export async function updateMinorCriteria(eventId, organizerId, criteriaId, minorId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
 
   const updates = {}
   if (payload.name !== undefined) updates.name = payload.name
@@ -744,7 +799,7 @@ export async function updateMinorCriteria(eventId, organizerId, criteriaId, mino
 }
 
 export async function deleteMinorCriteria(eventId, organizerId, criteriaId, minorId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
   const { error } = await getClient()
     .from(DB_TABLES.MINOR_CRITERIA)
     .delete()
@@ -762,7 +817,7 @@ export async function deleteMinorCriteria(eventId, organizerId, criteriaId, mino
 }
 
 export async function createCriteria(eventId, organizerId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
 
   // §F #1: for FLAT (no-round) events, event-wide criteria must total ≤ 100%.
   // Round-based events are guarded per round when the criterion is attached
@@ -825,7 +880,7 @@ export async function createCriteria(eventId, organizerId, payload) {
 }
 
 export async function updateCriteria(eventId, organizerId, criteriaId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
 
   if (payload.divisionId !== undefined && payload.divisionId !== null) {
     const { data: div, error: divErr } = await getClient()
@@ -866,7 +921,7 @@ export async function updateCriteria(eventId, organizerId, criteriaId, payload) 
 }
 
 export async function deleteCriteria(eventId, organizerId, criteriaId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
 
   const { error } = await getClient()
     .from(DB_TABLES.CRITERIA)
@@ -944,7 +999,7 @@ async function upsertJudgeInvitationStatus(eventId, userId, values) {
 }
 
 export async function inviteJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName }) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
   const event = await getEventById(eventId)
 
   const tempPassword = temporaryPassword || generateTemporaryPassword()
@@ -996,7 +1051,7 @@ export async function inviteJudge(eventId, organizerId, { email, temporaryPasswo
  * @param {boolean} [params.resetPasswordForExisting] - If false, won't reset password for existing judges (default: false for manual)
  */
 export async function registerJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName, resetPasswordForExisting = false }) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
 
   const tempPassword = temporaryPassword || generateTemporaryPassword()
   const { user, isNew } = await ensureJudgeAccount(email, tempPassword, resetPasswordForExisting)
@@ -1033,7 +1088,7 @@ export async function registerJudge(eventId, organizerId, { email, temporaryPass
  * If judge is new, generates temp password and sends it.
  */
 export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
   const event = await getEventById(eventId)
 
   const { data: judgeRow, error: judgeRowErr } = await getClient()
@@ -1130,7 +1185,7 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
  * Handles both new and existing accounts appropriately.
  */
 export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
   const event = await getEventById(eventId)
 
   // Start from event_participants — the source of truth for enrolled judges.

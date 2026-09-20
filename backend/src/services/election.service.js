@@ -10,7 +10,12 @@ import { mapEvent } from '../foundation/mapper.js'
 import { recordAudit } from '../foundation/audit.js'
 import { recordEventActivity } from '../foundation/activity.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
-import { assertEventUpdateAllowed } from '../utils/eventLifecycle.js'
+import {
+  assertEventUpdateAllowed,
+  assertSetupEditable,
+  assertParticipantsEditable,
+  canUnpublishEventStatus,
+} from '../utils/eventLifecycle.js'
 import { deleteDraft } from './draft.service.js'
 import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
 
@@ -95,40 +100,55 @@ export async function getOrganizerDashboard(organizerId) {
     let registeredVoters = 0
     let votedCount = 0
     let votesCast = 0
+    // Per-event participation so the dashboard can show an honest breakdown
+    // instead of a single turnout rate blended across every election.
+    const perEvent = new Map(eventIds.map((id) => [id, { registered: 0, voted: 0 }]))
 
     if (eventIds.length) {
-      const [assignedRes, votedRes, votesRes] = await Promise.all([
+      const [participantsRes, votesRes] = await Promise.all([
         getClient()
           .from(DB_TABLES.EVENT_PARTICIPANTS)
-          .select('*', { count: 'exact', head: true })
+          .select('event_id, has_voted')
           .in('event_id', eventIds)
           .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
-        getClient()
-          .from(DB_TABLES.EVENT_PARTICIPANTS)
-          .select('*', { count: 'exact', head: true })
-          .in('event_id', eventIds)
-          .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
-          .eq('has_voted', true),
         getClient()
           .from(DB_TABLES.ELECTION_VOTES)
           .select('*', { count: 'exact', head: true })
           .in('event_id', eventIds),
       ])
 
-      if (assignedRes.error) throw new ApiError(500, assignedRes.error.message)
-      if (votedRes.error) throw new ApiError(500, votedRes.error.message)
+      if (participantsRes.error) throw new ApiError(500, participantsRes.error.message)
       if (votesRes.error) throw new ApiError(500, votesRes.error.message)
 
-      registeredVoters = assignedRes.count ?? 0
-      votedCount = votedRes.count ?? 0
+      for (const row of participantsRes.data ?? []) {
+        const bucket = perEvent.get(row.event_id)
+        if (!bucket) continue
+        bucket.registered += 1
+        if (row.has_voted) bucket.voted += 1
+        registeredVoters += 1
+        if (row.has_voted) votedCount += 1
+      }
       votesCast = votesRes.count ?? 0
     }
 
     const turnoutRate = computeTurnoutRate(votedCount, registeredVoters)
 
+    const eventBreakdown = (events ?? []).map((e) => {
+      const b = perEvent.get(e.id) ?? { registered: 0, voted: 0 }
+      return {
+        id: e.id,
+        title: e.title,
+        status: e.status,
+        registered: b.registered,
+        participated: b.voted,
+        rate: computeTurnoutRate(b.voted, b.registered),
+      }
+    })
+
     const result = {
       organization: mapOrganization(org),
       events: (events ?? []).map(mapEvent),
+      eventBreakdown,
       stats: {
         totalEvents: events?.length ?? 0,
         activeVoting: events?.filter((e) => e.voting_enabled).length ?? 0,
@@ -209,6 +229,7 @@ export async function createElectionEvent(organizerId, payload) {
 
 export async function updateElectionEvent(eventId, organizerId, payload) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
+  assertSetupEditable(event)
 
   const nextStart = payload.startDate !== undefined ? payload.startDate : event.start_date
   const nextEnd = payload.endDate !== undefined ? payload.endDate : event.end_date
@@ -304,7 +325,7 @@ async function nextPositionDisplayOrder(eventId) {
 }
 
 export async function createPosition(eventId, organizerId, payload) {
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  assertSetupEditable(await assertOrganizerOwnsEvent(eventId, organizerId))
 
   const displayOrder =
     payload.displayOrder !== undefined
@@ -339,7 +360,7 @@ export async function createPosition(eventId, organizerId, payload) {
 }
 
 export async function updatePosition(eventId, organizerId, positionId, payload) {
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  assertSetupEditable(await assertOrganizerOwnsEvent(eventId, organizerId))
 
   const updates = {}
   if (payload.name !== undefined) updates.name = payload.name
@@ -372,7 +393,7 @@ export async function updatePosition(eventId, organizerId, positionId, payload) 
 }
 
 export async function deletePosition(eventId, organizerId, positionId) {
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  assertSetupEditable(await assertOrganizerOwnsEvent(eventId, organizerId))
 
   const { count: voteCount, error: voteErr } = await getClient()
     .from(DB_TABLES.ELECTION_VOTES)
@@ -434,7 +455,7 @@ export async function listCandidates(eventId, organizerId, positionId = null) {
 }
 
 export async function createCandidate(eventId, organizerId, positionId, payload) {
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  assertSetupEditable(await assertOrganizerOwnsEvent(eventId, organizerId))
 
   const { data: pos } = await getClient()
     .from(DB_TABLES.POSITIONS)
@@ -491,7 +512,7 @@ async function assertCandidateInEvent(eventId, candidateId) {
 }
 
 export async function updateCandidate(eventId, organizerId, candidateId, payload) {
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  assertSetupEditable(await assertOrganizerOwnsEvent(eventId, organizerId))
 
   await assertCandidateInEvent(eventId, candidateId)
 
@@ -543,7 +564,7 @@ export async function updateCandidate(eventId, organizerId, candidateId, payload
 }
 
 export async function deleteCandidate(eventId, organizerId, candidateId) {
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  assertSetupEditable(await assertOrganizerOwnsEvent(eventId, organizerId))
   await assertCandidateInEvent(eventId, candidateId)
 
   const { count: voteCount, error: voteErr } = await getClient()
@@ -1285,16 +1306,8 @@ export async function publishElectionEvent(eventId, organizerId) {
     throw new ApiError(400, 'Add at least one candidate before publishing.')
   }
 
-  const { count: voterCount, error: voterErr } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
-
-  if (voterErr) throw new ApiError(500, voterErr.message)
-  if (!voterCount || voterCount === 0) {
-    throw new ApiError(400, 'Register at least one voter before publishing.')
-  }
+  // Voters are no longer required at publish time — they are registered and
+  // invited after publishing, on the Voters step, within email resend limits.
 
   const { error } = await getClient()
     .from(DB_TABLES.EVENTS)
@@ -1322,4 +1335,42 @@ export async function publishElectionEvent(eventId, organizerId) {
   // Re-read so the returned status reflects any reconciliation the sync applied.
   const published = await getEventById(eventId)
   return mapEvent(published)
+}
+
+/**
+ * Pull a published election back to `draft` so its setup can be corrected.
+ *
+ * Only allowed while the event is still `scheduled` (published but voting has
+ * not opened). Once `active` the schedule owns the event and this is one-way.
+ * Drafts are excluded from the schedule sync, so voting stays closed.
+ */
+export async function unpublishElectionEvent(eventId, organizerId) {
+  const event = await assertOrganizerOwnsEvent(eventId, organizerId)
+
+  if (event.event_type !== EVENT_TYPES.ELECTION) {
+    throw new ApiError(400, 'Not an election event')
+  }
+  if (!canUnpublishEventStatus(event.status)) {
+    throw new ApiError(400, 'Only a scheduled event can be unpublished. Voting has already opened or the event is closed.')
+  }
+
+  const { error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({ status: 'draft', voting_enabled: false })
+    .eq('id', eventId)
+
+  if (error) throw new ApiError(500, error.message)
+
+  await recordAudit({
+    userId: organizerId,
+    action: 'election.event.unpublish',
+    entity: 'events',
+    entityId: eventId,
+    details: { title: event.title },
+  })
+
+  invalidateDashboardCache(organizerId)
+
+  const reverted = await getEventById(eventId)
+  return mapEvent(reverted)
 }

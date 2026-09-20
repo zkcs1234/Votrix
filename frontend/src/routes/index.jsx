@@ -45,6 +45,7 @@ const ElectionCandidatesPage = lazy(
   () => import('@/pages/organizer/election/ElectionCandidatesPage'),
 )
 const ElectionVotersPage = lazy(() => import('@/pages/organizer/election/ElectionVotersPage'))
+const ElectionReviewPage = lazy(() => import('@/pages/organizer/election/ElectionReviewPage'))
 const ElectionAnalyticsPage = lazy(
   () => import('@/pages/organizer/election/ElectionAnalyticsPage'),
 )
@@ -60,6 +61,7 @@ const CompetitionContestantsPage = lazy(
   () => import('@/pages/organizer/competition/CompetitionContestantsPage'),
 )
 const CompetitionJudgesPage = lazy(() => import('@/pages/organizer/competition/CompetitionJudgesPage'))
+const CompetitionReviewPage = lazy(() => import('@/pages/organizer/competition/CompetitionReviewPage'))
 const CompetitionRankingsPage = lazy(() => import('@/pages/organizer/competition/CompetitionRankingsPage'))
 const CompetitionWorkspacePage = lazy(
   () => import('@/pages/organizer/competition/CompetitionWorkspacePage'),
@@ -81,6 +83,7 @@ const PollingBuilderPage = lazy(() => import('@/pages/organizer/polling/PollingB
 const PollingRespondentsPage = lazy(
   () => import('@/pages/organizer/polling/PollingRespondentsPage'),
 )
+const PollingReviewPage = lazy(() => import('@/pages/organizer/polling/PollingReviewPage'))
 const PollingAnalyticsPage = lazy(() => import('@/pages/organizer/polling/PollingAnalyticsPage'))
 const VoterPollPage = lazy(() => import('@/pages/voter/VoterPollPage'))
 
@@ -195,6 +198,7 @@ export const routeConfig = [
       { path: 'events/:eventId/form', element: <ElectionEventFormPage /> },
       { path: 'events/:eventId/positions', element: <ElectionPositionsPage /> },
       { path: 'events/:eventId/candidates', element: <ElectionCandidatesPage /> },
+      { path: 'events/:eventId/review', element: <ElectionReviewPage /> },
       { path: 'events/:eventId/voters', element: <ElectionVotersPage /> },
       { path: 'events/:eventId/analytics', element: <ElectionAnalyticsPage /> },
     ],
@@ -216,6 +220,7 @@ export const routeConfig = [
       { path: 'events/:eventId/workspace', element: <CompetitionWorkspacePage /> },
       { path: 'events/:eventId/contestants', element: <CompetitionContestantsPage /> },
       { path: 'events/:eventId/judges', element: <CompetitionJudgesPage /> },
+      { path: 'events/:eventId/review', element: <CompetitionReviewPage /> },
       { path: 'events/:eventId/rankings', element: <CompetitionRankingsPage /> },
 { path: 'events/:eventId/analytics', element: <CompetitionAnalyticsPage /> },
       { path: 'events/:eventId/live', element: <CompetitionLiveControlPage /> },
@@ -237,6 +242,7 @@ export const routeConfig = [
       { path: 'events/:eventId/settings', element: <PollingEventFormPage /> },
       { path: 'events/:eventId/form', element: <PollingEventFormPage /> },
       { path: 'events/:eventId/builder', element: <PollingBuilderPage /> },
+      { path: 'events/:eventId/review', element: <PollingReviewPage /> },
       { path: 'events/:eventId/respondents', element: <PollingRespondentsPage /> },
       { path: 'events/:eventId/analytics', element: <PollingAnalyticsPage /> },
     ],

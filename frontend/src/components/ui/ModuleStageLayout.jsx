@@ -18,12 +18,14 @@ const FORM_WIZARD_STAGES = {
 // and the normal "Next" navigation footer once published — so the layout must
 // not add a second footer here. The stepper still renders for these stages.
 const PAGE_OWNS_FOOTER = {
-  election: ['voters'],
+  // 'review' renders the Finish & Publish / Unpublish footer; the roster pages
+  // (Voters/Judges/Respondents) now use the layout's default navigation footer.
+  election: ['review'],
   // 'workspace' (Structure & Scoring) renders its own tab-aware footer
   // (WorkspaceStageFooter) into #stage-footer-portal, so the layout must not
   // add a second one — otherwise two footers stack in the portal.
-  competition: ['judges', 'workspace'],
-  polling: ['respondents'],
+  competition: ['review', 'workspace'],
+  polling: ['review'],
 }
 
 /**

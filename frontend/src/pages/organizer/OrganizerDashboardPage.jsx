@@ -237,8 +237,25 @@ export default function OrganizerDashboardPage() {
         <StatCard label="Total events" value={stats?.totalEvents ?? 0} icon={CalendarDays} />
         <StatCard label="Active events" value={stats?.activeEvents ?? 0} icon={Zap} />
         <StatCard label="Finished events" value={stats?.finishedEvents ?? 0} icon={CheckCircle2} />
-        <StatCard label="Assigned voters" value={stats?.totalAssignedVoters ?? 0} icon={Users} />
+        <StatCard
+          label="Registered voters"
+          value={stats?.assignedVoters ?? 0}
+          hint="Election voters only"
+          icon={Users}
+        />
       </div>
+
+      {/* Registered participants shown per type instead of one blended total —
+          voters, judges, and respondents are different cohorts across different
+          events. */}
+      <Card padding="sm">
+        <h3 className="v-section-title">Registered participants across your events</h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <ParticipantStat label="Voters" value={stats?.assignedVoters ?? 0} icon={Vote} />
+          <ParticipantStat label="Judges" value={stats?.assignedJudges ?? 0} icon={Trophy} />
+          <ParticipantStat label="Respondents" value={stats?.assignedRespondents ?? 0} icon={BarChart2} />
+        </div>
+      </Card>
 
       <OrganizationLogoUpload
         organizationName={dashboard?.organization?.organizationName}
@@ -390,6 +407,22 @@ export default function OrganizerDashboardPage() {
           </div>
         )}
       </Card>
+    </div>
+  )
+}
+
+function ParticipantStat({ label, value, icon: Icon }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-v-border px-3 py-2.5">
+      {Icon && (
+        <div className="rounded-md bg-v-surface-elevated p-2 text-v-text-subtle">
+          <Icon className="h-4 w-4" strokeWidth={1.5} />
+        </div>
+      )}
+      <div>
+        <p className="text-lg font-semibold text-v-text tabular-nums">{value}</p>
+        <p className="v-caption">{label}</p>
+      </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import { ApiError } from '../utils/ApiError.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
+import { assertParticipantsEditable } from '../utils/eventLifecycle.js'
 import { inviteVoterToEvent, inviteRegisteredVoter, registerVoterToEvent, registerExistingVoter } from './invitation.service.js'
 import { db as getClient } from '../foundation/db.js'
 import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
@@ -153,7 +154,7 @@ export async function importVotersFromCsv(eventId, organizerId, fileBuffer) {
     throw new ApiError(400, 'Invalid file data')
   }
 
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  assertParticipantsEditable(await assertOrganizerOwnsEvent(eventId, organizerId))
 
   const fileRows = parseParticipantFile(fileBuffer)
   if (!fileRows.length) {
@@ -358,7 +359,7 @@ export async function registerVotersFromCsv(eventId, organizerId, parsedData) {
     throw new ApiError(400, 'Invalid parsed data')
   }
 
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  assertParticipantsEditable(await assertOrganizerOwnsEvent(eventId, organizerId))
 
   const results = []
   const enrolledVoterIds = []

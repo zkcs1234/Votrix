@@ -5,6 +5,7 @@
 import { db, wrap } from '../foundation/db.js'
 import { notFound, forbidden, badRequest } from '../foundation/errors.js'
 import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
+import { assertSetupEditable } from '../utils/eventLifecycle.js'
 import { sendEventNotificationEmail } from './mailer.service.js'
 import { createNotificationsForUsers } from './notification.service.js'
 
@@ -79,7 +80,7 @@ export async function getEventInformationForm(eventId, organizerId) {
 }
 
 export async function setEventInformationForm(eventId, organizerId, schema) {
-  await assertOrganizerOwnsEvent(eventId, organizerId)
+  assertSetupEditable(await assertOrganizerOwnsEvent(eventId, organizerId))
 
   if (!schema || typeof schema !== 'object') {
     throw badRequest('Information form schema must be an object')
