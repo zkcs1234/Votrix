@@ -59,10 +59,21 @@ export function isReadOnlyEventStatus(status) {
 // email resend limits. They lock once the event is `active` (voting/scoring is
 // open) and stay locked in the terminal states.
 const SETUP_EDITABLE_STATUSES = new Set([EVENT_STATUS.DRAFT])
-const PARTICIPANTS_EDITABLE_STATUSES = new Set([
-  EVENT_STATUS.DRAFT,
-  EVENT_STATUS.SCHEDULED,
-])
+
+// Feature flag — see PARTICIPANT_LOCK_FEATURE_FLAG.md.
+// Default (unset / anything but "false") = PRODUCTION: the participant roster
+// (voters / judges / respondents) locks once the event is ACTIVE.
+// Set VITE_LOCK_PARTICIPANTS_ON_ACTIVE=false in frontend/.env to keep the roster
+// editable through the active state during testing (then restart/rebuild). No
+// locking code is removed — flip it back (or unset it) to restore the lock.
+const LOCK_PARTICIPANTS_ON_ACTIVE =
+  import.meta.env.VITE_LOCK_PARTICIPANTS_ON_ACTIVE !== 'false'
+
+const PARTICIPANTS_EDITABLE_STATUSES = new Set(
+  LOCK_PARTICIPANTS_ON_ACTIVE
+    ? [EVENT_STATUS.DRAFT, EVENT_STATUS.SCHEDULED]
+    : [EVENT_STATUS.DRAFT, EVENT_STATUS.SCHEDULED, EVENT_STATUS.ACTIVE],
+)
 
 export function isSetupLocked(status) {
   return !SETUP_EDITABLE_STATUSES.has(status)

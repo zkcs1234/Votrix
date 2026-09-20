@@ -27,10 +27,20 @@ export function assertEventUpdateAllowed(event, updates = {}) {
 // it (the organizer unpublishes back to draft to correct it). Participant
 // rosters stay editable through `scheduled` and lock once `active`.
 const SETUP_EDITABLE_STATUSES = new Set([EVENT_STATUS.DRAFT])
-const PARTICIPANTS_EDITABLE_STATUSES = new Set([
-  EVENT_STATUS.DRAFT,
-  EVENT_STATUS.SCHEDULED,
-])
+
+// Feature flag — see PARTICIPANT_LOCK_FEATURE_FLAG.md.
+// Default (unset / anything but "false") = PRODUCTION: the participant roster
+// (voters / judges / respondents) locks once the event is ACTIVE.
+// Set env LOCK_PARTICIPANTS_ON_ACTIVE=false to keep the roster editable through
+// the active state during testing. No locking code is removed — flip the env
+// back (or unset it) to restore the production lock.
+const LOCK_PARTICIPANTS_ON_ACTIVE = process.env.LOCK_PARTICIPANTS_ON_ACTIVE !== 'false'
+
+const PARTICIPANTS_EDITABLE_STATUSES = new Set(
+  LOCK_PARTICIPANTS_ON_ACTIVE
+    ? [EVENT_STATUS.DRAFT, EVENT_STATUS.SCHEDULED]
+    : [EVENT_STATUS.DRAFT, EVENT_STATUS.SCHEDULED, EVENT_STATUS.ACTIVE],
+)
 
 export function isSetupLocked(status) {
   return !SETUP_EDITABLE_STATUSES.has(status)
