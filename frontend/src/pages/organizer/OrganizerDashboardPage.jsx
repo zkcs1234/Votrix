@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/Skeleton'
 import { AreaChartView, PieChartView } from '@/components/charts'
 import { organizerService } from '@/services/organizer.service'
-import { pageantService } from '@/services/pageant.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
@@ -45,54 +44,15 @@ export default function OrganizerDashboardPage() {
         if (!alive) return
         setDashboard(dashboardRes.data)
         setAnalytics(analyticsRes.data)
-        
-        // Check for active sessions across all competition events
-        await checkForActiveSessions()
-        
+        // Active competition sessions now arrive batched in the dashboard payload
+        // (previously one request per event — an N+1). Fall back to [] if absent.
+        setActiveSessions(dashboardRes.data.activeSessions ?? [])
         setError(null)
       } catch (err) {
         if (!alive) return
         setError(err.response?.data?.message || 'Failed to load organizer dashboard')
       } finally {
         if (alive) setLoading(false)
-      }
-    }
-
-    const checkForActiveSessions = async () => {
-      try {
-        // Get all competition events owned by organizer
-        const eventsRes = await pageantService.listEvents()
-        const events = eventsRes.data.events || []
-
-        // Check each event for active sessions
-        const activeSessionPromises = events.map(async (event) => {
-          try {
-            const sessionRes = await pageantService.getActiveSession(event.id)
-            if (sessionRes.data.session && sessionRes.data.session.status === 'active') {
-              return {
-                eventId: event.id,
-                eventTitle: event.title,
-                session: sessionRes.data.session
-              }
-            }
-          } catch (err) {
-            // 404 means no active session, which is fine
-            if (err.response?.status === 404) {
-              return null
-            }
-            console.error(`Failed to check session for event ${event.id}:`, err)
-            return null
-          }
-          return null
-        })
-
-        const results = await Promise.all(activeSessionPromises)
-        const activeSessions = results.filter(result => result !== null)
-        
-        if (!alive) return
-        setActiveSessions(activeSessions)
-      } catch (err) {
-        console.error('Failed to check for active sessions:', err)
       }
     }
 
@@ -104,7 +64,10 @@ export default function OrganizerDashboardPage() {
 
   // Real-time updates via WebSocket - no more polling!
   useSocketEvent('organizer:stats-updated', () => {
-    organizerService.getDashboard().then(({ data }) => setDashboard(data))
+    organizerService.getDashboard().then(({ data }) => {
+      setDashboard(data)
+      setActiveSessions(data.activeSessions ?? [])
+    })
   })
 
   // Helper function to format elapsed time

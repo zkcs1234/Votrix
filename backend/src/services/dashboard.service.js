@@ -8,6 +8,7 @@ import {
   USER_ROLES,
   PARTICIPANT_TYPES,
 } from '../utils/constants.js'
+import { getActiveSessionsForEvents } from './competition-session.service.js'
 
 
 function monthKey(dateLike) {
@@ -445,6 +446,20 @@ export async function getOrganizerDashboardStats(organizerId) {
     organizerId,
   })
 
+  // Fold what used to be one getActiveSession request per competition event
+  // (an N+1 on the organizer home) into a single batched lookup here.
+  const eventTitleById = new Map(events.map((e) => [e.id, e.title]))
+  const sessionsByEvent = await getActiveSessionsForEvents(competitionEventIds).catch(
+    () => new Map(),
+  )
+  const activeSessions = [...sessionsByEvent.entries()]
+    .filter(([, session]) => session && session.status === 'active')
+    .map(([eventId, session]) => ({
+      eventId,
+      eventTitle: eventTitleById.get(eventId) ?? 'Untitled event',
+      session,
+    }))
+
 return {
     organization: orgData
       ? {
@@ -453,6 +468,7 @@ return {
           logo: userData?.organization_logo ?? null,
         }
       : null,
+    activeSessions,
     stats: {
       totalEvents: events.length,
       activeEvents: events.filter((e) => e.status === EVENT_STATUS.ACTIVE).length,

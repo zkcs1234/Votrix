@@ -123,7 +123,7 @@ export default function useDraft(module) {
       setTimeout(() => {
         setSaveStatus((prev) => (prev === 'saved' ? 'idle' : prev))
       }, 3000)
-    } catch (error) {
+    } catch {
       setSaveStatus('error')
     }
   }, [saveDraft])

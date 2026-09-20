@@ -47,6 +47,10 @@ jobs:
         # `npm run lint` exits non-zero when there are errors.
         run: npm run lint
 
+      - name: Run unit tests
+        # Vitest run mode; a failing test fails CI.
+        run: npm test
+
       - name: Build production bundle
         # `vite build` will catch any import, syntax, or type errors that
         # the linter does not. A failing build is treated as a CI failure.

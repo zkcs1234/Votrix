@@ -28,4 +28,10 @@ export default defineConfig({
     },
   },
   build: {},
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.js',
+    css: false,
+  },
 })

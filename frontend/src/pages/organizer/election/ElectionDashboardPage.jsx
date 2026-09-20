@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarDays, Vote, Users, CheckSquare, Plus } from 'lucide-react'
 import { electionService } from '@/services/election.service'
 import PageLoader from '@/components/ui/PageLoader'
@@ -9,25 +9,24 @@ import Button from '@/components/ui/Button'
 import EventStatsTable from '@/components/organizer/EventStatsTable'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
+// Reference page for the React Query adoption (Phase B1). The service layer is
+// unchanged — useQuery just calls electionService.getDashboard — but the manual
+// useState/useEffect/loading/refetch boilerplate is gone, and websocket events
+// invalidate the cache instead of hand-rolling a reload.
+export const ELECTION_DASHBOARD_KEY = ['election', 'dashboard']
+
 export default function ElectionDashboardPage() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ELECTION_DASHBOARD_KEY,
+    queryFn: () => electionService.getDashboard().then((res) => res.data),
+  })
 
-  const load = () => {
-    electionService
-      .getDashboard()
-      .then(({ data: res }) => setData(res))
-      .finally(() => setLoading(false))
-  }
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ELECTION_DASHBOARD_KEY })
+  useSocketEvent('election:vote-submitted', invalidate)
+  useSocketEvent('election:voting-toggled', invalidate)
 
-  useEffect(() => {
-    load()
-  }, [])
-
-  useSocketEvent('election:vote-submitted', () => load())
-  useSocketEvent('election:voting-toggled', () => load())
-
-  if (loading) return <PageLoader label="Loading dashboard…" />
+  if (isLoading) return <PageLoader label="Loading dashboard…" />
 
   return (
     <div className="space-y-8">

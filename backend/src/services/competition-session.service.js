@@ -194,6 +194,27 @@ export async function getActiveSession(eventId) {
   return data ? mapSession(data) : null
 }
 
+/**
+ * Batch variant of getActiveSession: returns the active session for each of the
+ * given events in a single query. Lets the organizer dashboard avoid one request
+ * per competition event (the previous N+1). Returns a Map<eventId, session>.
+ */
+export async function getActiveSessionsForEvents(eventIds = []) {
+  const result = new Map()
+  if (!eventIds.length) return result
+
+  const { data, error } = await getClient()
+    .from('v_competition_active_session')
+    .select('*')
+    .in('event_id', eventIds)
+
+  if (error) throw new ApiError(500, error.message)
+  for (const row of data ?? []) {
+    result.set(row.event_id, mapSession(row))
+  }
+  return result
+}
+
 // Find the current live session INCLUDING a paused one. The
 // v_competition_active_session view filters to status='active', so a paused
 // session is invisible to getActiveSession — which is correct for the scoring

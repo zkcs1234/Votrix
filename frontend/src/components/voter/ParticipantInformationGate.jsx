@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ParticipantInformationForm from '@/components/voter/ParticipantInformationForm'
 import { voterService } from '@/services/voter.service'
 

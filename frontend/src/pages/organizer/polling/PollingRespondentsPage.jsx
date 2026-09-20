@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Lock } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
 import Button from '@/components/ui/Button'
+import Modal from '@/components/ui/Modal'
 import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
@@ -32,10 +33,7 @@ function downloadCsvTemplate() {
 
 function CsvPreviewModal({ data, onClose, onRegister, registering }) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-v-surface rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto">
-        <h3 className="v-page-title mb-4">Review & Register</h3>
-
+    <Modal open onClose={onClose} title="Review & Register" size="lg">
         {data.errors?.length > 0 && (
           <div className="mb-4 p-3 bg-v-danger/10 border border-v-danger/30 rounded-lg">
             <p className="v-error-text font-semibold mb-2">{data.errors.length} error(s)</p>
@@ -73,8 +71,7 @@ function CsvPreviewModal({ data, onClose, onRegister, registering }) {
             Register ({data.valid})
           </Button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
