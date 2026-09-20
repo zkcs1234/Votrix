@@ -50,13 +50,27 @@ export default function DynamicParticipantTable({
   // Derive dynamic columns from the form schema
   const customFields = formSchema?.enabled ? (Array.isArray(formSchema.fields) ? formSchema.fields : []) : []
 
-  // Search matches email + every metadata value; each custom field is a facet.
+  // Search matches email + every metadata value.
   const searchKeys = ['email', ...customFields.map((f) => (p) => readField(p, f))]
-  const facetFields = customFields.map((f) => ({
-    id: f.id,
-    label: f.label,
-    accessor: (p) => readField(p, f),
-  }))
+
+  // Facet only on CATEGORICAL fields — a dropdown (fixed choices, by design) or
+  // a field whose values repeat across people (e.g. Program & Year Level). A
+  // free-text field that is unique per person (e.g. Full name) is searchable but
+  // never becomes a filter, so the useful grouping fields surface instead.
+  const rowCount = participants.length
+  const facetFields = customFields
+    .filter((f) => {
+      if (f.type === 'dropdown') return true
+      const distinct = new Set(
+        participants.map((p) => readField(p, f)).filter((v) => v != null && v !== ''),
+      )
+      return distinct.size > 0 && distinct.size < rowCount
+    })
+    .map((f) => ({
+      id: f.id,
+      label: f.label,
+      accessor: (p) => readField(p, f),
+    }))
 
   const {
     search,

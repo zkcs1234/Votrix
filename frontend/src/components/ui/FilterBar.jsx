@@ -49,9 +49,10 @@ export default function FilterBar({
 
         {facetFields.map((field) => {
           const options = facets[field.id] ?? []
-          // Hide a facet with nothing to filter by (0 or 1 distinct value and
-          // no active selection) so the bar stays uncluttered.
-          if (options.length < 2 && !activeFilters[field.id]) return null
+          // Hide a facet only when it has no values at all. A single-value facet
+          // still shows so its count is visible (e.g. "BSCS - 4A (2)"); the
+          // caller decides which fields are worth faceting in the first place.
+          if (options.length === 0 && !activeFilters[field.id]) return null
           return (
             <select
               key={field.id}

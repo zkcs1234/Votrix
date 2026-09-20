@@ -54,7 +54,9 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [templates, setTemplates] = useState([])
   const [competitionType, setCompetitionType] = useState(null)
   const [eventStatus, setEventStatus] = useState(null)
-  const readOnly = isSetupLocked(eventStatus)
+  // A brand-new event has no status yet (null); it is always editable. Only an
+  // existing event whose setup is locked (scheduled/active/…) is read-only.
+  const readOnly = !isNew && isSetupLocked(eventStatus)
 
 const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'competition',
@@ -571,6 +573,11 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               saveStatus={saveStatus}
               lastSavedAt={lastSavedAt}
             />
+        )}
+
+        {/* Read-only events keep a plain Back/Next footer for viewing. */}
+        {readOnly && (
+          <StageFooter module="competition" currentKey={step} eventId={eventId} />
         )}
           </div>
         </>
