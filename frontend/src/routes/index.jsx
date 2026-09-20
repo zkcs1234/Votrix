@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { lazy } from 'react'
-import AuthLayout from '@/layouts/AuthLayout'
+// AuthLayout is the only framer-motion consumer; lazy-loading it keeps that
+// ~100 KB animation library out of the main bundle (loaded only on auth routes).
+const AuthLayout = lazy(() => import('@/layouts/AuthLayout'))
 import DashboardLayout from '@/layouts/DashboardLayout'
 import ElectionLayout from '@/layouts/ElectionLayout'
 import PageantLayout from '@/layouts/PageantLayout'
