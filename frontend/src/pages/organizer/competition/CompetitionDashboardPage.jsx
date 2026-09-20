@@ -1,5 +1,5 @@
-﻿import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+﻿import { Link } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarDays, Zap, Users, Star, CheckSquare, Plus } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import StatCard from '@/components/ui/StatCard'
@@ -9,47 +9,28 @@ import EventStatsTable from '@/components/organizer/EventStatsTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
+export const COMPETITION_DASHBOARD_KEY = ['competition', 'dashboard']
+
 export default function CompetitionDashboardPage() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: COMPETITION_DASHBOARD_KEY,
+    queryFn: () => pageantService.getDashboard().then((res) => res.data),
+  })
 
   // Use delayed loading - only show skeleton after 300ms
-  const showLoader = useDelayedLoading(loading, 300)
+  const showLoader = useDelayedLoading(isLoading, 300)
 
-  useEffect(() => {
-    let alive = true
-
-    const load = () => {
-      pageantService
-        .getDashboard()
-        .then(({ data: res }) => {
-          if (alive) setData(res)
-        })
-        .finally(() => {
-          if (alive) setLoading(false)
-        })
-    }
-
-    load()
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  // Real-time updates via WebSocket - no more polling!
-  useSocketEvent('rankings:updated', () => {
-    pageantService.getDashboard().then(({ data }) => setData(data))
-  })
-
-  useSocketEvent('session:status-changed', () => {
-    pageantService.getDashboard().then(({ data }) => setData(data))
-  })
+  // Real-time updates via WebSocket invalidate the cached dashboard.
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: COMPETITION_DASHBOARD_KEY })
+  useSocketEvent('rankings:updated', invalidate)
+  useSocketEvent('session:status-changed', invalidate)
 
   // Show nothing under 300ms
-  if (loading && !showLoader) return null
+  if (isLoading && !showLoader) return null
 
   // Show skeleton after 300ms
-  if (loading || showLoader) {
+  if (isLoading || showLoader) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-72 animate-pulse rounded-lg bg-v-surface-elevated" />

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { BarChart2, Zap, Send, Plus } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
 import StatCard from '@/components/ui/StatCard'
@@ -9,32 +9,27 @@ import EventStatsTable from '@/components/organizer/EventStatsTable'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
+export const POLLING_DASHBOARD_KEY = ['polling', 'dashboard']
+
 export default function PollingDashboardPage() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: POLLING_DASHBOARD_KEY,
+    queryFn: () => pollingService.getDashboard().then((res) => res.data),
+  })
 
   // Use delayed loading - only show skeleton after 300ms
-  const showLoader = useDelayedLoading(loading, 300)
+  const showLoader = useDelayedLoading(isLoading, 300)
 
-  const load = () => {
-    pollingService
-      .getDashboard()
-      .then(({ data: res }) => setData(res))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    load()
-  }, [])
-
-  useSocketEvent('poll:response-submitted', () => load())
-  useSocketEvent('poll:polling-toggled', () => load())
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: POLLING_DASHBOARD_KEY })
+  useSocketEvent('poll:response-submitted', invalidate)
+  useSocketEvent('poll:polling-toggled', invalidate)
 
   // Show nothing under 300ms
-  if (loading && !showLoader) return null
+  if (isLoading && !showLoader) return null
 
   // Show skeleton after 300ms
-  if (loading || showLoader) {
+  if (isLoading || showLoader) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
