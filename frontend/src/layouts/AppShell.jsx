@@ -26,6 +26,16 @@ const ROLE_LABELS = {
 const AUTO_COLLAPSE_BELOW = 1280
 const SIDEBAR_COLLAPSED_KEY = 'votrix.sidebar.collapsed'
 
+// Wide, terminal event views where content room matters more than the workflow
+// nav, so the sidebar auto-collapses on them. Setup pages (positions, voters,
+// contestants, judges…) are intentionally excluded — their nav is the point.
+const FOCUS_SUBPAGES = new Set(['analytics', 'live', 'rankings'])
+
+function isFocusPath(pathname) {
+  const segment = (pathname ?? '').split('/').filter(Boolean).pop()
+  return FOCUS_SUBPAGES.has(segment)
+}
+
 function readCollapsedPref() {
   try {
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'
@@ -123,41 +133,47 @@ function SidebarContent({
     <div className="flex h-full flex-col">
       {/* Top Section */}
       <div className="flex-1">
-        <div className={`flex items-center ${isCollapsed ? 'justify-between h-14' : 'justify-between'}`}>
-          <div className="flex items-center gap-3">
-            {isCollapsed ? (
-              <Link
-                to={homeLink}
-                className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15"
-                aria-label="Votrix home"
+        {isCollapsed ? (
+          // Collapsed rail: logo mark on top, expand toggle centered beneath it
+          // so neither is cramped in the narrow width.
+          <div className="flex flex-col items-center gap-3">
+            <Link
+              to={homeLink}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15"
+              aria-label="Votrix home"
+            >
+              <VotrixLogo size="sm" variant="mark" className="text-white" />
+            </Link>
+            {onToggleCollapse && (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="hidden h-10 w-10 items-center justify-center rounded-xl text-gray-400 transition-colors duration-150 hover:bg-white/10 hover:text-white lg:inline-flex"
+                aria-expanded={false}
+                aria-label="Expand sidebar"
+                title="Expand sidebar"
               >
-                <VotrixLogo size="sm" variant="mark" className="text-white" />
-              </Link>
-            ) : (
-              <VotrixLogo size="md" linkTo={homeLink} className="text-white" />
+                <PanelLeftOpen className="h-5 w-5" strokeWidth={1.5} />
+              </button>
             )}
           </div>
-          {onToggleCollapse && (
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              className={`hidden lg:inline-flex items-center justify-center p-2.5 transition-colors duration-150 ${
-                isCollapsed
-                  ? 'rounded-full border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15'
-                  : 'rounded-lg text-gray-400 hover:bg-white/10 hover:text-white'
-              }`}
-              aria-expanded={!isCollapsed}
-              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {isCollapsed ? (
-                <PanelLeftOpen className="h-5 w-5" strokeWidth={1.5} />
-              ) : (
+        ) : (
+          <div className="flex items-center justify-between">
+            <VotrixLogo size="md" linkTo={homeLink} className="text-white" />
+            {onToggleCollapse && (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="hidden items-center justify-center rounded-lg p-2.5 text-gray-400 transition-colors duration-150 hover:bg-white/10 hover:text-white lg:inline-flex"
+                aria-expanded
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+              >
                 <PanelLeftClose className="h-5 w-5" strokeWidth={1.5} />
-              )}
-            </button>
-          )}
-        </div>
+              </button>
+            )}
+          </div>
+        )}
         {navItems?.length > 0 && (
           <div className={`mt-8 ${isCollapsed ? 'space-y-1' : ''}`}>
             <NavLinks
@@ -203,12 +219,20 @@ export default function AppShell({
   children,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
-  // Narrow viewports start collapsed regardless of the saved preference; wide
-  // ones honour it. A responsive effect below keeps this in sync on resize.
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < AUTO_COLLAPSE_BELOW) return true
-    return readCollapsedPref()
-  })
+  // Is the viewport under the auto-collapse breakpoint? Tracked as state so a
+  // resize across the breakpoint recomputes the collapsed state.
+  const [isNarrow, setIsNarrow] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < AUTO_COLLAPSE_BELOW,
+  )
+  // Effective collapsed state. Auto-collapses on narrow screens and on data-heavy
+  // "focus" pages (analytics, live control, rankings); otherwise it follows the
+  // saved preference. The compute effect below keeps this in sync.
+  const [isCollapsed, setIsCollapsed] = useState(
+    () =>
+      isNarrow ||
+      (typeof window !== 'undefined' && isFocusPath(window.location.pathname)) ||
+      readCollapsedPref(),
+  )
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const [profileCardOpen, setProfileCardOpen] = useState(false)
@@ -234,9 +258,10 @@ export default function AppShell({
   const toggleCollapse = () => {
     setIsCollapsed((prev) => {
       const next = !prev
-      // Only persist on wide screens. On narrow ones the toggle is a temporary
-      // override that resets when the viewport crosses back to wide.
-      if (typeof window === 'undefined' || window.innerWidth >= AUTO_COLLAPSE_BELOW) {
+      // Persist only as a resting preference — a wide, non-focus screen. On a
+      // narrow screen or a data-heavy focus page the toggle is a temporary
+      // override that resets the next time that context changes.
+      if (!isNarrow && !isFocusPath(location.pathname)) {
         try {
           localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next))
         } catch {
@@ -247,18 +272,23 @@ export default function AppShell({
     })
   }
 
-  // Auto-collapse the sidebar on narrow viewports, and restore the saved
-  // preference when the viewport widens again. A manual toggle wins until the
-  // next time the breakpoint is crossed.
+  // Track the responsive breakpoint (fires only when it is crossed).
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return undefined
     const mq = window.matchMedia(`(max-width: ${AUTO_COLLAPSE_BELOW - 1}px)`)
-    const apply = (isNarrow) => setIsCollapsed(isNarrow ? true : readCollapsedPref())
-    apply(mq.matches)
-    const handler = (e) => apply(e.matches)
+    const handler = (e) => setIsNarrow(e.matches)
+    setIsNarrow(mq.matches)
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
+
+  // Recompute the collapsed state whenever the context changes: a narrow screen
+  // or a data-heavy focus page auto-collapses; leaving both restores the saved
+  // preference. Runs on breakpoint crossings and on navigation into/out of a
+  // focus page, which is what makes the collapse feel automatic.
+  useEffect(() => {
+    setIsCollapsed(isNarrow || isFocusPath(location.pathname) ? true : readCollapsedPref())
+  }, [isNarrow, location.pathname])
 
   const displayName = user?.username ?? user?.email ?? 'User'
   const initials = displayName.slice(0, 2).toUpperCase()
