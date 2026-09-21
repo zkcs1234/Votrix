@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Bell, LogOut, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
+import { Menu, Bell, LogOut, ChevronLeft, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { authService } from '@/services/auth.service'
 import { notificationsService } from '@/services/notifications.service'
@@ -18,6 +18,20 @@ const ROLE_LABELS = {
   admin: 'Administrator',
   organizer: 'Organizer',
   voter: 'Voter',
+}
+
+// Below this width the fixed sidebar crowds the content, so it auto-collapses to
+// a rail; at or above it, the user's saved preference applies. Matches Tailwind's
+// `xl` breakpoint.
+const AUTO_COLLAPSE_BELOW = 1280
+const SIDEBAR_COLLAPSED_KEY = 'votrix.sidebar.collapsed'
+
+function readCollapsedPref() {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'
+  } catch {
+    return false
+  }
 }
 
 function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
@@ -127,17 +141,19 @@ function SidebarContent({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className={`hidden lg:inline-flex items-center ${isCollapsed ? 'rounded-full border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15' : 'rounded-lg text-gray-400 hover:bg-white/10 hover:text-white'} transition-colors duration-150 ${isCollapsed ? 'p-2.5 justify-center' : 'p-2.5 gap-3'}`}
+              className={`hidden lg:inline-flex items-center justify-center p-2.5 transition-colors duration-150 ${
+                isCollapsed
+                  ? 'rounded-full border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15'
+                  : 'rounded-lg text-gray-400 hover:bg-white/10 hover:text-white'
+              }`}
               aria-expanded={!isCollapsed}
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               {isCollapsed ? (
-                <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
+                <PanelLeftOpen className="h-5 w-5" strokeWidth={1.5} />
               ) : (
-                <>
-                  <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
-                  <span className="text-sm font-medium">Collapse</span>
-                </>
+                <PanelLeftClose className="h-5 w-5" strokeWidth={1.5} />
               )}
             </button>
           )}
@@ -187,9 +203,11 @@ export default function AppShell({
   children,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  // Narrow viewports start collapsed regardless of the saved preference; wide
+  // ones honour it. A responsive effect below keeps this in sync on resize.
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    const stored = localStorage.getItem('votrix.sidebar.collapsed')
-    return stored === 'true'
+    if (typeof window !== 'undefined' && window.innerWidth < AUTO_COLLAPSE_BELOW) return true
+    return readCollapsedPref()
   })
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
@@ -216,10 +234,31 @@ export default function AppShell({
   const toggleCollapse = () => {
     setIsCollapsed((prev) => {
       const next = !prev
-      localStorage.setItem('votrix.sidebar.collapsed', String(next))
+      // Only persist on wide screens. On narrow ones the toggle is a temporary
+      // override that resets when the viewport crosses back to wide.
+      if (typeof window === 'undefined' || window.innerWidth >= AUTO_COLLAPSE_BELOW) {
+        try {
+          localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next))
+        } catch {
+          /* storage unavailable — keep the in-memory state only */
+        }
+      }
       return next
     })
   }
+
+  // Auto-collapse the sidebar on narrow viewports, and restore the saved
+  // preference when the viewport widens again. A manual toggle wins until the
+  // next time the breakpoint is crossed.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined
+    const mq = window.matchMedia(`(max-width: ${AUTO_COLLAPSE_BELOW - 1}px)`)
+    const apply = (isNarrow) => setIsCollapsed(isNarrow ? true : readCollapsedPref())
+    apply(mq.matches)
+    const handler = (e) => apply(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   const displayName = user?.username ?? user?.email ?? 'User'
   const initials = displayName.slice(0, 2).toUpperCase()
