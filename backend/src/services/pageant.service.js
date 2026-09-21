@@ -27,6 +27,7 @@ import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
 import { emitToEvent } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
+import { notifyAdminsEventPublished } from './notification.service.js'
 import {
   assertEventUpdateAllowed,
   assertSetupEditable,
@@ -449,6 +450,13 @@ export async function publishCompetitionEvent(eventId, organizerId) {
     module: 'competition',
     details: { title: event.title },
   })
+
+  // Let admins know a new event went live. Non-fatal — never block publishing.
+  await notifyAdminsEventPublished({
+    eventId,
+    title: event.title,
+    eventType: event.event_type,
+  }).catch((err) => console.error('[competition] admin publish notification failed (non-fatal):', err.message))
 
   // Re-read so the returned status reflects any reconciliation the sync applied.
   const published = await getEventById(eventId)

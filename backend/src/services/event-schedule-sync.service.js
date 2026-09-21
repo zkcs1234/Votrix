@@ -2,6 +2,7 @@ import { db } from '../foundation/db.js'
 import { DB_TABLES, EVENT_TYPES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
 import { isWithinEventSchedule } from '../utils/eventSchedule.js'
 import { emitToEvent } from '../websocket/ws-emitter.js'
+import { notifyOrganizerEventStatus } from './notification.service.js'
 
 let syncTimer = null
 let syncInFlight = false
@@ -118,7 +119,34 @@ async function reconcileEvent(event, now, liveEventIds, completedEventIds) {
     })
   }
 
+  // Tell the organizer when the scheduler flips their event open or closed.
+  // Non-fatal: a notification failure must never break schedule reconciliation.
+  if (updates.status === 'active' || updates.status === 'completed') {
+    await notifyOrganizerOfStatusChange(event.id, updates.status).catch((err) =>
+      console.error('[schedule-sync] organizer status notification failed (non-fatal):', err.message),
+    )
+  }
+
   return true
+}
+
+// Resolve the event's title and owning organizer, then notify them. Only runs on
+// an actual open/close transition, so the extra lookup is rare.
+async function notifyOrganizerOfStatusChange(eventId, status) {
+  const { data } = await db()
+    .from(DB_TABLES.EVENTS)
+    .select('id, title, event_type, organizations ( organizer_id )')
+    .eq('id', eventId)
+    .single()
+
+  if (!data) return
+  await notifyOrganizerEventStatus({
+    organizerId: data.organizations?.organizer_id,
+    eventId: data.id,
+    title: data.title,
+    eventType: data.event_type,
+    status,
+  })
 }
 
 export async function syncEventSchedules() {

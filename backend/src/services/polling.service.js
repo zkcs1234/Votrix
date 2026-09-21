@@ -26,7 +26,7 @@ import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
 import { findUserByEmail, findUserById, sanitizeUser } from './user.service.js'
 import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './mailer.service.js'
-import { createNotification } from './notification.service.js'
+import { createNotification, notifyAdminsEventPublished } from './notification.service.js'
 import { USER_ROLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
 import {
@@ -745,6 +745,13 @@ export async function publishPollEvent(eventId, organizerId) {
     module: 'polling',
     details: { title: event.title },
   })
+
+  // Let admins know a new event went live. Non-fatal — never block publishing.
+  await notifyAdminsEventPublished({
+    eventId,
+    title: event.title,
+    eventType: EVENT_TYPES.POLLING,
+  }).catch((err) => console.error('[polling] admin publish notification failed (non-fatal):', err.message))
 
   // Re-read so the returned status reflects any reconciliation the sync applied.
   const published = await getEventById(eventId)

@@ -10,6 +10,7 @@ import { mapEvent } from '../foundation/mapper.js'
 import { recordAudit } from '../foundation/audit.js'
 import { recordEventActivity } from '../foundation/activity.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
+import { notifyAdminsEventPublished } from './notification.service.js'
 import {
   assertEventUpdateAllowed,
   assertSetupEditable,
@@ -1329,6 +1330,13 @@ export async function publishElectionEvent(eventId, organizerId) {
     entityId: eventId,
     details: { title: event.title },
   })
+
+  // Let admins know a new event went live. Non-fatal — never block publishing.
+  await notifyAdminsEventPublished({
+    eventId,
+    title: event.title,
+    eventType: EVENT_TYPES.ELECTION,
+  }).catch((err) => console.error('[election] admin publish notification failed (non-fatal):', err.message))
 
   invalidateDashboardCache(organizerId)
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Bell, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Menu, Bell, LogOut, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { authService } from '@/services/auth.service'
 import { notificationsService } from '@/services/notifications.service'
@@ -10,6 +10,15 @@ import NotificationsModal from '@/components/ui/NotificationsModal'
 import GlobalSearch from '@/components/ui/GlobalSearch'
 import ProfileCard from '@/components/organizer/ProfileCard'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
+
+// Human-readable labels for the account chip. Shown instead of the raw username
+// or email, which can be long — the role is short and tells the user which
+// account they're signed in as.
+const ROLE_LABELS = {
+  admin: 'Administrator',
+  organizer: 'Organizer',
+  voter: 'Voter',
+}
 
 function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
   const linkClass = (active) =>
@@ -214,6 +223,10 @@ export default function AppShell({
 
   const displayName = user?.username ?? user?.email ?? 'User'
   const initials = displayName.slice(0, 2).toUpperCase()
+  const roleLabel = ROLE_LABELS[user?.role] ?? 'Account'
+  // Organizers open the ProfileCard; everyone else opens the dropdown. One flag
+  // drives the trigger's highlighted/open state for both.
+  const profileOpen = isOrganizer ? profileCardOpen : profileDropdownOpen
 
   // Close profile dropdown on outside click
   useEffect(() => {
@@ -400,17 +413,32 @@ export default function AppShell({
                     ? setProfileCardOpen((prev) => !prev)
                     : setProfileDropdownOpen((prev) => !prev)
                 }
-                className="flex items-center gap-2 rounded-lg border border-v-border px-2 py-1.5 text-sm transition hover:bg-v-surface-elevated"
-                aria-expanded={isOrganizer ? profileCardOpen : profileDropdownOpen}
+                className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-2 text-sm transition sm:pr-3 ${
+                  profileOpen
+                    ? 'border-v-primary bg-v-primary-soft ring-2 ring-v-primary/30'
+                    : 'border-v-border hover:border-v-primary/50 hover:bg-v-surface-elevated'
+                }`}
+                aria-expanded={profileOpen}
                 aria-haspopup="true"
-                aria-label="Open profile menu"
+                aria-label="Open account menu"
+                title={`Signed in as ${displayName} — account & sign out`}
               >
-                <div
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-v-surface-elevated text-xs font-semibold text-v-text-muted"
+                <span
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-v-primary text-xs font-semibold text-v-sidebar-active"
                   aria-hidden
                 >
                   {initials}
-                </div>
+                </span>
+                <span className="hidden font-medium text-v-text sm:block">
+                  {roleLabel}
+                </span>
+                <ChevronDown
+                  className={`hidden h-4 w-4 shrink-0 text-v-text-muted transition-transform sm:block ${
+                    profileOpen ? 'rotate-180' : ''
+                  }`}
+                  strokeWidth={1.5}
+                  aria-hidden
+                />
               </button>
 
               {profileDropdownOpen && (

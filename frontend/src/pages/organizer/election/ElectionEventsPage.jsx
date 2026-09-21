@@ -66,9 +66,17 @@ function BallotPreviewModal({ eventId, onClose }) {
                       key={candidate.id}
                       className="flex items-center gap-3 rounded-xl border border-v-border-strong px-4 py-3 bg-v-surface-elevated"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-v-surface text-v-text font-semibold text-sm">
-                        {candidate.name?.charAt(0)}
-                      </div>
+                      {candidate.photo ? (
+                        <img
+                          src={candidate.photo}
+                          alt={`Photo of ${candidate.name}`}
+                          className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-v-surface text-v-text font-semibold text-sm">
+                          {candidate.name?.charAt(0)}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm text-v-text">{candidate.name}</p>
                         {(candidate.party || candidate.partylist) && (

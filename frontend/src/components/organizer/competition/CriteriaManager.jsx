@@ -4,29 +4,12 @@ import { pageantService } from '@/services/pageant.service'
 import { useToast } from '@/hooks/useToast'
 import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
 import { HELPER_TEXT, INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
+// §8C: the score range is owned by the event scale (scoring_config.scoreType),
+// not per-criterion, and each minor criterion carries its own score type. Both
+// live in the shared helper so this editor and the organizer previews agree.
+import { resolveScaleBounds, minorScoreLabel } from '@/utils/scoreScale'
 
 const inputClass = `${INPUT_CLASS} w-full`
-
-// §8C: the score range is owned by the event scale (scoring_config.scoreType),
-// not per-criterion. Mirrors the backend resolveScoreBounds.
-function resolveScaleBounds(scoringConfig) {
-  const cfg = scoringConfig ?? {}
-  switch (cfg.scoreType) {
-    case 'range_1_10':
-      return { min: 1, max: 10 }
-    case 'decimal':
-      return { min: 0, max: 10 }
-    case 'custom_range': {
-      const min = Number(cfg.customMin ?? 0)
-      const max = Number(cfg.customMax ?? 100)
-      if (Number.isNaN(min) || Number.isNaN(max) || max < min) return { min: 0, max: 100 }
-      return { min, max }
-    }
-    case 'range_1_100':
-    default:
-      return { min: 1, max: 100 }
-  }
-}
 
 // Score type lives on each MINOR criterion (not the criterion / event). This is
 // the single source of truth for the range a judge types; the event-level
@@ -37,20 +20,6 @@ const SCORE_TYPE_OPTIONS = [
   { value: 'decimal', label: 'Decimal (0–10)' },
   { value: 'custom_range', label: 'Custom range' },
 ]
-
-function minorBoundsLabel(m) {
-  switch (m.scoreType) {
-    case 'range_1_10':
-      return '1–10'
-    case 'decimal':
-      return '0–10'
-    case 'custom_range':
-      return `${m.customMin ?? '?'}–${m.customMax ?? '?'}`
-    case 'range_1_100':
-    default:
-      return '1–100'
-  }
-}
 
 // Minor criteria sit beneath a criterion. Judges score THESE. They carry no
 // percentage (equal weight within the criterion) and each owns its score type.
@@ -120,7 +89,7 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
               <span className="min-w-0 truncate text-v-text">{m.name}</span>
               <span className="flex items-center gap-2">
                 <span className="rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-v-primary">
-                  {minorBoundsLabel(m)}
+                  {minorScoreLabel(m, { placeholder: '?' })}
                 </span>
                 <button
                   type="button"

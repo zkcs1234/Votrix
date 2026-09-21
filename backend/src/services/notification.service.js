@@ -3,7 +3,7 @@
 
 import { db, wrap } from '../foundation/db.js'
 import { notFound } from '../foundation/errors.js'
-import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
+import { DB_TABLES, USER_ROLES, EVENT_TYPES } from '../utils/constants.js'
 
 import { emitToUser } from '../websocket/ws-emitter.js'
 
@@ -161,4 +161,73 @@ export async function markAllNotificationsRead(userId) {
 
 export async function createAdminAlert(payload) {
   return createNotificationsForRole(USER_ROLES.ADMIN, payload)
+}
+
+// ——— Event lifecycle notifications (organizer + admin) ———
+
+// Where an organizer lands when they tap an event notification. There is no bare
+// `/events/:id` route per module, so we link to the module's events list, which
+// is always valid.
+const ORGANIZER_EVENT_BASE = {
+  [EVENT_TYPES.ELECTION]: '/organizer/election/events',
+  [EVENT_TYPES.PAGEANT]: '/organizer/competition/events',
+  [EVENT_TYPES.COMPETITION_SCORING]: '/organizer/competition/events',
+  [EVENT_TYPES.POLLING]: '/organizer/polling/events',
+}
+
+function organizerEventUrl(eventType) {
+  return ORGANIZER_EVENT_BASE[eventType] ?? '/organizer'
+}
+
+function participationNoun(eventType) {
+  if (eventType === EVENT_TYPES.POLLING) return 'responses'
+  if (eventType === EVENT_TYPES.ELECTION) return 'votes'
+  return 'scores'
+}
+
+// Notify an event's organizer that the scheduler opened ('active') or closed
+// ('completed') it. No-ops for any other status so callers can pass through
+// whatever transition just happened.
+export async function notifyOrganizerEventStatus({ organizerId, eventId, title, eventType, status }) {
+  if (!organizerId || !eventId) return null
+  const name = title || 'your event'
+
+  let payload
+  if (status === 'active') {
+    payload = {
+      type: 'event.opened',
+      title: 'Your event is now open',
+      message: `"${name}" is now open and accepting ${participationNoun(eventType)}.`,
+    }
+  } else if (status === 'completed') {
+    payload = {
+      type: 'event.closed',
+      title: 'Your event has closed',
+      message: `"${name}" has closed. Results are ready to review.`,
+    }
+  } else {
+    return null
+  }
+
+  return createNotification({
+    userId: organizerId,
+    ...payload,
+    actionUrl: organizerEventUrl(eventType),
+    entity: 'events',
+    entityId: eventId,
+    metadata: { status, eventType },
+  })
+}
+
+// Alert every admin that an organizer just published a new event.
+export async function notifyAdminsEventPublished({ eventId, title, eventType }) {
+  return createAdminAlert({
+    type: 'event.published',
+    title: 'New event published',
+    message: `A new ${(eventType ?? '').replace('_', ' ') || 'event'} "${title || 'Untitled'}" was just published.`,
+    actionUrl: '/admin/events',
+    entity: 'events',
+    entityId: eventId,
+    metadata: { eventType },
+  })
 }

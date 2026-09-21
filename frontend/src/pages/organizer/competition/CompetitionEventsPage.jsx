@@ -8,25 +8,32 @@ import Button from '@/components/ui/Button'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import useDraft from '@/hooks/useDraft'
 import DraftBanner from '@/components/organizer/DraftBanner'
+import { resolveScaleBounds, scaleBoundsLabel, minorScoreLabel } from '@/utils/scoreScale'
 
 function ScoringSheetPreviewModal({ eventId, eventTitle, onClose }) {
   const [contestants, setContestants] = useState([])
   const [criteria, setCriteria] = useState([])
+  const [scoringConfig, setScoringConfig] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    Promise.all([
-      pageantService.listContestants(eventId),
-      pageantService.listCriteria(eventId),
-    ])
-      .then(([contestantsRes, criteriaRes]) => {
-        setContestants(contestantsRes.data.contestants ?? [])
-        setCriteria(criteriaRes.data.criteria ?? [])
+    // The foundation carries the event's real score scale and each criterion's
+    // minor criteria, so the preview shows the range judges actually score
+    // against instead of a criterion's stale stored min/max.
+    pageantService
+      .getFoundation(eventId)
+      .then(({ data }) => {
+        const foundation = data.foundation ?? data
+        setContestants(foundation.contestants ?? [])
+        setCriteria(foundation.criteria ?? [])
+        setScoringConfig(foundation.scoringConfig ?? foundation.event?.scoring_config ?? null)
       })
       .catch((err) => setError(err.response?.data?.message || 'Failed to load preview'))
       .finally(() => setLoading(false))
   }, [eventId])
+
+  const eventBounds = resolveScaleBounds(scoringConfig)
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -59,17 +66,36 @@ function ScoringSheetPreviewModal({ eventId, eventTitle, onClose }) {
               <h4 className="font-medium text-v-text">Criteria</h4>
               {criteria.length > 0 ? (
                 <div className="space-y-2">
-                  {criteria.map((c) => (
-                    <div
-                      key={c.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-v-border-strong px-4 py-2.5 bg-v-surface-elevated"
-                    >
-                      <span className="text-sm font-medium text-v-text">{c.name}</span>
-                      <span className="text-xs text-v-text-subtle">
-                        {c.percentage}% · score {c.minScore}–{c.maxScore}
-                      </span>
-                    </div>
-                  ))}
+                  {criteria.map((c) => {
+                    const minors = c.minorCriteria ?? []
+                    return (
+                      <div
+                        key={c.id}
+                        className="rounded-xl border border-v-border-strong px-4 py-2.5 bg-v-surface-elevated"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-medium text-v-text">{c.name}</span>
+                          <span className="text-xs text-v-text-subtle">
+                            {c.percentage}%
+                            {minors.length === 0 && ` · score ${scaleBoundsLabel(eventBounds)}`}
+                          </span>
+                        </div>
+                        {minors.length > 0 && (
+                          <ul className="mt-2 space-y-1 border-t border-v-border/60 pt-2">
+                            {minors.map((m) => (
+                              <li
+                                key={m.id}
+                                className="flex items-center justify-between gap-3 text-xs text-v-text-subtle"
+                              >
+                                <span>{m.name}</span>
+                                <span>score {minorScoreLabel(m)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               ) : (
                 <p className="text-sm text-v-text-subtle">No criteria added yet.</p>
