@@ -7,6 +7,7 @@ import FormAlert from '@/components/ui/FormAlert'
 import ElectionPositionSection from '@/components/voter/election/ElectionPositionSection'
 import Button from '@/components/ui/Button'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
+import { useAuth } from '@/hooks/useAuth'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
 
@@ -104,6 +105,8 @@ function BallotSubmittedScreen({ ballot, eventId }) {
 
 export default function VoterEventPage() {
   const { eventId } = useParams()
+  const { user } = useAuth()
+  const voterName = [user?.firstName, user?.lastName].filter(Boolean).join(' ')
   const draftKey = getDraftStorageKey('electionDraft', eventId)
   const [ballot, setBallot] = useState(null)
   const [selections, setSelections] = useState(() => {
@@ -268,7 +271,9 @@ export default function VoterEventPage() {
       {/* ===== SCROLLABLE MIDDLE: header + ballot content scroll here ===== */}
       <div className="flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8">
-          <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
+          <VoterEventHeader event={ballot.event} eyebrow="Election ballot">
+            {voterName && <p className="text-sm font-medium text-white/75">Voting as {voterName}</p>}
+          </VoterEventHeader>
 
           {isReviewing ? (
             <div className="v-card p-6 space-y-6">

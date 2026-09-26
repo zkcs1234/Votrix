@@ -192,7 +192,7 @@ export default function OrganizerDashboardPage() {
       <div className="v-card-md">
         <h2 className="v-page-title">Organizer dashboard</h2>
         <p className="v-caption mt-2">
-          Signed in as <span className="text-v-text-muted">{user?.email}</span>
+          Signed in as <span className="text-v-text-muted">{user?.organizerName || user?.email}</span>
         </p>
       </div>
 

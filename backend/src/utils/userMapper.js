@@ -20,5 +20,8 @@ export function sanitizeUser(row) {
     profileData: row.profile_data ?? null,
     // Organizer voter scope (migration 076). Null for non-organizer accounts.
     scope: row.scope ?? null,
+    // Organizer profile display fields (null for non-organizer accounts).
+    organizerName: row.organizer_name ?? null,
+    organizationName: row.organization_name ?? null,
   }
 }

@@ -1522,6 +1522,32 @@ const { count: totalSubmissions } = await getClient()
     }
   })
 
+  // For a NON-anonymous poll, resolve each text response's respondent id to a
+  // real name so the analytics show who said what (plan: profile display).
+  // Anonymous polls leave respondent null, so nothing is resolved.
+  if (!anonymous) {
+    const ids = new Set()
+    for (const q of questionAnalytics) {
+      for (const r of q.responses ?? []) {
+        if (r.respondent) ids.add(r.respondent)
+      }
+    }
+    if (ids.size) {
+      const { data: usersRows } = await getClient()
+        .from(DB_TABLES.USERS)
+        .select('id, first_name, last_name, email')
+        .in('id', [...ids])
+      const nameById = new Map(
+        (usersRows ?? []).map((u) => [u.id, [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email]),
+      )
+      for (const q of questionAnalytics) {
+        for (const r of q.responses ?? []) {
+          if (r.respondent) r.respondentName = nameById.get(r.respondent) ?? null
+        }
+      }
+    }
+  }
+
   return {
     totalSubmissions: totalSubmissions ?? 0,
     enrolledRespondents: enrolledRespondents ?? 0,

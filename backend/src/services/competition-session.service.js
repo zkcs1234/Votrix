@@ -1685,7 +1685,7 @@ export async function getJudgeProgress(eventId, organizerId) {
 
   const { data: judges, error: judgeError } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id, user_id, display_name, judge_role')
+    .select('id, user_id, display_name, judge_role, users:users!inner (first_name, last_name, email)')
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .eq('is_active', true)
@@ -1785,7 +1785,12 @@ export async function getJudgeProgress(eventId, organizerId) {
     judges: eligibleJudges.map((j) => ({
       judgeId: j.user_id,
       judgeRowId: j.id,
-      displayName: j.display_name,
+      // Prefer the live account profile name over the enrollment snapshot.
+      displayName:
+        [j.users?.first_name, j.users?.last_name].filter(Boolean).join(' ') ||
+        j.display_name ||
+        j.users?.email ||
+        'Judge',
       role: j.judge_role ?? 'judge',
     })),
     contestants,

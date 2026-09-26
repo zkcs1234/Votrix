@@ -606,6 +606,8 @@ function mapJudge(row) {
     isActive: row.is_active,
     hasScored: scored,
     hasSubmitted: scored,
+    // Professional profile fields (title/affiliation/expertise), when joined.
+    profileData: row.profile_data ?? row.users?.profile_data ?? {},
     // Information-form answers (e.g. Name) live here; the judges table renders a
     // column per form field and reads the value from this map.
     metadata: row.metadata ?? {},
@@ -620,7 +622,7 @@ export async function listCompetitionJudges(eventId, organizerId) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id, event_id, user_id, first_name, last_name, metadata, has_scored, judge_role, display_name, is_active, created_at, updated_at, users!inner (id, email)')
+    .select('id, event_id, user_id, first_name, last_name, metadata, has_scored, judge_role, display_name, is_active, created_at, updated_at, users!inner (id, email, first_name, last_name, profile_data)')
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .order('created_at', { ascending: false })
@@ -644,11 +646,18 @@ export async function listCompetitionJudges(eventId, organizerId) {
     }
   }
 
-  return (data ?? []).map((row) => mapJudge({
-    ...row,
-    display_name: row.display_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || row.users?.email || null,
-    invitation_sent: invitationMap[row.user_id] ?? false,
-  }))
+  return (data ?? []).map((row) => {
+    // Prefer the live account profile so edits to a judge's name reflect
+    // everywhere; fall back to the enrollment snapshot, then email.
+    const profileName = [row.users?.first_name, row.users?.last_name].filter(Boolean).join(' ')
+    return mapJudge({
+      ...row,
+      first_name: row.users?.first_name ?? row.first_name,
+      last_name: row.users?.last_name ?? row.last_name,
+      display_name: profileName || row.display_name || row.users?.email || null,
+      invitation_sent: invitationMap[row.user_id] ?? false,
+    })
+  })
 }
 
 // Judges + the event's information-form schema, in the shape the organizer

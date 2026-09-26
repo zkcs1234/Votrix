@@ -173,7 +173,7 @@ export default function VoterDashboardPage() {
       <div className="v-card-md">
         <h2 className="v-page-title">Your events</h2>
         <p className="v-caption mt-2">
-          Signed in as <span className="text-v-text-muted">{user?.email}</span>
+          Signed in as <span className="text-v-text-muted">{[user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email}</span>
         </p>
         <p className="v-caption mt-1">
           Elections, competition judging, and polls assigned to you appear below.

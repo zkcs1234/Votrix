@@ -27,6 +27,10 @@ function TextResponses({ responses = [] }) {
     <ul className="mt-4 space-y-2 text-sm text-v-text-muted">
       {responses.map((r, i) => (
         <li key={i} className="rounded-lg border border-v-border px-3 py-2">
+          {/* Non-anonymous polls attach the respondent's name; anonymous ones don't. */}
+          {r.respondentName && (
+            <span className="mb-0.5 block text-xs font-medium text-v-text-subtle">{r.respondentName}</span>
+          )}
           {r.text}
         </li>
       ))}

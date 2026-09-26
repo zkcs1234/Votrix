@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button'
 import FormAlert from '@/components/ui/FormAlert'
 import CompetitionScoringForm from '@/components/voter/competition/CompetitionScoringForm'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
+import { useAuth } from '@/hooks/useAuth'
 
 // Build the flat scores map (keyed `contestantId:minorId`) of a judge's SAVED
 // scores, from each contestant's existingScores. Callers MERGE this over the
@@ -28,6 +29,8 @@ function scoresFromSheet(data) {
 
 export default function JudgeScoringPage() {
   const { eventId } = useParams()
+  const { user } = useAuth()
+  const judgeName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email
   const [sheet, setSheet] = useState(null)
   const [scores, setScores] = useState({})
   const [loading, setLoading] = useState(true)
@@ -510,7 +513,9 @@ export default function JudgeScoringPage() {
       )}
 
       <VoterEventHeader event={sheet?.event} eyebrow="Judge scoring">
-        <p className="text-sm font-medium text-white/75">Live session scoring</p>
+        <p className="text-sm font-medium text-white/75">
+          Live session scoring{judgeName ? ` · Scoring as ${judgeName}` : ''}
+        </p>
       </VoterEventHeader>
 
       {/* Connection error banner */}

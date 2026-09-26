@@ -8,10 +8,13 @@ import FormAlert from '@/components/ui/FormAlert'
 import Button from '@/components/ui/Button'
 import PollQuestionField from '@/components/voter/polling/PollQuestionField'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
+import { useAuth } from '@/hooks/useAuth'
 import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
 
 export default function VoterPollPage() {
   const { eventId } = useParams()
+  const { user } = useAuth()
+  const voterName = [user?.firstName, user?.lastName].filter(Boolean).join(' ')
   const draftKey = getDraftStorageKey('pollDraft', eventId)
 
   // Check for saved draft outside of state initializer
@@ -231,6 +234,7 @@ export default function VoterPollPage() {
           )}
 
           <VoterEventHeader event={poll.event} eyebrow="Poll">
+            {voterName && <p className="text-sm font-medium text-white/75">Responding as {voterName}</p>}
             {poll.event.pollAnonymous && (
               <p className="text-xs font-medium text-white/70">Your responses are anonymous.</p>
             )}
