@@ -12,7 +12,7 @@ import { DB_TABLES, USER_ROLES, ACCOUNT_STATUS } from '../utils/constants.js'
 export async function getOrganizersList() {
   const usersQuery = db()
     .from(DB_TABLES.USERS)
-    .select('id, email, organization_name, organizer_name, position, organization_type_display, organization_logo, created_at, updated_at, account_status')
+    .select('id, email, organization_name, organizer_name, position, organization_type_display, organization_logo, scope, created_at, updated_at, account_status')
     .eq('role', USER_ROLES.ORGANIZER)
     .order('created_at', { ascending: false })
   const users = await wrap(await usersQuery, { context: 'admin.getOrganizersList' })

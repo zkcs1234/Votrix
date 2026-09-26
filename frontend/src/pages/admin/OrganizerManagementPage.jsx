@@ -1,17 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Users, UserCheck, ShieldOff, UserPlus, Mail, Download } from 'lucide-react'
+import { Users, UserCheck, ShieldOff, UserPlus, Upload, Download } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import CreateOrganizerModal from '@/components/admin/CreateOrganizerModal'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import Modal from '@/components/ui/Modal'
 import FormAlert from '@/components/ui/FormAlert'
 import Badge from '@/components/ui/Badge'
 import SearchInput from '@/components/ui/SearchInput'
 import StatCard from '@/components/ui/StatCard'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 const STATUS_CONFIG = {
   active: { tone: 'success', label: 'Active' },
@@ -111,12 +113,58 @@ export default function OrganizerManagementPage() {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingOrg, setEditingOrg] = useState(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [savingKey, setSavingKey] = useState(null)
   const showLoader = useDelayedLoading(loading, 300)
   const { success: toastSuccess, error: toastError } = useToast()
   const [exporting, setExporting] = useState(false)
+  const [csvPreview, setCsvPreview] = useState(null)
+  const [registeringCsv, setRegisteringCsv] = useState(false)
+  const fileRef = useRef(null)
+
+  const closeModal = () => { setIsModalOpen(false); setEditingOrg(null) }
+
+  const downloadTemplate = () => {
+    const csv = 'email,organizer name,position,organization name,organization type,scope type,programs,year & sections\n' +
+      'organizer@example.com,Jane Cruz,SSG Adviser,Supreme Student Government,Student Organization,scoped,BSCS;BSIT,3-A;3-B\n'
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'organizer-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleCsvFile = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const { data } = await adminService.previewOrganizersCsv(file)
+      setCsvPreview(data)
+    } catch (err) {
+      const details = err.response?.data?.details?.errors
+      toastError(details?.length ? details.join('; ') : getErrorMessage(err, 'Preview failed'))
+    }
+    e.target.value = ''
+  }
+
+  const handleRegisterCsv = async () => {
+    if (!csvPreview?.data?.length) return
+    setRegisteringCsv(true)
+    try {
+      const { data } = await adminService.registerOrganizersCsv(csvPreview.data)
+      toastSuccess(`Registered ${data.succeeded} of ${data.total}${data.failed ? ` (${data.failed} failed)` : ''}`)
+      setCsvPreview(null)
+      await fetchOrganizers()
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Registration failed'))
+    } finally {
+      setRegisteringCsv(false)
+    }
+  }
 
   const handleExport = async () => {
     setExporting(true)
@@ -192,22 +240,6 @@ export default function OrganizerManagementPage() {
     }
   }
 
-  const handleSendOnboarding = async (organizerId, email) => {
-    setSavingKey(`${organizerId}:onboarding`)
-    setError(null)
-    setSuccess(null)
-
-    try {
-      await adminService.sendOnboardingNotification(organizerId)
-      toastSuccess(`Onboarding email sent to ${email}`)
-      await fetchOrganizers()
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send onboarding notification')
-    } finally {
-      setSavingKey(null)
-    }
-  }
-
   if (loading && !showLoader) {
     return null
   }
@@ -249,11 +281,20 @@ export default function OrganizerManagementPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={downloadTemplate}>
+            <Download className="h-4 w-4" strokeWidth={1.5} />
+            Template
+          </Button>
           <Button variant="secondary" onClick={handleExport} loading={exporting}>
             <Download className="h-4 w-4" strokeWidth={1.5} />
             Export CSV
           </Button>
-          <Button onClick={() => setIsModalOpen(true)}>
+          <Button variant="secondary" onClick={() => fileRef.current?.click()}>
+            <Upload className="h-4 w-4" strokeWidth={1.5} />
+            Import CSV
+          </Button>
+          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleCsvFile} />
+          <Button onClick={() => { setEditingOrg(null); setIsModalOpen(true) }}>
             <UserPlus className="h-4 w-4" strokeWidth={2} />
             Add organizer
           </Button>
@@ -316,7 +357,6 @@ export default function OrganizerManagementPage() {
                 {filteredOrganizers.map((org) => {
                   const status = org.account_status || 'active'
                   const isBusy = savingKey?.startsWith(org.id)
-                  const profileComplete = org.profile_complete
                   const nextPrimaryAction =
                     status === 'active'
                       ? { label: 'Suspend', next: 'suspended', variant: 'danger' }
@@ -342,35 +382,24 @@ export default function OrganizerManagementPage() {
                         </div>
                       </td>
                       <td>
-                        <div className="space-y-1">
-                          <p className="text-v-text">{org.email}</p>
-                          {!profileComplete && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              loading={isBusy && savingKey.endsWith('onboarding')}
-                              onClick={(e) => { e.stopPropagation(); handleSendOnboarding(org.id, org.email) }}
-                            >
-                              <Mail className="h-3 w-3" strokeWidth={2} />
-                              Send Onboarding
-                            </Button>
-                          )}
-                        </div>
+                        <p className="text-v-text">{org.email}</p>
                       </td>
                       <td>
-                        <div className="space-y-1">
-                          <Badge tone={getStatusTone(status)}>{getStatusLabel(status)}</Badge>
-                          {profileComplete && (
-                            <p className="v-caption text-xs">Onboarded</p>
-                          )}
-                        </div>
+                        <Badge tone={getStatusTone(status)}>{getStatusLabel(status)}</Badge>
                       </td>
                       <td className="v-caption">
                         {format(new Date(org.created_at), 'MMM d, yyyy')}
                       </td>
                       <td className="text-right">
                         <div className="flex flex-wrap justify-end gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => { e.stopPropagation(); setEditingOrg(org); setIsModalOpen(true) }}
+                          >
+                            Edit
+                          </Button>
                           <Button
                             type="button"
                             size="sm"
@@ -405,9 +434,48 @@ export default function OrganizerManagementPage() {
 
       <CreateOrganizerModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        organizer={editingOrg}
+        onClose={closeModal}
         onSuccess={fetchOrganizers}
       />
+
+      {csvPreview && (
+        <Modal open onClose={() => setCsvPreview(null)} title="Review & Register organizers" size="lg">
+          {csvPreview.errors?.length > 0 && (
+            <div className="mb-4 rounded-lg border border-v-danger/30 bg-v-danger/10 p-3">
+              <p className="v-error-text mb-2 font-semibold">{csvPreview.errors.length} row error(s) — these will be skipped</p>
+              <ul className="v-error-text list-inside list-disc text-sm">
+                {csvPreview.errors.slice(0, 6).map((err, i) => <li key={i}>{err}</li>)}
+                {csvPreview.errors.length > 6 && <li>…and {csvPreview.errors.length - 6} more</li>}
+              </ul>
+            </div>
+          )}
+          <p className="v-label mb-3">{csvPreview.valid} of {csvPreview.total} ready</p>
+          <div className="v-table-wrap mb-4 max-h-80 overflow-auto">
+            <table className="v-table">
+              <thead>
+                <tr><th>Email</th><th>Name</th><th>Organization</th><th>Scope</th></tr>
+              </thead>
+              <tbody>
+                {(csvPreview.data ?? []).map((row, i) => (
+                  <tr key={i}>
+                    <td>{row.email}</td>
+                    <td>{row.organizerName}</td>
+                    <td>{row.organizationName}</td>
+                    <td>{row.scope?.scopeType === 'scoped' ? (row.scope.programs || []).join(', ') || 'scoped' : 'All access'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-v-border pt-4">
+            <Button type="button" variant="secondary" onClick={() => setCsvPreview(null)}>Cancel</Button>
+            <Button type="button" onClick={handleRegisterCsv} loading={registeringCsv} disabled={!csvPreview.data?.length}>
+              Register {csvPreview.data?.length ?? 0}
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

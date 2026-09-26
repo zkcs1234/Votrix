@@ -16,8 +16,12 @@ router.get('/dashboard', adminController.getDashboard)
 router.get('/analytics', adminController.getAnalytics)
 
 router.get('/organizers', adminController.getOrganizers)
+router.get('/organizers/template', adminController.getOrganizerCsvTemplate)
 router.post('/organizers', adminActionLimiter, adminController.createOrganizerAccount)
+router.post('/organizers/import-preview', csvImportLimiter, uploadSingle('file'), adminController.previewOrganizersCsv)
+router.post('/organizers/import-register', csvImportLimiter, adminController.registerOrganizersCsv)
 router.get('/organizers/:organizerId/activity', adminController.getOrganizerActivity)
+router.patch('/organizers/:organizerId', adminActionLimiter, adminController.updateOrganizer)
 router.patch('/organizers/:organizerId/status', adminActionLimiter, adminController.updateOrganizerStatus)
 router.post('/organizers/:organizerId/send-onboarding', adminActionLimiter, adminController.sendOrganizerOnboarding)
 

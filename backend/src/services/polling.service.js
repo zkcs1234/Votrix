@@ -2,6 +2,7 @@ import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, EVENT_TYPES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
+import { getOrganizerScope, isStudentInScope, isAllAccess } from './organizer-scope.service.js'
 import { getOrCreatePollingOrganization, mapOrganization } from './organization.service.js'
 import {
   loadQuestionTypeRegistry,
@@ -216,26 +217,35 @@ export async function listEventRespondents(eventId, organizerId, page = 1, limit
     }
   }
 
+  let voters = (data ?? []).map((row) => ({
+    id: row.id,
+    voterId: row.users?.id,
+    email: row.users?.email,
+    firstName: row.users?.first_name ?? row.first_name,
+    lastName: row.users?.last_name ?? row.last_name,
+    schoolId: row.users?.school_id ?? null,
+    program: row.users?.program ?? null,
+    yearSection: row.users?.year_section ?? null,
+    hasResponded: row.has_responded,
+    createdAt: row.created_at,
+    metadata: row.metadata ?? {},
+    invitationSent: invitationMap.get(row.user_id) ?? false,
+  }))
+
+  // Bound the roster to the organizer's scope (plan O9). No-op for all-access.
+  const scope = await getOrganizerScope(organizerId)
+  const scoped = !isAllAccess(scope)
+  if (scoped) {
+    voters = voters.filter((v) => isStudentInScope(scope, { program: v.program, yearSection: v.yearSection }))
+  }
+
   return {
-    voters: (data ?? []).map((row) => ({
-      id: row.id,
-      voterId: row.users?.id,
-      email: row.users?.email,
-      firstName: row.users?.first_name ?? row.first_name,
-      lastName: row.users?.last_name ?? row.last_name,
-      schoolId: row.users?.school_id ?? null,
-      program: row.users?.program ?? null,
-      yearSection: row.users?.year_section ?? null,
-      hasResponded: row.has_responded,
-      createdAt: row.created_at,
-      metadata: row.metadata ?? {},
-      invitationSent: invitationMap.get(row.user_id) ?? false,
-    })),
+    voters,
     meta: {
       page,
       limit,
-      total: count ?? 0,
-      totalPages: Math.ceil((count ?? 0) / limit),
+      total: scoped ? voters.length : (count ?? 0),
+      totalPages: Math.ceil((scoped ? voters.length : (count ?? 0)) / limit),
     },
   }
 }

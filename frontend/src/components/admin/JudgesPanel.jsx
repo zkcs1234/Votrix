@@ -30,22 +30,31 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
     affiliation: data.affiliation ?? '',
     expertise: data.expertise ?? '',
   })
+  const [organizerIds, setOrganizerIds] = useState(() => (Array.isArray(data.organizerIds) ? data.organizerIds : []))
+  const [organizers, setOrganizers] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const { success, error: toastError } = useToast()
 
+  useEffect(() => {
+    adminService.getOrganizers().then(({ data: d }) => setOrganizers(d.organizers ?? [])).catch(() => {})
+  }, [])
+
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+  const toggleOrganizer = (id) =>
+    setOrganizerIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
     try {
+      const payload = { ...form, organizerIds }
       if (isEdit) {
-        await adminService.updateJudge(initial.id, form)
+        await adminService.updateJudge(initial.id, payload)
         success('Judge updated')
       } else {
-        await adminService.createJudge(form)
+        await adminService.createJudge(payload)
         success('Judge registered — credentials emailed')
       }
       onSaved()
@@ -88,6 +97,37 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
             <label className="v-label">Expertise <span className="v-caption">(optional)</span></label>
             <input type="text" value={form.expertise} onChange={set('expertise')} className={INPUT_CLASS} placeholder="Field of specialization" />
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-v-border p-3">
+          <p className="v-label mb-1">Assign to organizers</p>
+          <p className="v-caption mb-2">
+            Only assigned organizers can pick this judge. Leave empty to make the judge available to all organizers.
+          </p>
+          {organizers.length === 0 ? (
+            <p className="v-caption">No organizers registered yet.</p>
+          ) : (
+            <div className="max-h-32 overflow-auto rounded-lg border border-v-border p-2">
+              <div className="flex flex-wrap gap-1.5">
+                {organizers.map((o) => {
+                  const on = organizerIds.includes(o.id)
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => toggleOrganizer(o.id)}
+                      title={o.email}
+                      className={`rounded-md border px-2 py-1 text-xs transition ${
+                        on ? 'border-v-primary bg-v-primary/10 text-v-text' : 'border-v-border text-v-text-muted hover:bg-v-surface-elevated'
+                      }`}
+                    >
+                      {o.organizer_name || o.organization_name || o.email}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {error && <FormAlert variant="error">{error}</FormAlert>}
@@ -241,7 +281,7 @@ export default function JudgesPanel() {
   }
 
   const downloadTemplate = () => {
-    const csv = 'email,last name,first name,title,affiliation,expertise\njudge@example.com,Reyes,Maria,Prof.,College of Engineering,Robotics\n'
+    const csv = 'email,last name,first name,title,affiliation,expertise,organizers\njudge@example.com,Reyes,Maria,Prof.,College of Engineering,Robotics,organizer@example.com\n'
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

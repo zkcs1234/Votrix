@@ -370,6 +370,23 @@ export default function ProfileCard({ onClose }) {
                   />
                 </div>
 
+                {/* Divider */}
+                <div className="border-t border-v-border" />
+
+                {/* Voter scope — admin-managed, read-only (organizer plan O9) */}
+                <ProfileInfoRow
+                  icon={ClipboardList}
+                  label="Voter scope"
+                  value={
+                    !user?.scope || user.scope.scopeType === 'all'
+                      ? 'All programs & sections'
+                      : [
+                          (user.scope.programs ?? []).join(', ') || '—',
+                          (user.scope.sections ?? []).length ? `Sections: ${user.scope.sections.join(', ')}` : null,
+                        ].filter(Boolean).join(' · ')
+                  }
+                />
+
                 {/* Edit Button */}
                 <Button
                   variant="secondary"

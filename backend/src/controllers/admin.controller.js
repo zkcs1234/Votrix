@@ -1,6 +1,11 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
-import { createOrganizer } from '../services/user.service.js'
-import { validateCreateOrganizer } from '../validators/auth.validator.js'
+import {
+  createOrganizerAccount as createOrganizerWithProfile,
+  updateOrganizer as updateOrganizerProfile,
+  previewOrganizerImport,
+  registerOrganizerImport,
+  ORGANIZER_CSV_TEMPLATE_HEADERS,
+} from '../services/admin-organizer.service.js'
 import { getAdminDashboardStats, getAdminAnalytics } from '../services/dashboard.service.js'
 import { ACCOUNT_STATUS } from '../utils/constants.js'
 import {
@@ -88,22 +93,17 @@ function validateSystemSetting(body) {
 }
 
 export const createOrganizerAccount = asyncHandler(async (req, res) => {
-  const payload = validateCreateOrganizer(req.body)
-  const { user, email } = await createOrganizer({
-    email: payload.email,
-    // Password is auto-generated inside createOrganizer and emailed to the
-    // organizer — the admin never sets or sees it.
-    mustChangePassword: true,
-    sendInvitationEmail: req.body?.sendEmail !== false,
-  })
+  // Admin now registers organizers with a full profile + scope (organizer plan
+  // O1/O2), so there is no onboarding step. Password is auto-generated inside
+  // createOrganizer and emailed — the admin never sets or sees it.
+  const { user, email } = await createOrganizerWithProfile(req.body)
 
-  // Log the action
   await createAuditLog({
     userId: req.user.id,
     action: 'CREATE_ORGANIZER',
     entity: 'users',
     entityId: user.id,
-    details: { email: user.email }
+    details: { email: user.email },
   })
 
   res.status(201).json({
@@ -112,6 +112,51 @@ export const createOrganizerAccount = asyncHandler(async (req, res) => {
     user,
     email,
   })
+})
+
+export const updateOrganizer = asyncHandler(async (req, res) => {
+  const organizerId = validateUUID(req.params.organizerId, 'organizerId')
+  const { user } = await updateOrganizerProfile(organizerId, req.body)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'UPDATE_ORGANIZER',
+    entity: 'users',
+    entityId: organizerId,
+    details: { scopeType: user.scope?.scopeType },
+  })
+
+  res.json({ success: true, user })
+})
+
+export const previewOrganizersCsv = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'CSV file required')
+  const result = await previewOrganizerImport(req.file.buffer)
+  res.json({ success: true, ...result })
+})
+
+export const registerOrganizersCsv = asyncHandler(async (req, res) => {
+  const { data } = req.body
+  if (!data || !Array.isArray(data)) throw new ApiError(400, 'Invalid import data')
+
+  const result = await registerOrganizerImport(data)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'IMPORT_ORGANIZERS',
+    entity: 'users',
+    details: { total: result.total, succeeded: result.succeeded, failed: result.failed },
+  })
+
+  res.json({ success: true, ...result })
+})
+
+export const getOrganizerCsvTemplate = asyncHandler(async (_req, res) => {
+  const header = ORGANIZER_CSV_TEMPLATE_HEADERS.join(',')
+  const example = ['organizer@example.com', 'Jane Cruz', 'SSG Adviser', 'Supreme Student Government', 'Student Organization', 'scoped', 'BSCS;BSIT', '3-A;3-B'].join(',')
+  res.setHeader('Content-Type', 'text/csv')
+  res.setHeader('Content-Disposition', 'attachment; filename="organizer-template.csv"')
+  res.send(`${header}\n${example}\n`)
 })
 
 export const updateOrganizerStatus = asyncHandler(async (req, res) => {

@@ -46,6 +46,13 @@ export async function createOrganizer({
   password,
   mustChangePassword = true,
   sendInvitationEmail = true,
+  // Profile + scope, set by the admin at registration so no onboarding is
+  // needed (organizer plan O1/O2). All optional for backward compatibility.
+  organizerName,
+  position,
+  organizationName,
+  organizationType,
+  scope,
 }) {
   const normalizedEmail = email.toLowerCase().trim()
   const existing = await findUserByEmail(normalizedEmail)
@@ -60,16 +67,23 @@ export async function createOrganizer({
   const temporaryPassword = password || generateTemporaryPassword()
   const passwordHash = await hashPassword(temporaryPassword)
 
+  const insertRow = {
+    email: normalizedEmail,
+    password: passwordHash,
+    role: USER_ROLES.ORGANIZER,
+    account_status: 'active',
+    must_change_password: mustChangePassword,
+  }
+  if (organizerName !== undefined) insertRow.organizer_name = organizerName
+  if (position !== undefined) insertRow.position = position
+  if (organizationName !== undefined) insertRow.organization_name = organizationName
+  if (organizationType !== undefined) insertRow.organization_type_display = organizationType
+  if (scope !== undefined) insertRow.scope = scope
+
   const data = wrap(
     await db()
       .from(DB_TABLES.USERS)
-      .insert({
-        email: normalizedEmail,
-        password: passwordHash,
-        role: USER_ROLES.ORGANIZER,
-        account_status: 'active',
-        must_change_password: mustChangePassword,
-      })
+      .insert(insertRow)
       .select('*')
       .single(),
     { context: 'user.createOrganizer' },

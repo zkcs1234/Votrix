@@ -38,11 +38,12 @@ const JUDGE_COLUMN_ALIASES = {
   title: ['title', 'designation', 'honorific', 'position', 'rank'],
   affiliation: ['affiliation', 'organization', 'organisation', 'org', 'institution', 'company', 'department'],
   expertise: ['expertise', 'specialization', 'specialisation', 'specialty', 'field', 'expertise_area'],
+  organizers: ['organizers', 'organizer', 'organizer_emails', 'assigned_organizers', 'organizer_email'],
 }
 const JUDGE_REQUIRED_FIELDS = ['email', 'first_name', 'last_name']
 const JUDGE_OPTIONAL_FIELDS = ['title', 'affiliation', 'expertise']
 
-export const JUDGE_CSV_TEMPLATE_HEADERS = ['email', 'last name', 'first name', 'title', 'affiliation', 'expertise']
+export const JUDGE_CSV_TEMPLATE_HEADERS = ['email', 'last name', 'first name', 'title', 'affiliation', 'expertise', 'organizers']
 
 function normalizeHeader(header) {
   return String(header ?? '')
@@ -492,6 +493,8 @@ function parseJudgeFile(buffer) {
       title: cell('title'),
       affiliation: cell('affiliation'),
       expertise: cell('expertise'),
+      // Assigned-organizer emails, separated by ; | or ,
+      organizerEmails: cell('organizers').split(/[;|,]/).map((e) => e.trim()).filter(Boolean),
       rowNumber: i + 1,
     })
   }
@@ -507,14 +510,39 @@ function validateJudgeRequired(row) {
   return errors
 }
 
-// Build the profile_data JSON, omitting empty optional fields.
+// Build the profile_data JSON, omitting empty optional fields. Carries the
+// admin-assigned organizer list (organizer plan O7/Phase E) when present.
 function judgeProfileData(row) {
   const data = {}
   for (const field of JUDGE_OPTIONAL_FIELDS) {
     const value = String(row[field] ?? '').trim()
     if (value) data[field] = value
   }
+  if (Array.isArray(row.organizerIds) && row.organizerIds.length) {
+    data.organizerIds = [...new Set(row.organizerIds.map(String))]
+  }
   return data
+}
+
+// Resolve a list of organizer emails to their user ids (skips unknown/non-
+// organizer emails). Returns { ids, unknown }.
+async function resolveOrganizerEmails(emails) {
+  const cleaned = [...new Set((emails ?? []).map((e) => String(e).trim().toLowerCase()).filter(Boolean))]
+  if (!cleaned.length) return { ids: [], unknown: [] }
+  const { data, error } = await getClient()
+    .from(DB_TABLES.USERS)
+    .select('id, email')
+    .eq('role', USER_ROLES.ORGANIZER)
+    .in('email', cleaned)
+  if (error) throw new ApiError(500, error.message)
+  const byEmail = new Map((data ?? []).map((u) => [u.email, u.id]))
+  const ids = []
+  const unknown = []
+  for (const e of cleaned) {
+    if (byEmail.has(e)) ids.push(byEmail.get(e))
+    else unknown.push(e)
+  }
+  return { ids, unknown }
 }
 
 async function insertJudge(row, temporaryPassword) {
@@ -606,6 +634,7 @@ export async function createJudge(input) {
     title: String(input?.title ?? '').trim(),
     affiliation: String(input?.affiliation ?? '').trim(),
     expertise: String(input?.expertise ?? '').trim(),
+    organizerIds: Array.isArray(input?.organizerIds) ? input.organizerIds : [],
   }
 
   const errors = validateJudgeRequired(row)
@@ -633,6 +662,7 @@ export async function updateJudge(userId, input) {
     title: String(input?.title ?? existingData.title ?? '').trim(),
     affiliation: String(input?.affiliation ?? existingData.affiliation ?? '').trim(),
     expertise: String(input?.expertise ?? existingData.expertise ?? '').trim(),
+    organizerIds: Array.isArray(input?.organizerIds) ? input.organizerIds : (existingData.organizerIds ?? []),
   }
   const errors = validateJudgeRequired({ ...row, email: current.email })
   if (errors.length) throw new ApiError(400, 'Validation failed', { errors })
@@ -695,6 +725,17 @@ export async function previewJudgeImport(fileBuffer) {
     } else {
       newCount += 1
       data.push({ ...row, type: 'new' })
+    }
+  }
+
+  // Resolve assigned-organizer emails → ids for every kept row (Phase E).
+  for (const row of data) {
+    if (row.organizerEmails?.length) {
+      const { ids, unknown } = await resolveOrganizerEmails(row.organizerEmails)
+      row.organizerIds = ids
+      if (unknown.length) {
+        errors.push(`Row ${row.rowNumber}: unknown organizer email(s) ignored — ${unknown.join(', ')}`)
+      }
     }
   }
 

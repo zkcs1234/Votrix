@@ -146,6 +146,14 @@ export const PROFILE_TYPE_PARTICIPANT_TYPES = {
 //   { programs: string[], sections: string[] }
 export const PARTICIPANT_TAXONOMY_SETTING_KEY = 'participant_taxonomy'
 
+// Organizer voter-scope types (organizer plan O3/O5). Stored on users.scope.
+//   - ALL    → unrestricted (sees every program/section)
+//   - SCOPED → limited to scope.programs (optionally narrowed by scope.sections)
+export const ORGANIZER_SCOPE_TYPES = {
+  ALL: 'all',
+  SCOPED: 'scoped',
+}
+
 export const DB_TABLES = {
   USERS: 'users',
   ORGANIZATIONS: 'organizations',

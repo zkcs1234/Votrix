@@ -27,7 +27,6 @@ const AlertConfigPage = lazy(() => import('@/pages/admin/AlertConfigPage'))
 const SessionManagementPage = lazy(() => import('@/pages/admin/SessionManagementPage'))
 const ArchivalPolicyPage = lazy(() => import('@/pages/admin/ArchivalPolicyPage'))
 const OrganizerDashboardPage = lazy(() => import('@/pages/organizer/OrganizerDashboardPage'))
-const OrganizerOnboardingPage = lazy(() => import('@/pages/organizer/OrganizerOnboardingPage'))
 const VoterDashboardPage = lazy(() => import('@/pages/voter/VoterDashboardPage'))
 const VoterEventPage = lazy(() => import('@/pages/voter/VoterEventPage'))
 
@@ -169,14 +168,6 @@ export const routeConfig = [
       { path: 'sessions', element: <SessionManagementPage /> },
       { path: 'archival', element: <ArchivalPolicyPage /> },
     ],
-  },
-  {
-    path: '/organizer/onboarding',
-    element: (
-      <ProtectedRoute allowedRoles={[USER_ROLES.ORGANIZER]} allowOnboarding>
-        <OrganizerOnboardingPage />
-      </ProtectedRoute>
-    ),
   },
     {
     path: '/organizer',

@@ -694,7 +694,16 @@ export async function getJudgePool(eventId, organizerId, { search } = {}) {
   if (enrErr) throw new ApiError(500, enrErr.message)
   const enrolledSet = new Set((enrolled ?? []).map((r) => r.user_id))
 
-  return (data ?? []).map((u) => ({
+  // Judge → organizer assignment (organizer plan O7). A judge with an
+  // organizerIds list is visible only to those organizers; a judge with no
+  // assignment stays visible to everyone (backward-compatible default).
+  const visible = (data ?? []).filter((u) => {
+    const ids = u.profile_data?.organizerIds
+    if (!Array.isArray(ids) || ids.length === 0) return true
+    return ids.map(String).includes(String(organizerId))
+  })
+
+  return visible.map((u) => ({
     id: u.id,
     email: u.email,
     firstName: u.first_name,

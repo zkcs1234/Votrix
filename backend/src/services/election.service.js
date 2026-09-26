@@ -4,6 +4,7 @@ import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
 import { isElectionVotingOpen, canVoterViewElectionResults } from '../utils/eventSchedule.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
+import { getOrganizerScope, isStudentInScope, isAllAccess } from './organizer-scope.service.js'
 import { getOrCreateElectionOrganization, mapOrganization } from './organization.service.js'
 import { emitToEvent, emitToEventOrganizer, emitToUser, emitToRole } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
@@ -660,29 +661,38 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
     }
   }
 
+  let voters = voterRows.map((row) => ({
+    id: row.id,
+    voterId: row.users?.id,
+    email: row.users?.email,
+    // Prefer the account profile (admin-managed); fall back to legacy
+    // participant-level name columns for pre-migration rows.
+    firstName: row.users?.first_name ?? row.first_name,
+    lastName: row.users?.last_name ?? row.last_name,
+    schoolId: row.users?.school_id ?? null,
+    program: row.users?.program ?? null,
+    yearSection: row.users?.year_section ?? null,
+    hasVoted: row.has_voted,
+    createdAt: row.created_at,
+    metadata: row.metadata ?? {},
+    // Invitation status: true = sent, false = pending, no record = false
+    invitationSent: invitationSentByVoter.get(row.user_id) ?? false,
+  }))
+
+  // Bound the roster to the organizer's scope (plan O9). No-op for all-access.
+  const scope = await getOrganizerScope(organizerId)
+  const scoped = !isAllAccess(scope)
+  if (scoped) {
+    voters = voters.filter((v) => isStudentInScope(scope, { program: v.program, yearSection: v.yearSection }))
+  }
+
   return {
-    voters: voterRows.map((row) => ({
-      id: row.id,
-      voterId: row.users?.id,
-      email: row.users?.email,
-      // Prefer the account profile (admin-managed); fall back to legacy
-      // participant-level name columns for pre-migration rows.
-      firstName: row.users?.first_name ?? row.first_name,
-      lastName: row.users?.last_name ?? row.last_name,
-      schoolId: row.users?.school_id ?? null,
-      program: row.users?.program ?? null,
-      yearSection: row.users?.year_section ?? null,
-      hasVoted: row.has_voted,
-      createdAt: row.created_at,
-      metadata: row.metadata ?? {},
-      // Invitation status: true = sent, false = pending, no record = false
-      invitationSent: invitationSentByVoter.get(row.user_id) ?? false,
-    })),
+    voters,
     meta: {
       page,
       limit,
-      total: count ?? 0,
-      totalPages: Math.ceil((count ?? 0) / limit),
+      total: scoped ? voters.length : (count ?? 0),
+      totalPages: Math.ceil((scoped ? voters.length : (count ?? 0)) / limit),
     }
   }
 }

@@ -15,8 +15,19 @@ export const adminService = {
   createOrganizer(data) {
     return api.post(`${base}/organizers`, data)
   },
+  updateOrganizer(organizerId, data) {
+    return api.patch(`${base}/organizers/${organizerId}`, data)
+  },
   updateOrganizerStatus(organizerId, accountStatus) {
     return api.patch(`${base}/organizers/${organizerId}/status`, { accountStatus })
+  },
+  previewOrganizersCsv(file) {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`${base}/organizers/import-preview`, form)
+  },
+  registerOrganizersCsv(data) {
+    return api.post(`${base}/organizers/import-register`, { data })
   },
   getGlobalEvents() {
     return api.get(`${base}/events`)

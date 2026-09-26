@@ -6,6 +6,7 @@ import { assertParticipantsEditable } from '../utils/eventLifecycle.js'
 import { registerParticipant, resolveParticipantType } from './participant.service.js'
 import { sendVoterInvitationEmailRegistered } from './mailer.service.js'
 import { recordEventActivity } from '../foundation/activity.js'
+import { getOrganizerScope, filterCohortsForScope, areCohortValuesInScope } from './organizer-scope.service.js'
 
 // Phase 5 of VOTER_PROFILE_AND_ADMIN_REGISTRATION_PLAN.md.
 // Organizers no longer create voter/respondent accounts. Instead they invite
@@ -71,7 +72,9 @@ export async function getEventCohorts(eventId, organizerId) {
     enrolledCount: enrSectionsMap.get(value) ?? 0,
   }))
 
-  return { programs, sections }
+  // Bound the picker to the organizer's scope (plan O9).
+  const scope = await getOrganizerScope(organizerId)
+  return filterCohortsForScope(scope, { programs, sections })
 }
 
 /**
@@ -89,6 +92,13 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
   if (!column) throw new ApiError(400, "cohortType must be 'program' or 'year_section'")
   if (!Array.isArray(values) || values.length === 0) {
     throw new ApiError(400, 'Select at least one cohort value')
+  }
+
+  // Enforce the organizer's scope server-side (plan O9) — can't be bypassed
+  // by crafting a request for a program/section they don't own.
+  const scope = await getOrganizerScope(organizerId)
+  if (!areCohortValuesInScope(scope, cohortType, values)) {
+    throw new ApiError(403, 'One or more selected cohorts are outside your assigned scope')
   }
 
   const participantType = resolveParticipantType(event.event_type)
