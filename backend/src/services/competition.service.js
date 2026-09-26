@@ -8,10 +8,14 @@ import {
   JUDGE_ROLES,
   ASSIGNMENT_SCOPES,
   PARTICIPANT_TYPES,
+  PROFILE_TYPES,
+  ACCOUNT_STATUS,
 } from '../utils/constants.js'
-import { assertOrganizerOwnsEvent } from './event.service.js'
+import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { assertSetupEditable, assertParticipantsEditable } from '../utils/eventLifecycle.js'
 import { listDivisions } from './competition-division.service.js'
+import { registerParticipant } from './participant.service.js'
+import { sendJudgeInvitationEmailRegistered } from './mailer.service.js'
 
 // ---------------------------------------------------------------------------
 // Phase 4 — Competition Scoring Foundation service.
@@ -653,16 +657,116 @@ export async function listCompetitionJudges(eventId, organizerId) {
 // listCompetitionJudges stays a bare array for getCompetitionFoundation.
 export async function getCompetitionJudgesView(eventId, organizerId) {
   const judges = await listCompetitionJudges(eventId, organizerId)
-  const { data: eventRow, error } = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .select('information_form_schema')
-    .eq('id', eventId)
-    .single()
-  if (error) throw new ApiError(500, error.message)
-  return {
-    judges,
-    informationFormSchema: eventRow?.information_form_schema ?? { enabled: false, fields: [] },
+  return { judges }
+}
+
+// ---------------------------------------------------------------------------
+// Judge pool + pick (plan Phase 6). Judges are registered globally by the admin
+// (profile_type='judge'); organizers pick them into a competition instead of
+// creating accounts.
+// ---------------------------------------------------------------------------
+
+// The global judge pool, annotated with whether each judge is already enrolled
+// in this event. Supports a name/email search.
+export async function getJudgePool(eventId, organizerId, { search } = {}) {
+  await assertCompetitionEvent(eventId, organizerId)
+
+  let query = getClient()
+    .from(DB_TABLES.USERS)
+    .select('id, email, first_name, last_name, profile_data')
+    .eq('profile_type', PROFILE_TYPES.JUDGE)
+    .eq('account_status', ACCOUNT_STATUS.ACTIVE)
+    .order('last_name', { ascending: true })
+
+  if (search) {
+    const s = String(search).replace(/[,()%]/g, '').trim()
+    if (s) query = query.or(`email.ilike.%${s}%,first_name.ilike.%${s}%,last_name.ilike.%${s}%`)
   }
+
+  const { data, error } = await query
+  if (error) throw new ApiError(500, error.message)
+
+  const { data: enrolled, error: enrErr } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('user_id')
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+  if (enrErr) throw new ApiError(500, enrErr.message)
+  const enrolledSet = new Set((enrolled ?? []).map((r) => r.user_id))
+
+  return (data ?? []).map((u) => ({
+    id: u.id,
+    email: u.email,
+    firstName: u.first_name,
+    lastName: u.last_name,
+    profileData: u.profile_data ?? {},
+    enrolled: enrolledSet.has(u.id),
+  }))
+}
+
+// Enroll selected judges into the event as COMPETITION_JUDGE. Idempotent; only
+// real judge accounts are matched (D7 guard); optional Email B to newly added.
+export async function pickJudges(eventId, organizerId, { userIds, notify = false } = {}) {
+  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    throw new ApiError(400, 'Select at least one judge')
+  }
+
+  const { data: judges, error } = await getClient()
+    .from(DB_TABLES.USERS)
+    .select('id, email, first_name, last_name')
+    .eq('profile_type', PROFILE_TYPES.JUDGE)
+    .eq('account_status', ACCOUNT_STATUS.ACTIVE)
+    .in('id', userIds)
+  if (error) throw new ApiError(500, error.message)
+  if (!judges?.length) return { matched: 0, enrolled: 0, alreadyEnrolled: 0, notified: 0 }
+
+  const { data: existing, error: exErr } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('user_id')
+    .eq('event_id', eventId)
+    .in('user_id', judges.map((j) => j.id))
+  if (exErr) throw new ApiError(500, exErr.message)
+  const enrolledSet = new Set((existing ?? []).map((r) => r.user_id))
+  const toEnroll = judges.filter((j) => !enrolledSet.has(j.id))
+
+  for (const judge of toEnroll) {
+    await registerParticipant(eventId, judge.id, {
+      participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE,
+      firstName: judge.first_name,
+      lastName: judge.last_name,
+      displayName: [judge.first_name, judge.last_name].filter(Boolean).join(' ') || judge.email,
+      judgeRole: JUDGE_ROLES.JUDGE,
+      isActive: true,
+    })
+  }
+
+  let notified = 0
+  if (notify && toEnroll.length) {
+    const event = await getEventById(eventId)
+    for (const judge of toEnroll) {
+      try {
+        const result = await sendJudgeInvitationEmailRegistered({
+          email: judge.email,
+          eventId: event.id,
+          eventTitle: event.title,
+        })
+        if (result?.sent) notified += 1
+      } catch {
+        // Best-effort — email failure never blocks enrollment.
+      }
+    }
+  }
+
+  recordEventActivity({
+    eventId,
+    action: 'judge.pick',
+    userId: organizerId,
+    module: 'competition',
+    details: { enrolled: toEnroll.length, alreadyEnrolled: enrolledSet.size, notified },
+  })
+
+  return { matched: judges.length, enrolled: toEnroll.length, alreadyEnrolled: enrolledSet.size, notified }
 }
 
 export async function inviteCompetitionJudge(eventId, organizerId, payload) {

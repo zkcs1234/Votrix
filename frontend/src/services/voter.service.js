@@ -15,10 +15,6 @@ export const voterService = {
   getMyEventRole(eventId) {
     return api.get(`/voter/events/${eventId}/my-role`)
   },
-  /** Update participant information form data */
-  updateParticipantInformation(eventId, metadata) {
-    return api.patch(`/voter/events/${eventId}/participant-information`, { metadata })
-  },
 }
 
 export const EVENT_TYPE_META = {

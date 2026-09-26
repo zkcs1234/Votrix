@@ -4,6 +4,7 @@ import { sendEmail } from './email.service.js'
 import { organizerInvitationTemplate } from '../templates/email/organizerInvitation.js'
 import { organizerOnboardingTemplate } from '../templates/email/organizerOnboarding.js'
 import { voterInvitationTemplate } from '../templates/email/voterInvitation.js'
+import { voterAccountCreatedTemplate } from '../templates/email/voterAccountCreated.js'
 import { voterInvitationRegisteredTemplate } from '../templates/email/voterInvitationRegistered.js'
 import { passwordResetTemplate } from '../templates/email/passwordReset.js'
 import { eventNotificationTemplate } from '../templates/email/eventNotification.js'
@@ -56,6 +57,22 @@ export async function sendOrganizerInvitationEmail({ email, temporaryPassword })
   return sendWorkflowEmail({
     to: email,
     subject: 'Your VOTRIX organizer account',
+    html,
+  })
+}
+
+// Email A — account provisioning for admin-registered participants (plan D11).
+export async function sendVoterAccountCreatedEmail({ email, temporaryPassword }) {
+  const html = voterAccountCreatedTemplate({
+    email,
+    temporaryPassword,
+    loginUrl: voterLoginUrl(),
+    forgotPasswordUrl: forgotPasswordUrl(),
+  })
+
+  return sendWorkflowEmail({
+    to: email,
+    subject: 'Your VOTRIX account',
     html,
   })
 }

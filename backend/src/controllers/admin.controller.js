@@ -19,6 +19,26 @@ import { exportOrganizersCSV, exportEventsCSV, exportAuditLogsCSV } from '../ser
 import { checkSystemHealth } from '../services/health.service.js'
 import { getAlertConfig as fetchAlertConfig, updateAlertConfig as saveAlertConfig } from '../services/alert.service.js'
 import {
+  getParticipantTaxonomy as fetchParticipantTaxonomy,
+  updateParticipantTaxonomy as saveParticipantTaxonomy,
+} from '../services/participant-taxonomy.service.js'
+import {
+  listVoters as fetchVoters,
+  createVoter as createVoterAccount,
+  updateVoter as updateVoterProfile,
+  updateVoterStatus as updateVoterAccountStatus,
+  previewVoterImport,
+  registerVoterImport,
+  VOTER_CSV_TEMPLATE_HEADERS,
+  listJudges as fetchJudges,
+  createJudge as createJudgeAccount,
+  updateJudge as updateJudgeProfile,
+  updateJudgeStatus as updateJudgeAccountStatus,
+  previewJudgeImport,
+  registerJudgeImport,
+  JUDGE_CSV_TEMPLATE_HEADERS,
+} from '../services/admin-participant.service.js'
+import {
   listAdminSessions,
   listSessionsForUser,
   revokeSession,
@@ -248,8 +268,9 @@ export const getOrganizerActivity = asyncHandler(async (req, res) => {
   })
 })
 
-export const exportOrganizersData = asyncHandler(async (_req, res) => {
+export const exportOrganizersData = asyncHandler(async (req, res) => {
   const csv = await exportOrganizersCSV()
+  await createAuditLog({ userId: req.user.id, action: 'EXPORT_ORGANIZERS', entity: 'users' })
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="organizers.csv"')
   res.send(csv)
@@ -257,6 +278,12 @@ export const exportOrganizersData = asyncHandler(async (_req, res) => {
 
 export const exportEventsData = asyncHandler(async (req, res) => {
   const csv = await exportEventsCSV({ status: req.query.status })
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'EXPORT_EVENTS',
+    entity: 'events',
+    details: { status: req.query.status ?? null },
+  })
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="events.csv"')
   res.send(csv)
@@ -264,6 +291,12 @@ export const exportEventsData = asyncHandler(async (req, res) => {
 
 export const exportAuditLogsData = asyncHandler(async (req, res) => {
   const csv = await exportAuditLogsCSV({ startDate: req.query.startDate, endDate: req.query.endDate })
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'EXPORT_AUDIT_LOGS',
+    entity: 'audit_logs',
+    details: { startDate: req.query.startDate ?? null, endDate: req.query.endDate ?? null },
+  })
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="audit-logs.csv"')
   res.send(csv)
@@ -282,6 +315,192 @@ export const getAlertConfig = asyncHandler(async (_req, res) => {
 export const updateAlertConfig = asyncHandler(async (req, res) => {
   const config = await saveAlertConfig(req.body)
   res.json({ success: true, config })
+})
+
+export const getParticipantTaxonomy = asyncHandler(async (_req, res) => {
+  const taxonomy = await fetchParticipantTaxonomy()
+  res.json({ success: true, taxonomy })
+})
+
+export const updateParticipantTaxonomy = asyncHandler(async (req, res) => {
+  const taxonomy = await saveParticipantTaxonomy(req.body)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'UPDATE_PARTICIPANT_TAXONOMY',
+    entity: 'system_settings',
+    details: { programs: taxonomy.programs.length, sections: taxonomy.sections.length },
+  })
+
+  res.json({ success: true, taxonomy })
+})
+
+// ---------------------------------------------------------------------------
+// Voter (student participant) registration — plan Phase 3
+// ---------------------------------------------------------------------------
+export const getVoters = asyncHandler(async (req, res) => {
+  const { search, program, yearSection, status, page, limit } = req.query ?? {}
+  const result = await fetchVoters({ search, program, yearSection, status, page, limit })
+  res.json({ success: true, ...result })
+})
+
+export const createVoter = asyncHandler(async (req, res) => {
+  const { user, email } = await createVoterAccount(req.body)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'CREATE_VOTER',
+    entity: 'users',
+    entityId: user.id,
+    details: { email: user.email, emailSent: Boolean(email?.sent) },
+  })
+
+  res.status(201).json({ success: true, user, email })
+})
+
+export const updateVoter = asyncHandler(async (req, res) => {
+  const userId = validateUUID(req.params.userId, 'userId')
+  const { user } = await updateVoterProfile(userId, req.body)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'UPDATE_VOTER',
+    entity: 'users',
+    entityId: userId,
+    details: { schoolId: user.schoolId },
+  })
+
+  res.json({ success: true, user })
+})
+
+export const updateVoterStatus = asyncHandler(async (req, res) => {
+  const userId = validateUUID(req.params.userId, 'userId')
+  const { accountStatus } = req.body ?? {}
+  const { user } = await updateVoterAccountStatus(userId, accountStatus)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'UPDATE_VOTER_STATUS',
+    entity: 'users',
+    entityId: userId,
+    details: { accountStatus },
+  })
+
+  res.json({ success: true, user })
+})
+
+export const previewVotersCsv = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'CSV file required')
+  const result = await previewVoterImport(req.file.buffer)
+  res.json({ success: true, ...result })
+})
+
+export const registerVotersCsv = asyncHandler(async (req, res) => {
+  const { data } = req.body
+  if (!data || !Array.isArray(data)) throw new ApiError(400, 'Invalid import data')
+
+  const result = await registerVoterImport(data)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'IMPORT_VOTERS',
+    entity: 'users',
+    details: { total: result.total, succeeded: result.succeeded, failed: result.failed },
+  })
+
+  res.json({ success: true, ...result })
+})
+
+export const getVoterCsvTemplate = asyncHandler(async (_req, res) => {
+  const header = VOTER_CSV_TEMPLATE_HEADERS.join(',')
+  const example = ['voter@example.com', '2021-00123', 'Dela Cruz', 'Juan', 'BSIT', '3-A'].join(',')
+  res.setHeader('Content-Type', 'text/csv')
+  res.setHeader('Content-Disposition', 'attachment; filename="voter-template.csv"')
+  res.send(`${header}\n${example}\n`)
+})
+
+// ---------------------------------------------------------------------------
+// Judge registration — plan Phase 4
+// ---------------------------------------------------------------------------
+export const getJudges = asyncHandler(async (req, res) => {
+  const { search, status, page, limit } = req.query ?? {}
+  const result = await fetchJudges({ search, status, page, limit })
+  res.json({ success: true, ...result })
+})
+
+export const createJudge = asyncHandler(async (req, res) => {
+  const { user, email } = await createJudgeAccount(req.body)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'CREATE_JUDGE',
+    entity: 'users',
+    entityId: user.id,
+    details: { email: user.email, emailSent: Boolean(email?.sent) },
+  })
+
+  res.status(201).json({ success: true, user, email })
+})
+
+export const updateJudge = asyncHandler(async (req, res) => {
+  const userId = validateUUID(req.params.userId, 'userId')
+  const { user } = await updateJudgeProfile(userId, req.body)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'UPDATE_JUDGE',
+    entity: 'users',
+    entityId: userId,
+    details: {},
+  })
+
+  res.json({ success: true, user })
+})
+
+export const updateJudgeStatus = asyncHandler(async (req, res) => {
+  const userId = validateUUID(req.params.userId, 'userId')
+  const { accountStatus } = req.body ?? {}
+  const { user } = await updateJudgeAccountStatus(userId, accountStatus)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'UPDATE_JUDGE_STATUS',
+    entity: 'users',
+    entityId: userId,
+    details: { accountStatus },
+  })
+
+  res.json({ success: true, user })
+})
+
+export const previewJudgesCsv = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'CSV file required')
+  const result = await previewJudgeImport(req.file.buffer)
+  res.json({ success: true, ...result })
+})
+
+export const registerJudgesCsv = asyncHandler(async (req, res) => {
+  const { data } = req.body
+  if (!data || !Array.isArray(data)) throw new ApiError(400, 'Invalid import data')
+
+  const result = await registerJudgeImport(data)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'IMPORT_JUDGES',
+    entity: 'users',
+    details: { total: result.total, succeeded: result.succeeded, failed: result.failed },
+  })
+
+  res.json({ success: true, ...result })
+})
+
+export const getJudgeCsvTemplate = asyncHandler(async (_req, res) => {
+  const header = JUDGE_CSV_TEMPLATE_HEADERS.join(',')
+  const example = ['judge@example.com', 'Reyes', 'Maria', 'Prof.', 'College of Engineering', 'Robotics'].join(',')
+  res.setHeader('Content-Type', 'text/csv')
+  res.setHeader('Content-Disposition', 'attachment; filename="judge-template.csv"')
+  res.send(`${header}\n${example}\n`)
 })
 
 export const getAdminOverview = asyncHandler(async (_req, res) => {

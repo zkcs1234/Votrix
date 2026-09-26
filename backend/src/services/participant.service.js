@@ -158,31 +158,6 @@ export async function registerParticipant(eventId, userId, options = {}) {
 }
 
 /**
- * Update participant information (metadata JSONB).
- * Used for dynamic participant information forms.
- */
-export async function updateParticipantInformation(eventId, userId, metadata) {
-  const participant = await assertEventParticipant(eventId, userId)
-
-  // Merge new metadata with existing (shallow merge at top level)
-  const mergedMetadata = {
-    ...(participant.metadata ?? {}),
-    ...metadata,
-  }
-
-  const { data, error } = await db()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .update({ metadata: mergedMetadata })
-    .eq('id', participant.id)
-    .select('*')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
-
-  return data
-}
-
-/**
  * Mark a participant's voting flag as complete (for elections).
  */
 export async function markVoted(eventId, userId) {

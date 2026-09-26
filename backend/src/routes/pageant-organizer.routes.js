@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { uploadSingle, uploadImage } from '../middleware/upload.js'
-import { uploadLimiter, csvImportLimiter, emailLimiter } from '../middleware/rateLimiter.js'
+import { uploadImage } from '../middleware/upload.js'
+import { uploadLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/pageant-organizer.controller.js'
 import * as draftCtrl from '../controllers/draft.controller.js'
 import competitionRoutes from './competition-organizer.routes.js'
@@ -50,22 +50,16 @@ router.patch('/events/:eventId/criteria/:criteriaId/minor-criteria/:minorCriteri
 router.delete('/events/:eventId/criteria/:criteriaId/minor-criteria/:minorCriteriaId', ctrl.deleteMinorCriteria)
 
 router.get('/events/:eventId/judges', ctrl.listJudges)
-router.post('/events/:eventId/judges/invite', emailLimiter, ctrl.inviteJudge)
 
-// Registration and Invitation separated
-router.post('/events/:eventId/judges/register', emailLimiter, ctrl.registerJudge)
-router.post('/events/:eventId/judges/:judgeId/send-invitation', emailLimiter, ctrl.sendJudgeInvitation)
-router.post('/events/:eventId/judges/send-all', emailLimiter, ctrl.sendAllJudgeInvitations)
-router.post('/events/:eventId/judges/import-preview', csvImportLimiter, uploadSingle('file'), ctrl.previewImportJudgesCsv)
-router.post('/events/:eventId/judges/import-register', csvImportLimiter, ctrl.registerImportJudgesCsv)
+// Plan Phase 6: judge accounts are created by the admin; organizers pick judges
+// from the pool via /events/:eventId/judge-pool + /judges-v2/pick (see
+// competition-organizer.routes.js). The old judge invite / register /
+// send-invitation / send-all / import-preview / import-register routes were
+// removed here.
 
 router.get('/events/:eventId/rankings', ctrl.getRankings)
 router.get('/events/:eventId/results', ctrl.getResults)
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
-
-// ——— Participant Information Form ———
-router.get('/events/:eventId/information-form', ctrl.getInformationForm)
-router.patch('/events/:eventId/information-form', ctrl.updateInformationForm)
 
 // Phase 4-6 dynamic scoring engine: categories, rounds, scoring config,
 // judge participants, and flexible assignments live under

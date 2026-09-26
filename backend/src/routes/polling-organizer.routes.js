@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { uploadSingle, uploadImage } from '../middleware/upload.js'
-import { uploadLimiter, csvImportLimiter, emailLimiter } from '../middleware/rateLimiter.js'
+import { uploadImage } from '../middleware/upload.js'
+import { uploadLimiter, emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/polling-organizer.controller.js'
 import * as draftCtrl from '../controllers/draft.controller.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
@@ -40,17 +40,13 @@ router.delete('/question-types/custom/:typeId', ctrl.deleteCustomQuestionType)
 // List respondents
 router.get('/events/:eventId/voters', ctrl.listRespondents)
 
-// Registration and Invitation separated
-router.post('/events/:eventId/respondents/register', emailLimiter, ctrl.registerRespondent)
-router.post('/events/:eventId/respondents/register-existing', emailLimiter, ctrl.registerExistingRespondent)
-router.post('/events/:eventId/respondents/:voterId/send-invitation', emailLimiter, ctrl.sendRespondentInvitation)
-router.post('/events/:eventId/respondents/send-all', emailLimiter, ctrl.sendAllRespondentInvitations)
-router.post('/events/:eventId/respondents/import-preview', csvImportLimiter, uploadSingle('file'), ctrl.previewRespondentsCsv)
-router.post('/events/:eventId/respondents/import-register', csvImportLimiter, ctrl.registerRespondentsCsv)
-
-// ——— Participant Information Form ———
-router.get('/events/:eventId/information-form', ctrl.getInformationForm)
-router.patch('/events/:eventId/information-form', ctrl.updateInformationForm)
+// Cohort invite (plan Phase 5). Organizers invite existing students by cohort;
+// the admin owns account registration. The old register / register-existing /
+// send-invitation / send-all / import-preview / import-register routes were
+// removed here.
+router.get('/events/:eventId/cohorts', ctrl.getCohorts)
+router.post('/events/:eventId/invite-cohort', emailLimiter, ctrl.inviteCohort)
+router.delete('/events/:eventId/participants/:userId', ctrl.removeParticipant)
 
 // ——— Persistent Create Draft (one per organizer + module) ———
 router.get('/drafts', draftCtrl.getDraft('polling'))

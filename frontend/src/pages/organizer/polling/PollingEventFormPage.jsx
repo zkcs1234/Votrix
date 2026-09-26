@@ -14,7 +14,6 @@ import CalendarCard from '@/components/ui/CalendarCard'
 import Card from '@/components/ui/Card'
 import EventStepper from '@/components/ui/EventStepper'
 import StageFooter from '@/components/ui/StageFooter'
-import ParticipantInformationFormBuilder from '@/components/organizer/ParticipantInformationFormBuilder'
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
@@ -29,12 +28,11 @@ import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 function inferStepFromPath(pathname) {
   if (pathname.includes('/branding')) return 'branding'
   if (pathname.includes('/settings')) return 'settings'
-  if (pathname.includes('/form')) return 'information-form'
   return 'details'
 }
 
 function normalizeDraftStep(step) {
-  if (step === 'branding' || step === 'settings' || step === 'information-form') return step
+  if (step === 'branding' || step === 'settings') return step
   return 'details'
 }
 
@@ -50,8 +48,6 @@ const { eventId } = useParams()
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!isNew)
   const [error, setError] = useState(null)
-  const [infoFormSchema, setInfoFormSchema] = useState(null)
-  const [infoFormLoading, setInfoFormLoading] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
   const [eventStatus, setEventStatus] = useState(null)
   // A brand-new poll has no status yet (null); it is always editable. Only an
@@ -102,7 +98,7 @@ const { eventId } = useParams()
   const formValues = watch()
   const startDateValue = formValues.startDate ?? ''
 
-  const buildDraftSnapshot = useCallback((data = getValues(), draftStep = step, currentBanner = banner, schema = infoFormSchema) => ({
+  const buildDraftSnapshot = useCallback((data = getValues(), draftStep = step, currentBanner = banner) => ({
     step: draftStep,
     title: data.title,
     description: data.description,
@@ -117,9 +113,8 @@ const { eventId } = useParams()
       endDate: data.endDate,
       pollAnonymous: data.pollAnonymous,
       pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
-      infoFormSchema: schema,
     },
-  }), [banner, getValues, infoFormSchema, step])
+  }), [banner, getValues, step])
 
   const markDraftTouched = useCallback(() => {
     setDraftRestored(true)
@@ -134,7 +129,6 @@ useEffect(() => {
   useEffect(() => {
     setBanner(null)
     setBannerFile(null)
-    setInfoFormSchema(null)
     setError(null)
     setDraftRestored(false)
     reset({
@@ -166,13 +160,10 @@ useEffect(() => {
       pollAllowMultipleSubmissions: payload.pollAllowMultipleSubmissions ?? false,
     })
     setBanner(draft.banner ?? null)
-    if (payload.infoFormSchema) {
-      setInfoFormSchema(payload.infoFormSchema)
-    }
     if (draft.banner) {
       markComplete('branding')
     }
-    if (nextStep === 'information-form' || nextStep === 'settings' || nextStep === 'branding') {
+    if (nextStep === 'settings' || nextStep === 'branding') {
       markComplete('details')
     }
   }, [draft, reset, markComplete])
@@ -213,28 +204,6 @@ useEffect(() => {
       })
       .finally(() => setLoading(false))
   }, [eventId, isNew, reset, markComplete])
-
-  const loadInfoFormSchema = useCallback(async () => {
-    if (isNew) return
-    setInfoFormLoading(true)
-try {
-      const { data } = await pollingService.getInformationForm(eventId)
-      const schema = data.informationFormSchema || data.schema || { enabled: false, fields: [] }
-      setInfoFormSchema(schema)
-      if (schema.enabled && (schema.fields || []).length > 0) {
-        markComplete('information-form')
-      }
-    } catch (err) {
-      console.error('Failed to load information form:', err)
-      setInfoFormSchema({ enabled: false, fields: [] })
-    } finally {
-      setInfoFormLoading(false)
-    }
-  }, [eventId, isNew, markComplete])
-
-  useEffect(() => {
-    loadInfoFormSchema()
-  }, [loadInfoFormSchema])
 
   const handleNextDetails = async (e) => {
     e.preventDefault()
@@ -308,12 +277,13 @@ try {
       }
       if (isNew) {
         setDraftRestored(true)
-        saveDraftAsync(buildDraftSnapshot(data, 'information-form'))
-        setStep('information-form')
+        // Persist the draft, then create the real event and continue to setup.
+        await saveDraft(buildDraftSnapshot(data, 'settings'))
+        await handleContinueToBuilder()
       } else {
         const payload = buildPayload(data)
         await pollingService.updateEvent(eventId, payload)
-        navigate(`/organizer/polling/events/${eventId}/form`)
+        navigate(`/organizer/polling/events/${eventId}/builder`)
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save poll settings')
@@ -359,7 +329,6 @@ try {
       details: 'edit',
       branding: 'branding',
       settings: 'settings',
-      'information-form': 'form',
     }
     return `${base}/${eventId}/${pathByKey[stageKey]}`
   }
@@ -553,28 +522,6 @@ const stepperEventId = isNew ? 'new' : eventId
           </form>
         )}
 
-        {step === 'information-form' && (
-          <div className="space-y-4">
-            {infoFormLoading ? (
-              <p className="v-caption">Loading information form...</p>
-            ) : (
-              <ParticipantInformationFormBuilder
-                initialSchema={infoFormSchema}
-                service={pollingService}
-                eventId={eventId}
-                isDraft={isNew}
-                onSave={(schema) => {
-                  setInfoFormSchema(schema)
-                  if (isNew) {
-                    const data = getValues()
-                    setDraftRestored(true)
-                    saveDraftAsync(buildDraftSnapshot(data, 'information-form', banner, schema))
-                  }
-                }}
-              />
-            )}
-          </div>
-        )}
         </fieldset>
       </Card>
 
@@ -612,21 +559,7 @@ const stepperEventId = isNew ? 'new' : eventId
               eventId={stepperEventId}
               saving={saving}
               onNext={handleSaveSettings}
-              nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
-        )}
-        
-        {!readOnly && step === 'information-form' && (
-            <StageFooter
-              module="polling"
-              currentKey="information-form"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={isNew ? handleContinueToBuilder : undefined}
-              nextLabel="Continue to Builder"
-              nextPath={isNew ? undefined : `/organizer/polling/events/${eventId}/builder`}
+              nextLabel={isNew ? 'Create & continue' : 'Next: Builder'}
               saveStatus={saveStatus}
               lastSavedAt={lastSavedAt}
             />

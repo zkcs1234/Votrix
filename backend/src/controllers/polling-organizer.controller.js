@@ -1,8 +1,6 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import * as pollingService from '../services/polling.service.js'
-import * as electionService from '../services/election.service.js'
-import { importVotersFromCsv, previewCsv, registerVotersFromCsv } from '../services/csv-import.service.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
 import {
   validatePollEvent,
@@ -10,8 +8,7 @@ import {
   validateCustomType,
   validateCustomTypeUpdate,
 } from '../validators/polling.validator.js'
-import { validateInviteVoter } from '../validators/email.validator.js'
-import { getEventInformationForm, setEventInformationForm } from '../services/event.service.js'
+import { getEventCohorts, inviteCohort as inviteCohortService, removeEventParticipant } from '../services/cohort.service.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const data = await pollingService.getOrganizerDashboard(req.user.id)
@@ -185,89 +182,19 @@ export const listRespondents = asyncHandler(async (req, res) => {
   res.json({ success: true, ...result })
 })
 
-export const registerRespondent = asyncHandler(async (req, res) => {
-  const payload = validateInviteVoter(req.body)
-  const result = await pollingService.registerRespondentToPoll({
-    eventId: req.params.eventId,
-    email: payload.email,
-    organizerId: req.user.id,
-    temporaryPassword: payload.temporaryPassword,
-    resetPasswordForExisting: false,
-  })
-  res.status(201).json({ success: true, ...result })
-})
-
-export const registerExistingRespondent = asyncHandler(async (req, res) => {
-  const { email } = req.body
-  if (!email) throw new ApiError(400, 'Email is required')
-
-  const result = await pollingService.registerExistingRespondent({
-    eventId: req.params.eventId,
-    email,
-    organizerId: req.user.id,
-  })
-
-  res.json({
-    success: true,
-    message: 'Respondent registered successfully',
-    respondent: result.user,
-  })
-})
-
-export const sendRespondentInvitation = asyncHandler(async (req, res) => {
-  const result = await pollingService.sendRespondentInvitation({
-    eventId: req.params.eventId,
-    voterId: req.params.voterId,
-    organizerId: req.user.id,
-  })
-
-  res.json({
-    success: true,
-    message: result.invitationSent ? 'Invitation sent' : 'Failed to send invitation',
-    invitationSent: result.invitationSent,
-    email: result.email,
-  })
-})
-
-export const sendAllRespondentInvitations = asyncHandler(async (req, res) => {
-  const result = await pollingService.sendAllPendingRespondentInvitations({
-    eventId: req.params.eventId,
-    organizerId: req.user.id,
-  })
-
-  res.json({
-    success: true,
-    total: result.total,
-    sent: result.sent,
-    failed: result.failed,
-    results: result.results,
-  })
-})
-
-export const previewRespondentsCsv = asyncHandler(async (req, res) => {
-  if (!req.file) throw new ApiError(400, 'CSV file required')
-  const result = await previewCsv(req.params.eventId, req.user.id, req.file.buffer)
+// ——— Cohort invite (plan Phase 5) ———
+export const getCohorts = asyncHandler(async (req, res) => {
+  const result = await getEventCohorts(req.params.eventId, req.user.id)
   res.json({ success: true, ...result })
 })
 
-export const registerRespondentsCsv = asyncHandler(async (req, res) => {
-  const { data } = req.body
-  if (!data || !Array.isArray(data)) {
-    throw new ApiError(400, 'Invalid import data')
-  }
-
-  const result = await registerVotersFromCsv(req.params.eventId, req.user.id, data)
+export const inviteCohort = asyncHandler(async (req, res) => {
+  const { cohortType, values, notify } = req.body ?? {}
+  const result = await inviteCohortService(req.params.eventId, req.user.id, { cohortType, values, notify })
   res.json({ success: true, ...result })
 })
 
-// ——— Participant Information Form ———
-
-export const getInformationForm = asyncHandler(async (req, res) => {
-  const result = await getEventInformationForm(req.params.eventId, req.user.id)
-  res.json({ success: true, ...result })
-})
-
-export const updateInformationForm = asyncHandler(async (req, res) => {
-  const result = await setEventInformationForm(req.params.eventId, req.user.id, req.body)
+export const removeParticipant = asyncHandler(async (req, res) => {
+  const result = await removeEventParticipant(req.params.eventId, req.user.id, req.params.userId)
   res.json({ success: true, ...result })
 })

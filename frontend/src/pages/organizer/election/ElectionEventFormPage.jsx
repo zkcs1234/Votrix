@@ -9,7 +9,6 @@ import CalendarCard from '@/components/ui/CalendarCard'
 import Card from '@/components/ui/Card'
 import EventStepper from '@/components/ui/EventStepper'
 import StageFooter from '@/components/ui/StageFooter'
-import ParticipantInformationFormBuilder from '@/components/organizer/ParticipantInformationFormBuilder'
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
@@ -41,12 +40,11 @@ const RESULTS_VISIBILITY_OPTIONS = [
 
 function inferStepFromPath(pathname) {
   if (pathname.includes('/branding')) return 'branding'
-  if (pathname.includes('/form')) return 'information-form'
   return 'details'
 }
 
 function normalizeDraftStep(step) {
-  if (step === 'branding' || step === 'information-form') return step
+  if (step === 'branding') return step
   return 'details'
 }
 
@@ -62,8 +60,6 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const [infoFormSchema, setInfoFormSchema] = useState(null)
-  const [infoFormLoading, setInfoFormLoading] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
   const [eventStatus, setEventStatus] = useState(null)
   // A brand-new event has no status yet (null); it is always editable. Only an
@@ -114,7 +110,7 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const resultsVisibility = formValues.resultsVisibility ?? 'public'
   const startDateValue = formValues.startDate ?? ''
 
-  const buildDraftSnapshot = useCallback((data = getValues(), draftStep = step, currentBanner = banner, schema = infoFormSchema) => ({
+  const buildDraftSnapshot = useCallback((data = getValues(), draftStep = step, currentBanner = banner) => ({
     step: draftStep,
     title: data.title,
     description: data.description,
@@ -127,9 +123,8 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
       startDate: data.startDate,
       endDate: data.endDate,
       resultsVisibility: data.resultsVisibility,
-      infoFormSchema: schema,
     },
-  }), [banner, getValues, infoFormSchema, step])
+  }), [banner, getValues, step])
 
   const markDraftTouched = useCallback(() => {
     setDraftRestored(true)
@@ -146,7 +141,6 @@ useEffect(() => {
   useEffect(() => {
     setBanner(null)
     setBannerFile(null)
-    setInfoFormSchema(null)
     setError(null)
     setDraftRestored(false)
     reset({
@@ -176,13 +170,10 @@ resetProgress()
       resultsVisibility: payload.resultsVisibility ?? 'public',
     })
     setBanner(draft.banner ?? null)
-    if (payload.infoFormSchema) {
-      setInfoFormSchema(payload.infoFormSchema)
-    }
     if (draft.banner) {
       markComplete('branding')
     }
-    if (nextStep === 'information-form' || nextStep === 'branding') {
+    if (nextStep === 'branding') {
       markComplete('details')
     }
   }, [draft, reset, markComplete])
@@ -222,28 +213,6 @@ setBanner(ev.banner)
       })
       .finally(() => setLoading(false))
   }, [eventId, isNew, reset, setValue, markComplete])
-
-  const loadInfoFormSchema = useCallback(async () => {
-    if (isNew) return
-    setInfoFormLoading(true)
-try {
-      const { data } = await electionService.getInformationForm(eventId)
-      const schema = data.informationFormSchema || data.schema || { enabled: false, fields: [] }
-      setInfoFormSchema(schema)
-      if (schema.enabled && (schema.fields || []).length > 0) {
-        markComplete('information-form')
-      }
-    } catch (err) {
-      console.error('Failed to load information form:', err)
-      setInfoFormSchema({ enabled: false, fields: [] })
-    } finally {
-      setInfoFormLoading(false)
-    }
-  }, [eventId, isNew, markComplete])
-
-  useEffect(() => {
-    loadInfoFormSchema()
-  }, [loadInfoFormSchema])
 
   const handleNext = async (e) => {
     e.preventDefault()
@@ -292,14 +261,15 @@ try {
         }
         const data = getValues()
         setDraftRestored(true)
-        saveDraftAsync(buildDraftSnapshot(data, 'information-form', currentBanner))
-        setStep('information-form')
+        // Persist the draft, then create the real event and continue to setup.
+        await saveDraft(buildDraftSnapshot(data, 'branding', currentBanner))
+        await handleContinueToPositions()
       } else {
         if (bannerFile) {
           await electionService.uploadBanner(eventId, bannerFile)
           setBannerFile(null)
         }
-        setStep('information-form')
+        navigate(`/organizer/election/events/${eventId}/positions`)
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save event')
@@ -526,28 +496,6 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
           </form>
         )}
 
-        {step === 'information-form' && (
-          <div className="space-y-4">
-            {infoFormLoading ? (
-              <p className="v-caption">Loading information form...</p>
-            ) : (
-              <ParticipantInformationFormBuilder
-                initialSchema={infoFormSchema}
-                service={electionService}
-                eventId={eventId}
-                isDraft={isNew}
-                onSave={(schema) => {
-                  setInfoFormSchema(schema)
-                  if (isNew) {
-                    const data = getValues()
-                    setDraftRestored(true)
-                    saveDraftAsync(buildDraftSnapshot(data, 'information-form', banner, schema))
-                  }
-                }}
-              />
-            )}
-          </div>
-        )}
         </fieldset>
       </Card>
 
@@ -572,21 +520,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               eventId={stepperEventId}
               saving={saving}
               onNext={handleNextBranding}
-              nextLabel={isNew ? 'Save & continue' : 'Next: Information Form'}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
-        )}
-        
-        {!readOnly && step === 'information-form' && (
-            <StageFooter
-              module="election"
-              currentKey="information-form"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={isNew ? handleContinueToPositions : undefined}
-              nextLabel="Continue to Positions"
-              nextPath={isNew ? undefined : `/organizer/election/events/${eventId}/positions`}
+              nextLabel={isNew ? 'Create & continue' : 'Next: Positions'}
               saveStatus={saveStatus}
               lastSavedAt={lastSavedAt}
             />

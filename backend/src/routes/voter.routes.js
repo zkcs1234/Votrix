@@ -20,7 +20,6 @@ router.use('/polling', pollingVoterRoutes)
 // Participant role endpoints
 router.get('/participant-types', voterController.getMyParticipantTypes)
 router.get('/events/:eventId/my-role', voterController.getMyEventRole)
-router.patch('/events/:eventId/participant-information', voterController.updateMyParticipantInformation)
 
 // Dashboard & redirect
 router.get('/overview', voterController.getVoterOverview)

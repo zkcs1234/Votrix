@@ -27,6 +27,52 @@ export const adminService = {
   updateSystemSetting(data) {
     return api.put(`${base}/settings`, data)
   },
+  getParticipantTaxonomy() {
+    return api.get(`${base}/settings/taxonomy`)
+  },
+  updateParticipantTaxonomy(taxonomy) {
+    return api.put(`${base}/settings/taxonomy`, taxonomy)
+  },
+  getVoters(params = {}) {
+    return api.get(`${base}/voters`, { params })
+  },
+  createVoter(data) {
+    return api.post(`${base}/voters`, data)
+  },
+  updateVoter(userId, data) {
+    return api.patch(`${base}/voters/${userId}`, data)
+  },
+  updateVoterStatus(userId, accountStatus) {
+    return api.patch(`${base}/voters/${userId}/status`, { accountStatus })
+  },
+  previewVotersCsv(file) {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`${base}/voters/import-preview`, form)
+  },
+  registerVotersCsv(data) {
+    return api.post(`${base}/voters/import-register`, { data })
+  },
+  getJudges(params = {}) {
+    return api.get(`${base}/judges`, { params })
+  },
+  createJudge(data) {
+    return api.post(`${base}/judges`, data)
+  },
+  updateJudge(userId, data) {
+    return api.patch(`${base}/judges/${userId}`, data)
+  },
+  updateJudgeStatus(userId, accountStatus) {
+    return api.patch(`${base}/judges/${userId}/status`, { accountStatus })
+  },
+  previewJudgesCsv(file) {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`${base}/judges/import-preview`, form)
+  },
+  registerJudgesCsv(data) {
+    return api.post(`${base}/judges/import-register`, { data })
+  },
   getAuditLogs(params = {}) {
     return api.get(`${base}/audit-logs`, { params })
   },

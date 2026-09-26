@@ -1380,10 +1380,6 @@ export async function listJudges(eventId, organizerId) {
     }
   }
 
-  // Fetch the event's information form schema for dynamic columns
-  const event = await getEventById(eventId)
-  const informationFormSchema = event?.information_form_schema ?? { enabled: false, fields: [] }
-
   return {
     judges: (participantRows ?? []).map((row) => ({
       id: row.id,
@@ -1398,7 +1394,6 @@ export async function listJudges(eventId, organizerId) {
       metadata: row.metadata ?? {},
       invitationSent: invitationMap[row.user_id] ?? false,
     })),
-    informationFormSchema,
   }
 }
 

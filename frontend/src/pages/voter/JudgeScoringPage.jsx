@@ -7,7 +7,6 @@ import { useSocketEvent } from '@/hooks/useSocketEvent'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import FormAlert from '@/components/ui/FormAlert'
-import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
 import CompetitionScoringForm from '@/components/voter/competition/CompetitionScoringForm'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
 
@@ -513,8 +512,6 @@ export default function JudgeScoringPage() {
       <VoterEventHeader event={sheet?.event} eyebrow="Judge scoring">
         <p className="text-sm font-medium text-white/75">Live session scoring</p>
       </VoterEventHeader>
-
-      <ParticipantInformationGate eventId={eventId} />
 
       {/* Connection error banner */}
       {connectionError && (

@@ -2,7 +2,6 @@ export const EVENT_STAGES = {
   election: [
     { key: 'details', label: 'Details', path: 'edit' },
     { key: 'branding', label: 'Branding', path: 'branding' },
-    { key: 'information-form', label: 'Information Form', path: 'form' },
     { key: 'positions', label: 'Positions', path: 'positions' },
     { key: 'candidates', label: 'Candidates', path: 'candidates' },
     // Publishing happens here, before the roster. Setup (the stages above)
@@ -18,7 +17,6 @@ export const EVENT_STAGES = {
     // Create
     { key: 'details', label: 'Details', path: 'edit' },
     { key: 'branding', label: 'Branding', path: 'branding' },
-    { key: 'information-form', label: 'Information Form', path: 'form' },
     // Setup — Structure & Scoring holds rounds, criteria (with minor criteria +
     // score types), divisions and scoring rules; Contestants are added then
     // assigned to rounds on their own page; Judges are added + assigned.
@@ -39,7 +37,6 @@ export const EVENT_STAGES = {
     { key: 'details', label: 'Details', path: 'edit' },
     { key: 'branding', label: 'Branding', path: 'branding' },
     { key: 'settings', label: 'Settings', path: 'settings' },
-    { key: 'information-form', label: 'Information Form', path: 'form' },
     { key: 'builder', label: 'Builder', path: 'builder' },
     // Publishing happens here, before the roster. Setup (settings, builder)
     // locks on publish; Respondents stays editable through `scheduled`.

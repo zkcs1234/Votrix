@@ -8,7 +8,6 @@ import { validateCreateEvent as validateElectionEvent } from '../validators/elec
 import { validateCompetitionEvent } from '../validators/competition.validator.js'
 import { validatePollEvent } from '../validators/polling.validator.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
-import { setEventInformationForm } from '../services/event.service.js'
 
 // Module → { create service, create validator }. Validators that need an
 // isCreate flag (competition/polling) pass `true` so the same validation rules
@@ -59,13 +58,6 @@ export const publishDraft = (module) =>
     if (body.image_asset_id) payload.image_asset_id = body.image_asset_id
 
     const event = await draftService.publishDraft(req.user.id, module, create, payload)
-    
-    // Save infoFormSchema if present
-    if (draft?.payload?.infoFormSchema) {
-      await setEventInformationForm(event.id, req.user.id, draft.payload.infoFormSchema).catch((err) => {
-        console.error(`[draft] failed to save infoFormSchema for published event ${event.id}:`, err.message)
-      })
-    }
 
     res.status(201).json({ success: true, event })
   })

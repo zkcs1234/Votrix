@@ -76,6 +76,17 @@ export const electionService = {
     return api.get(`${base}/events/${eventId}/voters`, { params: { page, limit } })
   },
 
+  // Cohort invite (plan Phase 5).
+  getCohorts(eventId) {
+    return api.get(`${base}/events/${eventId}/cohorts`)
+  },
+  inviteCohort(eventId, payload) {
+    return api.post(`${base}/events/${eventId}/invite-cohort`, payload)
+  },
+  removeParticipant(eventId, userId) {
+    return api.delete(`${base}/events/${eventId}/participants/${userId}`)
+  },
+
   registerVoter(eventId, payload) {
     return api.post(`${base}/events/${eventId}/voters/register`, payload)
   },
@@ -130,15 +141,6 @@ export const electionService = {
   // Pull a published (scheduled) event back to draft so setup can be corrected.
   unpublishEvent(eventId) {
     return api.post(`${base}/events/${eventId}/unpublish`)
-  },
-
-  // ——— Participant Information Form ———
-  getInformationForm(eventId) {
-    return api.get(`${base}/events/${eventId}/information-form`)
-  },
-
-  updateInformationForm(eventId, schema) {
-    return api.patch(`${base}/events/${eventId}/information-form`, schema)
   },
 
   // Voter

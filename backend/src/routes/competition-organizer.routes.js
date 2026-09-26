@@ -43,9 +43,13 @@ router.patch('/scoring-config', ctrl.setScoringConfig)
 // Foundation snapshot (used by the workspace UI)
 router.get('/foundation', ctrl.getFoundation)
 
-// Judge participants (Phase 6) — canonical event_participants-backed model.
+// Judge participants — canonical event_participants-backed model.
+// Plan Phase 6: organizers PICK judges from the admin-registered pool instead
+// of creating accounts. The judges-v2/invite (single account create) route was
+// removed; list / update (role) / delete (un-enroll) remain.
 router.get('/judges-v2', ctrl.listJudgesV2)
-router.post('/judges-v2/invite', emailLimiter, ctrl.inviteJudgeV2)
+router.get('/judge-pool', ctrl.getJudgePool)
+router.post('/judges-v2/pick', emailLimiter, ctrl.pickJudges)
 router.patch('/judges-v2/:judgeId', ctrl.updateJudgeV2)
 router.delete('/judges-v2/:judgeId', ctrl.deleteJudgeV2)
 

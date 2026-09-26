@@ -6,7 +6,6 @@ import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import FormAlert from '@/components/ui/FormAlert'
 import Button from '@/components/ui/Button'
-import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
 import PollQuestionField from '@/components/voter/polling/PollQuestionField'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
 import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
@@ -236,8 +235,6 @@ export default function VoterPollPage() {
               <p className="text-xs font-medium text-white/70">Your responses are anonymous.</p>
             )}
           </VoterEventHeader>
-
-          <ParticipantInformationGate eventId={eventId} />
 
           {questions.map((q, idx) => (
             <PollQuestionField

@@ -7,7 +7,6 @@ import FormAlert from '@/components/ui/FormAlert'
 import ElectionPositionSection from '@/components/voter/election/ElectionPositionSection'
 import Button from '@/components/ui/Button'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
-import ParticipantInformationGate from '@/components/voter/ParticipantInformationGate'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
 
@@ -270,8 +269,6 @@ export default function VoterEventPage() {
       <div className="flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8">
           <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
-
-          {!done && !ballot?.hasVoted && <ParticipantInformationGate eventId={eventId} />}
 
           {isReviewing ? (
             <div className="v-card p-6 space-y-6">

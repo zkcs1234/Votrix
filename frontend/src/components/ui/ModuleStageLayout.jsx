@@ -8,9 +8,9 @@ import StageFooter from '@/components/ui/StageFooter'
 // Stages that are part of the multi-step create/edit wizard and already render
 // their own EventStepper + per-step StageFooter inside the form pages.
 const FORM_WIZARD_STAGES = {
-  election: ['details', 'branding', 'information-form'],
-  competition: ['details', 'branding', 'information-form'],
-  polling: ['details', 'branding', 'settings', 'information-form'],
+  election: ['details', 'branding'],
+  competition: ['details', 'branding'],
+  polling: ['details', 'branding', 'settings'],
 }
 
 // Last setup stage of each module. These pages render their own StageFooter in

@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { lazy } from 'react'
+import { Navigate } from 'react-router-dom'
 // AuthLayout is the only framer-motion consumer; lazy-loading it keeps that
 // ~100 KB animation library out of the main bundle (loaded only on auth routes).
 const AuthLayout = lazy(() => import('@/layouts/AuthLayout'))
@@ -16,7 +17,7 @@ const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
 const ChangePasswordPage = lazy(() => import('@/pages/auth/ChangePasswordPage'))
 const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'))
-const OrganizerManagementPage = lazy(() => import('@/pages/admin/OrganizerManagementPage'))
+const UserManagementPage = lazy(() => import('@/pages/admin/UserManagementPage'))
 const GlobalEventsPage = lazy(() => import('@/pages/admin/GlobalEventsPage'))
 const SystemSettingsPage = lazy(() => import('@/pages/admin/SystemSettingsPage'))
 const AuditLogsPage = lazy(() => import('@/pages/admin/AuditLogsPage'))
@@ -156,7 +157,9 @@ export const routeConfig = [
     ),
     children: [
       { index: true, element: <AdminDashboardPage /> },
-      { path: 'organizers', element: <OrganizerManagementPage /> },
+      { path: 'users', element: <UserManagementPage /> },
+      // Legacy path — redirect to the renamed User Management area (plan D14).
+      { path: 'organizers', element: <Navigate to="/admin/users" replace /> },
       { path: 'organizers/:id', element: <OrganizerDetailPage /> },
       { path: 'events', element: <GlobalEventsPage /> },
       { path: 'settings', element: <SystemSettingsPage /> },
@@ -197,7 +200,6 @@ export const routeConfig = [
       { path: 'events/new', element: <ElectionEventFormPage /> },
       { path: 'events/:eventId/edit', element: <ElectionEventFormPage /> },
       { path: 'events/:eventId/branding', element: <ElectionEventFormPage /> },
-      { path: 'events/:eventId/form', element: <ElectionEventFormPage /> },
       { path: 'events/:eventId/positions', element: <ElectionPositionsPage /> },
       { path: 'events/:eventId/candidates', element: <ElectionCandidatesPage /> },
       { path: 'events/:eventId/review', element: <ElectionReviewPage /> },
@@ -218,7 +220,6 @@ export const routeConfig = [
       { path: 'events/new', element: <CompetitionEventFormPage /> },
       { path: 'events/:eventId/edit', element: <CompetitionEventFormPage /> },
       { path: 'events/:eventId/branding', element: <CompetitionEventFormPage /> },
-      { path: 'events/:eventId/form', element: <CompetitionEventFormPage /> },
       { path: 'events/:eventId/workspace', element: <CompetitionWorkspacePage /> },
       { path: 'events/:eventId/contestants', element: <CompetitionContestantsPage /> },
       { path: 'events/:eventId/judges', element: <CompetitionJudgesPage /> },
@@ -242,7 +243,6 @@ export const routeConfig = [
       { path: 'events/:eventId/edit', element: <PollingEventFormPage /> },
       { path: 'events/:eventId/branding', element: <PollingEventFormPage /> },
       { path: 'events/:eventId/settings', element: <PollingEventFormPage /> },
-      { path: 'events/:eventId/form', element: <PollingEventFormPage /> },
       { path: 'events/:eventId/builder', element: <PollingBuilderPage /> },
       { path: 'events/:eventId/review', element: <PollingReviewPage /> },
       { path: 'events/:eventId/respondents', element: <PollingRespondentsPage /> },

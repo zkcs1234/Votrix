@@ -630,7 +630,7 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
       created_at,
       user_id,
       metadata,
-      users!inner (id, email)
+      users!inner (id, email, first_name, last_name, school_id, program, year_section)
     `,
       { count: 'exact' }
     )
@@ -660,24 +660,24 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
     }
   }
 
-  // Fetch the event's information form schema for dynamic columns
-  const event = await getEventById(eventId)
-  const informationFormSchema = event?.information_form_schema ?? { enabled: false, fields: [] }
-
   return {
     voters: voterRows.map((row) => ({
       id: row.id,
       voterId: row.users?.id,
       email: row.users?.email,
-      firstName: row.first_name,
-      lastName: row.last_name,
+      // Prefer the account profile (admin-managed); fall back to legacy
+      // participant-level name columns for pre-migration rows.
+      firstName: row.users?.first_name ?? row.first_name,
+      lastName: row.users?.last_name ?? row.last_name,
+      schoolId: row.users?.school_id ?? null,
+      program: row.users?.program ?? null,
+      yearSection: row.users?.year_section ?? null,
       hasVoted: row.has_voted,
       createdAt: row.created_at,
       metadata: row.metadata ?? {},
       // Invitation status: true = sent, false = pending, no record = false
       invitationSent: invitationSentByVoter.get(row.user_id) ?? false,
     })),
-    informationFormSchema,
     meta: {
       page,
       limit,
@@ -1120,7 +1120,9 @@ export async function getElectionVotingTimeline(eventId, organizerId) {
 
   const { data: votes, error } = await getClient()
     .from(DB_TABLES.ELECTION_VOTES)
-    .select('created_at, voter_id')
+    // Only timestamps are needed for the turnout timeline — never pull voter_id
+    // here, so the ballot↔identity link is not even loaded (plan D12).
+    .select('created_at')
     .eq('event_id', eventId)
     .order('created_at', { ascending: true })
 

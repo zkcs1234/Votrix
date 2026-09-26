@@ -133,6 +133,17 @@ export const pollingService = {
     return api.get(`${org}/events/${eventId}/voters`)
   },
 
+  // Cohort invite (plan Phase 5).
+  getCohorts(eventId) {
+    return api.get(`${org}/events/${eventId}/cohorts`)
+  },
+  inviteCohort(eventId, payload) {
+    return api.post(`${org}/events/${eventId}/invite-cohort`, payload)
+  },
+  removeParticipant(eventId, userId) {
+    return api.delete(`${org}/events/${eventId}/participants/${userId}`)
+  },
+
   // Phase 7 — Question type registry - force HMR reload
   listQuestionTypes() {
     return api.get(`${org}/question-types`)
@@ -148,15 +159,6 @@ export const pollingService = {
   },
   deleteCustomQuestionType(typeId) {
     return api.delete(`${org}/question-types/custom/${typeId}`)
-  },
-
-  // ——— Participant Information Form ———
-  getInformationForm(eventId) {
-    return api.get(`${org}/events/${eventId}/information-form`)
-  },
-
-  updateInformationForm(eventId, schema) {
-    return api.patch(`${org}/events/${eventId}/information-form`, schema)
   },
 
   listMyPolls() {

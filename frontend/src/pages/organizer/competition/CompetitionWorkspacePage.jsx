@@ -143,7 +143,7 @@ function WorkspaceStageFooter({ eventId, activeTab, setActiveTab }) {
   } else {
     back =
       idx <= 0
-        ? { label: 'Back: Information Form', href: stagePath('competition', 'information-form', eventId) }
+        ? { label: 'Back: Branding', href: stagePath('competition', 'branding', eventId) }
         : {
             label: `Back: ${WORKSPACE_TAB_LABEL[WORKSPACE_TAB_FLOW[idx - 1]]}`,
             onClick: () => setActiveTab(WORKSPACE_TAB_FLOW[idx - 1]),

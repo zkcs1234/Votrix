@@ -236,6 +236,14 @@ export const pageantService = {
     return api.patch(`${org}/events/${eventId}/scoring-config`, payload)
   },
 
+  // Plan Phase 6 — judge pool + pick.
+  getJudgePool(eventId, params = {}) {
+    return api.get(`${org}/events/${eventId}/judge-pool`, { params })
+  },
+  pickJudges(eventId, payload) {
+    return api.post(`${org}/events/${eventId}/judges-v2/pick`, payload)
+  },
+
   // Phase 6 — Judge participants.
   // Updates, deletes, and assignments use event_participants.id.
   listJudgesV2(eventId) {
@@ -258,15 +266,6 @@ export const pageantService = {
   },
   deleteJudgeAssignment(eventId, participantId, assignmentId) {
     return api.delete(`${org}/events/${eventId}/judges-v2/${participantId}/assignments/${assignmentId}`)
-  },
-
-  // ——— Participant Information Form ———
-  getInformationForm(eventId) {
-    return api.get(`${org}/events/${eventId}/information-form`)
-  },
-
-  updateInformationForm(eventId, schema) {
-    return api.patch(`${org}/events/${eventId}/information-form`, schema)
   },
 
   // Judge (voter)

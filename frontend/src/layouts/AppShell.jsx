@@ -20,6 +20,18 @@ const ROLE_LABELS = {
   voter: 'Voter',
 }
 
+// One label/value row in the account dropdown's participant-profile section.
+// Renders nothing when the value is empty so blank fields don't clutter it.
+function ProfileRow({ label, value }) {
+  if (!value) return null
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-xs text-v-text-subtle">{label}</dt>
+      <dd className="text-xs font-medium text-v-text text-right truncate">{value}</dd>
+    </div>
+  )
+}
+
 // Below this width the fixed sidebar crowds the content, so it auto-collapses to
 // a rail; at or above it, the user's saved preference applies. Matches Tailwind's
 // `xl` breakpoint.
@@ -511,11 +523,34 @@ export default function AppShell({
               </button>
 
               {profileDropdownOpen && (
-                <div className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-v-border bg-v-surface shadow-v-shadow-lg">
+                <div className="absolute right-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-v-border bg-v-surface shadow-v-shadow-lg">
                   <div className="px-4 py-3 border-b border-v-border">
                     <p className="text-sm font-medium text-v-text truncate">{displayName}</p>
                     <p className="text-xs text-v-text-subtle mt-0.5">{user?.email || ''}</p>
                   </div>
+
+                  {/* Participant profile (plan §6.5) — admin-managed, view-only. */}
+                  {user?.profileType && (
+                    <dl className="border-b border-v-border px-4 py-3 space-y-2">
+                      {[user.firstName, user.lastName].filter(Boolean).length > 0 && (
+                        <ProfileRow label="Name" value={[user.firstName, user.lastName].filter(Boolean).join(' ')} />
+                      )}
+                      {user.profileType === 'judge' ? (
+                        <>
+                          <ProfileRow label="Title" value={user.profileData?.title} />
+                          <ProfileRow label="Affiliation" value={user.profileData?.affiliation} />
+                          <ProfileRow label="Expertise" value={user.profileData?.expertise} />
+                        </>
+                      ) : (
+                        <>
+                          <ProfileRow label="School ID" value={user.schoolId} />
+                          <ProfileRow label="Program" value={user.program} />
+                          <ProfileRow label="Year & Section" value={user.yearSection} />
+                        </>
+                      )}
+                    </dl>
+                  )}
+
                   <div className="py-1">
                     <button
                       type="button"

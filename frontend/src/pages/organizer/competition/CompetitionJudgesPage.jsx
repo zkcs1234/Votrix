@@ -1,133 +1,57 @@
-import { useCallback, useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Lock } from 'lucide-react'
+import { Lock, Users, UserMinus, Send, Search } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import Button from '@/components/ui/Button'
-import Modal from '@/components/ui/Modal'
-import DynamicParticipantTable from '@/components/organizer/DynamicParticipantTable'
+import Card from '@/components/ui/Card'
+import Badge from '@/components/ui/Badge'
+import FormAlert from '@/components/ui/FormAlert'
 import JudgeAssignmentPanel from '@/components/organizer/competition/JudgeAssignmentPanel'
-import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 import { isParticipantsLocked } from '@/utils/constants'
 
-function downloadCsv(filename, headers, rows) {
-  const csvContent = [
-    headers.join(','),
-    ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
-  ].join('\n')
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(url)
-}
-
-function downloadCsvTemplate() {
-  const headers = ['email']
-  const exampleRows = [['judge@example.com']]
-  downloadCsv('judge.csv', headers, exampleRows)
-}
-
-function CsvPreviewModal({ data, onClose, onRegister, registering }) {
-  return (
-    <Modal open onClose={onClose} title="Review & Register" size="lg">
-        {data.errors?.length > 0 && (
-          <div className="mb-4 p-3 bg-v-danger/10 border border-v-danger/30 rounded-lg">
-            <p className="v-error-text font-semibold mb-2">{data.errors.length} error(s)</p>
-            <ul className="v-error-text text-sm list-disc list-inside">
-              {data.errors.slice(0, 5).map((err, i) => <li key={i}>{err}</li>)}
-              {data.errors.length > 5 && <li>...and {data.errors.length - 5} more</li>}
-            </ul>
-          </div>
-        )}
-
-        <p className="v-label mb-4">{data.valid} of {data.total} valid</p>
-
-        <div className="v-table-wrap mb-4">
-          <table className="v-table">
-            <thead>
-              <tr>
-                <th>Row</th>
-                <th>Email</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.data.map((row, i) => (
-                <tr key={i}>
-                  <td>{row.rowNumber}</td>
-                  <td>{row.email}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex gap-3 justify-end">
-          <Button variant="secondary" onClick={onClose} disabled={registering}>Cancel</Button>
-          <Button onClick={onRegister} loading={registering}>
-            Register ({data.valid})
-          </Button>
-        </div>
-    </Modal>
-  )
+// Phase 6: organizers no longer register or CSV-import judges. Judge accounts
+// are created by the admin; here the organizer PICKS judges from the pool into
+// this competition, then scopes them via the assignment panel.
+function judgeName(j) {
+  return j.displayName || [j.firstName, j.lastName].filter(Boolean).join(' ') || j.email
 }
 
 export default function CompetitionJudgesPage() {
   const { eventId } = useParams()
   const [judges, setJudges] = useState([])
-  const [formSchema, setFormSchema] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [email, setEmail] = useState('')
-  const [registering, setRegistering] = useState(false)
-  const [sendingAll, setSendingAll] = useState(false)
-  const [sendingId, setSendingId] = useState(null)
-  const [csvPreview, setCsvPreview] = useState(null)
-  const [importResult, setImportResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [pool, setPool] = useState([])
   const [foundation, setFoundation] = useState(null)
-  // Roster edit-lock: register/invite stay open while draft or scheduled, and
-  // lock once scoring is live (active). Publishing itself now happens on the
-  // Review & Publish step, not here.
   const [eventStatus, setEventStatus] = useState(null)
-  const fileInputRef = useRef(null)
-
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState(() => new Set())
+  const [notify, setNotify] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const [removingId, setRemovingId] = useState(null)
+  const [error, setError] = useState(null)
   const { success, error: showError } = useToast()
-  const showLoader = useDelayedLoading(loading, 300)
 
   const rosterLocked = isParticipantsLocked(eventStatus)
 
-  const load = useCallback(async () => {
+  const loadJudges = useCallback(async () => {
     try {
       const { data } = await pageantService.listJudges(eventId)
-      const normalized = Array.isArray(data?.judges)
-        ? data.judges.map((judge) => ({
-            ...judge,
-            id: judge.id ?? judge.email,
-            participantId: judge.id ?? null,
-            judgeId: judge.judgeId ?? judge.userId ?? null,
-            email: judge.email ?? null,
-            firstName: judge.firstName ?? null,
-            lastName: judge.lastName ?? null,
-            hasScored: Boolean(judge.hasScored ?? false),
-            invitationSent: Boolean(judge.invitationSent ?? false),
-            metadata: judge.metadata ?? {},
-          }))
-        : []
-
-      setJudges(normalized)
-      setFormSchema(data?.informationFormSchema ?? null)
-    } catch (err) {
-      console.error('Failed to load judges:', err)
+      setJudges(Array.isArray(data?.judges) ? data.judges : [])
+    } catch {
       setJudges([])
-      setFormSchema(null)
-    } finally {
-      setLoading(false)
     }
   }, [eventId])
+
+  const loadPool = useCallback(async () => {
+    try {
+      const { data } = await pageantService.getJudgePool(eventId, search ? { search } : {})
+      setPool(Array.isArray(data?.judges) ? data.judges : [])
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load judge pool'))
+    }
+  }, [eventId, search])
 
   const loadFoundation = useCallback(async () => {
     try {
@@ -138,278 +62,194 @@ export default function CompetitionJudgesPage() {
     }
   }, [eventId])
 
-  const loadStatus = useCallback(async () => {
-    try {
-      const { data } = await pageantService.getEvent(eventId)
-      setEventStatus(data.event?.status ?? null)
-    } catch (err) {
-      console.error('Failed to load event status:', err)
-    }
-  }, [eventId])
-
   useEffect(() => {
-    load()
+    pageantService.getEvent(eventId).then(({ data }) => setEventStatus(data.event?.status ?? null)).catch(() => {})
+    loadJudges()
     loadFoundation()
-    loadStatus()
-  }, [load, loadFoundation, loadStatus])
+  }, [eventId, loadJudges, loadFoundation])
 
-  const pendingCount = judges.filter((j) => !j.invitationSent && j.judgeId).length
+  // Reload the pool as the search term changes (debounced).
+  useEffect(() => {
+    const t = setTimeout(loadPool, 300)
+    return () => clearTimeout(t)
+  }, [loadPool])
 
-  const handleRegister = async (e) => {
-    e.preventDefault()
-    setError(null)
-    setRegistering(true)
-    try {
-      await pageantService.registerJudge(eventId, { email })
-      setEmail('')
-      // Refresh both the judges table (load) and the assignment panel's
-      // foundation snapshot (loadFoundation) so a newly registered judge is
-      // immediately assignable — otherwise the panel keeps showing "No judges yet".
-      await Promise.all([load(), loadFoundation()])
-      success('Judge registered. Send invitation when ready.')
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Registration failed'
-      setError(msg)
-      showError(msg)
-    } finally {
-      setRegistering(false)
-    }
+  const toggle = (id) => {
+    setSelected((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
-  const handleCsvPreview = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const selectableCount = useMemo(() => pool.filter((p) => !p.enrolled).length, [pool])
+
+  const handlePick = async () => {
+    if (selected.size === 0) return
+    setPicking(true)
     setError(null)
     try {
-      const { data } = await pageantService.previewJudgesCsv(eventId, file)
-      setCsvPreview(data)
-    } catch (err) {
-      const details = err.response?.data?.details?.errors
-      const msg = details?.length ? details.join(', ') : getErrorMessage(err, 'Preview failed')
-      setError(msg)
-      showError(msg)
-    }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
-  const handleCsvRegister = async () => {
-    if (!csvPreview?.data) return
-    setRegistering(true)
-    try {
-      const { data } = await pageantService.registerJudgesCsv(eventId, csvPreview.data)
-      setImportResult({ succeeded: data.succeeded, total: data.total })
-      setCsvPreview(null)
-      success(`Registered ${data.succeeded} of ${data.total} judges. Send invitations later.`)
-      // Refresh the assignment panel's foundation too, so imported judges appear there.
-      await Promise.all([load(), loadFoundation()])
-    } catch (err) {
-      const details = err.response?.data?.details?.errors
-      const msg = details?.length ? details.join(', ') : getErrorMessage(err, 'Registration failed')
-      setError(msg)
-      showError(msg)
-    } finally {
-      setRegistering(false)
-    }
-  }
-
-  const handleSendInvitation = async (judgeId, isResend = false) => {
-    setSendingId(judgeId)
-    try {
-      const response = await pageantService.sendJudgeInvitation(eventId, judgeId)
-      const { data } = response
-
-      if (data.invitationSent) {
-        success(isResend ? 'Invitation resent successfully' : 'Invitation sent successfully')
-        setJudges((current) =>
-          current.map((judge) =>
-            judge.judgeId === judgeId ? { ...judge, invitationSent: true } : judge,
-          ),
-        )
-        load()
-      } else {
-        // Show specific error message from backend
-        const errorMsg = data.message || data.email?.error || (isResend ? 'Failed to resend invitation' : 'Failed to send invitation')
-        if (data.email?.retryable) {
-          showError(`${errorMsg}. Please check your internet connection and try again.`)
-        } else {
-          showError(errorMsg)
-        }
-      }
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || (isResend ? 'Failed to resend invitation' : 'Failed to send invitation')
-      showError(`Network error: ${errorMsg}`)
-    } finally {
-      setSendingId(null)
-    }
-  }
-
-  // Render custom action buttons (send invitation)
-  const renderActions = (participant, type) => {
-    // Once scoring is live the roster is locked — no more invites or resends.
-    if (rosterLocked) return null
-    if (type === 'toolbar') {
-      return pendingCount > 0 ? (
-        <Button onClick={handleSendAll} loading={sendingAll} disabled={sendingAll}>
-          Send All Invitations ({pendingCount})
-        </Button>
-      ) : null
-    }
-
-    // Row-level action — needs a resolved judge account (judgeId) to email.
-    if (!participant.judgeId) return null
-    const isSending = sendingId === participant.judgeId
-    if (!participant.invitationSent) {
-      return (
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => handleSendInvitation(participant.judgeId)}
-          loading={isSending}
-          disabled={isSending}
-        >
-          Send Invitation
-        </Button>
+      const { data } = await pageantService.pickJudges(eventId, { userIds: [...selected], notify })
+      success(
+        `Added ${data.enrolled} judge(s)` +
+          (data.alreadyEnrolled ? ` (${data.alreadyEnrolled} already in)` : '') +
+          (notify ? ` · ${data.notified} emailed` : ''),
       )
-    }
-    // Already invited — allow resending the invitation email
-    return (
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() => handleSendInvitation(participant.judgeId, true)}
-        loading={isSending}
-        disabled={isSending}
-      >
-        Resend
-      </Button>
-    )
-  }
-
-  const handleSendAll = async () => {
-    if (pendingCount === 0) return
-    setSendingAll(true)
-    try {
-      const { data } = await pageantService.sendAllJudgeInvitations(eventId)
-      success(`Sent ${data.sent} of ${data.total} invitations`)
-      load()
+      setSelected(new Set())
+      await Promise.all([loadJudges(), loadPool(), loadFoundation()])
     } catch (err) {
-      showError(err.response?.data?.message || 'Failed to send invitations')
+      const message = getErrorMessage(err, 'Failed to add judges')
+      setError(message)
+      showError(message)
     } finally {
-      setSendingAll(false)
+      setPicking(false)
     }
   }
 
-  if (loading && !showLoader) return null
+  const handleRemove = async (participantId) => {
+    setRemovingId(participantId)
+    try {
+      await pageantService.deleteJudgeV2(eventId, participantId)
+      success('Judge removed from event')
+      await Promise.all([loadJudges(), loadPool(), loadFoundation()])
+    } catch (err) {
+      showError(getErrorMessage(err, 'Failed to remove judge'))
+    } finally {
+      setRemovingId(null)
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <h2 className="v-page-title">Judges</h2>
-      <p className="text-sm text-v-text-subtle">
-        Judges are voter accounts with scoring access for this competition event.
-      </p>
+      <div>
+        <h1 className="v-page-title">Judges</h1>
+        <p className="v-caption">
+          Pick judges from the registered pool for this competition, then scope their assignments below.
+        </p>
+      </div>
 
       {rosterLocked && (
-        <div className="flex items-center gap-3 rounded-2xl border border-v-border bg-v-surface-elevated p-4">
-          <div className="rounded-full bg-v-text-subtle/10 p-1.5 text-v-text-muted">
-            <Lock className="h-5 w-5" strokeWidth={2} />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-v-text">Roster locked — scoring is live</p>
-            <p className="text-xs text-v-text-muted mt-0.5">
-              You can no longer register or invite judges. The list below is read-only.
-            </p>
-          </div>
-        </div>
+        <FormAlert variant="warning">
+          <span className="inline-flex items-center gap-2">
+            <Lock className="h-4 w-4" strokeWidth={1.5} />
+            This event is active — the judge roster is locked and can no longer be changed.
+          </span>
+        </FormAlert>
       )}
 
-      {csvPreview && (
-        <CsvPreviewModal
-          data={csvPreview}
-          onClose={() => setCsvPreview(null)}
-          onRegister={handleCsvRegister}
-          registering={registering}
-        />
-      )}
-
-{!rosterLocked && (
-<div className="grid gap-6">
-        <div className="v-card-sm">
-          <h3 className="v-label">CSV Upload</h3>
-          <p className="v-helper-text mb-3">
-            Upload a CSV or Excel (.xlsx) file with an email column. Passwords are auto-generated.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.tsv,.xlsx,.xls"
-              className="v-caption"
-              onChange={handleCsvPreview}
-            />
-            <button
-              type="button"
-              onClick={downloadCsvTemplate}
-              className="text-sm text-v-primary hover:text-v-primary-hover underline"
-            >
-              Download CSV template
-            </button>
-          </div>
-          {importResult && (
-            <div className="mt-2 space-y-1">
-              <p className="v-caption text-v-success">
-                Registered {importResult.succeeded} of {importResult.total}.
-              </p>
-              {importResult.skipped > 0 && (
-                <p className="v-caption text-v-warning">
-                  {importResult.skipped} already enrolled, skipped.
-                </p>
-              )}
-              {importResult.failed > 0 && (
-                <p className="v-caption text-v-danger">{importResult.failed} failed.</p>
-              )}
+      {!rosterLocked && (
+        <Card>
+          <div className="space-y-4 p-5">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search judges by name or email"
+                className={INPUT_CLASS}
+              />
             </div>
-          )}
-        </div>
 
-        <div className="v-card-sm">
-          <h3 className="v-label mb-3">Register Manually</h3>
-          <form onSubmit={handleRegister} className="flex flex-wrap gap-3">
-            <input
-              type="email"
-              className="v-input flex-1 min-w-[200px]"
-              placeholder="Judge email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <Button type="submit" loading={registering} className="w-[160px]">
-              Register
-            </Button>
-          </form>
-        </div>
-      </div>
+            {pool.length === 0 ? (
+              <p className="v-caption">
+                No judges in the pool. Ask an admin to register judges in User Management.
+              </p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {pool.map((j) => {
+                  const checked = selected.has(j.id)
+                  return (
+                    <label
+                      key={j.id}
+                      className={`flex items-center gap-2 rounded-lg border p-2.5 text-sm transition ${
+                        j.enrolled
+                          ? 'border-v-border bg-v-surface-elevated opacity-60'
+                          : checked
+                            ? 'cursor-pointer border-v-primary bg-v-primary/5'
+                            : 'cursor-pointer border-v-border hover:bg-v-surface-elevated'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={j.enrolled || checked}
+                        disabled={j.enrolled}
+                        onChange={() => toggle(j.id)}
+                        className="h-4 w-4"
+                      />
+                      <span className="flex-1">
+                        <span className="text-v-text">{[j.firstName, j.lastName].filter(Boolean).join(' ') || j.email}</span>
+                        <span className="v-caption block">
+                          {j.email}
+                          {j.profileData?.affiliation ? ` · ${j.profileData.affiliation}` : ''}
+                        </span>
+                      </span>
+                      {j.enrolled && <Badge tone="success">Added</Badge>}
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-v-border pt-4">
+              <label className="flex items-center gap-2 text-sm text-v-text-muted">
+                <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} className="h-4 w-4" />
+                Email an invitation to newly added judges
+              </label>
+              <span className="v-caption">{selectableCount} available to add</span>
+              <Button onClick={handlePick} loading={picking} disabled={selected.size === 0}>
+                <Send className="h-4 w-4" strokeWidth={2} />
+                Add {selected.size || ''} judge{selected.size === 1 ? '' : 's'}
+              </Button>
+            </div>
+          </div>
+        </Card>
       )}
 
-      {error && <p className="v-error-text">{error}</p>}
+      {error && <FormAlert variant="error">{error}</FormAlert>}
 
-      <DynamicParticipantTable
-        participants={judges}
-        formSchema={formSchema}
-        loading={loading}
-        statusKey="hasScored"
-        statusLabel={{ active: 'Pending', done: 'Submitted' }}
-        renderActions={renderActions}
-        emptyMessage="No judges yet"
-        searchPlaceholder="Search judges by email or details"
-        noun="judges"
-        onExportCsv
-        exportLabel="Export CSV"
-      />
+      <Card padding="sm">
+        <div className="flex items-center gap-2 px-4 pt-4">
+          <Users className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
+          <h2 className="v-section-title">Judges in this event ({judges.length})</h2>
+        </div>
+        {judges.length === 0 ? (
+          <div className="p-8 text-center v-caption">No judges added yet.</div>
+        ) : (
+          <div className="v-table-wrap mt-3">
+            <table className="v-table">
+              <thead>
+                <tr>
+                  <th>Name</th><th>Email</th><th>Role</th><th>Status</th>
+                  {!rosterLocked && <th className="text-right">Actions</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-v-border">
+                {judges.map((j) => (
+                  <tr key={j.id}>
+                    <td>{judgeName(j)}</td>
+                    <td>{j.email}</td>
+                    <td>{j.role}</td>
+                    <td><Badge tone={j.hasScored ? 'success' : 'default'}>{j.hasScored ? 'Submitted' : 'Pending'}</Badge></td>
+                    {!rosterLocked && (
+                      <td>
+                        <div className="flex justify-end">
+                          <Button size="sm" variant="ghost" loading={removingId === j.id} onClick={() => handleRemove(j.id)}>
+                            <UserMinus className="h-4 w-4" strokeWidth={1.5} /> Remove
+                          </Button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
-      {/* Judge assignment — moved here so you add judges then scope them, after
-          the rounds/divisions/categories exist. */}
+      {/* Scope judges to divisions/categories/rounds once they're added. */}
       <div className="border-t border-v-border pt-6">
         <JudgeAssignmentPanel foundation={foundation} reload={loadFoundation} />
       </div>

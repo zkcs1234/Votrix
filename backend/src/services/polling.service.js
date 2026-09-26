@@ -190,7 +190,7 @@ export async function listEventRespondents(eventId, organizerId, page = 1, limit
       created_at,
       user_id,
       metadata,
-      users!inner (id, email)
+      users!inner (id, email, first_name, last_name, school_id, program, year_section)
     `, { count: 'exact' })
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
@@ -216,22 +216,21 @@ export async function listEventRespondents(eventId, organizerId, page = 1, limit
     }
   }
 
-  const event = await getEventById(eventId)
-  const informationFormSchema = event?.information_form_schema ?? { enabled: false, fields: [] }
-
   return {
     voters: (data ?? []).map((row) => ({
       id: row.id,
       voterId: row.users?.id,
       email: row.users?.email,
-      firstName: row.first_name,
-      lastName: row.last_name,
+      firstName: row.users?.first_name ?? row.first_name,
+      lastName: row.users?.last_name ?? row.last_name,
+      schoolId: row.users?.school_id ?? null,
+      program: row.users?.program ?? null,
+      yearSection: row.users?.year_section ?? null,
       hasResponded: row.has_responded,
       createdAt: row.created_at,
       metadata: row.metadata ?? {},
       invitationSent: invitationMap.get(row.user_id) ?? false,
     })),
-    informationFormSchema,
     meta: {
       page,
       limit,

@@ -10,7 +10,6 @@ import {
   validateDivision,
   validateDivisionsToggle,
 } from '../validators/competition.validator.js'
-import { validateInviteVoter } from '../validators/email.validator.js'
 
 // ---------------------------------------------------------------------------
 // Categories
@@ -139,22 +138,20 @@ export const listJudgesV2 = asyncHandler(async (req, res) => {
   res.json({ success: true, ...result })
 })
 
-export const inviteJudgeV2 = asyncHandler(async (req, res) => {
-  const base = validateInviteVoter(req.body)
-  const rolePayload = validateJudgeRole(req.body)
-  const result = await competitionService.inviteCompetitionJudge(
-    req.params.eventId,
-    req.user.id,
-    {
-      email: base.email,
-      temporaryPassword: base.temporaryPassword,
-      firstName: req.body.firstName,
-      lastName: req.body.lastName,
-      role: rolePayload.role,
-    },
-  )
-  res.status(201).json({ success: true, judge: result })
+// ——— Judge pool + pick (plan Phase 6) ———
+export const getJudgePool = asyncHandler(async (req, res) => {
+  const judges = await competitionService.getJudgePool(req.params.eventId, req.user.id, {
+    search: req.query.search,
+  })
+  res.json({ success: true, judges })
 })
+
+export const pickJudges = asyncHandler(async (req, res) => {
+  const { userIds, notify } = req.body ?? {}
+  const result = await competitionService.pickJudges(req.params.eventId, req.user.id, { userIds, notify })
+  res.json({ success: true, ...result })
+})
+
 
 export const updateJudgeV2 = asyncHandler(async (req, res) => {
   const rolePayload = validateJudgeRole(req.body)

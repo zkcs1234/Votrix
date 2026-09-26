@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { uploadSingle, uploadImage } from '../middleware/upload.js'
-import { uploadLimiter, csvImportLimiter, emailLimiter } from '../middleware/rateLimiter.js'
+import { uploadImage } from '../middleware/upload.js'
+import { uploadLimiter, emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/election-organizer.controller.js'
 import * as draftCtrl from '../controllers/draft.controller.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
@@ -36,13 +36,13 @@ router.post(
 
 router.get('/events/:eventId/voters', ctrl.listVoters)
 
-// Registration and Invitation separated
-router.post('/events/:eventId/voters/register', emailLimiter, ctrl.registerVoter)
-router.post('/events/:eventId/voters/register-existing', emailLimiter, ctrl.registerExistingVoter)
-router.post('/events/:eventId/voters/:voterId/send-invitation', emailLimiter, ctrl.sendInvitation)
-router.post('/events/:eventId/voters/send-all', emailLimiter, ctrl.sendAllInvitations)
-router.post('/events/:eventId/voters/import-preview', csvImportLimiter, uploadSingle('file'), ctrl.previewImportCsv)
-router.post('/events/:eventId/voters/import-register', csvImportLimiter, ctrl.registerImportCsv)
+// Cohort invite (plan Phase 5). Organizers no longer register accounts — the
+// admin owns registration; organizers invite existing students by cohort.
+// The old register / register-existing / send-invitation / send-all /
+// import-preview / import-register routes were removed here.
+router.get('/events/:eventId/cohorts', ctrl.getCohorts)
+router.post('/events/:eventId/invite-cohort', emailLimiter, ctrl.inviteCohort)
+router.delete('/events/:eventId/participants/:userId', ctrl.removeParticipant)
 
 router.post('/events/:eventId/duplicate', ctrl.duplicateEvent)
 router.post('/events/:eventId/finalize', ctrl.finalizeEvent)
@@ -52,10 +52,6 @@ router.get('/events/:eventId/ballot-preview', ctrl.getBallotPreview)
 
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
 router.get('/events/:eventId/analytics/timeline', ctrl.getVotingTimeline)
-
-// ——— Participant Information Form ———
-router.get('/events/:eventId/information-form', ctrl.getInformationForm)
-router.patch('/events/:eventId/information-form', ctrl.updateInformationForm)
 
 // ——— Persistent Create Draft (one per organizer + module) ———
 router.get('/drafts', draftCtrl.getDraft('election'))

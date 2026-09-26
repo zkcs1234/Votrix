@@ -29,10 +29,11 @@ export default function DashboardLayout({
           // clean sections, matching the Competition module's grouped layout.
           { section: 'Manage' },
           {
-            label: 'Organizer Management',
-            path: '/admin/organizers',
+            label: 'User Management',
+            path: '/admin/users',
             icon: Users,
-            isActive: (loc) => loc.pathname.startsWith('/admin/organizers'),
+            isActive: (loc) =>
+              loc.pathname.startsWith('/admin/users') || loc.pathname.startsWith('/admin/organizers'),
           },
           {
             label: 'Global Events',

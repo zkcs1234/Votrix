@@ -6,6 +6,7 @@ import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
 import Badge from '@/components/ui/Badge'
 import StatCard from '@/components/ui/StatCard'
+import ParticipantTaxonomyPanel from '@/components/admin/ParticipantTaxonomyPanel'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
@@ -281,6 +282,8 @@ export default function SystemSettingsPage() {
           </div>
         </form>
       </Card>
+
+      <ParticipantTaxonomyPanel />
     </div>
   )
 }

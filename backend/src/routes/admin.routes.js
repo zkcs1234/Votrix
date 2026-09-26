@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import { authenticate, authorize, requirePasswordChanged } from '../middleware/auth.js'
 import { USER_ROLES } from '../utils/constants.js'
-import { adminActionLimiter } from '../middleware/rateLimiter.js'
+import { adminActionLimiter, csvImportLimiter } from '../middleware/rateLimiter.js'
+import { uploadSingle } from '../middleware/upload.js'
 import * as adminController from '../controllers/admin.controller.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
 
@@ -22,8 +23,30 @@ router.post('/organizers/:organizerId/send-onboarding', adminActionLimiter, admi
 
 router.get('/events', adminController.getGlobalEvents)
 
+// Voter (student participant) registration — plan Phase 3.
+router.get('/voters', adminController.getVoters)
+router.get('/voters/template', adminController.getVoterCsvTemplate)
+router.post('/voters', adminActionLimiter, adminController.createVoter)
+router.post('/voters/import-preview', csvImportLimiter, uploadSingle('file'), adminController.previewVotersCsv)
+router.post('/voters/import-register', csvImportLimiter, adminController.registerVotersCsv)
+router.patch('/voters/:userId', adminActionLimiter, adminController.updateVoter)
+router.patch('/voters/:userId/status', adminActionLimiter, adminController.updateVoterStatus)
+
+// Judge registration — plan Phase 4.
+router.get('/judges', adminController.getJudges)
+router.get('/judges/template', adminController.getJudgeCsvTemplate)
+router.post('/judges', adminActionLimiter, adminController.createJudge)
+router.post('/judges/import-preview', csvImportLimiter, uploadSingle('file'), adminController.previewJudgesCsv)
+router.post('/judges/import-register', csvImportLimiter, adminController.registerJudgesCsv)
+router.patch('/judges/:userId', adminActionLimiter, adminController.updateJudge)
+router.patch('/judges/:userId/status', adminActionLimiter, adminController.updateJudgeStatus)
+
 router.get('/settings', adminController.getSystemSettings)
 router.put('/settings', adminController.updateSystemSettings)
+
+// Managed participant taxonomy — valid Programs and Year & Sections (plan D13).
+router.get('/settings/taxonomy', adminController.getParticipantTaxonomy)
+router.put('/settings/taxonomy', adminActionLimiter, adminController.updateParticipantTaxonomy)
 
 router.get('/audit-logs', adminController.getAuditLogs)
 
