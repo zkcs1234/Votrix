@@ -49,7 +49,7 @@ export default function CompetitionAnalyticsPage() {
       <AnalyticsLayout
         title="Competition analytics"
         description="Contestants, judges, scoring progress, and rankings."
-        fullReportTo={`/organizer/reports/competition/${eventId}`}
+        fullReportTo={`/organizer/competition/events/${eventId}/report`}
       >
         <EmptyAnalyticsState
           title="No competition activity yet"
@@ -70,7 +70,7 @@ export default function CompetitionAnalyticsPage() {
     <AnalyticsLayout
       title="Competition analytics"
       description="Contestants, judges, scoring progress, and rankings."
-      fullReportTo={`/organizer/reports/competition/${eventId}`}
+      fullReportTo={`/organizer/competition/events/${eventId}/report`}
     >
       <AnalyticsStatsGrid stats={stats} columns={4} />
 

@@ -9,7 +9,7 @@ export const EVENT_STAGES = {
     { key: 'review', label: 'Review & Publish', path: 'review' },
     { key: 'voters', label: 'Voters', path: 'voters' },
     { key: 'analytics', label: 'Analytics', path: 'analytics' },
-    { key: 'report', label: 'Report', path: null },
+    { key: 'report', label: 'Report', path: 'report' },
   ],
   // Order mirrors the regrouped sidebar (Setup → Run → Results) so the stepper
   // and its footer next/prev walk the same round-first workflow.
@@ -31,7 +31,7 @@ export const EVENT_STAGES = {
     // Results
     { key: 'rankings', label: 'Rankings', path: 'rankings' },
     { key: 'analytics', label: 'Analytics', path: 'analytics' },
-    { key: 'report', label: 'Report', path: null },
+    { key: 'report', label: 'Report', path: 'report' },
   ],
   polling: [
     { key: 'details', label: 'Details', path: 'edit' },
@@ -43,7 +43,7 @@ export const EVENT_STAGES = {
     { key: 'review', label: 'Review & Publish', path: 'review' },
     { key: 'respondents', label: 'Respondents', path: 'respondents' },
     { key: 'analytics', label: 'Analytics', path: 'analytics' },
-    { key: 'report', label: 'Report', path: null },
+    { key: 'report', label: 'Report', path: 'report' },
   ],
 }
 

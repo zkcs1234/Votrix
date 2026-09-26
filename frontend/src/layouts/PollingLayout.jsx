@@ -1,6 +1,6 @@
 import { useParams, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, CalendarDays, PenSquare, Settings2, Users, BarChart3, Rocket,
+  LayoutDashboard, CalendarDays, PenSquare, Settings2, Users, BarChart3, Rocket, FileText,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
@@ -20,6 +20,7 @@ const navItems = [
 
   { section: 'Results' },
   { label: 'Analytics', path: 'analytics', icon: BarChart3, scoped: true, basePath: BASE },
+  { label: 'Report', path: 'report', icon: FileText, scoped: true, basePath: BASE },
 ]
 
 export default function PollingLayout() {

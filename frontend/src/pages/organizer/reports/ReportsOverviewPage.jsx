@@ -3,6 +3,14 @@ import { Link } from 'react-router-dom'
 import { reportsService } from '@/services/reports.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
+// The report is now a stage inside each module, so link into the module route
+// (which carries the stepper, stage footer and sidebar) rather than the old
+// standalone /organizer/reports/:module/:id path.
+function toModuleReportPath(reportPath) {
+  const match = reportPath?.match(/^\/organizer\/reports\/(election|competition|polling)\/(.+)$/)
+  return match ? `/organizer/${match[1]}/events/${match[2]}/report` : reportPath
+}
+
 function EventList({ title, events, accent, statLabel }) {
   if (!events?.length) {
     return (
@@ -20,7 +28,7 @@ function EventList({ title, events, accent, statLabel }) {
         {events.map((event) => (
           <li key={event.id}>
             <Link
-              to={event.reportPath}
+              to={toModuleReportPath(event.reportPath)}
               className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-v-border px-4 py-3 hover:border-v-border-strong"
             >
               <span className="text-v-text-muted">{event.title}</span>

@@ -13,7 +13,6 @@ export default function ReportDocument({
   subtitle,
   generatedAt,
   actions,
-  backTo = '/organizer/reports',
   maxWidthClass = 'max-w-4xl',
   children,
 }) {
@@ -24,7 +23,6 @@ export default function ReportDocument({
           title={title}
           subtitle={subtitle}
           generatedAt={generatedAt}
-          backTo={backTo}
         />
         {actions}
       </div>

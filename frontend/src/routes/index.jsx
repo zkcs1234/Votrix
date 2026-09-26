@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { lazy } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 // AuthLayout is the only framer-motion consumer; lazy-loading it keeps that
 // ~100 KB animation library out of the main bundle (loaded only on auth routes).
 const AuthLayout = lazy(() => import('@/layouts/AuthLayout'))
@@ -93,6 +93,14 @@ const ReportsOverviewPage = lazy(() => import('@/pages/organizer/reports/Reports
 const ElectionReportPage = lazy(() => import('@/pages/organizer/reports/ElectionReportPage'))
 const CompetitionReportPage = lazy(() => import('@/pages/organizer/reports/CompetitionReportPage'))
 const PollingReportPage = lazy(() => import('@/pages/organizer/reports/PollingReportPage'))
+
+// The per-event report is now a stage inside each module (so it carries the
+// stepper, stage footer and sidebar). Old standalone /organizer/reports/:module
+// links redirect to the canonical in-module route.
+function ReportRedirect({ module }) {
+  const { eventId } = useParams()
+  return <Navigate to={`/organizer/${module}/events/${eventId}/report`} replace />
+}
 
 export const routeConfig = [
   // ROOT — Shows login for guests, redirects authenticated users to dashboard
@@ -196,6 +204,7 @@ export const routeConfig = [
       { path: 'events/:eventId/review', element: <ElectionReviewPage /> },
       { path: 'events/:eventId/voters', element: <ElectionVotersPage /> },
       { path: 'events/:eventId/analytics', element: <ElectionAnalyticsPage /> },
+      { path: 'events/:eventId/report', element: <ElectionReportPage /> },
     ],
   },
   {
@@ -217,6 +226,7 @@ export const routeConfig = [
       { path: 'events/:eventId/review', element: <CompetitionReviewPage /> },
       { path: 'events/:eventId/rankings', element: <CompetitionRankingsPage /> },
 { path: 'events/:eventId/analytics', element: <CompetitionAnalyticsPage /> },
+      { path: 'events/:eventId/report', element: <CompetitionReportPage /> },
       { path: 'events/:eventId/live', element: <CompetitionLiveControlPage /> },
     ],
   },
@@ -238,6 +248,7 @@ export const routeConfig = [
       { path: 'events/:eventId/review', element: <PollingReviewPage /> },
       { path: 'events/:eventId/respondents', element: <PollingRespondentsPage /> },
       { path: 'events/:eventId/analytics', element: <PollingAnalyticsPage /> },
+      { path: 'events/:eventId/report', element: <PollingReportPage /> },
     ],
   },
   {
@@ -249,9 +260,9 @@ export const routeConfig = [
     ),
     children: [
       { index: true, element: <ReportsOverviewPage /> },
-      { path: 'election/:eventId', element: <ElectionReportPage /> },
-      { path: 'competition/:eventId', element: <CompetitionReportPage /> },
-      { path: 'polling/:eventId', element: <PollingReportPage /> },
+      { path: 'election/:eventId', element: <ReportRedirect module="election" /> },
+      { path: 'competition/:eventId', element: <ReportRedirect module="competition" /> },
+      { path: 'polling/:eventId', element: <ReportRedirect module="polling" /> },
     ],
   },
   {

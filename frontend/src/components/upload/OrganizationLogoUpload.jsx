@@ -47,7 +47,7 @@ export default function OrganizationLogoUpload({
         />
       </div>
 
-      {uploading && <p className="mt-2 text-xs text-v-text-subtle">Uploadingâ€¦</p>}
+      {uploading && <p className="mt-2 text-xs text-v-text-subtle">Uploading…</p>}
       {error && <p className="mt-2 text-xs text-v-danger">{error}</p>}
     </div>
   )

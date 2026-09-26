@@ -80,7 +80,7 @@ export default function ImageUploadField({
         </label>
       </div>
 
-      <p className="mt-2 text-xs text-v-text-subtle">JPEG, PNG, WebP, or GIF Â· max 5 MB</p>
+      <p className="mt-2 text-xs text-v-text-subtle">JPEG, PNG, WebP, or GIF · max 5 MB</p>
     </div>
   )
 }

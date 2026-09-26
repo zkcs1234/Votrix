@@ -66,7 +66,7 @@ export default function PollingAnalyticsPage() {
     <AnalyticsLayout
       title="Poll analytics"
       description="Respondents, response rate, question statistics, and rating distributions."
-      fullReportTo={`/organizer/reports/polling/${eventId}`}
+      fullReportTo={`/organizer/polling/events/${eventId}/report`}
     >
       <div className="rounded-xl border border-v-border bg-v-surface p-4 text-sm text-v-text-muted">
         <span className="font-medium text-v-text">Mode:</span>{' '}

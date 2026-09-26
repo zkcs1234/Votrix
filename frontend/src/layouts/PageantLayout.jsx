@@ -1,6 +1,6 @@
 import { useParams, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, CalendarDays, Users, Star, Award, Play, Settings2, Rocket,
+  LayoutDashboard, CalendarDays, Users, Star, Award, Play, Settings2, Rocket, FileText,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
@@ -25,6 +25,7 @@ const navItems = [
 
   { section: 'Results' },
   { label: 'Rankings', path: 'rankings', icon: Award, scoped: true, basePath: BASE },
+  { label: 'Report', path: 'report', icon: FileText, scoped: true, basePath: BASE },
 ]
 
 export default function PageantLayout() {

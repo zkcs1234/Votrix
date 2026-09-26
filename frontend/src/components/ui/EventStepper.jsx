@@ -10,7 +10,7 @@ export default function EventStepper({ module, currentKey, eventId, completedKey
   if (!stages.length) return null
 
   return (
-    <ol className="flex w-full items-center gap-2 overflow-x-auto pb-1 text-sm">
+    <ol className="flex w-full items-center gap-2 overflow-x-auto pb-1 text-sm print:hidden">
       {stages.map((stage, idx) => {
         const isCurrent = idx === currentIndex
         const isCompleted = completedKeys.includes(stage.key) || (idx < currentIndex && currentIndex !== -1)

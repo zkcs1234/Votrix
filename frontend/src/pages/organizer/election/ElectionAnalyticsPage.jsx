@@ -78,7 +78,7 @@ export default function ElectionAnalyticsPage() {
     <AnalyticsLayout
       title="Election analytics"
       description="Live turnout, candidate rankings, and position results."
-      fullReportTo={`/organizer/reports/election/${eventId}`}
+      fullReportTo={`/organizer/election/events/${eventId}/report`}
     >
       <div className="rounded-xl border border-v-border bg-v-surface p-4 text-sm text-v-text-muted">
         <span className="font-medium text-v-text">Voter-facing results:</span>{' '}

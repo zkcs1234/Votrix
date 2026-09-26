@@ -109,7 +109,7 @@ export default function CompetitionRankingsPage() {
             </select>
           )}
           <Link
-            to={`/organizer/reports/competition/${eventId}`}
+            to={`/organizer/competition/events/${eventId}/report`}
             className="text-sm text-v-text-muted hover:text-v-text"
           >
             Full competition scoring report →
