@@ -241,17 +241,23 @@ export default function VoterEventPage() {
     */
     <FullscreenVotingShell>
     <div className="fixed inset-0 z-50 flex flex-col h-[100dvh] bg-v-surface">
-      {/* ===== FIXED TOP: Progress bar only (does not scroll) ===== */}
+      {/* ===== FIXED TOP: Floating progress card (does not scroll) ===== */}
       {!isReviewing && (
-        <div className="shrink-0 border-b border-v-border bg-v-surface">
-          <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
-            <div className="v-card-sm">
-              <div className="flex items-center justify-between text-sm">
-                <span className="v-caption">Ballot progress</span>
+        <div className="shrink-0">
+          <div className="mx-auto max-w-2xl px-4 pt-3 pb-1 md:px-8">
+            <div className="v-card-sm p-3 shadow-v-shadow-md">
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span className="v-caption">
+                  Ballot progress
+                  <span className="text-v-text-subtle">
+                    {' · '}
+                    {positions.length} position{positions.length !== 1 ? 's' : ''}
+                  </span>
+                </span>
                 <span className="v-caption font-medium">{progress}%</span>
               </div>
               <div
-                className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
+                className="mt-2 h-1.5 overflow-hidden rounded-full bg-v-surface-elevated"
                 role="progressbar"
                 aria-valuemin={0}
                 aria-valuemax={100}
@@ -260,9 +266,6 @@ export default function VoterEventPage() {
               >
                 <div className="h-full bg-v-primary transition-all duration-300" style={{ width: `${progress}%` }} />
               </div>
-              <p className="v-caption mt-2">
-                {positions.length} position{positions.length !== 1 ? 's' : ''} on this ballot
-              </p>
             </div>
           </div>
         </div>

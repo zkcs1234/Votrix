@@ -109,11 +109,37 @@ export async function getGlobalEvents() {
       created_at,
       organization_id,
       organizations (
-        organization_name
+        organization_name,
+        organizer:users (
+          organization_name,
+          organizer_name
+        )
       )
     `)
     .order('created_at', { ascending: false })
-  return wrap(result, { context: 'admin.getGlobalEvents' })
+  const events = await wrap(result, { context: 'admin.getGlobalEvents' })
+
+  // The `organizations.organization_name` column is only a placeholder
+  // ("My Organization") created when an organizer is provisioned. The real,
+  // organizer-set organization name lives on the users table, so prefer that
+  // and fall back to the placeholder / organizer name only when it is blank.
+  return events.map((event) => {
+    const org = event.organizations
+    const organizerOrgName = org?.organizer?.organization_name?.trim()
+    const placeholderName = org?.organization_name?.trim()
+    const displayName =
+      organizerOrgName || (placeholderName && placeholderName !== 'My Organization' ? placeholderName : '') ||
+      org?.organizer?.organizer_name?.trim() ||
+      placeholderName ||
+      null
+
+    return {
+      ...event,
+      organizations: org
+        ? { ...org, organization_name: displayName }
+        : org,
+    }
+  })
 }
 
 export async function getSystemSettings() {

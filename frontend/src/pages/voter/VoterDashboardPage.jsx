@@ -168,6 +168,17 @@ export default function VoterDashboardPage() {
     }
   }
 
+  const ROLE_PHRASES = {
+    ELECTION_VOTER: 'Elections',
+    COMPETITION_JUDGE: 'competition judging',
+    POLLING_RESPONDENT: 'polls',
+  }
+  const rolePhrases = Object.keys(ROLE_PHRASES).filter((type) => roleCounts[type] > 0)
+  const overviewSubject =
+    rolePhrases.length > 0
+      ? rolePhrases.map((type) => ROLE_PHRASES[type]).join(', ').replace(/, ([^,]*)$/, ' and $1')
+      : 'Elections, competition judging, and polls'
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="v-card-md">
@@ -176,7 +187,7 @@ export default function VoterDashboardPage() {
           Signed in as <span className="text-v-text-muted">{[user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email}</span>
         </p>
         <p className="v-caption mt-1">
-          Elections, competition judging, and polls assigned to you appear below.
+          {overviewSubject} assigned to you appear below.
         </p>
       </div>
 

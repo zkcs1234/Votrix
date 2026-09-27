@@ -192,18 +192,18 @@ export default function VoterPollPage() {
     */
     <FullscreenVotingShell>
     <form onSubmit={handleSubmit} className="fixed inset-0 z-50 flex flex-col h-[100dvh] bg-v-surface">
-      {/* ===== FIXED TOP: Progress bar only (does not scroll) ===== */}
-      <div className="shrink-0 border-b border-v-border bg-v-surface">
-        <div className="mx-auto max-w-2xl px-4 py-3 md:px-8">
-          <div className="v-card-sm">
-            <div className="flex items-center justify-between text-sm">
+      {/* ===== FIXED TOP: Floating progress card (does not scroll) ===== */}
+      <div className="shrink-0">
+        <div className="mx-auto max-w-2xl px-4 pt-3 pb-1 md:px-8">
+          <div className="v-card-sm p-3 shadow-v-shadow-md">
+            <div className="flex items-center justify-between gap-2 text-sm">
               <span className="text-v-text-muted">
-                {answeredCount} of {questions.length} questions answered
+                {answeredCount} of {questions.length} answered
               </span>
               <span className="text-v-text-muted font-semibold">{progressPercent}%</span>
             </div>
             <div
-              className="mt-2 h-2 overflow-hidden rounded-full bg-v-surface-elevated"
+              className="mt-2 h-1.5 overflow-hidden rounded-full bg-v-surface-elevated"
               role="progressbar"
               aria-valuenow={progressPercent}
               aria-valuemin={0}

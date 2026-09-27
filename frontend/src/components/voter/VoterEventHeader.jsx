@@ -31,7 +31,7 @@ export default function VoterEventHeader({ event, eyebrow, children }) {
   return (
     <section className="overflow-hidden rounded-xl border border-v-border bg-v-surface">
       <div
-        className="relative flex min-h-[180px] flex-col justify-between gap-8 px-5 py-5 sm:px-6"
+        className="relative flex min-h-[120px] flex-col justify-between gap-4 px-5 py-4 sm:min-h-[180px] sm:gap-8 sm:px-6 sm:py-5"
         style={showBanner ? undefined : { background: fallbackGradient }}
       >
         {showBanner && (
@@ -54,14 +54,14 @@ export default function VoterEventHeader({ event, eyebrow, children }) {
           </Link>
         </div>
 
-        <div className="relative z-10 space-y-3">
+        <div className="relative z-10 space-y-2 sm:space-y-3">
           {eyebrow && (
-            <p className="text-xs font-medium uppercase tracking-wide text-white/70">{eyebrow}</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-white/70 sm:text-xs">{eyebrow}</p>
           )}
           <div className="space-y-1">
-            <h1 className="text-2xl font-semibold text-white sm:text-3xl">{event?.title}</h1>
+            <h1 className="text-xl font-semibold text-white sm:text-3xl">{event?.title}</h1>
             {event?.description && (
-              <p className="max-w-2xl text-sm leading-6 text-white/80">{event.description}</p>
+              <p className="line-clamp-2 max-w-2xl text-sm leading-6 text-white/80 sm:line-clamp-none">{event.description}</p>
             )}
           </div>
 
