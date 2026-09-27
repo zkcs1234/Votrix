@@ -145,42 +145,58 @@ export default function OrganizerDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Session Recovery Banner */}
+      {/* Live competition session banner */}
       {activeSessions.length > 0 && (
-        <div className="rounded-xl border border-amber-500/50 bg-amber-950/30 p-4">
+        <div className="rounded-xl border border-v-primary/40 bg-v-primary-soft p-4 shadow-v-shadow">
           <div className="flex items-start gap-3">
-            <Clock className="mt-0.5 h-5 w-5 text-amber-400" strokeWidth={1.5} />
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-v-primary/15 text-v-primary">
+              <Trophy className="h-5 w-5" strokeWidth={1.75} />
+            </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-amber-300">Resume Active Session</h3>
-              <p className="mt-1 text-sm text-amber-200">
-                You have {activeSessions.length} active competition session{activeSessions.length > 1 ? 's' : ''} that can be resumed.
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-v-primary opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-v-primary" />
+                </span>
+                <h3 className="text-base font-semibold text-v-text">
+                  {activeSessions.length > 1 ? 'Live competition sessions running' : 'Live competition session running'}
+                </h3>
+              </div>
+              <p className="mt-1 text-sm text-v-text-muted">
+                {activeSessions.length > 1
+                  ? `You have ${activeSessions.length} live scoring sessions in progress. Rejoin to keep controlling the judging.`
+                  : 'A live scoring session is in progress. Rejoin to keep controlling the judging.'}
               </p>
-              
+
               <div className="mt-3 space-y-2">
                 {activeSessions.map((activeSession) => (
-                  <div key={activeSession.eventId} className="rounded-lg border border-amber-600/30 bg-amber-900/20 p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-amber-100">{activeSession.eventTitle}</p>
-                        <div className="mt-1 flex items-center gap-4 text-sm text-amber-200">
-                          {activeSession.session.activeContestantName && (
-                            <span>Current: {activeSession.session.activeContestantName}</span>
-                          )}
-                          {activeSession.session.activeContestantNumber && !activeSession.session.activeContestantName && (
-                            <span>Current: Contestant #{activeSession.session.activeContestantNumber}</span>
-                          )}
-                          <span>Started {formatElapsedTime(activeSession.session.startedAt)}</span>
-                        </div>
+                  <div
+                    key={activeSession.eventId}
+                    className="flex flex-col gap-3 rounded-lg border border-v-border bg-v-surface p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-v-text">{activeSession.eventTitle}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-v-text-subtle">
+                        {activeSession.session.activeContestantName && (
+                          <span>Now scoring: {activeSession.session.activeContestantName}</span>
+                        )}
+                        {activeSession.session.activeContestantNumber && !activeSession.session.activeContestantName && (
+                          <span>Now scoring: Contestant #{activeSession.session.activeContestantNumber}</span>
+                        )}
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" strokeWidth={1.75} />
+                          Running for {formatElapsedTime(activeSession.session.startedAt)}
+                        </span>
                       </div>
-                      
-                      <Link
-                        to={`/organizer/competition/events/${activeSession.eventId}/live`}
-                        className="flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-amber-500"
-                      >
-                        <Play className="h-4 w-4" strokeWidth={1.5} />
-                        Resume Session
-                      </Link>
                     </div>
+
+                    <Link
+                      to={`/organizer/competition/events/${activeSession.eventId}/live`}
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-v-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-v-primary-hover"
+                    >
+                      <Play className="h-4 w-4" strokeWidth={2} />
+                      Rejoin live session
+                    </Link>
                   </div>
                 ))}
               </div>

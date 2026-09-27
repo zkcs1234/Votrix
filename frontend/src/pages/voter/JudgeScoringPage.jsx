@@ -171,17 +171,22 @@ export default function JudgeScoringPage() {
     }
   }, [shouldShowSingleDivision, sheet?.allowedDivisions, selectedDivisionId, handleDivisionChange])
 
-  // Update session state from activeSession field
+  // Update session state from the sheet. The judge-session API returns the live
+  // session under `activeSession` when it is fully active (a contestant is on
+  // stage), but only under `session` when it is active-without-a-contestant,
+  // paused, or completed — so read BOTH, otherwise a judge who lands here right
+  // after the organizer starts the session stays stuck on "No active session".
   useEffect(() => {
-    if (sheet?.activeSession) {
-      setSessionState(sheet.activeSession)
-      if (sheet.activeSession.status === 'active' && sheet.activeSession.activeContestantId) {
-        setActiveContestantId(sheet.activeSession.activeContestantId)
+    const s = sheet?.activeSession ?? sheet?.session
+    if (s) {
+      setSessionState(s)
+      if (s.status === 'active' && s.activeContestantId) {
+        setActiveContestantId(s.activeContestantId)
       } else {
         setActiveContestantId(null)
       }
     }
-  }, [sheet?.activeSession])
+  }, [sheet?.activeSession, sheet?.session])
 
   // Re-sync the whole session view from the server (used on (re)connect and on
   // round/contestant/stage changes so the round name, criteria, on-stage set and
@@ -192,15 +197,33 @@ export default function JudgeScoringPage() {
       .then(({ data }) => {
         setSheet(data)
         setScores((prev) => ({ ...prev, ...scoresFromSheet(data) }))
-        if (data.activeSession) {
-          setSessionState(data.activeSession)
+        const s = data.activeSession ?? data.session
+        if (s) {
+          setSessionState(s)
           setActiveContestantId(
-            data.activeSession.status === 'active' ? data.activeSession.activeContestantId ?? null : null,
+            s.status === 'active' ? s.activeContestantId ?? null : null,
           )
+        } else {
+          // The session ended (or never existed) — drop back to the waiting view.
+          setSessionState(null)
+          setActiveContestantId(null)
         }
       })
       .catch((err) => console.error('[WS] Failed to sync session:', err))
   }, [eventId])
+
+  // Fallback polling while the session is NOT live yet. Socket events
+  // (session:status-changed) only reach judges who are already connected when
+  // the organizer starts the session; a judge who opens this page afterwards
+  // would otherwise sit on "No active session" until a manual refresh. Polling
+  // every few seconds makes the sheet flip to live automatically, and stops as
+  // soon as the session is active.
+  useEffect(() => {
+    if (loading) return undefined
+    if (sessionState?.status === 'active') return undefined
+    const intervalId = setInterval(syncSessionView, 5000)
+    return () => clearInterval(intervalId)
+  }, [loading, sessionState?.status, syncSessionView])
 
   // Real-time updates via the shared WS client (socket.service). The voter is
   // auto-joined to the event room on connect (ws-server setupRooms), and
