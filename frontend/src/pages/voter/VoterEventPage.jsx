@@ -71,7 +71,7 @@ function BallotSubmittedScreen({ ballot, eventId }) {
       <div className="v-card-lg text-center border-v-success">
         <p className="v-page-title text-v-success">Ballot submitted</p>
         <p className="v-caption mt-2">
-          Your vote for {ballot?.event?.title} has been recorded and locked.
+          Your {ballot?.event?.title} ballots have been recorded and locked.
         </p>
         <Link to="/voter" className="v-btn-tertiary mt-6 inline-block">
           Back to dashboard
@@ -107,24 +107,34 @@ export default function VoterEventPage() {
   const { eventId } = useParams()
   const { user } = useAuth()
   const voterName = [user?.firstName, user?.lastName].filter(Boolean).join(' ')
-  const draftKey = getDraftStorageKey('electionDraft', eventId)
   const [ballot, setBallot] = useState(null)
-  const [selections, setSelections] = useState(() => {
-    try {
-      const saved = localStorage.getItem(draftKey)
-      return saved ? JSON.parse(saved) : {}
-    } catch {
-      return {}
-    }
-  })
+  const draftKey = getDraftStorageKey(
+    'electionDraft',
+    `${eventId}:${ballot?.ballotSectionId ?? 'pending'}`,
+  )
+  const [selections, setSelections] = useState({})
+  const [loadedDraftKey, setLoadedDraftKey] = useState('')
+  const [sectionNotice, setSectionNotice] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
 
   useEffect(() => {
+    if (!ballot?.ballotSectionId) return
+    try {
+      const saved = localStorage.getItem(draftKey)
+      setSelections(saved ? JSON.parse(saved) : {})
+    } catch {
+      setSelections({})
+    }
+    setLoadedDraftKey(draftKey)
+  }, [ballot?.ballotSectionId, draftKey])
+
+  useEffect(() => {
+    if (!ballot?.ballotSectionId || loadedDraftKey !== draftKey) return
     localStorage.setItem(draftKey, JSON.stringify(selections))
-  }, [draftKey, selections])
+  }, [ballot?.ballotSectionId, draftKey, loadedDraftKey, selections])
 
   useEffect(() => {
     electionService
@@ -137,6 +147,12 @@ export default function VoterEventPage() {
   }, [eventId])
 
   const positions = useMemo(() => ballot?.positions ?? [], [ballot])
+  const completedSections = ballot?.sections?.filter((section) => section.completed).length ?? 0
+  const totalSections = ballot?.sections?.length ?? 1
+  const currentSectionIndex = ballot?.sections?.findIndex(
+    (section) => section.id === ballot?.ballotSectionId,
+  ) ?? -1
+  const currentSectionNumber = currentSectionIndex + 1
   const progress = useMemo(() => {
     if (!positions.length) return 0
     const filled = positions.filter((p) => {
@@ -190,14 +206,28 @@ export default function VoterEventPage() {
 
     setSubmitting(true)
     setError(null)
+    setSectionNotice('')
 
     try {
-      await electionService.submitVote(eventId, {
+      const { data: result } = await electionService.submitVote(eventId, {
         selections,
+        ballotSectionId: ballot.ballotSectionId,
         votingNonce: ballot?.votingNonce,
       })
       localStorage.removeItem(draftKey)
-      setDone(true)
+      if (result.eventComplete) {
+        setDone(true)
+      } else {
+        const { data: nextBallot } = await electionService.getBallot(eventId)
+        setBallot(nextBallot)
+        setSelections({})
+        setIsReviewing(false)
+        setSectionNotice(
+          nextBallot.currentSection
+            ? `${ballot.currentSection?.name} submitted. ${nextBallot.currentSection.name} is ready.`
+            : `${ballot.currentSection?.name} submitted.`,
+        )
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit ballot')
       setIsReviewing(false)
@@ -240,7 +270,7 @@ export default function VoterEventPage() {
       progress bar and submit footer cannot both stay on screen on mobile.
     */
     <FullscreenVotingShell>
-    <div className="fixed inset-0 z-50 flex flex-col h-[100dvh] bg-v-surface">
+    <div className="fixed inset-0 z-50 flex flex-col h-dvh bg-v-surface">
       {/* ===== FIXED TOP: Floating progress card (does not scroll) ===== */}
       {!isReviewing && (
         <div className="shrink-0">
@@ -248,10 +278,10 @@ export default function VoterEventPage() {
             <div className="v-card-sm p-3 shadow-v-shadow-md">
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="v-caption">
-                  Ballot progress
+                  Ballot {currentSectionNumber} of {totalSections}
                   <span className="text-v-text-subtle">
                     {' · '}
-                    {positions.length} position{positions.length !== 1 ? 's' : ''}
+                    {completedSections} submitted
                   </span>
                 </span>
                 <span className="v-caption font-medium">{progress}%</span>
@@ -276,12 +306,23 @@ export default function VoterEventPage() {
         <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8">
           <VoterEventHeader event={ballot.event} eyebrow="Election ballot">
             {voterName && <p className="text-sm font-medium text-white/75">Voting as {voterName}</p>}
+            {ballot.currentSection && (
+              <p className="mt-1 text-base font-semibold text-white">{ballot.currentSection.name}</p>
+            )}
           </VoterEventHeader>
+
+          {sectionNotice && !isReviewing && (
+            <p role="status" className="rounded-lg border border-v-success/30 bg-v-success/10 px-4 py-3 text-sm text-v-success">
+              {sectionNotice}
+            </p>
+          )}
 
           {isReviewing ? (
             <div className="v-card p-6 space-y-6">
               <div className="border-b border-v-border pb-4">
-                <h2 className="text-xl font-semibold text-v-text">Review your ballot</h2>
+                <h2 className="text-xl font-semibold text-v-text">
+                  Review your {ballot.currentSection?.name} ballot
+                </h2>
                 <p className="v-caption mt-1">Please confirm your selections before submitting.</p>
               </div>
 
@@ -349,7 +390,7 @@ export default function VoterEventPage() {
                 Back to editing
               </Button>
               <Button onClick={handleSubmit} loading={submitting} disabled={submitting}>
-                Confirm & Submit ballot
+                Submit {ballot.currentSection?.name} ballot
               </Button>
             </div>
           ) : (

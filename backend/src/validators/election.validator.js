@@ -101,6 +101,25 @@ export function validatePosition(body) {
   }
 }
 
+export function validateElectionBallotSection(body, { partial = false } = {}) {
+  const payload = {}
+  if (!partial || body?.name !== undefined) {
+    if (!body?.name?.trim()) throw new ApiError(400, 'Ballot section name is required')
+    payload.name = body.name.trim()
+  }
+  if (body?.description !== undefined) {
+    payload.description = body.description?.trim() || null
+  }
+  if (body?.displayOrder !== undefined) {
+    const displayOrder = Number(body.displayOrder)
+    if (!Number.isInteger(displayOrder) || displayOrder < 0) {
+      throw new ApiError(400, 'Display order must be a non-negative integer')
+    }
+    payload.displayOrder = displayOrder
+  }
+  return payload
+}
+
 export function validateCandidate(body) {
   if (!body?.name?.trim()) throw new ApiError(400, 'Candidate name is required')
   // `party` is the spec name; `partylist` is the legacy field name. Accept
@@ -131,5 +150,9 @@ export function validateBallot(body) {
   // Preserve the one-time voting nonce so replay protection in submitBallot can
   // actually run. Previously this value was dropped here, which silently
   // disabled the nonce check. `null` when the client sends no nonce (legacy).
-  return { selections: normalized, votingNonce: body?.votingNonce ?? null }
+  return {
+    selections: normalized,
+    votingNonce: body?.votingNonce ?? null,
+    ballotSectionId: body?.ballotSectionId ?? null,
+  }
 }

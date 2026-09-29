@@ -30,12 +30,34 @@ export const electionService = {
     return api.post(`${base}/events/${eventId}/banner`, form)
   },
 
-  listPositions(eventId) {
-    return api.get(`${base}/events/${eventId}/positions`)
+  listBallotSections(eventId) {
+    return api.get(`${base}/events/${eventId}/sections`)
   },
 
-  createPosition(eventId, payload) {
-    return api.post(`${base}/events/${eventId}/positions`, payload)
+  createBallotSection(eventId, payload) {
+    return api.post(`${base}/events/${eventId}/sections`, payload)
+  },
+
+  updateBallotSection(eventId, sectionId, payload) {
+    return api.patch(`${base}/events/${eventId}/sections/${sectionId}`, payload)
+  },
+
+  deleteBallotSection(eventId, sectionId) {
+    return api.delete(`${base}/events/${eventId}/sections/${sectionId}`)
+  },
+
+  listPositions(eventId, sectionId) {
+    const url = sectionId
+      ? `${base}/events/${eventId}/sections/${sectionId}/positions`
+      : `${base}/events/${eventId}/positions`
+    return api.get(url)
+  },
+
+  createPosition(eventId, payload, sectionId) {
+    const url = sectionId
+      ? `${base}/events/${eventId}/sections/${sectionId}/positions`
+      : `${base}/events/${eventId}/positions`
+    return api.post(url, payload)
   },
 
   updatePosition(eventId, positionId, payload) {
@@ -46,9 +68,9 @@ export const electionService = {
     return api.delete(`${base}/events/${eventId}/positions/${positionId}`)
   },
 
-  listCandidates(eventId, positionId) {
+  listCandidates(eventId, positionId, sectionId) {
     return api.get(`${base}/events/${eventId}/candidates`, {
-      params: positionId ? { positionId } : {},
+      params: { ...(positionId ? { positionId } : {}), ...(sectionId ? { sectionId } : {}) },
     })
   },
 

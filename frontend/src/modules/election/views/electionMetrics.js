@@ -62,6 +62,8 @@ export function buildElectionPositionSummaries(analytics) {
     return {
       id: position.positionId,
       name: position.positionName,
+      ballotSectionId: position.ballotSectionId,
+      ballotSectionName: position.ballotSectionName,
       totalVotes,
       leader: leader
         ? {

@@ -53,6 +53,11 @@ function BallotPreviewModal({ eventId, onClose }) {
             {(preview.positions ?? []).map((position) => (
               <div key={position.id} className="v-card p-5 space-y-3">
                 <div>
+                  {position.ballotSectionName && (
+                    <p className="mb-1 text-xs font-medium uppercase text-v-primary">
+                      {position.ballotSectionName}
+                    </p>
+                  )}
                   <h4 className="font-medium text-v-text">{position.name}</h4>
                   <p className="text-xs text-v-text-subtle">
                     Select {position.minVote === position.maxVote ? position.minVote : `${position.minVote}–${position.maxVote}`} candidate(s)
@@ -192,7 +197,6 @@ export default function ElectionEventsPage() {
   }, [])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 

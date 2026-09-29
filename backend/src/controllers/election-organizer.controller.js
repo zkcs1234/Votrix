@@ -7,6 +7,7 @@ import {
   validateUpdateEvent,
   validatePosition,
   validateCandidate,
+  validateElectionBallotSection,
 } from '../validators/election.validator.js'
 import { getEventCohorts, inviteCohort as inviteCohortService, removeEventParticipant } from '../services/cohort.service.js'
 
@@ -50,8 +51,47 @@ export const uploadBanner = asyncHandler(async (req, res) => {
   res.json({ success: true, url: result.secure_url, event })
 })
 
+export const listBallotSections = asyncHandler(async (req, res) => {
+  const sections = await electionService.listElectionBallotSections(req.params.eventId, req.user.id)
+  res.json({ success: true, sections })
+})
+
+export const createBallotSection = asyncHandler(async (req, res) => {
+  const payload = validateElectionBallotSection(req.body)
+  const section = await electionService.createElectionBallotSection(
+    req.params.eventId,
+    req.user.id,
+    payload,
+  )
+  res.status(201).json({ success: true, section })
+})
+
+export const updateBallotSection = asyncHandler(async (req, res) => {
+  const payload = validateElectionBallotSection(req.body, { partial: true })
+  const section = await electionService.updateElectionBallotSection(
+    req.params.eventId,
+    req.user.id,
+    req.params.sectionId,
+    payload,
+  )
+  res.json({ success: true, section })
+})
+
+export const deleteBallotSection = asyncHandler(async (req, res) => {
+  await electionService.deleteElectionBallotSection(
+    req.params.eventId,
+    req.user.id,
+    req.params.sectionId,
+  )
+  res.json({ success: true, message: 'Ballot section deleted' })
+})
+
 export const listPositions = asyncHandler(async (req, res) => {
-  const positions = await electionService.listPositions(req.params.eventId, req.user.id)
+  const positions = await electionService.listPositions(
+    req.params.eventId,
+    req.user.id,
+    req.params.sectionId ?? req.query.sectionId,
+  )
   res.json({ success: true, positions })
 })
 
@@ -61,6 +101,7 @@ export const createPosition = asyncHandler(async (req, res) => {
     req.params.eventId,
     req.user.id,
     payload,
+    req.params.sectionId,
   )
   res.status(201).json({ success: true, position })
 })
@@ -90,6 +131,7 @@ export const listCandidates = asyncHandler(async (req, res) => {
     req.params.eventId,
     req.user.id,
     req.query.positionId,
+    req.params.sectionId ?? req.query.sectionId,
   )
   res.json({ success: true, candidates })
 })

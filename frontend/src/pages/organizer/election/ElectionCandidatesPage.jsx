@@ -90,6 +90,8 @@ const EMPTY_FORM = { name: '', biography: '', platform: '', party: '' }
 
 function ElectionCandidatesPageContent() {
   const { eventId } = useParams()
+  const [sections, setSections] = useState([])
+  const [sectionId, setSectionId] = useState('')
   const [positions, setPositions] = useState([])
   const [candidates, setCandidates] = useState([])
   const [positionId, setPositionId] = useState('')
@@ -124,8 +126,8 @@ function ElectionCandidatesPageContent() {
     setLoading(true)
     try {
       const [posRes, candRes] = await Promise.all([
-        electionService.listPositions(eventId),
-        electionService.listCandidates(eventId),
+        electionService.listPositions(eventId, sectionId),
+        electionService.listCandidates(eventId, null, sectionId),
       ])
       setPositions(posRes.data.positions ?? [])
       setCandidates(candRes.data.candidates ?? [])
@@ -134,12 +136,19 @@ function ElectionCandidatesPageContent() {
     } finally {
       setLoading(false)
     }
+  }, [eventId, sectionId])
+
+  useEffect(() => {
+    electionService.listBallotSections(eventId).then(({ data }) => {
+      const nextSections = data.sections ?? []
+      setSections(nextSections)
+      setSectionId((current) =>
+        nextSections.some((section) => section.id === current) ? current : nextSections[0]?.id ?? '',
+      )
+    })
   }, [eventId])
 
   useEffect(() => {
-    // Async fetch-on-mount pattern: setState happens inside the
-    // Promise resolution, not synchronously with the effect.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 
@@ -219,6 +228,25 @@ function ElectionCandidatesPageContent() {
         setupLocked ? (
           <ReadOnlyEventBanner status={status} noun="election" />
         ) : (
+        <div className="space-y-4">
+        <div className="v-card p-4">
+          <label className="mb-1 block text-sm text-v-text-muted" htmlFor="candidate-section">
+            Ballot section
+          </label>
+          <select
+            id="candidate-section"
+            className={inputClass}
+            value={sectionId}
+            onChange={(e) => {
+              setSectionId(e.target.value)
+              setPositionId('')
+            }}
+          >
+            {sections.map((section) => (
+              <option key={section.id} value={section.id}>{section.name}</option>
+            ))}
+          </select>
+        </div>
         <form onSubmit={handleCreate} className="space-y-4 v-card p-6 mb-4">
         <div>
           <label className="mb-1 block text-sm text-v-text-muted">Position</label>
@@ -285,6 +313,7 @@ function ElectionCandidatesPageContent() {
           {saving ? 'Adding...' : 'Add candidate'}
         </button>
       </form>
+        </div>
         )
       }
       recordsPanel={

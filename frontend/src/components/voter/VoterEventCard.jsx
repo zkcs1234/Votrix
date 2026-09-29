@@ -66,7 +66,7 @@ export default function VoterEventCard({ event, showAction = true }) {
           />
         )}
         {/* Gradient overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
       </div>
 
       {/* Content */}
@@ -93,6 +93,11 @@ export default function VoterEventCard({ event, showAction = true }) {
           </div>
           <VoterStatusBadge bucket={event.bucket} label={event.statusLabel} />
         </div>
+        {event.eventType === 'election' && event.totalSections > 1 && (
+          <p className="mt-2 text-xs text-v-text-muted">
+            {event.submittedSections} of {event.totalSections} ballots submitted
+          </p>
+        )}
         {showAction && event.bucket === 'active' && (
           <p className="mt-3 flex items-center gap-1 text-sm font-medium text-v-text">
             {event.actionLabel}

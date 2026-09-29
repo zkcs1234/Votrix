@@ -18,6 +18,13 @@ router.get('/events/:eventId', ctrl.getEvent)
 router.patch('/events/:eventId', ctrl.updateEvent)
 router.post('/events/:eventId/banner', uploadLimiter, uploadImage('banner'), ctrl.uploadBanner)
 
+router.get('/events/:eventId/sections', ctrl.listBallotSections)
+router.post('/events/:eventId/sections', ctrl.createBallotSection)
+router.patch('/events/:eventId/sections/:sectionId', ctrl.updateBallotSection)
+router.delete('/events/:eventId/sections/:sectionId', ctrl.deleteBallotSection)
+router.get('/events/:eventId/sections/:sectionId/positions', ctrl.listPositions)
+router.post('/events/:eventId/sections/:sectionId/positions', ctrl.createPosition)
+
 router.get('/events/:eventId/positions', ctrl.listPositions)
 router.post('/events/:eventId/positions', ctrl.createPosition)
 router.patch('/events/:eventId/positions/:positionId', ctrl.updatePosition)

@@ -67,6 +67,7 @@ export default function ElectionAnalyticsPage() {
   const stats = buildElectionStats(data)
   const rankings = buildElectionCandidateRanking(data)
   const positionSummaries = buildElectionPositionSummaries(data)
+  const ballotSections = data?.ballotSections ?? []
   const trend = buildElectionParticipationTrend(data)
 
   const timelineItems = (timeline?.hourly?.length ? timeline.hourly : timeline?.daily ?? []).map((t) => ({
@@ -135,10 +136,25 @@ export default function ElectionAnalyticsPage() {
         items={trend}
       />
 
+      {ballotSections.length > 1 && ballotSections.map((section) => (
+        <AnalyticsSection
+          key={section.id}
+          title={section.name}
+          meta={`${section.votedCount} / ${section.totalVoters} submitted`}
+          description={`${section.turnoutPercentage}% section turnout · ${section.totalVotes} selections`}
+        >
+          <p className="text-sm text-v-text-muted">
+            {section.positionSummaries.length} positions in this ballot section
+          </p>
+        </AnalyticsSection>
+      ))}
+
       {positionSummaries.map((position) => (
         <AnalyticsSection
           key={position.id}
-          title={position.name}
+          title={position.ballotSectionName
+            ? `${position.ballotSectionName} · ${position.name}`
+            : position.name}
           meta={`${position.totalVotes} votes`}
           description={
             position.leader

@@ -161,6 +161,8 @@ export const DB_TABLES = {
   EVENT_PARTICIPANTS: 'event_participants',
   INVITATIONS: 'invitations',
   POSITIONS: 'positions',
+  ELECTION_BALLOT_SECTIONS: 'election_ballot_sections',
+  ELECTION_BALLOT_SUBMISSIONS: 'election_ballot_submissions',
   CANDIDATES: 'candidates',
   CONTESTANTS: 'competition_contestants',
   CRITERIA: 'competition_criteria',

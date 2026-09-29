@@ -33,6 +33,8 @@ function classifyElection(event) {
       bucket === 'active' ? 'Cast vote' : bucket === 'completed' ? 'View ballot' : 'View event',
     votingEnabled: Boolean(event.votingEnabled),
     hasVoted: Boolean(event.hasVoted),
+    submittedSections: event.submittedSections ?? (event.hasVoted ? 1 : 0),
+    totalSections: event.totalSections ?? 1,
     eventStatus: event.status,
     resultsVisibility: event.resultsVisibility ?? 'public',
     canViewResults,

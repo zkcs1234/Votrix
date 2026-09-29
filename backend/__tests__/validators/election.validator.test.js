@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest'
 import { ApiError } from '../../src/utils/ApiError.js'
 import {
   validateBallot,
+  validateElectionBallotSection,
   validatePosition,
   validateCandidate,
 } from '../../src/validators/election.validator.js'
@@ -19,6 +20,14 @@ describe('election.validator', () => {
         votingNonce: 'nonce-abc',
       })
       expect(result.votingNonce).toBe('nonce-abc')
+    })
+
+    test('preserves the ballot section ID', () => {
+      const result = validateBallot({
+        selections: { 'pos-1': ['c-1'] },
+        ballotSectionId: 'section-1',
+      })
+      expect(result.ballotSectionId).toBe('section-1')
     })
 
     test('defaults votingNonce to null when absent (legacy clients)', () => {
@@ -48,6 +57,31 @@ describe('election.validator', () => {
       const result = validatePosition({ name: 'President' })
       expect(result.maxVote).toBe(1)
       expect(result.numberOfWinners).toBe(1)
+    })
+  })
+
+  describe('validateElectionBallotSection', () => {
+    test('normalizes section fields and display order', () => {
+      expect(validateElectionBallotSection({
+        name: '  SSG Election  ',
+        description: ' Student council ',
+        displayOrder: '1',
+      })).toEqual({
+        name: 'SSG Election',
+        description: 'Student council',
+        displayOrder: 1,
+      })
+    })
+
+    test('allows partial updates but requires a name on create', () => {
+      expect(validateElectionBallotSection({ displayOrder: 2 }, { partial: true })).toEqual({
+        displayOrder: 2,
+      })
+      expect(() => validateElectionBallotSection({ displayOrder: 2 })).toThrow(ApiError)
+    })
+
+    test('rejects negative display order', () => {
+      expect(() => validateElectionBallotSection({ name: 'SSG', displayOrder: -1 })).toThrow(ApiError)
     })
   })
 
