@@ -19,13 +19,11 @@ import { recordSession, touchSession, isSessionActive } from './session.service.
  * an un-migrated environment) we return `null` so the token is issued without
  * a session binding and login/refresh never break.
  */
-async function createSession(user, { ip = null, userAgent = null } = {}) {
+async function createSession(user) {
   try {
     const session = await recordSession({
       userId: user.id,
       tokenVersion: Number(user.token_version ?? 0),
-      ip,
-      userAgent,
     })
     return session?.id ?? null
   } catch {
@@ -48,7 +46,7 @@ function assertAccountActive(user) {
 }
 
 // Unified login - works for admin, organizer, and voter by email
-export async function login({ email, password }, { ip = null, userAgent = null } = {}) {
+export async function login({ email, password }) {
   // Find user by email (any role)
   const user = await findUserByEmail(email)
 
@@ -63,11 +61,11 @@ export async function login({ email, password }, { ip = null, userAgent = null }
 
   assertAccountActive(user)
 
-  const sessionId = await createSession(user, { ip, userAgent })
+  const sessionId = await createSession(user)
   return issueTokenPair(user, { sessionId })
 }
 
-export async function refreshSession(userId, tokenVersion, { sessionId = null, ip = null, userAgent = null } = {}) {
+export async function refreshSession(userId, tokenVersion, { sessionId = null } = {}) {
   const user = await findUserById(userId)
   if (!user) {
     throw new ApiError(401, 'User not found')
@@ -93,19 +91,19 @@ export async function refreshSession(userId, tokenVersion, { sessionId = null, i
   } else {
     // Token pre-dates session tracking — start tracking from this refresh so
     // already-signed-in users appear in the sessions list without re-login.
-    sid = await createSession(user, { ip, userAgent })
+    sid = await createSession(user)
   }
 
   return issueTokenPair(user, { sessionId: sid })
 }
 
-export async function issueSessionForUser(userId, { ip = null, userAgent = null } = {}) {
+export async function issueSessionForUser(userId) {
   const user = await findUserById(userId)
   if (!user) {
     throw new ApiError(401, 'User not found')
   }
   assertAccountActive(user)
-  const sessionId = await createSession(user, { ip, userAgent })
+  const sessionId = await createSession(user)
   return issueTokenPair(user, { sessionId })
 }
 

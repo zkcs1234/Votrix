@@ -17,7 +17,6 @@ import { createAuditLog } from '../services/admin.service.js'
 import {
   revokeSession as deleteSessionRow,
   revokeAllSessionsForUser,
-  sessionMeta,
 } from '../services/session.service.js'
 
 function sendAuthResponse(res, { accessToken, refreshToken, user }, { remember = false } = {}) {
@@ -61,8 +60,7 @@ export const login = asyncHandler(async (req, res) => {
   const credentials = validateLogin(req.body)
 
   try {
-    const { ip, userAgent } = sessionMeta.extractClientMeta(req)
-    const tokens = await authService.login(credentials, { ip, userAgent })
+    const tokens = await authService.login(credentials)
 
     await writeAuthAudit({
       action: `${tokens.user.role.toUpperCase()}_LOGIN_SUCCESS`,
@@ -71,8 +69,6 @@ export const login = asyncHandler(async (req, res) => {
       details: {
         email: tokens.user?.email ?? credentials.email,
         role: tokens.user?.role,
-        ip: req.ip ?? null,
-        userAgent: req.get('user-agent') ?? null,
       },
     })
 
@@ -82,8 +78,6 @@ export const login = asyncHandler(async (req, res) => {
       action: 'LOGIN_FAILED',
       details: {
         email: credentials.email,
-        ip: req.ip ?? null,
-        userAgent: req.get('user-agent') ?? null,
         message: error.message,
       },
     })
@@ -100,11 +94,8 @@ export const refresh = asyncHandler(async (req, res) => {
   }
 
   const decoded = verifyRefreshToken(token)
-  const { ip, userAgent } = sessionMeta.extractClientMeta(req)
   const tokens = await authService.refreshSession(decoded.sub, decoded.tokenVersion, {
     sessionId: decoded.sid ?? null,
-    ip,
-    userAgent,
   })
   sendAuthResponse(res, tokens)
 })
@@ -191,8 +182,7 @@ export const changePassword = asyncHandler(async (req, res) => {
     // Best-effort cleanup — do not block the password change.
   }
 
-  const { ip, userAgent } = sessionMeta.extractClientMeta(req)
-  const tokens = await authService.issueSessionForUser(user.id, { ip, userAgent })
+  const tokens = await authService.issueSessionForUser(user.id)
 
   await writeAuthAudit({
     action: 'auth.password.change',
@@ -228,8 +218,7 @@ export const skipPasswordChange = asyncHandler(async (req, res) => {
   }
 
   // Issue new session tokens since must_change_password changed
-  const { ip, userAgent } = sessionMeta.extractClientMeta(req)
-  const tokens = await authService.issueSessionForUser(user.id, { ip, userAgent })
+  const tokens = await authService.issueSessionForUser(user.id)
 
   await writeAuthAudit({
     action: 'auth.password.change_skipped',

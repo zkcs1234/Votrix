@@ -2,22 +2,7 @@ import { db, wrap } from '../foundation/db.js'
 import { DB_TABLES } from '../utils/constants.js'
 import { ApiError } from '../utils/ApiError.js'
 
-function extractClientMeta(req) {
-  const ip =
-    req?.headers?.['x-forwarded-for']?.split(',')?.[0]?.trim() ||
-    req?.headers?.['x-real-ip'] ||
-    req?.ip ||
-    null
-  const userAgent = req?.headers?.['user-agent'] || null
-  return { ip, userAgent }
-}
-
-export async function recordSession({
-  userId,
-  tokenVersion = 0,
-  ip = null,
-  userAgent = null,
-} = {}) {
+export async function recordSession({ userId, tokenVersion = 0 } = {}) {
   if (!userId) {
     throw new ApiError(400, 'userId is required to record a session')
   }
@@ -26,10 +11,8 @@ export async function recordSession({
     .insert({
       user_id: userId,
       token_version: tokenVersion,
-      ip_address: ip,
-      user_agent: userAgent,
     })
-    .select('id, user_id, token_version, ip_address, user_agent, last_activity_at, created_at')
+    .select('id, user_id, token_version, last_activity_at, created_at')
     .single()
   return wrap(result, { context: 'session.recordSession' })
 }
@@ -75,7 +58,7 @@ export async function listAdminSessions({ limit = 100 } = {}) {
   const result = await db()
     .from(DB_TABLES.USER_SESSIONS)
     .select(
-      `id, user_id, token_version, ip_address, user_agent, last_activity_at, created_at,
+      `id, user_id, token_version, last_activity_at, created_at,
        users ( id, email, role )`,
     )
     .order('last_activity_at', { ascending: false })
@@ -87,7 +70,7 @@ export async function listSessionsForUser(userId, { limit = 50 } = {}) {
   const safeLimit = Math.min(Math.max(1, Number(limit) || 50), 200)
   const result = await db()
     .from(DB_TABLES.USER_SESSIONS)
-    .select('id, user_id, token_version, ip_address, user_agent, last_activity_at, created_at')
+    .select('id, user_id, token_version, last_activity_at, created_at')
     .eq('user_id', userId)
     .order('last_activity_at', { ascending: false })
     .limit(safeLimit)
@@ -125,6 +108,3 @@ export async function revokeAllSessionsForUser(userId, { exceptSessionId = null 
   return { revokedCount: data?.length ?? 0 }
 }
 
-export const sessionMeta = {
-  extractClientMeta,
-}

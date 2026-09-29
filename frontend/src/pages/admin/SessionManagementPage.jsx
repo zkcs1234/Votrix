@@ -10,23 +10,6 @@ import SearchInput from '@/components/ui/SearchInput'
 import { useToast } from '@/hooks/useToast'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
-function parseUserAgent(ua) {
-  if (!ua) return { browser: 'Unknown', os: 'Unknown' }
-  const browser =
-    ua.match(/Edg\/([\d.]+)/)?.[0] ||
-    ua.match(/Chrome\/([\d.]+)/)?.[0] ||
-    ua.match(/Firefox\/([\d.]+)/)?.[0] ||
-    ua.match(/Safari\/([\d.]+)/)?.[0] ||
-    'Browser'
-  const os =
-    ua.match(/Windows NT [\d.]+/)?.[0] ||
-    ua.match(/Mac OS X [\d_]+/)?.[0]?.replace(/_/g, '.') ||
-    ua.match(/Android [\d.]+/)?.[0] ||
-    ua.match(/iOS [\d_]+/)?.[0]?.replace(/_/g, '.') ||
-    'Unknown OS'
-  return { browser, os }
-}
-
 function formatDate(iso) {
   if (!iso) return '—'
   try { return format(parseISO(iso), 'MMM d, yyyy HH:mm') } catch { return iso }
@@ -63,9 +46,7 @@ export default function SessionManagementPage() {
     return sessions.filter((s) => {
       const email = s.users?.email?.toLowerCase() ?? ''
       const role = s.users?.role?.toLowerCase() ?? ''
-      const ip = s.ip_address?.toLowerCase() ?? ''
-      const ua = s.user_agent?.toLowerCase() ?? ''
-      return email.includes(term) || role.includes(term) || ip.includes(term) || ua.includes(term)
+      return email.includes(term) || role.includes(term)
     })
   }, [sessions, search])
 
@@ -139,7 +120,7 @@ export default function SessionManagementPage() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <SearchInput
-          placeholder="Search by email, role, IP or user agent"
+          placeholder="Search by email or role"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="sm:max-w-md"
@@ -188,8 +169,6 @@ export default function SessionManagementPage() {
                   <table className="v-table w-full text-sm">
                     <thead>
                       <tr>
-                        <th>IP address</th>
-                        <th>Browser / OS</th>
                         <th>Last active</th>
                         <th>Created</th>
                         <th className="text-right">Action</th>
@@ -197,14 +176,8 @@ export default function SessionManagementPage() {
                     </thead>
                     <tbody className="divide-y divide-v-border">
                       {userSessions.map((s) => {
-                        const { browser, os } = parseUserAgent(s.user_agent)
                         return (
                           <tr key={s.id} className="hover:bg-v-surface-elevated/50">
-                            <td className="font-mono text-xs text-v-text-muted">{s.ip_address || '—'}</td>
-                            <td>
-                              <p className="text-sm">{browser}</p>
-                              <p className="v-caption">{os}</p>
-                            </td>
                             <td className="v-caption">{formatDate(s.last_activity_at)}</td>
                             <td className="v-caption">{formatDate(s.created_at)}</td>
                             <td className="text-right">
