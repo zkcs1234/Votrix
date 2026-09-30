@@ -243,7 +243,7 @@ export default function GlobalEventsPage() {
                       <th>Organization</th>
                       <th>Status</th>
                       <th>Date range</th>
-                      <th><span className="sr-only">Actions</span></th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-v-border">

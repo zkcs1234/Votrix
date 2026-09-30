@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import OrganizerManagementPage from './OrganizerManagementPage'
 import VotersPanel from '@/components/admin/VotersPanel'
 import JudgesPanel from '@/components/admin/JudgesPanel'
@@ -13,7 +14,10 @@ const TABS = [
 ]
 
 export default function UserManagementPage() {
-  const [tab, setTab] = useState('organizers')
+  const [searchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab')
+  const initialTab = TABS.some((item) => item.id === requestedTab) ? requestedTab : 'organizers'
+  const [tab, setTab] = useState(initialTab)
 
   return (
     <div className="space-y-6">

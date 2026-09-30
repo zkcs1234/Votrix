@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Users, CalendarDays, UserCheck, Zap, CheckSquare,
+  Users, CalendarDays, UserCheck, UserPlus, Gavel, Zap, CheckSquare,
   Settings, ArrowRight, LayoutDashboard,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -132,9 +132,26 @@ export default function AdminDashboardPage() {
         title="Admin dashboard"
         description={`Signed in as ${user?.username ?? 'admin'}`}
         actions={
-          <Link to="/admin/organizers">
-            <Button>Add organizer</Button>
-          </Link>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Link to="/admin/users?tab=organizers">
+              <Button size="sm">
+                <UserPlus className="h-4 w-4" strokeWidth={2} />
+                Add organizer
+              </Button>
+            </Link>
+            <Link to="/admin/users?tab=voters">
+              <Button size="sm" variant="secondary">
+                <UserPlus className="h-4 w-4" strokeWidth={2} />
+                Add voter
+              </Button>
+            </Link>
+            <Link to="/admin/users?tab=judges">
+              <Button size="sm" variant="secondary">
+                <Gavel className="h-4 w-4" strokeWidth={2} />
+                Add judge
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -192,11 +209,29 @@ export default function AdminDashboardPage() {
           <ul className="mt-3 space-y-1 text-sm">
             <li>
               <Link
-                to="/admin/organizers"
+                to="/admin/users?tab=organizers"
                 className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
                 <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
                 Add organizer account
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/admin/users?tab=voters"
+                className="v-btn-tertiary inline-flex items-center gap-1.5"
+              >
+                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+                Add voter account
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/admin/users?tab=judges"
+                className="v-btn-tertiary inline-flex items-center gap-1.5"
+              >
+                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+                Add judge account
               </Link>
             </li>
             <li>
