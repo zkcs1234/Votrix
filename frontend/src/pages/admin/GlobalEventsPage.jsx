@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Zap, Clock, CheckCircle2, Vote, Trophy, BarChart2, Download } from 'lucide-react'
+import { CalendarDays, Zap, Clock, CheckCircle2, Vote, Trophy, BarChart2, Download, X } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Card from '@/components/ui/Card'
 import { format } from 'date-fns'
@@ -9,6 +9,20 @@ import Badge from '@/components/ui/Badge'
 import StatCard from '@/components/ui/StatCard'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
+import { INPUT_CLASS } from '@/utils/uiClasses'
+
+function eventTypeMatches(eventType, filter) {
+  if (filter === 'all') return true
+  if (filter === 'competition') return eventType === 'competition_scoring' || eventType === 'pageant'
+  return eventType === filter
+}
+
+function eventTypeLabel(eventType) {
+  if (eventType === 'competition_scoring' || eventType === 'pageant') return 'Competition'
+  if (eventType === 'election') return 'Election'
+  if (eventType === 'polling') return 'Polling'
+  return eventType?.replace(/_/g, ' ') || 'Unknown'
+}
 
 export default function GlobalEventsPage() {
   const [events, setEvents] = useState([])
@@ -24,7 +38,11 @@ export default function GlobalEventsPage() {
   const handleExport = async () => {
     setExporting(true)
     try {
-      const { data } = await adminService.exportEvents(statusFilter !== 'all' ? { status: statusFilter } : {})
+      const { data } = await adminService.exportEvents({
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        type: typeFilter !== 'all' ? typeFilter : undefined,
+        search: search.trim() || undefined,
+      })
       const url = URL.createObjectURL(data)
       const a = document.createElement('a')
       a.href = url
@@ -71,12 +89,14 @@ export default function GlobalEventsPage() {
         event.title?.toLowerCase().includes(searchLower) ||
         event.organizations?.organization_name?.toLowerCase().includes(searchLower)
 
-      const matchesType = typeFilter === 'all' || event.event_type === typeFilter
+      const matchesType = eventTypeMatches(event.event_type, typeFilter)
       const matchesStatus = statusFilter === 'all' || event.status === statusFilter
 
       return matchesSearch && matchesType && matchesStatus
     })
   }, [events, search, typeFilter, statusFilter])
+
+  const hasActiveFilters = Boolean(search.trim()) || typeFilter !== 'all' || statusFilter !== 'all'
 
   if (loading && !showLoader) {
     return null
@@ -141,90 +161,51 @@ export default function GlobalEventsPage() {
           <div className="p-8 text-center text-v-danger">{error}</div>
         ) : (
           <div className="space-y-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <SearchInput
                 placeholder="Search by title or organization"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="lg:max-w-md"
+                className="min-w-0 flex-1 lg:max-w-md"
               />
-
-              <div className="flex flex-wrap gap-2">
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className={`${INPUT_CLASS} w-full sm:w-44`}
+                aria-label="Filter by event type"
+              >
+                <option value="all">All types</option>
+                <option value="election">Election</option>
+                <option value="competition">Competition</option>
+                <option value="polling">Polling</option>
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className={`${INPUT_CLASS} w-full sm:w-44`}
+                aria-label="Filter by status"
+              >
+                <option value="all">All statuses</option>
+                <option value="draft">Draft</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              {hasActiveFilters && (
                 <Button
                   type="button"
-                  variant={typeFilter === 'all' ? 'primary' : 'secondary'}
-                  onClick={() => setTypeFilter('all')}
+                  variant="ghost"
+                  onClick={() => { setSearch(''); setTypeFilter('all'); setStatusFilter('all') }}
                 >
-                  All types
+                  <X className="h-4 w-4" strokeWidth={1.5} /> Clear filters
                 </Button>
-                <Button
-                  type="button"
-                  variant={typeFilter === 'election' ? 'primary' : 'secondary'}
-                  onClick={() => setTypeFilter('election')}
-                >
-                  Election
-                </Button>
-                <Button
-                  type="button"
-                  variant={typeFilter === 'competition_scoring' ? 'primary' : 'secondary'}
-                  onClick={() => setTypeFilter('competition_scoring')}
-                >
-                  Competition
-                </Button>
-                <Button
-                  type="button"
-                  variant={typeFilter === 'polling' ? 'primary' : 'secondary'}
-                  onClick={() => setTypeFilter('polling')}
-                >
-                  Polling
-                </Button>
-              </div>
+              )}
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant={statusFilter === 'all' ? 'primary' : 'secondary'}
-                onClick={() => setStatusFilter('all')}
-              >
-                All statuses
-              </Button>
-              <Button
-                type="button"
-                variant={statusFilter === 'draft' ? 'primary' : 'secondary'}
-                onClick={() => setStatusFilter('draft')}
-              >
-                Draft
-              </Button>
-              <Button
-                type="button"
-                variant={statusFilter === 'scheduled' ? 'primary' : 'secondary'}
-                onClick={() => setStatusFilter('scheduled')}
-              >
-                Scheduled
-              </Button>
-              <Button
-                type="button"
-                variant={statusFilter === 'active' ? 'primary' : 'secondary'}
-                onClick={() => setStatusFilter('active')}
-              >
-                Active
-              </Button>
-              <Button
-                type="button"
-                variant={statusFilter === 'completed' ? 'primary' : 'secondary'}
-                onClick={() => setStatusFilter('completed')}
-              >
-                Completed
-              </Button>
-              <Button
-                type="button"
-                variant={statusFilter === 'cancelled' ? 'primary' : 'secondary'}
-                onClick={() => setStatusFilter('cancelled')}
-              >
-                Cancelled
-              </Button>
-            </div>
+            <p className="text-sm text-v-text-subtle">
+              Showing <span className="font-medium text-v-text">{filteredEvents.length}</span> of {events.length} events
+            </p>
 
             {filteredEvents.length === 0 ? (
               <div className="rounded-xl border border-dashed border-v-border p-8 text-center text-v-text-subtle">
@@ -252,7 +233,7 @@ export default function GlobalEventsPage() {
                               {event.event_type === 'election' && <Vote className="h-3 w-3" strokeWidth={2} />}
                               {(event.event_type === 'competition_scoring' || event.event_type === 'pageant') && <Trophy className="h-3 w-3" strokeWidth={2} />}
                               {event.event_type === 'polling' && <BarChart2 className="h-3 w-3" strokeWidth={2} />}
-                              {event.event_type}
+                              {eventTypeLabel(event.event_type)}
                             </span>
                           </Badge>
                         </td>

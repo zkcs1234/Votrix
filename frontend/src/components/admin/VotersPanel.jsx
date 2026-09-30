@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Users, UserPlus, Upload, Download, Pencil, ShieldOff, UserCheck } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
@@ -11,6 +12,8 @@ import StatCard from '@/components/ui/StatCard'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
+import { downloadBlob, downloadCsv } from '@/utils/csvDownload'
+import AccountStatusConfirmModal from '@/components/admin/AccountStatusConfirmModal'
 
 const STATUS_TONE = { active: 'success', suspended: 'danger', archived: 'default' }
 
@@ -61,62 +64,61 @@ function VoterFormModal({ mode, initial, programs, sections, onClose, onSaved })
   return (
     <Modal open onClose={onClose} title={isEdit ? 'Edit voter' : 'Add voter'} size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="v-label">Email</label>
-          <input
-            type="email"
-            value={form.email}
-            onChange={set('email')}
-            className={INPUT_CLASS}
-            required
-            disabled={isEdit}
-            placeholder="voter@example.com"
-          />
-          {isEdit && <p className="v-caption mt-1">Email can&apos;t be changed here.</p>}
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <fieldset className="space-y-3">
+          <legend className="v-label">Identity</legend>
+          <p className="v-caption">Login email and voter identification.</p>
           <div>
-            <label className="v-label">School ID</label>
-            <input type="text" value={form.schoolId} onChange={set('schoolId')} className={INPUT_CLASS} required />
+            <label htmlFor="voter-email" className="v-label">Email</label>
+            <input id="voter-email" type="email" value={form.email} onChange={set('email')} className={INPUT_CLASS} required disabled={isEdit} placeholder="voter@example.com" />
+            {isEdit && <p className="v-caption mt-1">Email can&apos;t be changed here.</p>}
           </div>
-          <div>
-            <label className="v-label">First name</label>
-            <input type="text" value={form.firstName} onChange={set('firstName')} className={INPUT_CLASS} required />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="voter-school-id" className="v-label">School ID</label>
+              <input id="voter-school-id" type="text" value={form.schoolId} onChange={set('schoolId')} className={INPUT_CLASS} required />
+            </div>
+            <div>
+              <label htmlFor="voter-first-name" className="v-label">First name</label>
+              <input id="voter-first-name" type="text" value={form.firstName} onChange={set('firstName')} className={INPUT_CLASS} required />
+            </div>
+            <div>
+              <label htmlFor="voter-last-name" className="v-label">Last name</label>
+              <input id="voter-last-name" type="text" value={form.lastName} onChange={set('lastName')} className={INPUT_CLASS} required />
+            </div>
           </div>
-          <div>
-            <label className="v-label">Last name</label>
-            <input type="text" value={form.lastName} onChange={set('lastName')} className={INPUT_CLASS} required />
+        </fieldset>
+        <fieldset className="space-y-3 border-t border-v-border pt-4">
+          <legend className="v-label">Academic placement</legend>
+          <p className="v-caption">Choose the program and year/section for this voter.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="voter-program" className="v-label">Program</label>
+              <select id="voter-program" value={form.program} onChange={set('program')} className={INPUT_CLASS} required>
+                <option value="">Select program</option>
+                {programs.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="voter-year-section" className="v-label">Year &amp; Section</label>
+              <select id="voter-year-section" value={form.yearSection} onChange={set('yearSection')} className={INPUT_CLASS} required>
+                <option value="">Select year &amp; section</option>
+                {sections.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
           </div>
-          <div>
-            <label className="v-label">Program</label>
-            <select value={form.program} onChange={set('program')} className={INPUT_CLASS} required>
-              <option value="">Select program</option>
-              {programs.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="v-label">Year &amp; Section</label>
-            <select value={form.yearSection} onChange={set('yearSection')} className={INPUT_CLASS} required>
-              <option value="">Select year &amp; section</option>
-              {sections.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+        </fieldset>
 
         {(programs.length === 0 || sections.length === 0) && (
           <FormAlert variant="warning">
-            Define Programs and Year &amp; Sections in System Settings first.
+            Define Programs and Year &amp; Sections in System Settings before registering voters.{' '}
+            <Link to="/admin/settings" onClick={onClose} className="font-medium text-v-primary hover:underline">Open System Settings</Link>
           </FormAlert>
         )}
         {error && <FormAlert variant="error">{error}</FormAlert>}
 
         <div className="flex justify-end gap-2 border-t border-v-border pt-4">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={saving}>{isEdit ? 'Save changes' : 'Register voter'}</Button>
+          <Button type="submit" loading={saving} disabled={!programs.length || !sections.length}>{isEdit ? 'Save changes' : 'Register voter'}</Button>
         </div>
       </form>
     </Modal>
@@ -134,6 +136,15 @@ function CsvPreviewModal({ preview, onClose, onRegister, registering }) {
             {preview.errors.slice(0, 6).map((err, i) => <li key={i}>{err}</li>)}
             {preview.errors.length > 6 && <li>…and {preview.errors.length - 6} more</li>}
           </ul>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="mt-3"
+            onClick={() => downloadCsv('voter-import-errors.csv', ['Issue'], preview.errors.map((issue) => [issue]))}
+          >
+            <Download className="h-4 w-4" strokeWidth={1.5} /> Download errors
+          </Button>
         </div>
       )}
 
@@ -187,8 +198,10 @@ export default function VotersPanel() {
   const [statusFilter, setStatusFilter] = useState('')
   const [taxonomy, setTaxonomy] = useState({ programs: [], sections: [] })
   const [modal, setModal] = useState(null) // { mode: 'add'|'edit', voter }
+  const [statusTarget, setStatusTarget] = useState(null)
   const [preview, setPreview] = useState(null)
   const [registering, setRegistering] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [savingId, setSavingId] = useState(null)
   const fileRef = useRef(null)
   const { success, error: toastError } = useToast()
@@ -264,11 +277,25 @@ export default function VotersPanel() {
     }
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const { data } = await adminService.exportVoters()
+      downloadBlob('voters.csv', data)
+      success('Voters exported')
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Export failed'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const handleStatus = async (voter, accountStatus) => {
     setSavingId(voter.id)
     try {
       await adminService.updateVoterStatus(voter.id, accountStatus)
       success(`Voter ${accountStatus}`)
+      setStatusTarget(null)
       await fetchVoters()
     } catch (err) {
       toastError(getErrorMessage(err, 'Failed to update status'))
@@ -277,15 +304,15 @@ export default function VotersPanel() {
     }
   }
 
-  const downloadTemplate = () => {
-    const csv = 'email,school id,last name,first name,program,year & section\nvoter@example.com,2021-00123,Dela Cruz,Juan,BSIT,3-A\n'
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'voter-template.csv'
-    a.click()
-    URL.revokeObjectURL(url)
+  const downloadTemplate = async () => {
+    try {
+      const { data } = await adminService.getVoterCsvTemplate()
+      downloadBlob('voter-template.csv', data)
+    } catch (err) {
+      const message = getErrorMessage(err, 'Could not download the voter template')
+      setError(message)
+      toastError(message)
+    }
   }
 
   return (
@@ -301,8 +328,11 @@ export default function VotersPanel() {
           <Button variant="secondary" onClick={downloadTemplate}>
             <Download className="h-4 w-4" strokeWidth={1.5} /> Template
           </Button>
+          <Button variant="secondary" onClick={handleExport} loading={exporting}>
+            <Download className="h-4 w-4" strokeWidth={1.5} /> Export CSV
+          </Button>
           <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-            <Upload className="h-4 w-4" strokeWidth={1.5} /> Import CSV
+            <Upload className="h-4 w-4" strokeWidth={1.5} /> Review CSV import
           </Button>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFile} />
           <Button onClick={() => setModal({ mode: 'add' })}>
@@ -377,13 +407,21 @@ export default function VotersPanel() {
                         <Button size="sm" variant="ghost" onClick={() => setModal({ mode: 'edit', voter: v })}>
                           <Pencil className="h-4 w-4" strokeWidth={1.5} /> Edit
                         </Button>
-                        {v.accountStatus === 'active' ? (
-                          <Button size="sm" variant="secondary" loading={savingId === v.id} onClick={() => handleStatus(v, 'suspended')}>
-                            Suspend
-                          </Button>
-                        ) : (
-                          <Button size="sm" variant="secondary" loading={savingId === v.id} onClick={() => handleStatus(v, 'active')}>
-                            Activate
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={savingId === v.id}
+                          onClick={() => setStatusTarget({
+                            user: v,
+                            accountStatus: v.accountStatus === 'active' ? 'suspended' : 'active',
+                            label: v.accountStatus === 'active' ? 'Suspend' : v.accountStatus === 'archived' ? 'Restore' : 'Reinstate',
+                          })}
+                        >
+                          {v.accountStatus === 'active' ? 'Suspend' : v.accountStatus === 'archived' ? 'Restore' : 'Reinstate'}
+                        </Button>
+                        {v.accountStatus !== 'archived' && (
+                          <Button size="sm" variant="secondary" onClick={() => setStatusTarget({ user: v, accountStatus: 'archived', label: 'Archive' })}>
+                            Archive
                           </Button>
                         )}
                       </div>
@@ -406,6 +444,18 @@ export default function VotersPanel() {
           onSaved={() => { setModal(null); fetchVoters() }}
         />
       )}
+
+      <AccountStatusConfirmModal
+        target={statusTarget ? {
+          ...statusTarget,
+          name: fullName(statusTarget.user),
+          email: statusTarget.user.email,
+        } : null}
+        accountType="Voter"
+        onClose={() => setStatusTarget(null)}
+        onConfirm={() => handleStatus(statusTarget.user, statusTarget.accountStatus)}
+        loading={Boolean(savingId)}
+      />
 
       {preview && (
         <CsvPreviewModal

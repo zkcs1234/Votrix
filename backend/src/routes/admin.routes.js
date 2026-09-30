@@ -60,6 +60,8 @@ router.get('/alerts/config', adminController.getAlertConfig)
 router.put('/alerts/config', adminActionLimiter, adminController.updateAlertConfig)
 
 router.get('/export/organizers', adminActionLimiter, adminController.exportOrganizersData)
+router.get('/export/voters', adminActionLimiter, adminController.exportVotersData)
+router.get('/export/judges', adminActionLimiter, adminController.exportJudgesData)
 router.get('/export/events', adminActionLimiter, adminController.exportEventsData)
 router.get('/export/audit-logs', adminActionLimiter, adminController.exportAuditLogsData)
 

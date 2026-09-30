@@ -196,7 +196,7 @@ function parseOrganizerFile(buffer) {
   try {
     matrix = readFileMatrix(buffer)
   } catch {
-    throw new ApiError(400, 'Could not read the file. Upload a CSV or Excel (.xlsx) file with the required columns.')
+    throw new ApiError(400, 'Could not read the file. Upload a CSV or Excel (.xls, .xlsx) file with the required columns.')
   }
   const headerIdx = matrix.findIndex((r) => r.some((c) => String(c ?? '').trim() !== ''))
   if (headerIdx === -1) throw new ApiError(400, 'The file is empty.')

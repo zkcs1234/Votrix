@@ -105,6 +105,21 @@ export const adminService = {
   exportOrganizers() {
     return api.get(`${base}/export/organizers`, { responseType: 'blob' })
   },
+  getOrganizerCsvTemplate() {
+    return api.get(`${base}/organizers/template`, { responseType: 'blob' })
+  },
+  getVoterCsvTemplate() {
+    return api.get(`${base}/voters/template`, { responseType: 'blob' })
+  },
+  getJudgeCsvTemplate() {
+    return api.get(`${base}/judges/template`, { responseType: 'blob' })
+  },
+  exportVoters() {
+    return api.get(`${base}/export/voters`, { responseType: 'blob' })
+  },
+  exportJudges() {
+    return api.get(`${base}/export/judges`, { responseType: 'blob' })
+  },
   exportEvents(params = {}) {
     return api.get(`${base}/export/events`, { params, responseType: 'blob' })
   },

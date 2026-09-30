@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { Users, UserCheck, ShieldOff, UserPlus, Upload, Download } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import CreateOrganizerModal from '@/components/admin/CreateOrganizerModal'
+import AccountStatusConfirmModal from '@/components/admin/AccountStatusConfirmModal'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Modal from '@/components/ui/Modal'
@@ -14,6 +15,7 @@ import StatCard from '@/components/ui/StatCard'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
+import { downloadBlob, downloadCsv } from '@/utils/csvDownload'
 
 const STATUS_CONFIG = {
   active: { tone: 'success', label: 'Active' },
@@ -114,6 +116,7 @@ export default function OrganizerManagementPage() {
   const [success, setSuccess] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingOrg, setEditingOrg] = useState(null)
+  const [statusTarget, setStatusTarget] = useState(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [savingKey, setSavingKey] = useState(null)
@@ -126,16 +129,13 @@ export default function OrganizerManagementPage() {
 
   const closeModal = () => { setIsModalOpen(false); setEditingOrg(null) }
 
-  const downloadTemplate = () => {
-    const csv = 'email,organizer name,position,organization name,organization type,scope type,programs,year & sections\n' +
-      'organizer@example.com,Jane Cruz,SSG Adviser,Supreme Student Government,Student Organization,scoped,BSCS;BSIT,3-A;3-B\n'
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'organizer-template.csv'
-    a.click()
-    URL.revokeObjectURL(url)
+  const downloadTemplate = async () => {
+    try {
+      const { data } = await adminService.getOrganizerCsvTemplate()
+      downloadBlob('organizer-template.csv', data)
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Could not download the organizer template'))
+    }
   }
 
   const handleCsvFile = async (e) => {
@@ -170,12 +170,7 @@ export default function OrganizerManagementPage() {
     setExporting(true)
     try {
       const { data } = await adminService.exportOrganizers()
-      const url = URL.createObjectURL(data)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'organizers.csv'
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob('organizers.csv', data)
       toastSuccess('Organizers exported')
     } catch {
       toastError('Export failed')
@@ -232,6 +227,7 @@ export default function OrganizerManagementPage() {
     try {
       await adminService.updateOrganizerStatus(organizerId, accountStatus)
       setSuccess(`Organizer status updated to ${getStatusLabel(accountStatus).toLowerCase()}.`)
+      setStatusTarget(null)
       await fetchOrganizers()
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update organizer status')
@@ -291,7 +287,7 @@ export default function OrganizerManagementPage() {
           </Button>
           <Button variant="secondary" onClick={() => fileRef.current?.click()}>
             <Upload className="h-4 w-4" strokeWidth={1.5} />
-            Import CSV
+            Review CSV import
           </Button>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleCsvFile} />
           <Button onClick={() => { setEditingOrg(null); setIsModalOpen(true) }}>
@@ -405,7 +401,16 @@ export default function OrganizerManagementPage() {
                             size="sm"
                             variant={nextPrimaryAction.variant}
                             loading={isBusy && savingKey.endsWith(nextPrimaryAction.next)}
-                            onClick={(e) => { e.stopPropagation(); handleStatusChange(org.id, nextPrimaryAction.next) }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setStatusTarget({
+                                id: org.id,
+                                accountStatus: nextPrimaryAction.next,
+                                label: nextPrimaryAction.label,
+                                name: org.organizer_name || org.organization_name,
+                                email: org.email,
+                              })
+                            }}
                           >
                             {nextPrimaryAction.label}
                           </Button>
@@ -416,7 +421,10 @@ export default function OrganizerManagementPage() {
                               size="sm"
                               variant="secondary"
                               loading={isBusy && savingKey.endsWith('archived')}
-                              onClick={(e) => { e.stopPropagation(); handleStatusChange(org.id, 'archived') }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setStatusTarget({ id: org.id, accountStatus: 'archived', label: 'Archive', name: org.organizer_name || org.organization_name, email: org.email })
+                              }}
                             >
                               Archive
                             </Button>
@@ -439,6 +447,14 @@ export default function OrganizerManagementPage() {
         onSuccess={fetchOrganizers}
       />
 
+      <AccountStatusConfirmModal
+        target={statusTarget}
+        accountType="Organizer"
+        onClose={() => setStatusTarget(null)}
+        onConfirm={() => handleStatusChange(statusTarget.id, statusTarget.accountStatus)}
+        loading={Boolean(savingKey)}
+      />
+
       {csvPreview && (
         <Modal open onClose={() => setCsvPreview(null)} title="Review & Register organizers" size="lg">
           {csvPreview.errors?.length > 0 && (
@@ -448,9 +464,18 @@ export default function OrganizerManagementPage() {
                 {csvPreview.errors.slice(0, 6).map((err, i) => <li key={i}>{err}</li>)}
                 {csvPreview.errors.length > 6 && <li>…and {csvPreview.errors.length - 6} more</li>}
               </ul>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="mt-3"
+                onClick={() => downloadCsv('organizer-import-errors.csv', ['Issue'], csvPreview.errors.map((issue) => [issue]))}
+              >
+                <Download className="h-4 w-4" strokeWidth={1.5} /> Download errors
+              </Button>
             </div>
           )}
-          <p className="v-label mb-3">{csvPreview.valid} of {csvPreview.total} ready</p>
+          <p className="v-label mb-3">{csvPreview.valid} of {csvPreview.total} rows ready. Invalid rows will not be registered.</p>
           <div className="v-table-wrap mb-4 max-h-80 overflow-auto">
             <table className="v-table">
               <thead>

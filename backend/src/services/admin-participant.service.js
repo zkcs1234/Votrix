@@ -76,7 +76,7 @@ function parseVoterFile(buffer) {
   try {
     matrix = readFileMatrix(buffer)
   } catch {
-    throw new ApiError(400, 'Could not read the file. Upload a CSV or Excel (.xlsx) file with the required columns.')
+    throw new ApiError(400, 'Could not read the file. Upload a CSV or Excel (.xls, .xlsx) file with the required columns.')
   }
 
   const headerIdx = matrix.findIndex((row) => row.some((cell) => String(cell ?? '').trim() !== ''))
@@ -463,7 +463,7 @@ function parseJudgeFile(buffer) {
   try {
     matrix = readFileMatrix(buffer)
   } catch {
-    throw new ApiError(400, 'Could not read the file. Upload a CSV or Excel (.xlsx) file with the required columns.')
+    throw new ApiError(400, 'Could not read the file. Upload a CSV or Excel (.xls, .xlsx) file with the required columns.')
   }
 
   const headerIdx = matrix.findIndex((row) => row.some((cell) => String(cell ?? '').trim() !== ''))

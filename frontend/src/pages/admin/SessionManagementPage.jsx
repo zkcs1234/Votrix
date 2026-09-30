@@ -7,6 +7,7 @@ import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
 import Badge from '@/components/ui/Badge'
 import SearchInput from '@/components/ui/SearchInput'
+import SessionRevokeConfirmModal from '@/components/admin/SessionRevokeConfirmModal'
 import { useToast } from '@/hooks/useToast'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
@@ -22,6 +23,7 @@ export default function SessionManagementPage() {
   const [search, setSearch] = useState('')
   const [revokingId, setRevokingId] = useState(null)
   const [revokingUser, setRevokingUser] = useState(null)
+  const [revokeTarget, setRevokeTarget] = useState(null)
   const showLoader = useDelayedLoading(loading, 300)
   const { success: toastSuccess, error: toastError } = useToast()
 
@@ -75,13 +77,11 @@ export default function SessionManagementPage() {
       toastError(err.response?.data?.message || 'Failed to revoke session')
     } finally {
       setRevokingId(null)
+      setRevokeTarget(null)
     }
   }
 
-  const handleRevokeAll = async (userId, email) => {
-    if (!window.confirm(`Revoke all sessions for ${email}? They will be signed out everywhere.`)) {
-      return
-    }
+  const handleRevokeAll = async (userId) => {
     setRevokingUser(userId)
     try {
       const { data } = await adminService.revokeAllUserSessions(userId)
@@ -91,6 +91,7 @@ export default function SessionManagementPage() {
       toastError(err.response?.data?.message || 'Failed to revoke sessions')
     } finally {
       setRevokingUser(null)
+      setRevokeTarget(null)
     }
   }
 
@@ -156,7 +157,12 @@ export default function SessionManagementPage() {
                     <Button
                       size="sm"
                       variant="danger"
-                      onClick={() => handleRevokeAll(user.id, user?.email)}
+                      onClick={() => setRevokeTarget({
+                        mode: 'all',
+                        userId: user.id,
+                        email: user?.email,
+                        sessionCount: userSessions.length,
+                      })}
                       loading={revokingUser === user.id}
                     >
                       <ShieldOff className="h-4 w-4" strokeWidth={1.5} />
@@ -184,7 +190,7 @@ export default function SessionManagementPage() {
                               <Button
                                 size="sm"
                                 variant="danger"
-                                onClick={() => handleRevoke(s)}
+                                onClick={() => setRevokeTarget({ mode: 'single', session: s, email: user?.email })}
                                 loading={revokingId === s.id}
                               >
                                 Revoke
@@ -201,6 +207,24 @@ export default function SessionManagementPage() {
           ))}
         </div>
       )}
+
+      <SessionRevokeConfirmModal
+        target={revokeTarget?.mode === 'all'
+          ? revokeTarget
+          : revokeTarget?.session
+            ? { ...revokeTarget.session, email: revokeTarget.email }
+            : null}
+        mode={revokeTarget?.mode}
+        onClose={() => setRevokeTarget(null)}
+        onConfirm={() => {
+          if (revokeTarget?.mode === 'all') {
+            void handleRevokeAll(revokeTarget.userId)
+          } else if (revokeTarget?.session) {
+            void handleRevoke(revokeTarget.session)
+          }
+        }}
+        loading={Boolean(revokingId || revokingUser)}
+      />
     </div>
   )
 }

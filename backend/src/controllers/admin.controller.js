@@ -20,7 +20,13 @@ import {
   getOrganizerActivity as fetchOrganizerActivity,
 } from '../services/admin.service.js'
 import { createAdminAlert, createNotification } from '../services/notification.service.js'
-import { exportOrganizersCSV, exportEventsCSV, exportAuditLogsCSV } from '../services/export.service.js'
+import {
+  exportOrganizersCSV,
+  exportVotersCSV,
+  exportJudgesCSV,
+  exportEventsCSV,
+  exportAuditLogsCSV,
+} from '../services/export.service.js'
 import { checkSystemHealth } from '../services/health.service.js'
 import { getAlertConfig as fetchAlertConfig, updateAlertConfig as saveAlertConfig } from '../services/alert.service.js'
 import {
@@ -321,13 +327,30 @@ export const exportOrganizersData = asyncHandler(async (req, res) => {
   res.send(csv)
 })
 
+export const exportVotersData = asyncHandler(async (req, res) => {
+  const csv = await exportVotersCSV()
+  await createAuditLog({ userId: req.user.id, action: 'EXPORT_VOTERS', entity: 'users' })
+  res.setHeader('Content-Type', 'text/csv')
+  res.setHeader('Content-Disposition', 'attachment; filename="voters.csv"')
+  res.send(csv)
+})
+
+export const exportJudgesData = asyncHandler(async (req, res) => {
+  const csv = await exportJudgesCSV()
+  await createAuditLog({ userId: req.user.id, action: 'EXPORT_JUDGES', entity: 'users' })
+  res.setHeader('Content-Type', 'text/csv')
+  res.setHeader('Content-Disposition', 'attachment; filename="judges.csv"')
+  res.send(csv)
+})
+
 export const exportEventsData = asyncHandler(async (req, res) => {
-  const csv = await exportEventsCSV({ status: req.query.status })
+  const { status, type, search } = req.query
+  const csv = await exportEventsCSV({ status, type, search })
   await createAuditLog({
     userId: req.user.id,
     action: 'EXPORT_EVENTS',
     entity: 'events',
-    details: { status: req.query.status ?? null },
+    details: { status: status ?? null, type: type ?? null },
   })
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="events.csv"')
@@ -359,6 +382,12 @@ export const getAlertConfig = asyncHandler(async (_req, res) => {
 
 export const updateAlertConfig = asyncHandler(async (req, res) => {
   const config = await saveAlertConfig(req.body)
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'UPDATE_ALERT_CONFIG',
+    entity: 'system_settings',
+    details: { config },
+  })
   res.json({ success: true, config })
 })
 

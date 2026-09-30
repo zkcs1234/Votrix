@@ -1,5 +1,6 @@
 import { stringify } from 'csv-stringify/sync'
 import { getOrganizersList, getGlobalEvents } from './admin.service.js'
+import { listVoters, listJudges } from './admin-participant.service.js'
 import { listAuditTrail } from '../foundation/audit.js'
 
 function toCSV(rows, columns) {
@@ -19,9 +20,72 @@ export async function exportOrganizersCSV() {
   ])
 }
 
-export async function exportEventsCSV({ status } = {}) {
+async function listAllParticipants(listPage, key) {
+  const rows = []
+  let page = 1
+  let total = 0
+
+  do {
+    const result = await listPage({ page, limit: 200 })
+    const pageRows = result[key] ?? []
+    if (!pageRows.length) break
+    rows.push(...pageRows)
+    total = result.total
+    page += 1
+  } while (rows.length < total)
+
+  return rows
+}
+
+export async function exportVotersCSV() {
+  const voters = await listAllParticipants(listVoters, 'voters')
+  return toCSV(voters, [
+    { key: 'email', header: 'email' },
+    { key: 'schoolId', header: 'school_id' },
+    { key: 'firstName', header: 'first_name' },
+    { key: 'lastName', header: 'last_name' },
+    { key: 'program', header: 'program' },
+    { key: 'yearSection', header: 'year_section' },
+    { key: 'accountStatus', header: 'account_status' },
+    { key: 'createdAt', header: 'created_at' },
+  ])
+}
+
+export async function exportJudgesCSV() {
+  const judges = await listAllParticipants(listJudges, 'judges')
+  const rows = judges.map((judge) => ({
+    ...judge,
+    expertise: judge.profileData?.expertise,
+  }))
+  return toCSV(rows, [
+    { key: 'email', header: 'email' },
+    { key: 'firstName', header: 'first_name' },
+    { key: 'lastName', header: 'last_name' },
+    { key: 'expertise', header: 'expertise' },
+    { key: 'accountStatus', header: 'account_status' },
+    { key: 'createdAt', header: 'created_at' },
+  ])
+}
+
+function eventMatchesType(eventType, type) {
+  if (!type || type === 'all') return true
+  if (type === 'competition') return eventType === 'competition_scoring' || eventType === 'pageant'
+  return eventType === type
+}
+
+export async function exportEventsCSV({ status, type, search } = {}) {
   const events = await getGlobalEvents()
-  const filtered = status ? events.filter((e) => e.status === status) : events
+  const searchTerm = String(search ?? '').trim().toLowerCase()
+  const filtered = events.filter((event) => {
+    if (status && status !== 'all' && event.status !== status) return false
+    if (!eventMatchesType(event.event_type, type)) return false
+    if (searchTerm) {
+      const title = event.title?.toLowerCase() ?? ''
+      const organization = event.organizations?.organization_name?.toLowerCase() ?? ''
+      if (!title.includes(searchTerm) && !organization.includes(searchTerm)) return false
+    }
+    return true
+  })
   return toCSV(filtered, [
     { key: 'title', header: 'title' },
     { key: 'event_type', header: 'event_type' },

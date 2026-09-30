@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Settings, ToggleLeft, Hash, Save, ShieldAlert } from 'lucide-react'
+import { Settings, ToggleLeft, Save, ShieldAlert } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -79,6 +79,8 @@ function hydrateSettings(apiSettings = []) {
 
 export default function SystemSettingsPage() {
   const [settings, setSettings] = useState([])
+  const [activeSessionCount, setActiveSessionCount] = useState(0)
+  const [enabledAlertCount, setEnabledAlertCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -89,8 +91,21 @@ export default function SystemSettingsPage() {
     const fetchSettings = async () => {
       try {
         setLoading(true)
-        const { data } = await adminService.getSystemSettings()
-        setSettings(hydrateSettings(data.settings || []))
+        const [settingsResult, sessionsResult, alertsResult] = await Promise.allSettled([
+          adminService.getSystemSettings(),
+          adminService.listSessions(),
+          adminService.getAlertConfig(),
+        ])
+        if (settingsResult.status === 'rejected') throw settingsResult.reason
+
+        const settingsData = settingsResult.value.data
+        const sessionsData = sessionsResult.status === 'fulfilled' ? sessionsResult.value.data : {}
+        const alertsData = alertsResult.status === 'fulfilled' ? alertsResult.value.data : {}
+        setSettings(hydrateSettings(settingsData.settings || []))
+        setActiveSessionCount((sessionsData.sessions || []).length)
+        setEnabledAlertCount(
+          Object.values(alertsData.config || {}).filter((alert) => alert?.enabled).length,
+        )
         setError(null)
       } catch {
         setError('Failed to load system settings')
@@ -105,9 +120,8 @@ export default function SystemSettingsPage() {
   const summary = useMemo(() => {
     const total = settings.length
     const enabled = settings.filter((setting) => setting.type === 'boolean' && setting.value === true).length
-    const numeric = settings.filter((setting) => setting.type === 'number').length
-    return { total, enabled, numeric }
-  }, [settings])
+    return { total, enabled, activeSessionCount, enabledAlertCount }
+  }, [settings, activeSessionCount, enabledAlertCount])
 
   const updateSettingValue = (key, nextValue) => {
     setSettings((current) =>
@@ -205,8 +219,8 @@ export default function SystemSettingsPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Settings" value={summary.total} icon={Settings} />
         <StatCard label="Boolean flags" value={summary.enabled} icon={ToggleLeft} />
-        <StatCard label="Numeric values" value={summary.numeric} icon={Hash} />
-        <StatCard label="Editable now" value={settings.length > 0 ? 'Yes' : 'No'} />
+        <StatCard label="Active sessions" value={summary.activeSessionCount} />
+        <StatCard label="Enabled alerts" value={summary.enabledAlertCount} icon={ShieldAlert} />
       </div>
 
       <Card>

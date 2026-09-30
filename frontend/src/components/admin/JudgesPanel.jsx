@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Trophy, UserPlus, Upload, Download, Pencil, ShieldOff, UserCheck } from 'lucide-react'
+import { Trophy, UserPlus, Upload, Download, Pencil, ShieldOff, UserCheck, ChevronDown } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -11,6 +11,8 @@ import StatCard from '@/components/ui/StatCard'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
+import { downloadBlob, downloadCsv } from '@/utils/csvDownload'
+import AccountStatusConfirmModal from '@/components/admin/AccountStatusConfirmModal'
 
 const STATUS_TONE = { active: 'success', suspended: 'danger', archived: 'default' }
 
@@ -30,6 +32,9 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
     affiliation: data.affiliation ?? '',
     expertise: data.expertise ?? '',
   })
+  const [showAdditionalDetails, setShowAdditionalDetails] = useState(
+    isEdit && Boolean(data.title || data.affiliation),
+  )
   const [organizerIds, setOrganizerIds] = useState(() => (Array.isArray(data.organizerIds) ? data.organizerIds : []))
   const [organizers, setOrganizers] = useState([])
   const [saving, setSaving] = useState(false)
@@ -85,18 +90,35 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
             <label className="v-label">Last name</label>
             <input type="text" value={form.lastName} onChange={set('lastName')} className={INPUT_CLASS} required />
           </div>
-          <div>
-            <label className="v-label">Title <span className="v-caption">(optional)</span></label>
-            <input type="text" value={form.title} onChange={set('title')} className={INPUT_CLASS} placeholder="Prof., Engr., Dr." />
-          </div>
-          <div>
-            <label className="v-label">Affiliation <span className="v-caption">(optional)</span></label>
-            <input type="text" value={form.affiliation} onChange={set('affiliation')} className={INPUT_CLASS} placeholder="Organization / department" />
-          </div>
           <div className="sm:col-span-2">
             <label className="v-label">Expertise <span className="v-caption">(optional)</span></label>
             <input type="text" value={form.expertise} onChange={set('expertise')} className={INPUT_CLASS} placeholder="Field of specialization" />
           </div>
+        </div>
+
+        <div className="border-t border-v-border pt-2">
+          <button
+            type="button"
+            onClick={() => setShowAdditionalDetails((value) => !value)}
+            aria-expanded={showAdditionalDetails}
+            aria-controls="judge-additional-details"
+            className="flex w-full items-center justify-between py-2 text-sm font-medium text-v-text hover:text-v-primary"
+          >
+            Additional details
+            <ChevronDown className={`h-4 w-4 transition-transform ${showAdditionalDetails ? 'rotate-180' : ''}`} />
+          </button>
+          {showAdditionalDetails && (
+            <div id="judge-additional-details" className="grid gap-4 pb-2 sm:grid-cols-2">
+              <div>
+                <label className="v-label">Title <span className="v-caption">(optional)</span></label>
+                <input type="text" value={form.title} onChange={set('title')} className={INPUT_CLASS} placeholder="Prof., Engr., Dr." />
+              </div>
+              <div>
+                <label className="v-label">Affiliation <span className="v-caption">(optional)</span></label>
+                <input type="text" value={form.affiliation} onChange={set('affiliation')} className={INPUT_CLASS} placeholder="Organization / department" />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-v-border p-3">
@@ -152,6 +174,15 @@ function CsvPreviewModal({ preview, onClose, onRegister, registering }) {
             {preview.errors.slice(0, 6).map((err, i) => <li key={i}>{err}</li>)}
             {preview.errors.length > 6 && <li>…and {preview.errors.length - 6} more</li>}
           </ul>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="mt-3"
+            onClick={() => downloadCsv('judge-import-errors.csv', ['Issue'], preview.errors.map((issue) => [issue]))}
+          >
+            <Download className="h-4 w-4" strokeWidth={1.5} /> Download errors
+          </Button>
         </div>
       )}
 
@@ -200,8 +231,10 @@ export default function JudgesPanel() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [modal, setModal] = useState(null)
+  const [statusTarget, setStatusTarget] = useState(null)
   const [preview, setPreview] = useState(null)
   const [registering, setRegistering] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [savingId, setSavingId] = useState(null)
   const fileRef = useRef(null)
   const { success, error: toastError } = useToast()
@@ -267,11 +300,25 @@ export default function JudgesPanel() {
     }
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const { data } = await adminService.exportJudges()
+      downloadBlob('judges.csv', data)
+      success('Judges exported')
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Export failed'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const handleStatus = async (judge, accountStatus) => {
     setSavingId(judge.id)
     try {
       await adminService.updateJudgeStatus(judge.id, accountStatus)
       success(`Judge ${accountStatus}`)
+      setStatusTarget(null)
       await fetchJudges()
     } catch (err) {
       toastError(getErrorMessage(err, 'Failed to update status'))
@@ -280,15 +327,15 @@ export default function JudgesPanel() {
     }
   }
 
-  const downloadTemplate = () => {
-    const csv = 'email,last name,first name,title,affiliation,expertise,organizers\njudge@example.com,Reyes,Maria,Prof.,College of Engineering,Robotics,organizer@example.com\n'
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'judge-template.csv'
-    a.click()
-    URL.revokeObjectURL(url)
+  const downloadTemplate = async () => {
+    try {
+      const { data } = await adminService.getJudgeCsvTemplate()
+      downloadBlob('judge-template.csv', data)
+    } catch (err) {
+      const message = getErrorMessage(err, 'Could not download the judge template')
+      setError(message)
+      toastError(message)
+    }
   }
 
   return (
@@ -304,8 +351,11 @@ export default function JudgesPanel() {
           <Button variant="secondary" onClick={downloadTemplate}>
             <Download className="h-4 w-4" strokeWidth={1.5} /> Template
           </Button>
+          <Button variant="secondary" onClick={handleExport} loading={exporting}>
+            <Download className="h-4 w-4" strokeWidth={1.5} /> Export CSV
+          </Button>
           <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-            <Upload className="h-4 w-4" strokeWidth={1.5} /> Import CSV
+            <Upload className="h-4 w-4" strokeWidth={1.5} /> Review CSV import
           </Button>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFile} />
           <Button onClick={() => setModal({ mode: 'add' })}>
@@ -353,7 +403,7 @@ export default function JudgesPanel() {
             <table className="v-table">
               <thead>
                 <tr>
-                  <th>Name</th><th>Email</th><th>Title</th><th>Affiliation</th><th>Expertise</th><th>Status</th><th className="text-right">Actions</th>
+                  <th>Name</th><th>Email</th><th>Expertise</th><th>Status</th><th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-v-border">
@@ -361,8 +411,6 @@ export default function JudgesPanel() {
                   <tr key={v.id}>
                     <td>{fullName(v)}</td>
                     <td>{v.email}</td>
-                    <td>{v.profileData?.title || '—'}</td>
-                    <td>{v.profileData?.affiliation || '—'}</td>
                     <td>{v.profileData?.expertise || '—'}</td>
                     <td><Badge tone={STATUS_TONE[v.accountStatus] ?? 'default'}>{v.accountStatus}</Badge></td>
                     <td>
@@ -370,13 +418,21 @@ export default function JudgesPanel() {
                         <Button size="sm" variant="ghost" onClick={() => setModal({ mode: 'edit', judge: v })}>
                           <Pencil className="h-4 w-4" strokeWidth={1.5} /> Edit
                         </Button>
-                        {v.accountStatus === 'active' ? (
-                          <Button size="sm" variant="secondary" loading={savingId === v.id} onClick={() => handleStatus(v, 'suspended')}>
-                            Suspend
-                          </Button>
-                        ) : (
-                          <Button size="sm" variant="secondary" loading={savingId === v.id} onClick={() => handleStatus(v, 'active')}>
-                            Activate
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={savingId === v.id}
+                          onClick={() => setStatusTarget({
+                            user: v,
+                            accountStatus: v.accountStatus === 'active' ? 'suspended' : 'active',
+                            label: v.accountStatus === 'active' ? 'Suspend' : v.accountStatus === 'archived' ? 'Restore' : 'Reinstate',
+                          })}
+                        >
+                          {v.accountStatus === 'active' ? 'Suspend' : v.accountStatus === 'archived' ? 'Restore' : 'Reinstate'}
+                        </Button>
+                        {v.accountStatus !== 'archived' && (
+                          <Button size="sm" variant="secondary" onClick={() => setStatusTarget({ user: v, accountStatus: 'archived', label: 'Archive' })}>
+                            Archive
                           </Button>
                         )}
                       </div>
@@ -397,6 +453,18 @@ export default function JudgesPanel() {
           onSaved={() => { setModal(null); fetchJudges() }}
         />
       )}
+
+      <AccountStatusConfirmModal
+        target={statusTarget ? {
+          ...statusTarget,
+          name: fullName(statusTarget.user),
+          email: statusTarget.user.email,
+        } : null}
+        accountType="Judge"
+        onClose={() => setStatusTarget(null)}
+        onConfirm={() => handleStatus(statusTarget.user, statusTarget.accountStatus)}
+        loading={Boolean(savingId)}
+      />
 
       {preview && (
         <CsvPreviewModal

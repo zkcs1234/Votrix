@@ -44,6 +44,13 @@ describe('Admin API Endpoints', () => {
     })
   })
 
+  describe.each(['voters', 'judges'])('GET /api/admin/export/%s', (userType) => {
+    test('should require authentication', async () => {
+      const response = await request(app).get(`/api/admin/export/${userType}`)
+      expect(response.status).toBe(401)
+    })
+  })
+
   describe('POST /api/admin/organizers', () => {
     test('should return 401 without authentication', async () => {
       const response = await request(app)

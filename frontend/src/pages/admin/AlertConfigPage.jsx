@@ -5,10 +5,10 @@ import Card from '@/components/ui/Card'
 import { useToast } from '@/hooks/useToast'
 
 const ALERT_LABELS = {
-  failedEmailDelivery: { label: 'Failed email delivery', hasThreshold: true, thresholdKey: 'threshold', thresholdLabel: 'Threshold (count)' },
-  newOrganizerSignup: { label: 'New organizer signup', hasThreshold: false },
-  eventCompletion: { label: 'Event completion', hasThreshold: false },
-  suspiciousActivity: { label: 'Suspicious activity (failed logins)', hasThreshold: true, thresholdKey: 'failedLoginThreshold', thresholdLabel: 'Failed login threshold' },
+  failedEmailDelivery: { label: 'Failed email delivery', description: 'Notify admins when outbound email repeatedly fails.', hasThreshold: true, thresholdKey: 'threshold', thresholdLabel: 'Threshold (count)' },
+  newOrganizerSignup: { label: 'New organizer signup', description: 'Notify admins when a new organizer account is created.', hasThreshold: false },
+  eventCompletion: { label: 'Event completion', description: 'Notify admins when an event reaches its completion state.', hasThreshold: false },
+  suspiciousActivity: { label: 'Suspicious activity (failed logins)', description: 'Notify admins after repeated failed login attempts.', hasThreshold: true, thresholdKey: 'failedLoginThreshold', thresholdLabel: 'Failed login threshold' },
 }
 
 export default function AlertConfigPage() {
@@ -69,6 +69,7 @@ export default function AlertConfigPage() {
               <div key={key} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
                 <div className="flex-1">
                   <p className="font-medium text-v-text">{meta.label}</p>
+                  <p className="mt-1 text-sm text-v-text-muted">{meta.description}</p>
                   {meta.hasThreshold && alertCfg.enabled && (
                     <div className="mt-2 flex items-center gap-2">
                       <label className="text-sm text-v-text-muted">{meta.thresholdLabel}:</label>
