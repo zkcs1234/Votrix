@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Settings, ToggleLeft, Save, ShieldAlert } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Settings, Save, ShieldAlert } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
 import Badge from '@/components/ui/Badge'
-import StatCard from '@/components/ui/StatCard'
 import ParticipantTaxonomyPanel from '@/components/admin/ParticipantTaxonomyPanel'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -79,8 +78,6 @@ function hydrateSettings(apiSettings = []) {
 
 export default function SystemSettingsPage() {
   const [settings, setSettings] = useState([])
-  const [activeSessionCount, setActiveSessionCount] = useState(0)
-  const [enabledAlertCount, setEnabledAlertCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -91,21 +88,9 @@ export default function SystemSettingsPage() {
     const fetchSettings = async () => {
       try {
         setLoading(true)
-        const [settingsResult, sessionsResult, alertsResult] = await Promise.allSettled([
-          adminService.getSystemSettings(),
-          adminService.listSessions(),
-          adminService.getAlertConfig(),
-        ])
-        if (settingsResult.status === 'rejected') throw settingsResult.reason
-
-        const settingsData = settingsResult.value.data
-        const sessionsData = sessionsResult.status === 'fulfilled' ? sessionsResult.value.data : {}
-        const alertsData = alertsResult.status === 'fulfilled' ? alertsResult.value.data : {}
+        const settingsResult = await adminService.getSystemSettings()
+        const settingsData = settingsResult.data
         setSettings(hydrateSettings(settingsData.settings || []))
-        setActiveSessionCount((sessionsData.sessions || []).length)
-        setEnabledAlertCount(
-          Object.values(alertsData.config || {}).filter((alert) => alert?.enabled).length,
-        )
         setError(null)
       } catch {
         setError('Failed to load system settings')
@@ -116,12 +101,6 @@ export default function SystemSettingsPage() {
 
     fetchSettings()
   }, [])
-
-  const summary = useMemo(() => {
-    const total = settings.length
-    const enabled = settings.filter((setting) => setting.type === 'boolean' && setting.value === true).length
-    return { total, enabled, activeSessionCount, enabledAlertCount }
-  }, [settings, activeSessionCount, enabledAlertCount])
 
   const updateSettingValue = (key, nextValue) => {
     setSettings((current) =>
@@ -187,12 +166,6 @@ export default function SystemSettingsPage() {
           <div className="h-8 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
           <div className="mt-2 h-4 w-72 animate-pulse rounded-lg bg-v-surface-elevated" />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
-          <div className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
-          <div className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
-          <div className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
-        </div>
         <Card>
           <div className="space-y-4 p-6">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -214,13 +187,6 @@ export default function SystemSettingsPage() {
         <p className="v-caption">
           Configure platform-wide behavior without changing the database schema.
         </p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Settings" value={summary.total} icon={Settings} />
-        <StatCard label="Boolean flags" value={summary.enabled} icon={ToggleLeft} />
-        <StatCard label="Active sessions" value={summary.activeSessionCount} />
-        <StatCard label="Enabled alerts" value={summary.enabledAlertCount} icon={ShieldAlert} />
       </div>
 
       <Card>

@@ -1150,6 +1150,12 @@ export async function completeSession(eventId, organizerId) {
     console.warn('[completeSession] Failed to disable scoring:', scoringOffError.message)
   } else {
     emitToEvent(eventId, 'competition:scoring-toggled', { eventId, scoringEnabled: false })
+    try {
+      const { notifyAdminsOfEventCompletion } = await import('./alert.service.js')
+      await notifyAdminsOfEventCompletion(eventId)
+    } catch (alertError) {
+      console.error('[completeSession] admin completion alert failed (non-fatal):', alertError.message)
+    }
   }
 
   // Phase 3 (§7.1) safety net: bridge any live-session scores for this event

@@ -6,7 +6,6 @@ import { useToast } from '@/hooks/useToast'
 
 const ALERT_LABELS = {
   failedEmailDelivery: { label: 'Failed email delivery', description: 'Notify admins when outbound email repeatedly fails.', hasThreshold: true, thresholdKey: 'threshold', thresholdLabel: 'Threshold (count)' },
-  newOrganizerSignup: { label: 'New organizer signup', description: 'Notify admins when a new organizer account is created.', hasThreshold: false },
   eventCompletion: { label: 'Event completion', description: 'Notify admins when an event reaches its completion state.', hasThreshold: false },
   suspiciousActivity: { label: 'Suspicious activity (failed logins)', description: 'Notify admins after repeated failed login attempts.', hasThreshold: true, thresholdKey: 'failedLoginThreshold', thresholdLabel: 'Failed login threshold' },
 }

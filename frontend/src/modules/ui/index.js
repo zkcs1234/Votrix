@@ -24,7 +24,6 @@ export {
 } from '@/components/ui/Skeleton'
 export { default as ProgressBar, ProgressBarWithStats, IndeterminateProgressBar } from '@/components/ui/ProgressBar'
 export { default as PageLoader } from '@/components/ui/PageLoader'
-export { default as ThemeToggle } from '@/components/ui/ThemeToggle'
 export { default as ToastContainer } from '@/components/ui/ToastContainer'
 export { default as FormAlert } from '@/components/ui/FormAlert'
 export { default as LoadingSpinner } from '@/components/ui/LoadingSpinner'

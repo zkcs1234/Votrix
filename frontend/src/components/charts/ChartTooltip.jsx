@@ -3,7 +3,7 @@
  *
  * Shared custom tooltip used across all Recharts chart types.
  * Renders using Votrix design tokens (v-* CSS classes) so it
- * automatically follows light/dark mode.
+ * automatically follows the application design tokens.
  *
  * Props (passed automatically by Recharts):
  *   active     — boolean, whether the tooltip is visible

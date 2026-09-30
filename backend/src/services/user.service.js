@@ -90,6 +90,7 @@ export async function createOrganizer({
   )
 
   const user = sanitizeUser(data)
+
   let emailResult = { sent: false, skipped: true }
 
   if (sendInvitationEmail) {

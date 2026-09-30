@@ -35,6 +35,13 @@ export async function sendWorkflowEmail({ to, subject, html }) {
     return { sent: true, id: data?.id }
   } catch (error) {
     console.error(`[mailer] Failed to send to ${to}:`, error.message)
+
+    try {
+      const { notifyAdminsOfFailedEmailDelivery } = await import('./alert.service.js')
+      await notifyAdminsOfFailedEmailDelivery({ recipient: to })
+    } catch (alertError) {
+      console.error('[mailer] email failure alert failed (non-fatal):', alertError.message)
+    }
     
     // For network connectivity issues, suggest retry
     if (error.message?.includes('Network connectivity') || error.message?.includes('Unable to reach')) {

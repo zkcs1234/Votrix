@@ -6,10 +6,7 @@ import { router } from '@/app/router'
 import { queryClient } from '@/app/queryClient'
 import Bootstrap from '@/app/Bootstrap'
 import ErrorBoundary from '@/components/ui/ErrorBoundary'
-import { initTheme } from '@/utils/theme'
 import '@/index.css'
-
-initTheme()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

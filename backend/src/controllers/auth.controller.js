@@ -14,6 +14,7 @@ import {
 } from '../validators/email.validator.js'
 import * as passwordResetService from '../services/password-reset.service.js'
 import { createAuditLog } from '../services/admin.service.js'
+import { notifyAdminsOfFailedLoginThreshold } from '../services/alert.service.js'
 import {
   revokeSession as deleteSessionRow,
   revokeAllSessionsForUser,
@@ -80,6 +81,9 @@ export const login = asyncHandler(async (req, res) => {
         email: credentials.email,
         message: error.message,
       },
+    })
+    await notifyAdminsOfFailedLoginThreshold(credentials.email).catch((alertError) => {
+      console.error('[auth] failed-login admin alert failed (non-fatal):', alertError.message)
     })
     throw error
   }

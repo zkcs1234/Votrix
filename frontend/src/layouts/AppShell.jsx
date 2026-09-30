@@ -5,7 +5,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { authService } from '@/services/auth.service'
 import { notificationsService } from '@/services/notifications.service'
 import VotrixLogo from '@/components/brand/VotrixLogo'
-import ThemeToggle from '@/components/ui/ThemeToggle'
 import NotificationsModal from '@/components/ui/NotificationsModal'
 import GlobalSearch from '@/components/ui/GlobalSearch'
 import ProfileCard from '@/components/organizer/ProfileCard'
@@ -484,8 +483,6 @@ export default function AppShell({
                 <ProfileCard onClose={() => setProfileCardOpen(false)} />
               )}
             </div>
-            {/* Organizers get the theme toggle inside their profile card. */}
-            {!isOrganizer && <ThemeToggle />}
             <div className="relative" ref={profileDropdownRef}>
               <button
                 type="button"

@@ -3,6 +3,7 @@ import { DB_TABLES, EVENT_TYPES, COMPETITION_SCORING_EVENT_TYPES } from '../util
 import { isWithinEventSchedule } from '../utils/eventSchedule.js'
 import { emitToEvent } from '../websocket/ws-emitter.js'
 import { notifyOrganizerEventStatus } from './notification.service.js'
+import { notifyAdminsOfEventCompletion } from './alert.service.js'
 
 let syncTimer = null
 let syncInFlight = false
@@ -124,6 +125,12 @@ async function reconcileEvent(event, now, liveEventIds, completedEventIds) {
   if (updates.status === 'active' || updates.status === 'completed') {
     await notifyOrganizerOfStatusChange(event.id, updates.status).catch((err) =>
       console.error('[schedule-sync] organizer status notification failed (non-fatal):', err.message),
+    )
+  }
+
+  if (updates.status === 'completed') {
+    await notifyAdminsOfEventCompletion(event.id).catch((err) =>
+      console.error('[schedule-sync] admin completion alert failed (non-fatal):', err.message),
     )
   }
 

@@ -3,7 +3,7 @@
  *
  * Single source of truth for chart colors and axis/grid styling.
  * Uses CSS variables from the Votrix --v-* design token system so
- * charts automatically respect light/dark mode.
+ * charts automatically use the application design tokens.
  *
  * Usage:
  *   import { CHART_COLORS, getAxisStyle, getGridStyle } from '@/components/charts/chartTokens'
