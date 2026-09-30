@@ -73,10 +73,11 @@ function eventMatchesType(eventType, type) {
   return eventType === type
 }
 
-export async function exportEventsCSV({ status, type, search } = {}) {
+export async function exportEventsCSV({ status, type, search, eventId } = {}) {
   const events = await getGlobalEvents()
   const searchTerm = String(search ?? '').trim().toLowerCase()
   const filtered = events.filter((event) => {
+    if (eventId && event.id !== eventId) return false
     if (status && status !== 'all' && event.status !== status) return false
     if (!eventMatchesType(event.event_type, type)) return false
     if (searchTerm) {

@@ -270,6 +270,7 @@ export const getAuditLogs = asyncHandler(async (req, res) => {
     search = '',
     action,
     entity,
+    entityId,
     startDate,
     endDate,
   } = req.query ?? {}
@@ -282,6 +283,7 @@ export const getAuditLogs = asyncHandler(async (req, res) => {
     search: search || undefined,
     action: action || undefined,
     entity: entity || undefined,
+    entityId: entityId || undefined,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
     limit: safeLimit,
@@ -344,13 +346,13 @@ export const exportJudgesData = asyncHandler(async (req, res) => {
 })
 
 export const exportEventsData = asyncHandler(async (req, res) => {
-  const { status, type, search } = req.query
-  const csv = await exportEventsCSV({ status, type, search })
+  const { status, type, search, eventId } = req.query
+  const csv = await exportEventsCSV({ status, type, search, eventId })
   await createAuditLog({
     userId: req.user.id,
     action: 'EXPORT_EVENTS',
     entity: 'events',
-    details: { status: status ?? null, type: type ?? null },
+    details: { status: status ?? null, type: type ?? null, eventId: eventId ?? null },
   })
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="events.csv"')

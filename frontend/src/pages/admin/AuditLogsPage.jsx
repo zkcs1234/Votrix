@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { RefreshCw, Download, X, AlertTriangle, FileSearch, ChevronUp, ChevronDown, Copy, Check } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
@@ -247,6 +248,8 @@ function Row({ label, value, mono = false }) {
 
 export default function AuditLogsPage() {
   const { success: toastSuccess, error: toastError } = useToast()
+  const [searchParams] = useSearchParams()
+  const initialEntityId = searchParams.get('entityId') || ''
 
   // ── Data state ──
   const [logs, setLogs]           = useState([])
@@ -259,6 +262,7 @@ export default function AuditLogsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [actionFilter, setActionFilter]     = useState('')
   const [entityFilter, setEntityFilter]     = useState('')
+  const [entityIdFilter] = useState(initialEntityId)
   const [startDate, setStartDate]           = useState('')
   const [endDate, setEndDate]               = useState('')
 
@@ -327,6 +331,7 @@ export default function AuditLogsPage() {
         search: debouncedSearch || undefined,
         action: actionFilter || undefined,
         entity: entityFilter || undefined,
+        entityId: entityIdFilter || undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
       })
@@ -341,7 +346,7 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, limit, debouncedSearch, actionFilter, entityFilter, startDate, endDate, toastError])
+  }, [page, limit, debouncedSearch, actionFilter, entityFilter, entityIdFilter, startDate, endDate, toastError])
 
   useEffect(() => {
     fetchLogs()

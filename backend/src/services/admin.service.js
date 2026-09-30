@@ -111,6 +111,7 @@ export async function getGlobalEvents() {
       organizations (
         organization_name,
         organizer:users (
+          id,
           organization_name,
           organizer_name
         )
