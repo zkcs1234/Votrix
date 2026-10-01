@@ -46,11 +46,27 @@ function formatDetailValue(value) {
   return String(value)
 }
 
-function formatDetailsSummary(details) {
-  if (!details || Object.keys(details).length === 0) return EMPTY_VALUE
-  return Object.entries(details)
-    .map(([key, value]) => `${formatDetailLabel(key)}: ${formatDetailValue(value)}`)
-    .join('; ')
+function formatActivitySummary(log) {
+  const details = log.details ?? {}
+  const action = log.action ?? ''
+
+  if (details.message) return details.message
+  if (action.includes('set_division')) {
+    return `Competition division set to ${details.division ?? details.divisionId ?? 'Not provided'}`
+  }
+  if (action.includes('set_active_criteria')) {
+    return `Active criteria updated for round ${details.roundId ?? 'Not provided'}`
+  }
+  if (action.includes('set_open_contestants')) {
+    if (Array.isArray(details.open)) {
+      return details.open.length > 0
+        ? `${details.open.length} contestant${details.open.length === 1 ? '' : 's'} opened for scoring`
+        : 'No contestants opened for scoring'
+    }
+    return details.open ? 'Contestant access opened for scoring' : 'No contestants opened for scoring'
+  }
+  if (Object.keys(details).length === 0) return 'Activity recorded'
+  return `${formatDetailLabel(action.replaceAll('.', ' '))} completed`
 }
 
 function ActivityDetailModal({ log, onClose }) {
@@ -240,7 +256,7 @@ export default function OrganizerDetailPage() {
                       <td><Badge tone={actionTone(log.action)}>{log.action}</Badge></td>
                       <td className="capitalize text-v-text-muted">{log.entity ?? EMPTY_VALUE}</td>
                       <td className="max-w-70 truncate text-xs text-v-text-muted">
-                        {formatDetailsSummary(log.details)}
+                        {formatActivitySummary(log)}
                       </td>
                       <td className="text-right">
                         <button onClick={() => setSelectedLog(log)} className="rounded-md px-2 py-1 text-xs font-medium text-v-primary hover:bg-v-surface-elevated" aria-label="View activity details">
