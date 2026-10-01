@@ -33,6 +33,10 @@ const DEFAULT_SETTINGS = [
   },
 ]
 
+// These settings have dedicated admin editors below or on their own page.
+// Keeping them out of the generic editor prevents raw JSON from leaking into the UI.
+const MANAGED_SETTING_KEYS = new Set(['participant_taxonomy', 'admin_alert_config'])
+
 function inferType(value) {
   if (typeof value === 'boolean') return 'boolean'
   if (typeof value === 'number') return 'number'
@@ -62,6 +66,7 @@ function hydrateSettings(apiSettings = []) {
   })
 
   for (const setting of apiSettings) {
+    if (MANAGED_SETTING_KEYS.has(setting.setting_key)) continue
     if (rows.some((row) => row.key === setting.setting_key)) continue
     const type = inferType(setting.setting_value)
     rows.push({

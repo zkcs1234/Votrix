@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { ArrowLeft, Activity, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Activity, ChevronLeft, ChevronRight, Copy, Check, X } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -28,6 +29,94 @@ function formatDate(iso) {
   try { return format(parseISO(iso), 'MMM d, yyyy HH:mm') } catch { return iso }
 }
 
+function formatDetailLabel(key) {
+  return key.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').trim()
+}
+
+function formatDetailValue(value) {
+  if (value === null || value === undefined || value === '') return '—'
+  if (Array.isArray(value)) return value.length > 0 ? value.map(formatDetailValue).join(', ') : 'None'
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .map(([key, entry]) => `${formatDetailLabel(key)}: ${formatDetailValue(entry)}`)
+      .join('; ')
+  }
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  return String(value)
+}
+
+function ActivityDetailModal({ log, onClose }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(JSON.stringify(log, null, 2)).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    }).catch(() => {})
+  }
+
+  useEffect(() => {
+    const handleKey = (event) => { if (event.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div role="dialog" aria-modal="true" aria-label="Organizer activity detail" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-v-border bg-v-surface shadow-2xl">
+          <div className="flex items-center justify-between border-b border-v-border p-5">
+            <div>
+              <h2 className="text-base font-semibold text-v-text">Activity detail</h2>
+              <p className="v-caption mt-0.5">{formatDate(log.createdAt)}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={handleCopy} className="text-xs!">
+                {copied ? <><Check className="h-3.5 w-3.5" /> Copied</> : <><Copy className="h-3.5 w-3.5" /> Copy JSON</>}
+              </Button>
+              <button onClick={onClose} className="rounded-lg p-1.5 text-v-text-muted hover:bg-v-surface-elevated hover:text-v-text" aria-label="Close">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <div className="min-h-0 space-y-5 overflow-y-auto p-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <DetailValue label="Action" value={<Badge tone={actionTone(log.action)}>{log.action}</Badge>} />
+              <DetailValue label="Entity" value={log.entity ?? '—'} />
+              <DetailValue label="Entity ID" value={log.entityId ?? '—'} mono />
+              <DetailValue label="Timestamp" value={formatDate(log.createdAt)} />
+            </div>
+            <section>
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-v-text-subtle">Recorded details</h3>
+              {log.details && Object.keys(log.details).length > 0 ? (
+                <div className="space-y-3 rounded-lg bg-v-surface-elevated p-4">
+                  {Object.entries(log.details).map(([key, value]) => (
+                    <div key={key} className="grid gap-1 border-b border-v-border/50 pb-3 last:border-0 last:pb-0 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.5fr)] sm:gap-4">
+                      <span className="font-medium capitalize text-v-text-subtle">{formatDetailLabel(key)}</span>
+                      <span className="wrap-break-word text-sm text-v-text">{formatDetailValue(value)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="text-sm italic text-v-text-subtle">No additional details recorded.</p>}
+            </section>
+          </div>
+        </div>
+      </div>
+    </>,
+    document.body,
+  )
+}
+
+function DetailValue({ label, value, mono = false }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-v-text-subtle">{label}</p>
+      <div className={`mt-1 wrap-break-word text-sm text-v-text ${mono ? 'font-mono text-xs' : ''}`}>{value}</div>
+    </div>
+  )
+}
+
 export default function OrganizerDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -38,6 +127,7 @@ export default function OrganizerDetailPage() {
   const [page, setPage] = useState(1)
   const [actionFilter, setActionFilter] = useState('')
   const [entityFilter, setEntityFilter] = useState('')
+  const [selectedLog, setSelectedLog] = useState(null)
 
   const fetchActivity = useCallback(async () => {
     setLoading(true)
@@ -132,6 +222,7 @@ export default function OrganizerDetailPage() {
                     <th>Action</th>
                     <th>Entity</th>
                     <th>Details</th>
+                    <th className="text-right">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-v-border">
@@ -140,8 +231,13 @@ export default function OrganizerDetailPage() {
                       <td className="whitespace-nowrap font-mono text-xs text-v-text-muted">{formatDate(log.createdAt)}</td>
                       <td><Badge tone={actionTone(log.action)}>{log.action}</Badge></td>
                       <td className="capitalize text-v-text-muted">{log.entity ?? '—'}</td>
-                      <td className="max-w-[280px] truncate text-xs text-v-text-muted">
-                        {log.details ? JSON.stringify(log.details) : '—'}
+                      <td className="max-w-70 truncate text-xs text-v-text-muted">
+                        {log.details ? 'Additional activity details' : '—'}
+                      </td>
+                      <td className="text-right">
+                        <button onClick={() => setSelectedLog(log)} className="rounded-md px-2 py-1 text-xs font-medium text-v-primary hover:bg-v-surface-elevated" aria-label="View activity details">
+                          View
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -168,6 +264,8 @@ export default function OrganizerDetailPage() {
           )}
         </div>
       </Card>
+
+      {selectedLog && <ActivityDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
     </div>
   )
 }

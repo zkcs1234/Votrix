@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { RefreshCw, Download, X, AlertTriangle, FileSearch, ChevronUp, ChevronDown, Copy, Check } from 'lucide-react'
@@ -85,6 +86,20 @@ function formatDetailsSummary(log) {
   return 'Action completed'
 }
 
+function formatDetailValue(value) {
+  if (value === null || value === undefined || value === '') return '—'
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.map(formatDetailValue).join(', ') : 'None'
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .map(([key, entry]) => `${key.replace(/([A-Z])/g, ' $1').trim()}: ${formatDetailValue(entry)}`)
+      .join('; ')
+  }
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  return String(value)
+}
+
 // ─── Skeleton rows ────────────────────────────────────────────────────────────
 
 function TableSkeleton({ rows = 8 }) {
@@ -159,7 +174,7 @@ function AuditDetailModal({ log, onClose }) {
                 {key.replace(/([A-Z])/g, ' $1').trim()}
               </span>
               <span className="min-w-0 break-all text-v-text">
-                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                {formatDetailValue(value)}
               </span>
             </div>
           ))}
@@ -170,7 +185,7 @@ function AuditDetailModal({ log, onClose }) {
     },
   ]
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -186,7 +201,7 @@ function AuditDetailModal({ log, onClose }) {
         aria-label="Audit log detail"
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
-        <div className="w-full max-w-lg rounded-xl border border-v-border bg-v-surface shadow-2xl">
+        <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-v-border bg-v-surface shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-v-border p-5">
             <div>
@@ -198,7 +213,7 @@ function AuditDetailModal({ log, onClose }) {
                 size="sm"
                 variant="secondary"
                 onClick={handleCopy}
-                className="!text-xs"
+                className="text-xs!"
               >
                 {copied ? (
                   <><Check className="h-3.5 w-3.5" strokeWidth={2} /> Copied</>
@@ -217,7 +232,7 @@ function AuditDetailModal({ log, onClose }) {
           </div>
 
           {/* Sections */}
-          <div className="divide-y divide-v-border overflow-y-auto max-h-[70vh]">
+          <div className="min-h-0 divide-y divide-v-border overflow-y-auto">
             {sections.map((section) => (
               <div key={section.title} className="p-5">
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-v-text-subtle">
@@ -229,7 +244,8 @@ function AuditDetailModal({ log, onClose }) {
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   )
 }
 
@@ -553,7 +569,7 @@ export default function AuditLogsPage() {
 
             {/* Table */}
             <div className="overflow-x-auto rounded-lg">
-              <table className="v-table w-full min-w-[700px] text-sm">
+              <table className="v-table w-full min-w-175 text-sm">
                 <thead>
                   <tr>
                     <th
@@ -643,7 +659,7 @@ export default function AuditLogsPage() {
                         </td>
 
                         {/* Details preview */}
-                        <td className="max-w-[240px] truncate text-xs text-v-text-muted" title={log.details ? formatDetailsSummary(log) : undefined}>
+                        <td className="max-w-60 truncate text-xs text-v-text-muted" title={log.details ? formatDetailsSummary(log) : undefined}>
                           {log.details
                             ? formatDetailsSummary(log)
                             : <span className="italic">—</span>
