@@ -15,6 +15,7 @@ const ACTION_TONES = {
   DELETE: 'danger', REMOVE: 'danger',
   LOGIN: 'warning', LOGOUT: 'default',
 }
+const EMPTY_VALUE = 'Not available'
 
 function actionTone(action = '') {
   const upper = action.toUpperCase()
@@ -25,7 +26,7 @@ function actionTone(action = '') {
 }
 
 function formatDate(iso) {
-  if (!iso) return '—'
+  if (!iso) return EMPTY_VALUE
   try { return format(parseISO(iso), 'MMM d, yyyy HH:mm') } catch { return iso }
 }
 
@@ -34,7 +35,7 @@ function formatDetailLabel(key) {
 }
 
 function formatDetailValue(value) {
-  if (value === null || value === undefined || value === '') return '—'
+  if (value === null || value === undefined || value === '') return 'Not provided'
   if (Array.isArray(value)) return value.length > 0 ? value.map(formatDetailValue).join(', ') : 'None'
   if (typeof value === 'object') {
     return Object.entries(value)
@@ -43,6 +44,13 @@ function formatDetailValue(value) {
   }
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   return String(value)
+}
+
+function formatDetailsSummary(details) {
+  if (!details || Object.keys(details).length === 0) return EMPTY_VALUE
+  return Object.entries(details)
+    .map(([key, value]) => `${formatDetailLabel(key)}: ${formatDetailValue(value)}`)
+    .join('; ')
 }
 
 function ActivityDetailModal({ log, onClose }) {
@@ -83,8 +91,8 @@ function ActivityDetailModal({ log, onClose }) {
           <div className="min-h-0 space-y-5 overflow-y-auto p-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <DetailValue label="Action" value={<Badge tone={actionTone(log.action)}>{log.action}</Badge>} />
-              <DetailValue label="Entity" value={log.entity ?? '—'} />
-              <DetailValue label="Entity ID" value={log.entityId ?? '—'} mono />
+              <DetailValue label="Entity" value={log.entity ?? EMPTY_VALUE} />
+              <DetailValue label="Entity ID" value={log.entityId ?? EMPTY_VALUE} mono />
               <DetailValue label="Timestamp" value={formatDate(log.createdAt)} />
             </div>
             <section>
@@ -230,9 +238,9 @@ export default function OrganizerDetailPage() {
                     <tr key={log.id} className="hover:bg-v-surface-elevated/50">
                       <td className="whitespace-nowrap font-mono text-xs text-v-text-muted">{formatDate(log.createdAt)}</td>
                       <td><Badge tone={actionTone(log.action)}>{log.action}</Badge></td>
-                      <td className="capitalize text-v-text-muted">{log.entity ?? '—'}</td>
+                      <td className="capitalize text-v-text-muted">{log.entity ?? EMPTY_VALUE}</td>
                       <td className="max-w-70 truncate text-xs text-v-text-muted">
-                        {log.details ? 'Additional activity details' : '—'}
+                        {formatDetailsSummary(log.details)}
                       </td>
                       <td className="text-right">
                         <button onClick={() => setSelectedLog(log)} className="rounded-md px-2 py-1 text-xs font-medium text-v-primary hover:bg-v-surface-elevated" aria-label="View activity details">

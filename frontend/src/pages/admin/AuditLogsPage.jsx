@@ -45,11 +45,12 @@ function actionTone(action = '') {
 // ─── Rows-per-page options ───────────────────────────────────────────────────
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100]
+const EMPTY_VALUE = 'Not available'
 
 // ─── Utility: safe ISO date format ───────────────────────────────────────────
 
 function formatDate(iso) {
-  if (!iso) return '—'
+  if (!iso) return EMPTY_VALUE
   try {
     return format(parseISO(iso), 'MMM d, yyyy HH:mm')
   } catch {
@@ -60,7 +61,7 @@ function formatDate(iso) {
 // ─── Utility: format summary ────────────────────────────────────────────────
 
 function formatDetailsSummary(log) {
-  if (!log) return '—'
+  if (!log) return EMPTY_VALUE
   const action = log.action || ''
   const role = log.actor?.role || 'system'
   const formattedRole = role.charAt(0).toUpperCase() + role.slice(1)
@@ -87,7 +88,7 @@ function formatDetailsSummary(log) {
 }
 
 function formatDetailValue(value) {
-  if (value === null || value === undefined || value === '') return '—'
+  if (value === null || value === undefined || value === '') return 'Not provided'
   if (Array.isArray(value)) {
     return value.length > 0 ? value.map(formatDetailValue).join(', ') : 'None'
   }
@@ -98,6 +99,10 @@ function formatDetailValue(value) {
   }
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   return String(value)
+}
+
+function formatDetailLabel(key) {
+  return key.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').trim()
 }
 
 // ─── Skeleton rows ────────────────────────────────────────────────────────────
@@ -148,8 +153,8 @@ function AuditDetailModal({ log, onClose }) {
       content: (
         <div className="space-y-2 text-sm text-v-text">
           <Row label="Action" value={<Badge tone={actionTone(log.action)}>{log.action}</Badge>} />
-          <Row label="Entity" value={log.entity ?? '—'} />
-          <Row label="Entity ID" value={log.entityId ?? '—'} mono />
+          <Row label="Entity" value={log.entity ?? EMPTY_VALUE} />
+          <Row label="Entity ID" value={log.entityId ?? EMPTY_VALUE} mono />
           <Row label="Timestamp" value={formatDate(log.createdAt)} />
         </div>
       ),
@@ -160,7 +165,7 @@ function AuditDetailModal({ log, onClose }) {
         <div className="space-y-2 text-sm text-v-text">
           <Row label="Email" value={log.actor?.email ?? 'System'} />
           <Row label="Role" value={<span className="capitalize">{log.actor?.role ?? 'system'}</span>} />
-          <Row label="User ID" value={log.actor?.id ?? log.userId ?? '—'} mono />
+          <Row label="User ID" value={log.actor?.id ?? log.userId ?? EMPTY_VALUE} mono />
         </div>
       ),
     },
@@ -171,7 +176,7 @@ function AuditDetailModal({ log, onClose }) {
           {Object.entries(log.details).map(([key, value]) => (
             <div key={key} className="flex flex-col sm:flex-row sm:gap-4 border-b border-v-border/50 pb-2 last:border-0 last:pb-0">
               <span className="w-1/3 shrink-0 font-medium text-v-text-subtle capitalize">
-                {key.replace(/([A-Z])/g, ' $1').trim()}
+                {formatDetailLabel(key)}
               </span>
               <span className="min-w-0 break-all text-v-text">
                 {formatDetailValue(value)}
@@ -655,7 +660,7 @@ export default function AuditLogsPage() {
 
                         {/* Entity */}
                         <td className="capitalize text-v-text-muted">
-                          {log.entity ?? '—'}
+                          {log.entity ?? EMPTY_VALUE}
                         </td>
 
                         {/* Details preview */}
