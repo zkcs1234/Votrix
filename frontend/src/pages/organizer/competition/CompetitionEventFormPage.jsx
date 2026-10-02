@@ -49,6 +49,7 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   // navigation and draft restore.
   const [templates, setTemplates] = useState([])
   const [competitionType, setCompetitionType] = useState(null)
+  const [competitionTypeOther, setCompetitionTypeOther] = useState('')
   const [eventStatus, setEventStatus] = useState(null)
   // A brand-new event has no status yet (null); it is always editable. Only an
   // existing event whose setup is locked (scheduled/active/…) is read-only.
@@ -107,8 +108,9 @@ const {
       startDate: data.startDate,
       endDate: data.endDate,
       competitionType,
+      competitionTypeOther,
     },
-  }), [banner, getValues, step, competitionType])
+  }), [banner, competitionType, competitionTypeOther, getValues, step])
 
   const markDraftTouched = useCallback(() => {
     setDraftRestored(true)
@@ -135,6 +137,7 @@ useEffect(() => {
     setError(null)
     setDraftRestored(false)
     setCompetitionType(null)
+    setCompetitionTypeOther('')
     reset({
       title: '',
       description: '',
@@ -161,6 +164,7 @@ useEffect(() => {
     })
     setBanner(draft.banner ?? null)
     setCompetitionType(payload.competitionType ?? null)
+    setCompetitionTypeOther(payload.competitionTypeOther ?? '')
     if (draft.banner) {
       markComplete('branding')
     }
@@ -278,7 +282,7 @@ setBanner(data.event.banner)
         description: data.description,
         startDate: localInputToIso(data.startDate),
         endDate: localInputToIso(data.endDate),
-        competitionType,
+        competitionType: getCompetitionTypeValue(),
       }
       const { data: res } = await draftService.publishDraft('competition', payload)
       navigate(`/organizer/competition/events/${res.event.id}/workspace`, { replace: true })
@@ -289,7 +293,16 @@ setBanner(data.event.banner)
     }
   }
 
+  const getCompetitionTypeValue = () => {
+    if (competitionType !== '__other__') return competitionType
+    return competitionTypeOther.trim() || null
+  }
+
 const handleSubmitDetails = rhfHandleSubmit(async () => {
+    if (competitionType === '__other__' && !competitionTypeOther.trim()) {
+      setError('Enter a competition type.')
+      return
+    }
     setStep('branding')
   })
 
@@ -369,7 +382,11 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                   id="competition-template"
                   className={INPUT_CLASS}
                   value={competitionType ?? ''}
-                  onChange={(e) => setCompetitionType(e.target.value || null)}
+                  onChange={(e) => {
+                    setCompetitionType(e.target.value || null)
+                    if (e.target.value !== '__other__') setCompetitionTypeOther('')
+                    setError(null)
+                  }}
                 >
                   <option value="">Unspecified</option>
                   {templates.map((t) => (
@@ -377,7 +394,23 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                       {t.label}
                     </option>
                   ))}
+                  <option value="__other__">Others</option>
                 </select>
+                {competitionType === '__other__' && (
+                  <input
+                    id="competition-type-other"
+                    className={`${INPUT_CLASS} mt-2`}
+                    value={competitionTypeOther}
+                    onChange={(e) => {
+                      setCompetitionTypeOther(e.target.value.slice(0, 32))
+                      setError(null)
+                    }}
+                    placeholder="Enter competition type"
+                    maxLength={32}
+                    required
+                  />
+                )}
+                {error && <p className="v-error-text">{error}</p>}
                 <p className={HELPER_TEXT}>
                   Just a label — it tailors the setup hints for your event. You&apos;ll configure the
                   rounds, criteria, and scoring yourself in Structure &amp; Scoring.

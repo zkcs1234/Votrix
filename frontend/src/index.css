@@ -134,7 +134,7 @@
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
-    padding: 1rem;
+    padding: 0.75rem;
   }
 
   .v-card-md {

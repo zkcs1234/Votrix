@@ -54,13 +54,11 @@ export default function EventStatsTable({
 
   return (
     <Card padding={false}>
-      <div className="border-b border-v-border px-6 py-4">
-        <h3 className="font-semibold text-v-text">{title}</h3>
-      </div>
-
       {events.length > 0 && (
-        <div className="border-b border-v-border px-6 py-4">
+        <div className="flex flex-col gap-3 border-b border-v-border px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <h3 className="font-semibold text-v-text">{title}</h3>
           <FilterBar
+            className="min-w-0 lg:items-end"
             search={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search events"
@@ -74,6 +72,12 @@ export default function EventStatsTable({
             totalCount={totalCount}
             noun="events"
           />
+        </div>
+      )}
+
+      {events.length === 0 && (
+        <div className="border-b border-v-border px-6 py-4">
+          <h3 className="font-semibold text-v-text">{title}</h3>
         </div>
       )}
 

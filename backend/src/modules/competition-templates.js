@@ -123,11 +123,15 @@ const TEMPLATES = {
   },
 }
 
-// The set of accepted competition_type labels (nullable is also valid = unset).
+// Catalog keys are used for starter-template hints. Custom labels are also
+// valid because organizers can describe formats not represented in the catalog.
 export const COMPETITION_TYPES = Object.keys(TEMPLATES)
 
 export function isValidCompetitionType(type) {
-  return type === null || type === undefined || COMPETITION_TYPES.includes(type)
+  if (type === null || type === undefined) return true
+  if (typeof type !== 'string') return false
+  const label = type.trim()
+  return label.length > 0 && label.length <= 32
 }
 
 export function getTemplate(key) {

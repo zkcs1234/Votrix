@@ -9,9 +9,8 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { EVENT_STATUS, canUnpublishEventStatus } from '@/utils/constants'
 
-// Review & Publish sits between Candidates and Voters. Publishing a draft hands
-// it to the schedule (draft → scheduled) and locks setup; while still scheduled
-// the organizer can unpublish to correct setup, or move on to invite voters.
+// Review & Publish is the final setup stage. Publishing a draft hands it to the
+// schedule (draft -> scheduled) and locks setup.
 export default function ElectionReviewPage() {
   const { eventId } = useParams()
   const navigate = useNavigate()
@@ -89,10 +88,9 @@ export default function ElectionReviewPage() {
     <div className="space-y-6">
       <div>
         <h2 className="v-page-title">Review &amp; Publish</h2>
-        <p className="v-helper-text mt-1">
+          <p className="v-helper-text mt-1">
           Publishing finishes setup and hands the event to its schedule. It does not open voting
-          immediately — voting opens and closes based on the start and end dates you set. After
-          publishing you can still register and invite voters until voting opens.
+            immediately — voting opens and closes based on the start and end dates you set.
         </p>
       </div>
 
@@ -153,8 +151,8 @@ export default function ElectionReviewPage() {
                   <Undo2 className="h-4 w-4" strokeWidth={1.5} />
                   Unpublish to draft
                 </Button>
-                <Button onClick={() => navigate(`/organizer/election/events/${eventId}/voters`)}>
-                  Continue to Voters
+                <Button onClick={() => navigate(`/organizer/election/events/${eventId}/analytics`)}>
+                  Continue to Analytics
                 </Button>
               </div>
             )}

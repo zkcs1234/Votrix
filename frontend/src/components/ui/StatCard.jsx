@@ -14,10 +14,10 @@ export default function StatCard({
           <Icon className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
         )}
       </div>
-      <p className={`mt-2 text-3xl font-bold tracking-tight ${valueClassName || 'text-v-text'}`}>
+      <p className={`mt-1 text-2xl font-bold tracking-tight ${valueClassName || 'text-v-text'}`}>
         {value}
       </p>
-      {hint && <p className="v-caption mt-1">{hint}</p>}
+      {hint && <p className="v-caption mt-0.5">{hint}</p>}
     </div>
   )
 }

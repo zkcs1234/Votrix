@@ -4,10 +4,10 @@ export const EVENT_STAGES = {
     { key: 'branding', label: 'Branding', path: 'branding' },
     { key: 'positions', label: 'Positions', path: 'positions' },
     { key: 'candidates', label: 'Candidates', path: 'candidates' },
-    // Publishing happens here, before the roster. Setup (the stages above)
-    // locks on publish; Voters stays editable through `scheduled`.
-    { key: 'review', label: 'Review & Publish', path: 'review' },
     { key: 'voters', label: 'Voters', path: 'voters' },
+    // Publishing is the final setup gate. Setup locks on publish; the voter
+    // roster is completed before this stage and locks once voting is active.
+    { key: 'review', label: 'Review & Publish', path: 'review' },
     { key: 'analytics', label: 'Analytics', path: 'analytics' },
     { key: 'report', label: 'Report', path: 'report' },
   ],
@@ -38,10 +38,10 @@ export const EVENT_STAGES = {
     { key: 'branding', label: 'Branding', path: 'branding' },
     { key: 'settings', label: 'Settings', path: 'settings' },
     { key: 'builder', label: 'Builder', path: 'builder' },
-    // Publishing happens here, before the roster. Setup (settings, builder)
-    // locks on publish; Respondents stays editable through `scheduled`.
-    { key: 'review', label: 'Review & Publish', path: 'review' },
     { key: 'respondents', label: 'Respondents', path: 'respondents' },
+    // Publishing is the final setup gate. Setup locks on publish; the
+    // respondent roster is completed before this stage.
+    { key: 'review', label: 'Review & Publish', path: 'review' },
     { key: 'analytics', label: 'Analytics', path: 'analytics' },
     { key: 'report', label: 'Report', path: 'report' },
   ],

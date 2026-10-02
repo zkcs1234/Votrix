@@ -100,7 +100,7 @@ export default function SessionManagementPage() {
       <div className="space-y-4">
         <div className="h-8 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-24 animate-pulse rounded-xl bg-v-surface-elevated" />
+          <div key={i} className="h-20 animate-pulse rounded-xl bg-v-surface-elevated" />
         ))}
       </div>
     )

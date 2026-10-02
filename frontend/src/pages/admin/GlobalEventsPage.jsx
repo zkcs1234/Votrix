@@ -133,10 +133,10 @@ export default function GlobalEventsPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
-          <div className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
-          <div className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
-          <div className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
+          <div className="v-card-sm h-20 animate-pulse bg-v-surface-elevated" />
+          <div className="v-card-sm h-20 animate-pulse bg-v-surface-elevated" />
+          <div className="v-card-sm h-20 animate-pulse bg-v-surface-elevated" />
+          <div className="v-card-sm h-20 animate-pulse bg-v-surface-elevated" />
         </div>
 
         <Card padding="sm">

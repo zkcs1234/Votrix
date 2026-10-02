@@ -13,8 +13,8 @@ export default function AnalyticsStatCard({
   return (
     <div className={`v-card-sm ${className}`}>
       <p className="v-caption">{label}</p>
-      <p className={`mt-2 text-2xl font-bold ${valueClassName}`}>{value ?? 0}</p>
-      {hint && <p className="v-caption mt-1">{hint}</p>}
+      <p className={`mt-1 text-xl font-bold ${valueClassName}`}>{value ?? 0}</p>
+      {hint && <p className="v-caption mt-0.5">{hint}</p>}
     </div>
   )
 }

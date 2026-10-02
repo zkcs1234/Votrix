@@ -9,10 +9,8 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { EVENT_STATUS, canUnpublishEventStatus } from '@/utils/constants'
 
-// Review & Publish sits between Builder and Respondents. Publishing a draft
-// hands it to the schedule (draft → scheduled) and locks setup; the poll opens
-// on its dates. While scheduled the organizer can unpublish to correct setup,
-// or move on to invite respondents.
+// Review & Publish is the final setup stage. Publishing a draft hands it to the
+// schedule (draft -> scheduled) and locks setup.
 export default function PollingReviewPage() {
   const { eventId } = useParams()
   const navigate = useNavigate()
@@ -88,10 +86,9 @@ export default function PollingReviewPage() {
     <div className="space-y-6">
       <div>
         <h2 className="v-page-title">Review &amp; Publish</h2>
-        <p className="v-helper-text mt-1">
+          <p className="v-helper-text mt-1">
           Publishing finishes setup and hands the poll to its schedule. It does not open the poll
-          immediately — it opens and closes based on the start and end dates you set. After
-          publishing you can still register and invite respondents until the poll opens.
+            immediately — it opens and closes based on the start and end dates you set.
         </p>
       </div>
 
@@ -149,8 +146,8 @@ export default function PollingReviewPage() {
                   <Undo2 className="h-4 w-4" strokeWidth={1.5} />
                   Unpublish to draft
                 </Button>
-                <Button onClick={() => navigate(`/organizer/polling/events/${eventId}/respondents`)}>
-                  Continue to Respondents
+                <Button onClick={() => navigate(`/organizer/polling/events/${eventId}/analytics`)}>
+                  Continue to Analytics
                 </Button>
               </div>
             )}

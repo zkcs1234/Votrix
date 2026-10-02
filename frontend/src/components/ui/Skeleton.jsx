@@ -65,7 +65,7 @@ export function SkeletonTable({ rows = 5, cols = 4 }) {
  */
 export function SkeletonStatCard() {
   return (
-    <div className="v-card-sm">
+    <div className="v-card-sm min-h-20">
       <Skeleton className="h-4 w-16" />
       <Skeleton className="mt-2 h-8 w-12" />
     </div>

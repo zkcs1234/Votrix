@@ -47,7 +47,7 @@ export function validateCompetitionEvent(body, isCreate = false) {
 
   // Phase 1: optional competition sub-type (nullable, validated against catalog).
   if (body.competitionType !== undefined) {
-    const ct = body.competitionType || null
+    const ct = typeof body.competitionType === 'string' ? body.competitionType.trim() || null : body.competitionType || null
     if (!isValidCompetitionType(ct)) throw new ApiError(400, 'Invalid competition type')
     payload.competitionType = ct
   }

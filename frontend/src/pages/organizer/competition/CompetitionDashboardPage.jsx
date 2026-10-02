@@ -36,7 +36,7 @@ export default function CompetitionDashboardPage() {
         <div className="h-8 w-72 animate-pulse rounded-lg bg-v-surface-elevated" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="v-card-sm h-24 animate-pulse bg-v-surface-elevated" />
+            <div key={i} className="v-card-sm h-20 animate-pulse bg-v-surface-elevated" />
           ))}
         </div>
       </div>
