@@ -8,7 +8,7 @@ import {
 } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
 import { listElectionEvents, getElectionAnalytics, listPositions } from './election.service.js'
-import { listCompetitionEvents, getLiveRankings } from './pageant.service.js'
+import { listCompetitionEvents, getLiveRankings, getCompetitionResults } from './pageant.service.js'
 import { listPollEvents, getPollAnalytics } from './polling.service.js'
 
 
@@ -203,6 +203,8 @@ export async function getElectionReport(eventId, organizerId) {
       notVotedCount: (analytics.totalVoters ?? 0) - (analytics.votedCount ?? 0),
       turnoutPercentage: analytics.turnoutPercentage,
     },
+    participationByProgram: analytics.participationByProgram ?? [],
+    participationByYearSection: analytics.participationByYearSection ?? [],
     voteSummary: {
       liveTotalVotes: analytics.liveTotalVotes,
       candidateResults: analytics.candidateResults,
@@ -221,7 +223,10 @@ export async function getCompetitionReport(eventId, organizerId, { divisionId = 
     throw new ApiError(400, 'Not a competition scoring event')
   }
 
-  const rankingsData = await getLiveRankings(eventId, organizerId, { divisionId })
+  const [rankingsData, resultsData] = await Promise.all([
+    getLiveRankings(eventId, organizerId, { divisionId }),
+    getCompetitionResults(eventId, organizerId),
+  ])
 
   return {
     generatedAt: new Date().toISOString(),
@@ -243,6 +248,10 @@ export async function getCompetitionReport(eventId, organizerId, { divisionId = 
     },
     rankings: rankingsData.rankings,
     criteriaTotalPercentage: rankingsData.criteriaTotalPercentage,
+    rounds: rankingsData.rounds ?? [],
+    roundResults: resultsData.rounds ?? [],
+    divisionResults: resultsData.divisions ?? [],
+    categoryAwards: resultsData.categoryAwards ?? [],
   }
 }
 
@@ -273,9 +282,14 @@ export async function getPollingReport(eventId, organizerId) {
     responseSummary: {
       totalSubmissions: analytics.totalSubmissions,
       enrolledRespondents: enrolled ?? 0,
-      responseRate: pct(analytics.totalSubmissions, enrolled ?? 0),
+      respondedRespondents: analytics.respondedRespondents ?? 0,
+      notRespondedRespondents: Math.max((enrolled ?? 0) - (analytics.respondedRespondents ?? 0), 0),
+      responseRate: pct(analytics.respondedRespondents ?? 0, enrolled ?? 0),
       pollAnonymous: analytics.pollAnonymous,
     },
+    participationByProgram: analytics.participationByProgram ?? [],
+    participationByYearSection: analytics.participationByYearSection ?? [],
+    responseActivity: analytics.responseActivity ?? [],
     questions: analytics.questions,
   }
 }

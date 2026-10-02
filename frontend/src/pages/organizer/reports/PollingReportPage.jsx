@@ -25,6 +25,41 @@ import {
 } from '@/components/ui/Skeleton'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
+function ParticipationTable({ rows }) {
+  if (!rows.length) return null
+  return (
+    <AnalyticsSection
+      title="Program participation"
+      description="Response rate among registered students by program."
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-140 text-left text-sm">
+          <thead className="border-b border-v-border text-xs uppercase tracking-wide text-v-text-subtle">
+            <tr>
+              <th className="px-3 py-2 font-medium">Program</th>
+              <th className="px-3 py-2 text-right font-medium">Registered</th>
+              <th className="px-3 py-2 text-right font-medium">Responded</th>
+              <th className="px-3 py-2 text-right font-medium">Not responded</th>
+              <th className="px-3 py-2 text-right font-medium">Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label} className="border-b border-v-border last:border-0">
+                <td className="px-3 py-3 font-medium text-v-text">{row.label}</td>
+                <td className="px-3 py-3 text-right text-v-text-muted">{row.registered}</td>
+                <td className="px-3 py-3 text-right text-v-text-muted">{row.responded}</td>
+                <td className="px-3 py-3 text-right text-v-text-muted">{row.notResponded}</td>
+                <td className="px-3 py-3 text-right font-medium text-v-text">{row.responseRate}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </AnalyticsSection>
+  )
+}
+
 export default function PollingReportPage() {
   const { eventId } = useParams()
   const { report, loading, refresh, lastUpdated } = useModuleAnalytics({
@@ -84,13 +119,16 @@ export default function PollingReportPage() {
       <TurnoutReport
         title="Response summary"
         stats={{
-          totalSubmissions: summary.totalSubmissions,
           enrolledRespondents: summary.enrolledRespondents,
+          respondedRespondents: summary.respondedRespondents,
+          notRespondedRespondents: summary.notRespondedRespondents,
           responseRate: summary.responseRate,
         }}
         accentClass="text-v-text-muted"
         barColorClass="bg-v-primary"
       />
+
+      <ParticipationTable rows={report.participationByProgram ?? []} />
 
       <AnalyticsStatsGrid
         stats={[

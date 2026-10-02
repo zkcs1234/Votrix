@@ -1825,7 +1825,11 @@ export async function listJudgeCompetitionEvents(judgeId) {
 
 // ——— Live rankings ———
 
-export async function getLiveRankings(eventId, organizerId, { divisionId = null } = {}) {
+function highestCriterionScore(row) {
+  return Math.max(...(row.criteriaBreakdown ?? []).map((criterion) => Number(criterion.average ?? 0)), 0)
+}
+
+export async function getLiveRankings(eventId, organizerId, { divisionId = null, roundId = null } = {}) {
   await assertCompetitionEvent(eventId, organizerId)
 
   // Build division-aware queries
@@ -1951,6 +1955,7 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
   })
 
   // Map the engine's nested shape to the public shape the UI already uses.
+  // Ranking views read these calculated values; they never recalculate scores.
   const publicRankings = rankings.map((row) => ({
     contestantId: row.contestantId,
     contestantName: row.contestantName,
@@ -1960,20 +1965,66 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null 
     divisionId: divisionId ?? null,
     weightedScore: row.finalScore,
     finalScore: row.finalScore,
+    rankingScore: roundId
+      ? row.perRound[roundId]?.value ?? 0
+      : row.finalScore,
+    rankingView: roundId ? 'round' : divisionId ? 'division' : 'overall',
+    status: (() => {
+      const criteria = Object.values(row.perCriterion)
+      if (!criteria.length || criteria.every((criterion) => (criterion.judgeCount ?? 0) === 0)) {
+        return 'Awaiting scores'
+      }
+      return criteria.every((criterion) => (criterion.judgeCount ?? 0) > 0)
+        ? 'Fully scored'
+        : 'Partially scored'
+    })(),
     criteriaBreakdown: Object.values(row.perCriterion).map((c) => ({
       criteriaId: c.criteriaId,
       criteriaName: c.criteriaName,
       percentage: c.percentage,
       average: c.average,
       judgeCount: c.judgeCount,
+      weightedContribution: Number(c.average ?? 0) * Number(c.percentage ?? 0) / 100,
     })),
-    perRound: Object.values(row.perRound),
-    perCategory: Object.values(row.perCategory),
+    perRound: Object.values(row.perRound).map((round) => ({
+      ...round,
+      contribution: Number(round.value ?? 0) * Number(round.weight ?? 0) / 100,
+    })),
+    perCategory: Object.values(row.perCategory).map((category) => ({
+      ...category,
+      contribution: Number(category.value ?? 0) * Number(category.weight ?? 0) / 100,
+    })),
   }))
+
+  if (roundId) {
+    const tieBreaker = mergeScoringConfig(eventRes.data?.scoring_config).tieBreaker
+    publicRankings.sort((left, right) =>
+      right.rankingScore - left.rankingScore ||
+      (tieBreaker === 'highest_criterion'
+        ? highestCriterionScore(right) - highestCriterionScore(left)
+        : 0),
+    )
+    publicRankings.forEach((row, index) => {
+      const previous = publicRankings[index - 1]
+      row.rank = previous &&
+        previous.rankingScore === row.rankingScore &&
+        (tieBreaker !== 'highest_criterion' || highestCriterionScore(previous) === highestCriterionScore(row))
+        ? previous.rank
+        : index + 1
+    })
+  }
 
   return {
     divisionId: divisionId ?? null,
+    roundId: roundId ?? null,
     divisionsEnabled: Boolean(eventRes.data?.divisions_enabled),
+    rounds: (roundsRes.data ?? []).map((round) => ({
+      id: round.id,
+      name: round.name,
+      weight: Number(round.weight ?? 0),
+      displayOrder: round.display_order ?? 0,
+      finalizedAt: round.finalized_at ?? null,
+    })),
     rankings: publicRankings,
     criteriaTotalPercentage: debug.criterionTotals,
     roundWeightTotal: debug.roundTotals,

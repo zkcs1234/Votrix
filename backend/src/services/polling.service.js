@@ -1459,10 +1459,12 @@ export async function getPollAnalytics(eventId, organizerId) {
   const registry = await loadQuestionTypeRegistry(orgId)
   const questions = await listQuestions(eventId, organizerId)
 
-const { count: totalSubmissions } = await getClient()
+  const { data: submissionRows, count: totalSubmissions, error: submissionErr } = await getClient()
     .from(DB_TABLES.POLL_SUBMISSIONS)
-    .select('*', { count: 'exact', head: true })
+    .select('voter_id, completed_at', { count: 'exact' })
     .eq('event_id', eventId)
+
+  if (submissionErr) throw new ApiError(500, submissionErr.message)
 
   // Enrolled respondents — the denominator for "Total respondents" and the
   // response-rate stat on the analytics dashboard.
@@ -1471,6 +1473,14 @@ const { count: totalSubmissions } = await getClient()
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+
+  const { data: participantRows, error: participantErr } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('has_responded, users!inner (program, year_section)')
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+
+  if (participantErr) throw new ApiError(500, participantErr.message)
 
   // Compute average completion time (in seconds) for submissions that have started_at
   const { data: completionTimes, error: ctErr } = await getClient()
@@ -1489,6 +1499,33 @@ const { count: totalSubmissions } = await getClient()
       return sum + Math.max(0, diff) / 1000
     }, 0)
     averageCompletionTimeSeconds = Math.round(totalSeconds / completionTimes.length)
+  }
+
+  const participationBy = (field) => {
+    const groups = new Map()
+    for (const row of participantRows ?? []) {
+      const label = row.users?.[field] || 'Unspecified'
+      const current = groups.get(label) ?? { registered: 0, responded: 0 }
+      current.registered += 1
+      if (row.has_responded) current.responded += 1
+      groups.set(label, current)
+    }
+    return Array.from(groups.entries())
+      .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
+      .map(([label, counts]) => ({
+        label,
+        registered: counts.registered,
+        responded: counts.responded,
+        notResponded: counts.registered - counts.responded,
+        responseRate: computeParticipationRate(counts.responded, counts.registered),
+      }))
+  }
+
+  const activityByDay = new Map()
+  for (const submission of submissionRows ?? []) {
+    if (!submission.completed_at) continue
+    const day = new Date(submission.completed_at).toISOString().slice(0, 10)
+    activityByDay.set(day, (activityByDay.get(day) ?? 0) + 1)
   }
 
   const { data: allAnswers, error } = await getClient()
@@ -1522,36 +1559,14 @@ const { count: totalSubmissions } = await getClient()
     }
   })
 
-  // For a NON-anonymous poll, resolve each text response's respondent id to a
-  // real name so the analytics show who said what (plan: profile display).
-  // Anonymous polls leave respondent null, so nothing is resolved.
-  if (!anonymous) {
-    const ids = new Set()
-    for (const q of questionAnalytics) {
-      for (const r of q.responses ?? []) {
-        if (r.respondent) ids.add(r.respondent)
-      }
-    }
-    if (ids.size) {
-      const { data: usersRows } = await getClient()
-        .from(DB_TABLES.USERS)
-        .select('id, first_name, last_name, email')
-        .in('id', [...ids])
-      const nameById = new Map(
-        (usersRows ?? []).map((u) => [u.id, [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email]),
-      )
-      for (const q of questionAnalytics) {
-        for (const r of q.responses ?? []) {
-          if (r.respondent) r.respondentName = nameById.get(r.respondent) ?? null
-        }
-      }
-    }
-  }
-
   return {
     totalSubmissions: totalSubmissions ?? 0,
     enrolledRespondents: enrolledRespondents ?? 0,
+    respondedRespondents: (participantRows ?? []).filter((row) => row.has_responded).length,
     pollAnonymous: anonymous,
+    participationByProgram: participationBy('program'),
+    participationByYearSection: participationBy('year_section'),
+    responseActivity: Array.from(activityByDay.entries()).map(([period, responses]) => ({ period, responses })),
     averageCompletionTimeSeconds,
     questions: questionAnalytics,
   }

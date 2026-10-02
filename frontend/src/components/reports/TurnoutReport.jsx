@@ -47,6 +47,9 @@ const TurnoutReport = memo(function TurnoutReport({
         {stats.votedCount !== undefined && (
           <StatCard label="Voted" value={stats.votedCount} accent={accentClass} />
         )}
+        {stats.respondedRespondents !== undefined && (
+          <StatCard label="Responded" value={stats.respondedRespondents} accent={accentClass} />
+        )}
         {stats.submittedCount !== undefined && (
           <StatCard label="Submitted" value={stats.submittedCount} accent={accentClass} />
         )}
@@ -55,6 +58,9 @@ const TurnoutReport = memo(function TurnoutReport({
         )}
         {stats.notVotedCount !== undefined && (
           <StatCard label="Not voted" value={stats.notVotedCount} />
+        )}
+        {stats.notRespondedRespondents !== undefined && (
+          <StatCard label="Not responded" value={stats.notRespondedRespondents} />
         )}
         {stats.pendingCount !== undefined && (
           <StatCard label="Pending" value={stats.pendingCount} />

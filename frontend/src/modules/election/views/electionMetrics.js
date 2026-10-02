@@ -22,17 +22,33 @@ export function electionVisibilityLabel(value) {
 }
 
 export function buildElectionStats(analytics) {
+  const total = analytics?.totalVoters ?? 0
+  const voted = analytics?.votedCount ?? 0
   return [
-    { id: 'voters', label: 'Total registered voters', value: analytics?.totalVoters ?? 0 },
-    { id: 'voted', label: 'Votes cast', value: analytics?.votedCount ?? 0 },
+    { id: 'voters', label: 'Registered students', value: total },
+    { id: 'voted', label: 'Students who voted', value: voted, tone: 'success' },
+    { id: 'not-voted', label: 'Students who have not voted', value: Math.max(total - voted, 0) },
     {
       id: 'turnout',
-      label: 'Turnout percentage',
+      label: 'Overall turnout',
       value: `${analytics?.turnoutPercentage ?? 0}%`,
-      tone: 'success',
+      tone: 'muted',
     },
-    { id: 'live', label: 'Total ballot selections', value: analytics?.liveTotalVotes ?? 0 },
   ]
+}
+
+export function buildElectionParticipationGroups(analytics, dimension) {
+  const rows = dimension === 'program'
+    ? analytics?.participationByProgram
+    : analytics?.participationByYearSection
+  return (rows ?? []).map((row) => ({
+    id: row.label,
+    label: row.label,
+    registered: row.registered ?? 0,
+    voted: row.voted ?? 0,
+    notVoted: row.notVoted ?? 0,
+    turnoutPercentage: row.turnoutPercentage ?? 0,
+  }))
 }
 
 export function buildElectionCandidateRanking(analytics, { limit } = {}) {
@@ -99,6 +115,13 @@ export function buildElectionParticipationTrend(analytics) {
 export function buildElectionExportPayload(report, { generatedAt } = {}) {
   const turnout = report?.turnout ?? {}
   const voteSummary = report?.voteSummary ?? {}
+  const participationRows = (report?.participationByProgram ?? []).map((row) => ({
+    program: row.label,
+    registered: row.registered,
+    voted: row.voted,
+    notVoted: row.notVoted,
+    turnoutPercentage: `${row.turnoutPercentage}%`,
+  }))
   return {
     title: report?.event?.title ?? 'Election report',
     subtitle: 'Election report — turnout & vote summary',
@@ -116,6 +139,18 @@ export function buildElectionExportPayload(report, { generatedAt } = {}) {
             value: `${turnout.turnoutPercentage ?? 0}%`,
           },
         ],
+      },
+      {
+        title: 'Program participation',
+        kind: 'table',
+        columns: [
+          { key: 'program', label: 'Program' },
+          { key: 'registered', label: 'Registered' },
+          { key: 'voted', label: 'Voted' },
+          { key: 'notVoted', label: 'Not voted' },
+          { key: 'turnoutPercentage', label: 'Turnout' },
+        ],
+        rows: participationRows,
       },
       {
         title: 'Vote summary',
@@ -178,6 +213,26 @@ export function buildElectionReportSheets(report) {
       ],
     },
     {
+      name: 'Program participation',
+      rows: (report?.participationByProgram ?? []).map((row) => ({
+        program: row.label,
+        registered: row.registered,
+        voted: row.voted,
+        notVoted: row.notVoted,
+        turnoutPercentage: `${row.turnoutPercentage}%`,
+      })),
+    },
+    {
+      name: 'Year section participation',
+      rows: (report?.participationByYearSection ?? []).map((row) => ({
+        yearSection: row.label,
+        registered: row.registered,
+        voted: row.voted,
+        notVoted: row.notVoted,
+        turnoutPercentage: `${row.turnoutPercentage}%`,
+      })),
+    },
+    {
       name: 'Candidates',
       rows: (voteSummary.candidateResults ?? []).map((c) => ({
         position: c.positionName ?? '',
@@ -198,10 +253,18 @@ export function buildElectionReportSheets(report) {
 }
 
 export function buildElectionReportCsvRows(report) {
-  const rows = []
+  const rows = (report?.participationByProgram ?? []).map((row) => ({
+    reportSection: 'Program participation',
+    program: row.label,
+    registered: row.registered,
+    voted: row.voted,
+    notVoted: row.notVoted,
+    turnoutPercentage: row.turnoutPercentage,
+  }))
   for (const pos of report?.voteSummary?.positionSummaries ?? []) {
     for (const c of pos.candidates ?? []) {
       rows.push({
+        reportSection: 'Election results',
         position: pos.positionName,
         candidate: c.candidateName,
         votes: c.votes,

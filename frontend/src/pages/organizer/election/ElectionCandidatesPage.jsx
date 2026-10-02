@@ -225,9 +225,6 @@ function ElectionCandidatesPageContent() {
     <ManagementWorkspace
       title="Candidate Management"
       formPanel={
-        setupLocked ? (
-          <ReadOnlyEventBanner status={status} noun="election" />
-        ) : (
         <div className="space-y-4">
         <div className="v-card p-4">
           <label className="mb-1 block text-sm text-v-text-muted" htmlFor="candidate-section">
@@ -247,6 +244,9 @@ function ElectionCandidatesPageContent() {
             ))}
           </select>
         </div>
+        {setupLocked ? (
+          <ReadOnlyEventBanner status={status} noun="election" />
+        ) : (
         <form onSubmit={handleCreate} className="space-y-4 v-card p-6 mb-4">
         <div>
           <label className="mb-1 block text-sm text-v-text-muted">Position</label>
@@ -313,8 +313,8 @@ function ElectionCandidatesPageContent() {
           {saving ? 'Adding...' : 'Add candidate'}
         </button>
       </form>
+        )}
         </div>
-        )
       }
       recordsPanel={
         <div className="space-y-4 pb-8">

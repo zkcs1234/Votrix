@@ -213,6 +213,7 @@ export const listJudges = asyncHandler(async (req, res) => {
 export const getRankings = asyncHandler(async (req, res) => {
   const rankings = await pageantService.getLiveRankings(req.params.eventId, req.user.id, {
     divisionId: req.query.divisionId || null,
+    roundId: req.query.roundId || null,
   })
   res.json({ success: true, ...rankings })
 })

@@ -111,6 +111,7 @@ export function buildCompetitionReportSheets(report) {
         contestantNumber: r.contestantNumber,
         contestantName: r.contestantName,
         weightedScore: r.weightedScore,
+        status: r.status ?? '',
       })),
     },
     {
@@ -122,6 +123,20 @@ export function buildCompetitionReportSheets(report) {
           criteria: c.criteriaName,
           average: c.average,
           percentage: c.percentage,
+          contribution: c.weightedContribution ?? '',
+        })),
+      ),
+    },
+    {
+      name: 'Round results',
+      rows: (report?.roundResults ?? []).flatMap((round) =>
+        (round.standings ?? []).map((standing) => ({
+          round: round.roundName ?? round.name ?? '',
+          rank: standing.rank,
+          contestantNumber: standing.contestantNumber,
+          contestantName: standing.contestantName,
+          score: standing.score,
+          qualified: standing.qualified,
         })),
       ),
     },
@@ -134,6 +149,7 @@ export function buildCompetitionReportCsvRows(report) {
     contestantNumber: r.contestantNumber,
     contestantName: r.contestantName,
     weightedScore: r.weightedScore,
+    status: r.status ?? '',
   }))
 }
 
@@ -161,11 +177,13 @@ export function buildCompetitionExportPayload(report, { generatedAt } = {}) {
           { key: 'rank', label: 'Rank' },
           { key: 'contestant', label: 'Contestant' },
           { key: 'score', label: 'Weighted score' },
+          { key: 'status', label: 'Status' },
         ],
         rows: (report?.rankings ?? []).map((r) => ({
           rank: r.rank,
           contestant: `#${r.contestantNumber ?? ''} ${r.contestantName ?? ''}`.trim(),
           score: Number(r.weightedScore ?? 0).toFixed(2),
+          status: r.status ?? '',
         })),
       },
       {
@@ -177,6 +195,7 @@ export function buildCompetitionExportPayload(report, { generatedAt } = {}) {
           { key: 'criteria', label: 'Criteria' },
           { key: 'average', label: 'Average' },
           { key: 'percentage', label: '%' },
+          { key: 'contribution', label: 'Contribution' },
         ],
         rows: (report?.rankings ?? []).flatMap((r) =>
           (r.criteriaBreakdown ?? []).map((c) => ({
@@ -185,6 +204,27 @@ export function buildCompetitionExportPayload(report, { generatedAt } = {}) {
             criteria: c.criteriaName,
             average: c.average,
             percentage: c.percentage !== undefined ? `${c.percentage}%` : '',
+            contribution: c.weightedContribution ?? '',
+          })),
+        ),
+      },
+      {
+        title: 'Finalized round results',
+        kind: 'table',
+        columns: [
+          { key: 'round', label: 'Round' },
+          { key: 'rank', label: 'Rank' },
+          { key: 'contestant', label: 'Contestant' },
+          { key: 'score', label: 'Score' },
+          { key: 'qualified', label: 'Qualified' },
+        ],
+        rows: (report?.roundResults ?? []).flatMap((round) =>
+          (round.standings ?? []).map((standing) => ({
+            round: round.roundName ?? round.name ?? '',
+            rank: standing.rank,
+            contestant: `#${standing.contestantNumber ?? ''} ${standing.contestantName ?? ''}`.trim(),
+            score: Number(standing.score ?? 0).toFixed(2),
+            qualified: standing.qualified === undefined ? '' : standing.qualified ? 'Yes' : 'No',
           })),
         ),
       },
@@ -200,21 +240,20 @@ export function buildCompetitionContestantPerformance(report) {
     sublabel: `Weighted ${Number(r.weightedScore ?? 0).toFixed(2)}`,
     value: Number(r.weightedScore ?? 0),
     photo: r.photo,
-    meta: (r.criteriaBreakdown ?? [])
-      .map((c) => `${c.criteriaName}: ${c.average} (${c.percentage}%)`)
-      .join(' · '),
+    meta: [
+      r.status ?? 'Awaiting scores',
+      ...(r.criteriaBreakdown ?? [])
+        .map((c) => `${c.criteriaName}: ${c.average} (${c.percentage}%)`),
+    ].join(' · '),
   }))
 }
 
 export function buildCompetitionRoundResults(report) {
   return (report?.roundResults ?? []).map((round, idx) => ({
     id: round.roundId ?? `round-${idx}`,
-    name: round.name ?? `Round ${idx + 1}`,
-    value: Number(round.submittedCount ?? 0),
-    sublabel:
-      round.totalScores !== undefined
-        ? `${round.submittedCount ?? 0} / ${round.totalScores} scores`
-        : null,
+    name: round.roundName ?? round.name ?? `Round ${idx + 1}`,
+    value: Number(round.standings?.[0]?.score ?? 0),
+    sublabel: round.finalizedAt ? `Finalized ${round.finalizedAt}` : 'Provisional',
   }))
 }
 

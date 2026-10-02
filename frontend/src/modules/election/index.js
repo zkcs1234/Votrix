@@ -2,6 +2,7 @@ export { electionService } from '@/services/election.service'
 
 export {
   buildElectionStats,
+  buildElectionParticipationGroups,
   buildElectionCandidateRanking,
   buildElectionPositionSummaries,
   buildElectionVotingProgress,

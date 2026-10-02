@@ -23,46 +23,34 @@ export function pollingQuestionTypeLabel(type) {
 }
 
 export function buildPollingStats(analytics) {
-  const total = analytics?.totalSubmissions ?? 0
+  const total = analytics?.respondedRespondents ?? 0
   const enrolled = analytics?.enrolledRespondents ?? 0
-  const avgTimeSec = analytics?.averageCompletionTimeSeconds ?? null
 
-  const stats = [
-    { id: 'respondents', label: 'Total respondents', value: enrolled },
-    { id: 'responses', label: 'Total responses', value: total, tone: 'success' },
+  return [
+    { id: 'respondents', label: 'Registered students', value: enrolled },
+    { id: 'responses', label: 'Students who responded', value: total, tone: 'success' },
+    { id: 'not-responded', label: 'Students who have not responded', value: Math.max(enrolled - total, 0) },
     {
       id: 'rate',
-      label: 'Response rate',
+      label: 'Overall response rate',
       value: `${safePercentage(total, enrolled)}%`,
       tone: 'muted',
     },
   ]
-
-  if (avgTimeSec !== null) {
-    stats.push({
-      id: 'avg-time',
-      label: 'Avg. completion time',
-      value: formatDuration(avgTimeSec),
-      tone: 'muted',
-    })
-  } else {
-    stats.push({
-      id: 'completion',
-      label: 'Poll completion rate',
-      value: `${safePercentage(total, enrolled)}%`,
-      tone: 'muted',
-    })
-  }
-
-  return stats
 }
 
-function formatDuration(seconds) {
-  if (seconds == null) return '—'
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  if (m === 0) return `${s}s`
-  return `${m}m ${s}s`
+export function buildPollingParticipationGroups(analytics, dimension) {
+  const rows = dimension === 'program'
+    ? analytics?.participationByProgram
+    : analytics?.participationByYearSection
+  return (rows ?? []).map((row) => ({
+    id: row.label,
+    label: row.label,
+    registered: row.registered ?? 0,
+    responded: row.responded ?? 0,
+    notResponded: row.notResponded ?? 0,
+    responseRate: row.responseRate ?? 0,
+  }))
 }
 
 export function buildPollingQuestionStats(analytics) {
@@ -130,9 +118,31 @@ export function buildPollingReportSheets(report) {
           mode: summary.pollAnonymous ? 'Anonymous' : 'Identified',
           totalSubmissions: summary.totalSubmissions ?? 0,
           enrolledRespondents: summary.enrolledRespondents ?? 0,
+          respondedRespondents: summary.respondedRespondents ?? 0,
+          notRespondedRespondents: summary.notRespondedRespondents ?? 0,
           responseRate: `${summary.responseRate ?? 0}%`,
         },
       ],
+    },
+    {
+      name: 'Program participation',
+      rows: (report?.participationByProgram ?? []).map((row) => ({
+        program: row.label,
+        registered: row.registered,
+        responded: row.responded,
+        notResponded: row.notResponded,
+        responseRate: `${row.responseRate}%`,
+      })),
+    },
+    {
+      name: 'Year section participation',
+      rows: (report?.participationByYearSection ?? []).map((row) => ({
+        yearSection: row.label,
+        registered: row.registered,
+        responded: row.responded,
+        notResponded: row.notResponded,
+        responseRate: `${row.responseRate}%`,
+      })),
     },
     {
       name: 'Questions',
@@ -169,11 +179,19 @@ export function buildPollingReportSheets(report) {
 }
 
 export function buildPollingReportCsvRows(report) {
-  const rows = []
+  const rows = (report?.participationByProgram ?? []).map((row) => ({
+    reportSection: 'Program participation',
+    program: row.label,
+    registered: row.registered,
+    responded: row.responded,
+    notResponded: row.notResponded,
+    responseRate: row.responseRate,
+  }))
   for (const q of report?.questions ?? []) {
     if (q.options) {
       for (const o of q.options) {
         rows.push({
+          reportSection: 'Poll results',
           question: q.question,
           type: pollingQuestionTypeLabel(q.type),
           option: o.label,
@@ -184,6 +202,7 @@ export function buildPollingReportCsvRows(report) {
     } else if (q.distribution) {
       for (const d of q.distribution) {
         rows.push({
+          reportSection: 'Poll results',
           question: q.question,
           type: pollingQuestionTypeLabel(q.type),
           option: `${d.rating} stars`,
@@ -193,6 +212,7 @@ export function buildPollingReportCsvRows(report) {
       }
     } else {
       rows.push({
+        reportSection: 'Poll results',
         question: q.question,
         type: pollingQuestionTypeLabel(q.type),
         option: '',
@@ -206,11 +226,30 @@ export function buildPollingReportCsvRows(report) {
 
 export function buildPollingExportPayload(report, { generatedAt } = {}) {
   const summary = report?.responseSummary ?? {}
+  const participationRows = (report?.participationByProgram ?? []).map((row) => ({
+    program: row.label,
+    registered: row.registered,
+    responded: row.responded,
+    notResponded: row.notResponded,
+    responseRate: `${row.responseRate}%`,
+  }))
   return {
     title: report?.event?.title ?? 'Poll report',
     subtitle: 'Poll report — response charts',
     generatedAt: generatedAt ?? new Date().toISOString(),
     sections: [
+      {
+        title: 'Program participation',
+        kind: 'table',
+        columns: [
+          { key: 'program', label: 'Program' },
+          { key: 'registered', label: 'Registered' },
+          { key: 'responded', label: 'Responded' },
+          { key: 'notResponded', label: 'Not responded' },
+          { key: 'responseRate', label: 'Response rate' },
+        ],
+        rows: participationRows,
+      },
       {
         title: 'Response summary',
         kind: 'stats',

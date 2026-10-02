@@ -11,6 +11,7 @@ import {
 } from '@/modules/analytics'
 import {
   buildPollingStats,
+  buildPollingParticipationGroups,
   buildPollingQuestionStats,
   buildPollingMostSelected,
   buildPollingRatingDistributions,
@@ -27,14 +28,40 @@ function TextResponses({ responses = [] }) {
     <ul className="mt-4 space-y-2 text-sm text-v-text-muted">
       {responses.map((r, i) => (
         <li key={i} className="rounded-lg border border-v-border px-3 py-2">
-          {/* Non-anonymous polls attach the respondent's name; anonymous ones don't. */}
-          {r.respondentName && (
-            <span className="mb-0.5 block text-xs font-medium text-v-text-subtle">{r.respondentName}</span>
-          )}
           {r.text}
         </li>
       ))}
     </ul>
+  )
+}
+
+function ParticipationTable({ rows }) {
+  if (!rows.length) return <p className="text-sm text-v-text-subtle">No participation data yet.</p>
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-140 text-left text-sm">
+        <thead className="border-b border-v-border text-xs uppercase tracking-wide text-v-text-subtle">
+          <tr>
+            <th className="px-3 py-2 font-medium">Group</th>
+            <th className="px-3 py-2 text-right font-medium">Registered</th>
+            <th className="px-3 py-2 text-right font-medium">Responded</th>
+            <th className="px-3 py-2 text-right font-medium">Not responded</th>
+            <th className="px-3 py-2 text-right font-medium">Response rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="border-b border-v-border last:border-0">
+              <td className="px-3 py-3 font-medium text-v-text">{row.label}</td>
+              <td className="px-3 py-3 text-right text-v-text-muted">{row.registered}</td>
+              <td className="px-3 py-3 text-right text-v-text-muted">{row.responded}</td>
+              <td className="px-3 py-3 text-right text-v-text-muted">{row.notResponded}</td>
+              <td className="px-3 py-3 text-right font-medium text-v-text">{row.responseRate}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -61,6 +88,12 @@ export default function PollingAnalyticsPage() {
   const ratingDistros = buildPollingRatingDistributions(data)
   const trend = buildPollingParticipationTrend(data)
   const distributions = buildPollingQuestionDistribution(data)
+  const programParticipation = buildPollingParticipationGroups(data, 'program')
+  const yearSectionParticipation = buildPollingParticipationGroups(data, 'yearSection')
+  const responseActivity = (data?.responseActivity ?? []).map((item) => ({
+    label: item.period,
+    value: item.responses,
+  }))
 
   return (
     <AnalyticsLayout
@@ -74,6 +107,34 @@ export default function PollingAnalyticsPage() {
       </div>
 
       <AnalyticsStatsGrid stats={stats} columns={4} />
+
+      <AnalyticsSection
+        title="Participation by program"
+        description="Response rate among the registered students in each program."
+      >
+        <ParticipationTable rows={programParticipation} />
+      </AnalyticsSection>
+
+      <AnalyticsSection
+        title="Participation by year & section"
+        description="The system stores year and section together as one managed student field."
+      >
+        <ParticipationTable rows={yearSectionParticipation} />
+      </AnalyticsSection>
+
+      <AnalyticsSection
+        title="Response activity"
+        description="Completed poll submissions by day."
+      >
+        <DistributionList
+          items={responseActivity}
+          valueKey="value"
+          labelKey="label"
+          showCount
+          showPercentage={false}
+          emptyMessage="No response activity recorded yet."
+        />
+      </AnalyticsSection>
 
       <AnalyticsSection
         title="Most selected choices"

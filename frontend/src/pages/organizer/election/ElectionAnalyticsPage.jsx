@@ -8,16 +8,46 @@ import {
   AnalyticsStatsGrid,
   DistributionList,
   RankingList,
-  TrendList,
   useModuleAnalytics,
 } from '@/modules/analytics'
 import {
   buildElectionStats,
+  buildElectionParticipationGroups,
   buildElectionCandidateRanking,
   buildElectionPositionSummaries,
   buildElectionParticipationTrend,
   electionVisibilityLabel,
 } from '@/modules/election'
+
+function ParticipationTable({ rows, votedLabel = 'Voted' }) {
+  if (!rows.length) return <p className="text-sm text-v-text-subtle">No participation data yet.</p>
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-140 text-left text-sm">
+        <thead className="border-b border-v-border text-xs uppercase tracking-wide text-v-text-subtle">
+          <tr>
+            <th className="px-3 py-2 font-medium">Group</th>
+            <th className="px-3 py-2 text-right font-medium">Registered</th>
+            <th className="px-3 py-2 text-right font-medium">{votedLabel}</th>
+            <th className="px-3 py-2 text-right font-medium">Not voted</th>
+            <th className="px-3 py-2 text-right font-medium">Turnout</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="border-b border-v-border last:border-0">
+              <td className="px-3 py-3 font-medium text-v-text">{row.label}</td>
+              <td className="px-3 py-3 text-right text-v-text-muted">{row.registered}</td>
+              <td className="px-3 py-3 text-right text-v-text-muted">{row.voted}</td>
+              <td className="px-3 py-3 text-right text-v-text-muted">{row.notVoted}</td>
+              <td className="px-3 py-3 text-right font-medium text-v-text">{row.turnoutPercentage}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 export default function ElectionAnalyticsPage() {
   const { eventId } = useParams()
@@ -69,6 +99,8 @@ export default function ElectionAnalyticsPage() {
   const positionSummaries = buildElectionPositionSummaries(data)
   const ballotSections = data?.ballotSections ?? []
   const trend = buildElectionParticipationTrend(data)
+  const programParticipation = buildElectionParticipationGroups(data, 'program')
+  const yearSectionParticipation = buildElectionParticipationGroups(data, 'yearSection')
 
   const timelineItems = (timeline?.hourly?.length ? timeline.hourly : timeline?.daily ?? []).map((t) => ({
     label: t.period,
@@ -106,7 +138,7 @@ export default function ElectionAnalyticsPage() {
 
       <AnalyticsSection
         title="Voting progress"
-        description="How many registered voters have cast their ballot so far."
+        description="How many registered students have cast their ballot so far."
       >
         <DistributionList
           items={trend}
@@ -130,11 +162,19 @@ export default function ElectionAnalyticsPage() {
         />
       </AnalyticsSection>
 
-      <TrendList
-        title="Election participation trends"
-        description="Snapshot of total registered voters, votes cast, and outstanding ballots."
-        items={trend}
-      />
+      <AnalyticsSection
+        title="Participation by program"
+        description="Turnout among the registered students in each program."
+      >
+        <ParticipationTable rows={programParticipation} />
+      </AnalyticsSection>
+
+      <AnalyticsSection
+        title="Participation by year & section"
+        description="The system stores year and section together as one managed student field."
+      >
+        <ParticipationTable rows={yearSectionParticipation} />
+      </AnalyticsSection>
 
       {ballotSections.length > 1 && ballotSections.map((section) => (
         <AnalyticsSection

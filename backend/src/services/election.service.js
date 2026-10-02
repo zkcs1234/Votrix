@@ -1307,6 +1307,7 @@ async function fetchElectionResultsData(eventId) {
   const [
     { count: totalVoters, error: evErr },
     { count: votedCount, error: votedErr },
+    { data: participantRows, error: participantErr },
     { data: voteRows, error: voteErr },
     { data: candidates, error: candErr },
   ] = await Promise.all([
@@ -1321,12 +1322,18 @@ async function fetchElectionResultsData(eventId) {
       .eq('event_id', eventId)
       .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
       .eq('has_voted', true),
+    getClient()
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .select('has_voted, users!inner (program, year_section)')
+      .eq('event_id', eventId)
+      .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
     getClient().from(DB_TABLES.ELECTION_VOTES).select('candidate_id, position_id').eq('event_id', eventId),
     getClient().from(DB_TABLES.CANDIDATES).select('id, name, position_id, positions!inner(event_id)').eq('positions.event_id', eventId),
   ])
 
   if (evErr) throw new ApiError(500, evErr.message)
   if (votedErr) throw new ApiError(500, votedErr.message)
+  if (participantErr) throw new ApiError(500, participantErr.message)
   if (voteErr) throw new ApiError(500, voteErr.message)
   if (candErr) throw new ApiError(500, candErr.message)
 
@@ -1338,6 +1345,26 @@ async function fetchElectionResultsData(eventId) {
   const total = totalVoters ?? 0
   const voted = votedCount ?? 0
   const turnoutPercentage = computeTurnoutRate(voted, total)
+
+  const participationBy = (field) => {
+    const groups = new Map()
+    for (const row of participantRows ?? []) {
+      const label = row.users?.[field] || 'Unspecified'
+      const current = groups.get(label) ?? { registered: 0, voted: 0 }
+      current.registered += 1
+      if (row.has_voted) current.voted += 1
+      groups.set(label, current)
+    }
+    return Array.from(groups.entries())
+      .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
+      .map(([label, counts]) => ({
+        label,
+        registered: counts.registered,
+        voted: counts.voted,
+        notVoted: counts.registered - counts.voted,
+        turnoutPercentage: computeTurnoutRate(counts.voted, counts.registered),
+      }))
+  }
 
   const candidateResults = (candidates ?? []).map((c) => ({
     candidateId: c.id,
@@ -1424,6 +1451,8 @@ async function fetchElectionResultsData(eventId) {
     totalVoters: total,
     votedCount: voted,
     turnoutPercentage,
+    participationByProgram: participationBy('program'),
+    participationByYearSection: participationBy('year_section'),
     liveTotalVotes,
     candidateResults,
     positionSummaries,

@@ -17,11 +17,15 @@ export default function CompetitionRankingsPage() {
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(true)
   const [divisionId, setDivisionId] = useState('')
+  const [roundId, setRoundId] = useState('')
 
   const load = useCallback(() => {
     setLoading(true)
     Promise.all([
-      pageantService.getRankings(eventId, { divisionId: divisionId || undefined }).catch(() => ({ data: {} })),
+      pageantService.getRankings(eventId, {
+        divisionId: divisionId || undefined,
+        roundId: roundId || undefined,
+      }).catch(() => ({ data: {} })),
       pageantService.getFoundation(eventId).catch(() => ({ data: {} })),
       pageantService.getResults(eventId).catch(() => ({ data: {} })),
     ]).then(([rankingsRes, foundationRes, resultsRes]) => {
@@ -29,7 +33,7 @@ export default function CompetitionRankingsPage() {
       if (foundationRes.data?.foundation) setFoundation(foundationRes.data.foundation)
       if (resultsRes.data?.results) setResults(resultsRes.data.results)
     }).finally(() => setLoading(false))
-  }, [eventId, divisionId])
+  }, [eventId, divisionId, roundId])
 
   // On first open, silently re-sync the ranking store from the real live-session
   // scores judges submitted, THEN load — so the rankings reflect the corrected
@@ -53,12 +57,12 @@ export default function CompetitionRankingsPage() {
     // Note: real-time updates might not have division filter applied, 
     // so we should probably re-fetch if we have a filter, or just use the data if no filter.
     // To be safe, we just reload the data if there's a specific division selected.
-    if (divisionId) {
+    if (divisionId || roundId) {
       load()
     } else if (rankings) {
       setData(rankings)
     }
-  }, [eventId, divisionId, load])
+  }, [eventId, divisionId, roundId, load])
 
   const {
     search,
@@ -82,6 +86,8 @@ export default function CompetitionRankingsPage() {
 
   const divisionsEnabled = foundation?.event?.divisions_enabled
   const divisions = foundation?.divisions ?? []
+  const rounds = data?.rounds ?? []
+  const selectedRound = rounds.find((round) => round.id === roundId)
 
   return (
     <div className="space-y-6">
@@ -92,7 +98,7 @@ export default function CompetitionRankingsPage() {
             placeholder="Search contestant"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="max-w-[200px]"
+            className="max-w-50"
           />
           {divisionsEnabled && divisions.length > 0 && (
             <select
@@ -104,6 +110,21 @@ export default function CompetitionRankingsPage() {
               {divisions.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {rounds.length > 0 && (
+            <select
+              className={`${INPUT_CLASS} py-1.5 text-sm w-auto`}
+              value={roundId}
+              onChange={(e) => setRoundId(e.target.value)}
+              aria-label="Ranking round"
+            >
+              <option value="">— Overall —</option>
+              {rounds.map((round) => (
+                <option key={round.id} value={round.id}>
+                  {round.name}
                 </option>
               ))}
             </select>
@@ -121,6 +142,7 @@ export default function CompetitionRankingsPage() {
       </div>
 
       <p className="text-sm text-v-text-subtle">
+        {selectedRound ? `${selectedRound.name} ranking · ` : 'Overall ranking · '}
         Judges submitted: {data?.judges?.submitted ?? 0} / {data?.judges?.total ?? 0}
         {hasActiveFilters && ` · Showing ${resultCount} of ${totalCount} contestants`}
       </p>
@@ -142,9 +164,28 @@ export default function CompetitionRankingsPage() {
                 #{r.contestantNumber} {r.contestantName}
               </p>
               <p className="mt-1 text-2xl font-bold text-v-text-muted">
-                {r.weightedScore.toFixed(2)}
-                <span className="ml-1 text-sm font-normal text-v-text-subtle">weighted</span>
+                {Number(r.rankingScore ?? r.weightedScore ?? 0).toFixed(2)}
+                <span className="ml-1 text-sm font-normal text-v-text-subtle">
+                  {selectedRound ? 'round score' : 'final score'}
+                </span>
               </p>
+              {selectedRound && (
+                <p className="text-xs text-v-text-subtle">
+                  Final score: {Number(r.finalScore ?? r.weightedScore ?? 0).toFixed(2)}
+                </p>
+              )}
+              <span className="mt-2 inline-flex rounded-full border border-v-border px-2 py-0.5 text-xs text-v-text-subtle">
+                {r.status ?? 'Awaiting scores'}
+              </span>
+              {(r.perRound ?? []).length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-v-text-subtle">
+                  {r.perRound.map((round) => (
+                    <span key={round.roundId ?? round.roundName} className="rounded-md bg-v-surface-elevated px-2 py-1">
+                      {round.roundName}: {Number(round.value ?? 0).toFixed(2)}
+                    </span>
+                  ))}
+                </div>
+              )}
               {(() => {
                 const breakdown = r.criteriaBreakdown ?? []
                 const scored = breakdown.filter((c) => (c.judgeCount ?? (c.average > 0 ? 1 : 0)) > 0)

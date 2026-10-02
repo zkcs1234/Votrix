@@ -96,7 +96,7 @@ export default function CompetitionReportPage() {
 
       <AnalyticsSection
         title="Ranking report"
-        description="Weighted score = Σ (criterion average × weight %)"
+        description="Final scores and status from the existing competition scoring engine."
       >
         <RankingList
           items={contestantPerformance}
@@ -105,6 +105,81 @@ export default function CompetitionReportPage() {
           metaFormatter={(meta) => meta}
         />
       </AnalyticsSection>
+
+      {report.roundResults?.length > 0 && (
+        <AnalyticsSection
+          title="Finalized round results"
+          description="Round standings recorded by the existing advancement workflow."
+        >
+          <div className="space-y-5">
+            {report.roundResults.map((round) => (
+              <div key={round.roundId} className="overflow-x-auto">
+                <h4 className="mb-2 text-sm font-medium text-v-text">{round.roundName}</h4>
+                <table className="w-full min-w-140 text-left text-sm">
+                  <thead className="border-b border-v-border text-xs uppercase tracking-wide text-v-text-subtle">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Rank</th>
+                      <th className="px-3 py-2 font-medium">Contestant</th>
+                      <th className="px-3 py-2 text-right font-medium">Score</th>
+                      <th className="px-3 py-2 text-right font-medium">Qualified</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(round.standings ?? []).map((standing) => (
+                      <tr key={standing.contestantId} className="border-b border-v-border last:border-0">
+                        <td className="px-3 py-3 text-v-text-muted">{standing.rank}</td>
+                        <td className="px-3 py-3 font-medium text-v-text">
+                          #{standing.contestantNumber} {standing.contestantName}
+                        </td>
+                        <td className="px-3 py-3 text-right text-v-text-muted">
+                          {Number(standing.score ?? 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-3 text-right text-v-text-muted">
+                          {standing.qualified === undefined ? '—' : standing.qualified ? 'Yes' : 'No'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        </AnalyticsSection>
+      )}
+
+      {report.divisionResults?.length > 0 && (
+        <AnalyticsSection
+          title="Division results"
+          description="Winners and rankings remain scoped to their configured division."
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-140 text-left text-sm">
+              <thead className="border-b border-v-border text-xs uppercase tracking-wide text-v-text-subtle">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Division</th>
+                  <th className="px-3 py-2 font-medium">Winner</th>
+                  <th className="px-3 py-2 text-right font-medium">Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.divisionResults.map((division) => (
+                  <tr key={division.divisionId} className="border-b border-v-border last:border-0">
+                    <td className="px-3 py-3 font-medium text-v-text">{division.name}</td>
+                    <td className="px-3 py-3 text-v-text-muted">
+                      {division.winner
+                        ? `#${division.winner.contestantNumber} ${division.winner.contestantName}`
+                        : '—'}
+                    </td>
+                    <td className="px-3 py-3 text-right text-v-text-muted">
+                      {division.winner ? Number(division.winner.finalScore ?? 0).toFixed(2) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </AnalyticsSection>
+      )}
 
       {categoryResults.length > 0 && (
         <AnalyticsSection
