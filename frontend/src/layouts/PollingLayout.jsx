@@ -15,8 +15,8 @@ const navItems = [
   { section: 'Setup' },
   { label: 'Builder', path: 'builder', icon: PenSquare, scoped: true, basePath: BASE },
   { label: 'Settings', path: 'settings', icon: Settings2, scoped: true, basePath: BASE },
-  { label: 'Review & Publish', path: 'review', icon: Rocket, scoped: true, basePath: BASE },
   { label: 'Respondents', path: 'respondents', icon: Users, scoped: true, basePath: BASE },
+  { label: 'Review & Publish', path: 'review', icon: Rocket, scoped: true, basePath: BASE },
 
   { section: 'Results' },
   { label: 'Analytics', path: 'analytics', icon: BarChart3, scoped: true, basePath: BASE },
