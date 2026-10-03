@@ -521,7 +521,10 @@ async function getArrangementPreview(eventId, organizerId, config) {
   const session = await getCurrentSession(eventId)
   if (!session) throw new ApiError(400, 'No live session is active')
 
-  const ids = session.contestantOrder ?? []
+  // The session order may be narrowed by the organizer's active-division
+  // control. Arrangement preview must use the complete current-round field so
+  // a Male/Female arrangement cannot accidentally publish only one division.
+  const ids = await buildContestantOrder(eventId, session.currentRoundId, null)
   const { data, error } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
     .select('id, name, photo, contestant_number, division_id')
