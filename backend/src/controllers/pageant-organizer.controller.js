@@ -1,6 +1,7 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import * as pageantService from '../services/pageant.service.js'
+import * as tabulationService from '../services/competition-tabulation.service.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
 import {
   validateCompetitionEvent,
@@ -216,6 +217,51 @@ export const getRankings = asyncHandler(async (req, res) => {
     roundId: req.query.roundId || null,
   })
   res.json({ success: true, ...rankings })
+})
+
+export const listDeductions = asyncHandler(async (req, res) => {
+  const deductions = await tabulationService.listDeductions(req.params.eventId, req.user.id, {
+    includeVoided: req.query.includeVoided === 'true',
+  })
+  res.json({ success: true, deductions })
+})
+
+export const createDeduction = asyncHandler(async (req, res) => {
+  const deduction = await tabulationService.createDeduction(req.params.eventId, req.user.id, req.body)
+  res.status(201).json({ success: true, deduction })
+})
+
+export const voidDeduction = asyncHandler(async (req, res) => {
+  const deduction = await tabulationService.voidDeduction(req.params.eventId, req.user.id, req.params.deductionId)
+  res.json({ success: true, deduction })
+})
+
+export const calculateResults = asyncHandler(async (req, res) => {
+  const result = await tabulationService.calculateResults(req.params.eventId, req.user.id, {
+    divisionId: req.body?.divisionId ?? req.query.divisionId ?? null,
+    roundId: req.body?.roundId ?? req.query.roundId ?? null,
+  })
+  res.status(201).json({ success: true, ...result })
+})
+
+export const getCalculation = asyncHandler(async (req, res) => {
+  const calculation = await tabulationService.getCalculation(req.params.eventId, req.user.id, req.params.calculationId)
+  res.json({ success: true, calculation })
+})
+
+export const getLatestCalculation = asyncHandler(async (req, res) => {
+  const calculation = await tabulationService.getLatestCalculation(req.params.eventId, req.user.id)
+  res.json({ success: true, calculation })
+})
+
+export const finalizeCalculation = asyncHandler(async (req, res) => {
+  const calculation = await tabulationService.finalizeCalculation(req.params.eventId, req.user.id, req.params.calculationId)
+  res.json({ success: true, calculation })
+})
+
+export const publishCalculation = asyncHandler(async (req, res) => {
+  const calculation = await tabulationService.publishCalculation(req.params.eventId, req.user.id, req.params.calculationId)
+  res.json({ success: true, calculation })
 })
 
 export const getAnalytics = asyncHandler(async (req, res) => {

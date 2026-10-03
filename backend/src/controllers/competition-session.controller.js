@@ -66,6 +66,16 @@ export const setActiveContestant = asyncHandler(async (req, res) => {
   res.json({ success: true, session })
 })
 
+export const previewArrangement = asyncHandler(async (req, res) => {
+  const preview = await sessionService.previewArrangement(req.params.eventId, req.user.id, req.body ?? {})
+  res.json({ success: true, ...preview })
+})
+
+export const publishArrangement = asyncHandler(async (req, res) => {
+  const result = await sessionService.publishArrangement(req.params.eventId, req.user.id, req.body ?? {})
+  res.json({ success: true, ...result })
+})
+
 /** POST /api/organizer/competition/events/:eventId/session/stage-group */
 export const setStageGroup = asyncHandler(async (req, res) => {
   const { contestantIds } = req.body

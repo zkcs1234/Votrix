@@ -77,6 +77,8 @@ router.post('/session/next-contestant', sessionCtrl.nextContestant)
 router.post('/session/prev-contestant', sessionCtrl.previousContestant)
 router.post('/session/set-contestant', sessionCtrl.setActiveContestant)
 router.post('/session/stage-group', sessionCtrl.setStageGroup)
+router.post('/session/arrangement/preview', sessionCtrl.previewArrangement)
+router.post('/session/arrangement/publish', sessionCtrl.publishArrangement)
 // #4 contestant gate — open/close which contestants judges may score
 router.post('/session/open-contestants', sessionCtrl.setOpenContestants)
 router.post('/session/set-round', sessionCtrl.setActiveRound)

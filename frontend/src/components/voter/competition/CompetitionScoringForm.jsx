@@ -70,18 +70,10 @@ export default function CompetitionScoringForm({
     return [...contestants].sort((a, b) => a.contestantNumber - b.contestantNumber)
   })()
 
-  // With divisions on, contestant numbers repeat across divisions (Male #1 vs
-  // Female #1). Group the field by division with section headers, and sort by
-  // (division, number) so identical numbers never sit adjacent unlabeled.
+  // Keep the exact published session order. Re-sorting by division here would
+  // destroy organizer-selected alternating arrangements.
   const divisionsEnabled = Boolean(sheet.divisionsEnabled)
-  const orderedContestants = divisionsEnabled
-    ? [...baseOrdered].sort((a, b) => {
-        const da = a.divisionName ?? ''
-        const db = b.divisionName ?? ''
-        if (da !== db) return da.localeCompare(db)
-        return (a.contestantNumber ?? 0) - (b.contestantNumber ?? 0)
-      })
-    : baseOrdered
+  const orderedContestants = baseOrdered
 
   // Group consecutive contestants by division for section headers. Only show
   // headers when divisions are on AND more than one division is present.
@@ -98,7 +90,7 @@ export default function CompetitionScoringForm({
     }
     return groups
   })()
-  const showDivisionHeaders = divisionsEnabled && contestantGroups.length > 1
+  const showDivisionHeaders = divisionsEnabled && contestantGroups.length > 1 && sessionState?.arrangement?.mode !== 'alternate'
   // Total columns for a full-width division header row: contestant + minors + status.
   const totalMinorCols = critColumns.reduce((s, { minors }) => s + minors.length, 0)
   const totalColSpan = 1 + totalMinorCols + 1

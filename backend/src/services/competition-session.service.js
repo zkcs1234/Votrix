@@ -34,6 +34,7 @@ function mapSession(row) {
     activeContestantPhoto: row.active_contestant_photo ?? null,
     currentContestantOrder: row.current_contestant_order,
     contestantOrder: row.contestant_order ?? [],
+    arrangement: row.arrangement ?? { mode: 'default', primaryDivisionId: null, secondaryDivisionId: null },
     // Live control: criteria of the current round open for scoring. Empty is
     // treated by the app as "all criteria open" (see loadActiveScoringCriteria).
     activeCriteriaIds: Array.isArray(row.active_criteria_ids) ? row.active_criteria_ids : [],
@@ -471,6 +472,114 @@ async function buildContestantOrder(eventId, roundId, divisionId) {
   }
 
   return eligibleContestants.map(c => c.id)
+}
+
+function arrangeContestants(contestants, config = {}) {
+  const mode = config.mode ?? 'default'
+  const primaryDivisionId = config.primaryDivisionId ?? null
+  const secondaryDivisionId = config.secondaryDivisionId ?? null
+  const byDivision = new Map()
+
+  for (const contestant of contestants) {
+    const key = contestant.division_id ?? null
+    if (!byDivision.has(key)) byDivision.set(key, [])
+    byDivision.get(key).push(contestant)
+  }
+  for (const group of byDivision.values()) {
+    group.sort((a, b) => (a.contestant_number ?? 0) - (b.contestant_number ?? 0))
+  }
+
+  if (mode === 'default' || byDivision.size < 2) {
+    return [...contestants].sort((a, b) => (a.contestant_number ?? 0) - (b.contestant_number ?? 0))
+  }
+
+  const primary = byDivision.get(primaryDivisionId) ?? []
+  const secondary = byDivision.get(secondaryDivisionId) ?? []
+  if (!primaryDivisionId || !secondaryDivisionId || primaryDivisionId === secondaryDivisionId) {
+    throw new ApiError(400, 'Select two different divisions for this arrangement')
+  }
+
+  const remaining = [...byDivision.entries()]
+    .filter(([id]) => id !== primaryDivisionId && id !== secondaryDivisionId)
+    .flatMap(([, group]) => group)
+  if (mode === 'primary-first') return [...primary, ...secondary, ...remaining]
+  if (mode === 'secondary-first') return [...secondary, ...primary, ...remaining]
+  if (mode === 'alternate') {
+    const result = []
+    const max = Math.max(primary.length, secondary.length)
+    for (let index = 0; index < max; index += 1) {
+      if (primary[index]) result.push(primary[index])
+      if (secondary[index]) result.push(secondary[index])
+    }
+    return [...result, ...remaining]
+  }
+  throw new ApiError(400, 'Unsupported arrangement mode')
+}
+
+async function getArrangementPreview(eventId, organizerId, config) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const session = await getCurrentSession(eventId)
+  if (!session) throw new ApiError(400, 'No live session is active')
+
+  const ids = session.contestantOrder ?? []
+  const { data, error } = await getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .select('id, name, photo, contestant_number, division_id')
+    .in('id', ids)
+  if (error) throw new ApiError(500, error.message)
+
+  const ordered = arrangeContestants(data ?? [], config)
+  const divisionIds = [...new Set(ordered.map((c) => c.division_id).filter(Boolean))]
+  const { data: divisions } = divisionIds.length
+    ? await getClient().from(DB_TABLES.COMPETITION_DIVISIONS).select('id, name').in('id', divisionIds)
+    : { data: [] }
+  const divisionNames = new Map((divisions ?? []).map((d) => [d.id, d.name]))
+  return {
+    session,
+    arrangement: {
+      mode: config.mode ?? 'default',
+      primaryDivisionId: config.primaryDivisionId ?? null,
+      secondaryDivisionId: config.secondaryDivisionId ?? null,
+    },
+    contestants: ordered.map((c) => ({
+      id: c.id,
+      name: c.name,
+      photo: c.photo,
+      contestantNumber: c.contestant_number,
+      divisionId: c.division_id ?? null,
+      divisionName: c.division_id ? divisionNames.get(c.division_id) ?? null : null,
+    })),
+  }
+}
+
+export async function previewArrangement(eventId, organizerId, config = {}) {
+  return getArrangementPreview(eventId, organizerId, config)
+}
+
+export async function publishArrangement(eventId, organizerId, config = {}) {
+  const session = await assertActiveSession(eventId, organizerId)
+  const preview = await getArrangementPreview(eventId, organizerId, config)
+  const contestantOrder = preview.contestants.map((c) => c.id)
+  const currentContestantOrder = Math.max(0, contestantOrder.indexOf(session.activeContestantId))
+  const arrangement = preview.arrangement
+  const { data, error } = await getClient()
+    .from('competition_sessions')
+    .update({ contestant_order: contestantOrder, current_contestant_order: currentContestantOrder, arrangement })
+    .eq('id', session.id)
+    .select('*')
+    .single()
+  if (error) throw new ApiError(500, error.message)
+
+  const updated = mapSession(data)
+  emitToEvent(eventId, 'session:arrangement-changed', { session: updated })
+  recordEventActivity({
+    eventId,
+    action: 'competition.session.set_arrangement',
+    userId: organizerId,
+    module: 'competition',
+    details: { sessionId: session.id, arrangement },
+  })
+  return { session: updated, arrangement, contestants: preview.contestants }
 }
 
 // ---------------------------------------------------------------------------

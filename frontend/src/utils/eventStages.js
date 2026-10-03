@@ -29,6 +29,7 @@ export const EVENT_STAGES = {
     // Run
     { key: 'live', label: 'Live Control', path: 'live' },
     // Results
+    { key: 'tabulation', label: 'Tabulation', path: 'tabulation' },
     { key: 'rankings', label: 'Rankings', path: 'rankings' },
     { key: 'analytics', label: 'Analytics', path: 'analytics' },
     { key: 'report', label: 'Report', path: 'report' },

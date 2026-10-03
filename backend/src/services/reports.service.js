@@ -228,6 +228,10 @@ export async function getCompetitionReport(eventId, organizerId, { divisionId = 
     getCompetitionResults(eventId, organizerId),
   ])
 
+  const reportRankings = resultsData.publishedCalculationId
+    ? resultsData.overall
+    : rankingsData.rankings
+
   return {
     generatedAt: new Date().toISOString(),
     reportType: 'competition_scoring',
@@ -246,7 +250,9 @@ export async function getCompetitionReport(eventId, organizerId, { divisionId = 
       pendingCount: rankingsData.judges.total - rankingsData.judges.submitted,
       turnoutPercentage: pct(rankingsData.judges.submitted, rankingsData.judges.total),
     },
-    rankings: rankingsData.rankings,
+    rankings: reportRankings,
+    publishedCalculationId: resultsData.publishedCalculationId ?? null,
+    publishedAt: resultsData.publishedAt ?? null,
     criteriaTotalPercentage: rankingsData.criteriaTotalPercentage,
     rounds: rankingsData.rounds ?? [],
     roundResults: resultsData.rounds ?? [],

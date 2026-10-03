@@ -25,6 +25,7 @@ const navItems = [
 
   { section: 'Results' },
   { label: 'Rankings', path: 'rankings', icon: Award, scoped: true, basePath: BASE },
+  { label: 'Tabulation', path: 'tabulation', icon: Award, scoped: true, basePath: BASE },
   { label: 'Report', path: 'report', icon: FileText, scoped: true, basePath: BASE },
 ]
 

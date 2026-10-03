@@ -2068,8 +2068,25 @@ export async function getCompetitionResults(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
 
   const overall = await getLiveRankings(eventId, organizerId)
-  const categoryAwards = computeCategoryAwards(overall.rankings)
-  const champion = overall.rankings[0] ?? null
+  const { data: publishedCalculation } = await getClient()
+    .from('competition_result_calculations')
+    .select('id, published_at, result_snapshot')
+    .eq('event_id', eventId)
+    .eq('status', 'published')
+    .is('round_id', null)
+    .order('published_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  // Published tabulation snapshots are authoritative for official results.
+  // If the additive snapshot table is not migrated yet, or no result has been
+  // published, preserve the existing live-ranking behavior.
+  const publishedRows = Array.isArray(publishedCalculation?.result_snapshot)
+    ? publishedCalculation.result_snapshot
+    : null
+  const officialRankings = publishedRows?.length ? publishedRows : overall.rankings
+  const categoryAwards = computeCategoryAwards(officialRankings)
+  const champion = officialRankings[0] ?? null
 
   // Per-division standings + winners.
   const divisions = []
@@ -2133,7 +2150,9 @@ export async function getCompetitionResults(eventId, organizerId) {
   return {
     divisionsEnabled: overall.divisionsEnabled,
     champion,
-    overall: overall.rankings,
+    overall: officialRankings,
+    publishedCalculationId: publishedCalculation?.id ?? null,
+    publishedAt: publishedCalculation?.published_at ?? null,
     categoryAwards,
     divisions,
     rounds: roundStandings,

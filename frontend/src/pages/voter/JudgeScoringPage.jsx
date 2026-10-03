@@ -259,6 +259,11 @@ export default function JudgeScoringPage() {
     syncSessionView()
   }, [syncSessionView])
 
+  useSocketEvent('session:arrangement-changed', ({ session }) => {
+    if (session) setSessionState(session)
+    syncSessionView()
+  }, [syncSessionView])
+
   // Round switched by the organizer — reload so the round name + criteria update.
   useSocketEvent('session:round-changed', ({ session }) => {
     if (session) setSessionState(session)

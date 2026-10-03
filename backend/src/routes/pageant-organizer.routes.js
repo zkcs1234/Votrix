@@ -61,6 +61,16 @@ router.get('/events/:eventId/rankings', ctrl.getRankings)
 router.get('/events/:eventId/results', ctrl.getResults)
 router.get('/events/:eventId/analytics', ctrl.getAnalytics)
 
+// Additive tabulation workflow. Existing rankings/results endpoints remain unchanged.
+router.get('/events/:eventId/deductions', ctrl.listDeductions)
+router.post('/events/:eventId/deductions', ctrl.createDeduction)
+router.post('/events/:eventId/deductions/:deductionId/void', ctrl.voidDeduction)
+router.post('/events/:eventId/tabulation/calculate', ctrl.calculateResults)
+router.get('/events/:eventId/tabulation/latest', ctrl.getLatestCalculation)
+router.get('/events/:eventId/tabulation/:calculationId', ctrl.getCalculation)
+router.post('/events/:eventId/tabulation/:calculationId/finalize', ctrl.finalizeCalculation)
+router.post('/events/:eventId/tabulation/:calculationId/publish', ctrl.publishCalculation)
+
 // Phase 4-6 dynamic scoring engine: categories, rounds, scoring config,
 // judge participants, and flexible assignments live under
 // `/events/:eventId/...` and share the auth middleware on the parent router.

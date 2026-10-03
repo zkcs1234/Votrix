@@ -31,6 +31,8 @@ export default function CompetitionLiveControlPage() {
   const [event, setEvent] = useState(null)
   const [eventStatus, setEventStatus] = useState(null)
   const [foundation, setFoundation] = useState(null)
+  const [arrangement, setArrangement] = useState({ mode: 'default', primaryDivisionId: '', secondaryDivisionId: '' })
+  const [arrangementPreview, setArrangementPreview] = useState(null)
 
   // Phase 6 — round finalize & advancement review modal.
   const [finalizeRoundId, setFinalizeRoundId] = useState(null)
@@ -69,6 +71,15 @@ export default function CompetitionLiveControlPage() {
     loadSession()
   }, [loadSession])
 
+  useEffect(() => {
+    if (!session?.arrangement) return
+    setArrangement({
+      mode: session.arrangement.mode ?? 'default',
+      primaryDivisionId: session.arrangement.primaryDivisionId ?? '',
+      secondaryDivisionId: session.arrangement.secondaryDivisionId ?? '',
+    })
+  }, [session?.arrangement])
+
   const refreshJudgeProgress = useCallback(async () => {
     try {
       const { data } = await competitionSessionService.getJudgeProgress(eventId)
@@ -88,6 +99,7 @@ export default function CompetitionLiveControlPage() {
   useSocketEvent('session:round-changed', () => loadSession(), [loadSession])
   useSocketEvent('session:active-criteria-changed', () => loadSession(), [loadSession])
   useSocketEvent('session:division-changed', () => loadSession(), [loadSession])
+  useSocketEvent('session:arrangement-changed', () => loadSession(), [loadSession])
   useSocketEvent('session:judge-score-submitted', () => refreshJudgeProgress(), [refreshJudgeProgress])
 
   // Actions
@@ -109,6 +121,32 @@ export default function CompetitionLiveControlPage() {
         complete: 'Session completed',
       }
       if (successMessages[action]) success(successMessages[action])
+    } catch (err) {
+      toastError(getErrorMessage(err))
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const previewArrangement = async () => {
+    setActionLoading('previewArrangement')
+    try {
+      const { data } = await competitionSessionService.previewArrangement(eventId, arrangement)
+      setArrangementPreview(data)
+    } catch (err) {
+      toastError(getErrorMessage(err))
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const publishArrangement = async () => {
+    setActionLoading('publishArrangement')
+    try {
+      await competitionSessionService.publishArrangement(eventId, arrangement)
+      setArrangementPreview(null)
+      await loadSession()
+      success('Arrangement published to judges')
     } catch (err) {
       toastError(getErrorMessage(err))
     } finally {
@@ -400,6 +438,16 @@ export default function CompetitionLiveControlPage() {
           </Button>
         </div>
       </div>
+
+      <ArrangementControl
+        arrangement={arrangement}
+        setArrangement={setArrangement}
+        divisions={foundation?.divisions ?? []}
+        preview={arrangementPreview}
+        onPreview={previewArrangement}
+        onPublish={publishArrangement}
+        actionLoading={actionLoading}
+      />
 
       {/* Current Stage & Contestant */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -767,6 +815,86 @@ export default function CompetitionLiveControlPage() {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+function ArrangementControl({ arrangement, setArrangement, divisions, preview, onPreview, onPublish, actionLoading }) {
+  const needsDivisions = arrangement.mode !== 'default'
+  const update = (key, value) => setArrangement((current) => ({ ...current, [key]: value }))
+
+  return (
+    <div className="rounded-xl border border-v-border bg-v-surface p-6">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-medium uppercase tracking-wider text-v-text-muted">Judge arrangement</h3>
+          <p className="mt-1 text-sm text-v-text-subtle">Choose how contestants appear in the published scoring order.</p>
+        </div>
+        <Badge variant={preview ? 'warning' : 'default'}>{preview ? 'PREVIEW READY' : 'PUBLISHED ORDER'}</Badge>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <label className="text-sm text-v-text-muted">
+          Arrangement mode
+          <select
+            value={arrangement.mode}
+            onChange={(event) => update('mode', event.target.value)}
+            className="mt-1 w-full rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text"
+          >
+            <option value="default">Default number order</option>
+            <option value="primary-first">Primary division first</option>
+            <option value="secondary-first">Secondary division first</option>
+            <option value="alternate">Alternate divisions</option>
+          </select>
+        </label>
+        <label className="text-sm text-v-text-muted">
+          First division
+          <select
+            value={arrangement.primaryDivisionId}
+            onChange={(event) => update('primaryDivisionId', event.target.value)}
+            disabled={!needsDivisions}
+            className="mt-1 w-full rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text disabled:opacity-50"
+          >
+            <option value="">Select division</option>
+            {divisions.map((division) => <option key={division.id} value={division.id}>{division.name}</option>)}
+          </select>
+        </label>
+        <label className="text-sm text-v-text-muted">
+          Second division
+          <select
+            value={arrangement.secondaryDivisionId}
+            onChange={(event) => update('secondaryDivisionId', event.target.value)}
+            disabled={!needsDivisions}
+            className="mt-1 w-full rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text disabled:opacity-50"
+          >
+            <option value="">Select division</option>
+            {divisions.map((division) => <option key={division.id} value={division.id}>{division.name}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button size="sm" variant="secondary" onClick={onPreview} loading={actionLoading === 'previewArrangement'}>
+          Preview order
+        </Button>
+        <Button size="sm" onClick={onPublish} loading={actionLoading === 'publishArrangement'} disabled={!preview}>
+          Publish to judges
+        </Button>
+      </div>
+
+      {preview && (
+        <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-300">Draft preview</p>
+          <ol className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+            {preview.contestants.map((contestant, index) => (
+              <li key={contestant.id} className="rounded-md border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text">
+                <span className="mr-2 font-bold tabular-nums text-v-primary">{index + 1}.</span>
+                {contestant.divisionName ? `${contestant.divisionName} ` : ''}#{contestant.contestantNumber} · {contestant.name}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // Whole-round progress: rows = contestants, columns = judges. Each cell shows a
 // judge's per-criterion lock progress for that contestant (#6): a green check

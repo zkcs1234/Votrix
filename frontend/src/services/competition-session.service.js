@@ -61,6 +61,14 @@ export const competitionSessionService = {
     return api.post(`${BASE}/events/${eventId}/session/stage-group`, { contestantIds })
   },
 
+  previewArrangement(eventId, arrangement) {
+    return api.post(`${BASE}/events/${eventId}/session/arrangement/preview`, arrangement)
+  },
+
+  publishArrangement(eventId, arrangement) {
+    return api.post(`${BASE}/events/${eventId}/session/arrangement/publish`, arrangement)
+  },
+
   /** POST /session/open-contestants — #4 contestant gate.
    *  Pass an array of ids to open exactly those ([] = none open), or
    *  { openAll: true } to clear the gate (every contestant open). */
