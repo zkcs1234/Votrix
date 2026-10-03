@@ -92,7 +92,7 @@ export default function CompetitionRankingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold text-v-text">Live rankings</h2>
+        <h2 className="text-xl font-semibold text-v-text">{data?.isOfficial ? 'Official rankings' : 'Live rankings preview'}</h2>
         <div className="flex flex-wrap items-center gap-3">
           <SearchInput
             placeholder="Search contestant"
@@ -142,6 +142,10 @@ export default function CompetitionRankingsPage() {
       </div>
 
       <p className="text-sm text-v-text-subtle">
+        {data?.isOfficial
+          ? `Published tabulation${data.tabulationMethod ? ` · ${data.tabulationMethod}` : ''}`
+          : 'No published tabulation yet — these rankings are a live preview.'}
+        {' · '}
         {selectedRound ? `${selectedRound.name} ranking · ` : 'Overall ranking · '}
         Judges submitted: {data?.judges?.submitted ?? 0} / {data?.judges?.total ?? 0}
         {hasActiveFilters && ` · Showing ${resultCount} of ${totalCount} contestants`}
@@ -166,7 +170,7 @@ export default function CompetitionRankingsPage() {
               <p className="mt-1 text-2xl font-bold text-v-text-muted">
                 {Number(r.rankingScore ?? r.weightedScore ?? 0).toFixed(2)}
                 <span className="ml-1 text-sm font-normal text-v-text-subtle">
-                  {selectedRound ? 'round score' : 'final score'}
+                  {selectedRound ? 'round score' : data?.isOfficial ? 'official result' : 'live preview score'}
                 </span>
               </p>
               {selectedRound && (

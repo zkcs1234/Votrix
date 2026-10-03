@@ -14,6 +14,7 @@ export default function CompetitionTabulationPage() {
   const [contestants, setContestants] = useState([])
   const [deductions, setDeductions] = useState([])
   const [result, setResult] = useState(null)
+  const [method, setMethod] = useState('weighted_average')
   const [form, setForm] = useState({ contestantId: '', amount: '', reason: '' })
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(null)
@@ -29,6 +30,7 @@ export default function CompetitionTabulationPage() {
       const { data: latestData } = await competitionTabulationService.getLatestCalculation(eventId).catch(() => ({ data: {} }))
       const latest = latestData.calculation
       if (latest) {
+        setMethod(latest.configuration_snapshot?.method ?? 'weighted_average')
         setResult({
           calculationId: latest.id,
           status: latest.status,
@@ -64,7 +66,7 @@ export default function CompetitionTabulationPage() {
   const calculate = async () => {
     setBusy('calculate')
     try {
-      const { data } = await competitionTabulationService.calculate(eventId)
+      const { data } = await competitionTabulationService.calculate(eventId, { method })
       setResult(data)
       success('Results calculated for review')
     } catch (err) {
@@ -139,12 +141,27 @@ export default function CompetitionTabulationPage() {
 
       <section className="rounded-xl border border-v-border bg-v-surface p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><h2 className="v-section-title">Calculate results</h2><p className="mt-1 text-sm text-v-text-muted">The existing scoring configuration and ranking engine are used.</p></div>
+          <div>
+            <h2 className="v-section-title">Calculate official results</h2>
+            <p className="mt-1 text-sm text-v-text-muted">Live Control stores judge scores. Select how those scores become the official result.</p>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-v-text">
+            <span className="text-v-text-muted">Tabulation method</span>
+            <select value={method} onChange={(event) => setMethod(event.target.value)} className="rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text">
+              <option value="weighted_average">Weighted average</option>
+              <option value="average">Average</option>
+              <option value="sum">Sum</option>
+              <option value="highest_score">Highest score</option>
+              <option value="lowest_removal">Lowest-score removal</option>
+              <option value="rank_based">Rank-based</option>
+            </select>
+          </label>
           <Button onClick={calculate} loading={busy === 'calculate'}>Calculate</Button>
         </div>
+        {method === 'rank_based' && <p className="mt-3 rounded-lg bg-v-surface-elevated p-3 text-sm text-v-text-muted">Each judge&apos;s numeric scores are converted into placements. The lowest combined placement total ranks highest.</p>}
         {result && <div className="mt-5 space-y-3">
-          <div className="flex flex-wrap gap-2 text-sm text-v-text-muted"><Badge variant="warning">{result.status ?? result.calculation?.status ?? 'calculated'}</Badge><span>Judges submitted: {result.configuration?.judges?.submitted ?? '—'} / {result.configuration?.judges?.total ?? '—'}</span></div>
-          <div className="overflow-x-auto rounded-lg border border-v-border"><table className="w-full text-left text-sm"><thead className="bg-v-surface-elevated text-v-text-muted"><tr><th className="p-3">Rank</th><th className="p-3">Contestant</th><th className="p-3">Base score</th><th className="p-3">Deductions</th><th className="p-3">Final score</th></tr></thead><tbody>{(result.results ?? result.calculation?.result_snapshot ?? []).map((row) => <tr key={row.contestantId} className="border-t border-v-border"><td className="p-3 font-semibold">{row.rank}</td><td className="p-3">{row.contestantName}</td><td className="p-3">{Number(row.baseScore).toFixed(2)}</td><td className="p-3 text-v-danger">-{Number(row.deductionTotal).toFixed(2)}</td><td className="p-3 font-semibold">{Number(row.finalScore).toFixed(2)}</td></tr>)}</tbody></table></div>
+          <div className="flex flex-wrap gap-2 text-sm text-v-text-muted"><Badge variant="warning">{result.status ?? result.calculation?.status ?? 'calculated'}</Badge><span>Method: {result.configuration?.method ?? 'weighted_average'}</span><span>Judges submitted: {result.configuration?.judges?.submitted ?? '—'} / {result.configuration?.judges?.total ?? '—'}</span></div>
+          <div className="overflow-x-auto rounded-lg border border-v-border"><table className="w-full text-left text-sm"><thead className="bg-v-surface-elevated text-v-text-muted"><tr><th className="p-3">Rank</th><th className="p-3">Contestant</th><th className="p-3">{result.configuration?.method === 'rank_based' ? 'Placement total' : 'Base score'}</th><th className="p-3">Deductions</th><th className="p-3">{result.configuration?.method === 'rank_based' ? 'Final placement total' : 'Final score'}</th></tr></thead><tbody>{(result.results ?? result.calculation?.result_snapshot ?? []).map((row) => <tr key={row.contestantId} className="border-t border-v-border"><td className="p-3 font-semibold">{row.rank}</td><td className="p-3">{row.contestantName}</td><td className="p-3">{Number(row.baseScore).toFixed(2)}</td><td className="p-3 text-v-danger">{result.configuration?.method === 'rank_based' ? `+${Number(row.deductionTotal).toFixed(2)}` : `-${Number(row.deductionTotal).toFixed(2)}`}</td><td className="p-3 font-semibold">{Number(row.finalScore).toFixed(2)}</td></tr>)}</tbody></table></div>
           <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => transition('finalize', 'Results finalized')} disabled={busy || result.status === 'finalized' || result.calculation?.status === 'finalized'} loading={busy === 'finalize'}>Finalize results</Button><Button onClick={() => transition('publish', 'Results published')} disabled={busy || (result.status ?? result.calculation?.status) !== 'finalized'} loading={busy === 'publish'}>Publish results</Button></div>
         </div>}
       </section>

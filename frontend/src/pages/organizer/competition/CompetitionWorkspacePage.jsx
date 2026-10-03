@@ -940,9 +940,6 @@ function ScoringTab({ foundation, reload }) {
   // (Criteria tab), the single source of truth. This tab owns only how scores
   // COMBINE. The stored scoreType is preserved as a fallback via the backend's
   // partial merge (setScoringConfig), so we simply don't send it.
-  const [calculationMethod, setCalculationMethod] = useState(
-    config.calculationMethod ?? 'weighted_average',
-  )
   const [decimalPlaces, setDecimalPlaces] = useState(config.decimalPlaces ?? 2)
   const [dropHighest, setDropHighest] = useState(config.dropHighest ?? 0)
   const [dropLowest, setDropLowest] = useState(config.dropLowest ?? 0)
@@ -958,7 +955,6 @@ function ScoringTab({ foundation, reload }) {
     setSaved(false)
     try {
       await pageantService.setScoringConfig(eventId, {
-        calculationMethod,
         decimalPlaces: Number(decimalPlaces),
         dropHighest: Number(dropHighest),
         dropLowest: Number(dropLowest),
@@ -979,20 +975,6 @@ function ScoringTab({ foundation, reload }) {
         These rules control how judges&apos; scores <strong>combine</strong> into a result. The{' '}
         <strong>score type / range</strong> a judge types is set per <strong>minor criterion</strong>{' '}
         in the <strong>Criteria</strong> tab.
-      </div>
-      <div>
-        <label className={LABEL_CLASS}>Calculation method</label>
-        <select
-          className={INPUT_CLASS}
-          value={calculationMethod}
-          onChange={(e) => setCalculationMethod(e.target.value)}
-        >
-          <option value="average">Average</option>
-          <option value="weighted_average">Weighted average</option>
-          <option value="sum">Sum</option>
-          <option value="highest_score">Highest score</option>
-          <option value="lowest_removal">Lowest-score removal</option>
-        </select>
       </div>
       <div>
         <label className={LABEL_CLASS}>Decimal places</label>

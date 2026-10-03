@@ -81,7 +81,10 @@ export const CALCULATION_METHODS = {
   SUM: 'sum',
   HIGHEST_SCORE: 'highest_score',
   LOWEST_REMOVAL: 'lowest_removal',
+  RANK_BASED: 'rank_based',
 }
+
+export const TABULATION_METHODS = CALCULATION_METHODS
 
 // Phase 6 — round progression.
 export const ADVANCEMENT_TYPES = {

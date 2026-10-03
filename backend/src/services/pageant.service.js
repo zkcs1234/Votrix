@@ -1829,7 +1829,48 @@ function highestCriterionScore(row) {
   return Math.max(...(row.criteriaBreakdown ?? []).map((criterion) => Number(criterion.average ?? 0)), 0)
 }
 
-export async function getLiveRankings(eventId, organizerId, { divisionId = null, roundId = null } = {}) {
+async function getPublishedCalculation(eventId) {
+  const { data, error } = await getClient()
+    .from('competition_result_calculations')
+    .select('id, published_at, configuration_snapshot, result_snapshot')
+    .eq('event_id', eventId)
+    .eq('status', 'published')
+    .is('round_id', null)
+    .order('published_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new ApiError(500, error.message)
+  return data
+}
+
+export async function getOfficialRankings(eventId, organizerId, options = {}) {
+  const live = await getLiveRankings(eventId, organizerId, options)
+  const published = !options.roundId ? await getPublishedCalculation(eventId) : null
+  if (!published?.result_snapshot?.length) {
+    return { ...live, isOfficial: false, publishedAt: null, tabulationMethod: null }
+  }
+  const officialRows = options.divisionId
+    ? published.result_snapshot.filter((row) => row.divisionId === options.divisionId)
+    : published.result_snapshot
+  let previousScore = null
+  let previousRank = 0
+  const scopedOfficialRows = officialRows.map((row, index) => {
+    const score = Number(row.finalScore ?? row.weightedScore ?? 0)
+    const rank = score === previousScore ? previousRank : index + 1
+    previousScore = score
+    previousRank = rank
+    return { ...row, rank }
+  })
+  return {
+    ...live,
+    rankings: scopedOfficialRows,
+    isOfficial: true,
+    publishedAt: published.published_at,
+    tabulationMethod: published.configuration_snapshot?.method ?? null,
+  }
+}
+
+export async function getLiveRankings(eventId, organizerId, { divisionId = null, roundId = null, calculationMethod = null } = {}) {
   await assertCompetitionEvent(eventId, organizerId)
 
   // Build division-aware queries
@@ -1950,7 +1991,9 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null,
     criteria: critList,
     rounds: roundsRes.data ?? [],
     categories: categoriesRes.data ?? [],
-    config: eventRes.data?.scoring_config,
+    config: calculationMethod
+      ? { ...(eventRes.data?.scoring_config ?? {}), calculationMethod }
+      : eventRes.data?.scoring_config,
     roundCriteria,
   })
 
@@ -1962,7 +2005,7 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null,
     contestantNumber: row.contestantNumber,
     photo: row.photo,
     rank: row.rank,
-    divisionId: divisionId ?? null,
+    divisionId: row.divisionId ?? divisionId ?? null,
     weightedScore: row.finalScore,
     finalScore: row.finalScore,
     rankingScore: roundId
@@ -2068,15 +2111,7 @@ export async function getCompetitionResults(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
 
   const overall = await getLiveRankings(eventId, organizerId)
-  const { data: publishedCalculation } = await getClient()
-    .from('competition_result_calculations')
-    .select('id, published_at, result_snapshot')
-    .eq('event_id', eventId)
-    .eq('status', 'published')
-    .is('round_id', null)
-    .order('published_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const publishedCalculation = await getPublishedCalculation(eventId)
 
   // Published tabulation snapshots are authoritative for official results.
   // If the additive snapshot table is not migrated yet, or no result has been
@@ -2097,7 +2132,9 @@ export async function getCompetitionResults(eventId, organizerId) {
       .eq('event_id', eventId)
       .order('created_at', { ascending: true })
     for (const d of divList ?? []) {
-      const dr = await getLiveRankings(eventId, organizerId, { divisionId: d.id })
+      const dr = publishedRows?.length
+        ? { rankings: publishedRows.filter((row) => row.divisionId === d.id) }
+        : await getLiveRankings(eventId, organizerId, { divisionId: d.id })
       divisions.push({
         divisionId: d.id,
         name: d.name,
@@ -2153,6 +2190,7 @@ export async function getCompetitionResults(eventId, organizerId) {
     overall: officialRankings,
     publishedCalculationId: publishedCalculation?.id ?? null,
     publishedAt: publishedCalculation?.published_at ?? null,
+    tabulationMethod: publishedCalculation?.configuration_snapshot?.method ?? null,
     categoryAwards,
     divisions,
     rounds: roundStandings,
@@ -2165,6 +2203,10 @@ export async function getPageantAnalytics(eventId, organizerId) {
 
 export async function getCompetitionAnalytics(eventId, organizerId) {
   const rankings = await getLiveRankings(eventId, organizerId)
+  const publishedCalculation = await getPublishedCalculation(eventId)
+  const officialRankings = publishedCalculation?.result_snapshot?.length
+    ? publishedCalculation.result_snapshot
+    : rankings.rankings
 
   const [contestantsRes, criteriaRes, categoriesRes, roundsRes, scoresRes, judgesRes] =
     await Promise.all([
@@ -2234,7 +2276,7 @@ export async function getCompetitionAnalytics(eventId, organizerId) {
   // Per-category leaderboards — invert each contestant's per-category sub-score
   // into { category → contestants[] }, sorted high-to-low within the category.
   const categoryAgg = new Map()
-  for (const row of rankings.rankings ?? []) {
+  for (const row of officialRankings ?? []) {
     for (const cat of row.perCategory ?? []) {
       if (!categoryAgg.has(cat.categoryId)) {
         categoryAgg.set(cat.categoryId, {
@@ -2315,7 +2357,10 @@ export async function getCompetitionAnalytics(eventId, organizerId) {
       pendingCount: pendingJudges,
       turnoutPercentage: judgeCompletionRate,
     },
-    rankings: rankings.rankings,
+    rankings: officialRankings,
+    isOfficial: Boolean(publishedCalculation?.result_snapshot?.length),
+    publishedAt: publishedCalculation?.published_at ?? null,
+    tabulationMethod: publishedCalculation?.configuration_snapshot?.method ?? null,
     categoryRankings,
     judgeActivity,
     rounds,

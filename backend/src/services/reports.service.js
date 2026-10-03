@@ -251,6 +251,8 @@ export async function getCompetitionReport(eventId, organizerId, { divisionId = 
       turnoutPercentage: pct(rankingsData.judges.submitted, rankingsData.judges.total),
     },
     rankings: reportRankings,
+    isOfficial: Boolean(resultsData.publishedCalculationId),
+    tabulationMethod: resultsData.tabulationMethod ?? null,
     publishedCalculationId: resultsData.publishedCalculationId ?? null,
     publishedAt: resultsData.publishedAt ?? null,
     criteriaTotalPercentage: rankingsData.criteriaTotalPercentage,

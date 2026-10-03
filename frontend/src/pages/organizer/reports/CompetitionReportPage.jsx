@@ -96,7 +96,9 @@ export default function CompetitionReportPage() {
 
       <AnalyticsSection
         title="Ranking report"
-        description="Final scores and status from the existing competition scoring engine."
+        description={report.isOfficial
+          ? `Published tabulation results${report.tabulationMethod ? ` · ${report.tabulationMethod}` : ''}.`
+          : 'No published tabulation yet. Showing live scoring preview.'}
       >
         <RankingList
           items={contestantPerformance}

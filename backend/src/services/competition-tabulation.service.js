@@ -5,6 +5,7 @@ import { ApiError } from '../utils/ApiError.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { getLiveRankings } from './pageant.service.js'
 import { applyDeductionsToRankings } from '../modules/tabulation.js'
+import { TABULATION_METHODS } from '../utils/constants.js'
 
 async function assertCompetitionEvent(eventId, organizerId) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
@@ -111,13 +112,18 @@ export async function voidDeduction(eventId, organizerId, deductionId) {
   return mapDeduction(data)
 }
 
-export async function calculateResults(eventId, organizerId, { divisionId = null, roundId = null } = {}) {
+export async function calculateResults(eventId, organizerId, { method, divisionId = null, roundId = null } = {}) {
   const event = await assertCompetitionEvent(eventId, organizerId)
-  const rankings = await getLiveRankings(eventId, organizerId, { divisionId, roundId })
+  const selectedMethod = method ?? event.scoring_config?.calculationMethod
+  if (!Object.values(TABULATION_METHODS).includes(selectedMethod)) {
+    throw new ApiError(400, `method must be one of: ${Object.values(TABULATION_METHODS).join(', ')}`)
+  }
+  const rankings = await getLiveRankings(eventId, organizerId, { divisionId, roundId, calculationMethod: selectedMethod })
   const deductions = await listDeductions(eventId, organizerId)
   const results = applyDeductionsToRankings(rankings.rankings, deductions, roundId)
 
   const configSnapshot = {
+    method: selectedMethod,
     scoringConfig: rankings.scoringConfig,
     divisionId,
     roundId,

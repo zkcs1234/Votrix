@@ -10,11 +10,17 @@ export function applyDeductionsToRankings(rankings = [], deductions = [], roundI
 
   const sorted = rankings
     .map((row) => {
-      const baseScore = Number(row.finalScore ?? row.weightedScore ?? 0)
       const deductionTotal = totals.get(row.contestantId) ?? 0
+      if (row.placementTotal !== undefined) {
+        const baseScore = Number(row.placementTotal)
+        return { ...row, baseScore, deductionTotal, finalScore: baseScore + deductionTotal }
+      }
+      const baseScore = Number(row.finalScore ?? row.weightedScore ?? 0)
       return { ...row, baseScore, deductionTotal, finalScore: baseScore - deductionTotal }
     })
-    .sort((a, b) => b.finalScore - a.finalScore)
+    .sort((a, b) => a.placementTotal !== undefined
+      ? a.finalScore - b.finalScore
+      : b.finalScore - a.finalScore)
 
   let previousRank = null
   return sorted.map((row, index) => {

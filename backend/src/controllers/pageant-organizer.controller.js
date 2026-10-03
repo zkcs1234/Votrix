@@ -212,7 +212,7 @@ export const listJudges = asyncHandler(async (req, res) => {
 })
 
 export const getRankings = asyncHandler(async (req, res) => {
-  const rankings = await pageantService.getLiveRankings(req.params.eventId, req.user.id, {
+  const rankings = await pageantService.getOfficialRankings(req.params.eventId, req.user.id, {
     divisionId: req.query.divisionId || null,
     roundId: req.query.roundId || null,
   })
@@ -238,6 +238,7 @@ export const voidDeduction = asyncHandler(async (req, res) => {
 
 export const calculateResults = asyncHandler(async (req, res) => {
   const result = await tabulationService.calculateResults(req.params.eventId, req.user.id, {
+    method: req.body?.method ?? req.query.method ?? null,
     divisionId: req.body?.divisionId ?? req.query.divisionId ?? null,
     roundId: req.body?.roundId ?? req.query.roundId ?? null,
   })

@@ -48,7 +48,7 @@ export default function CompetitionAnalyticsPage() {
     return (
       <AnalyticsLayout
         title="Competition analytics"
-        description="Contestants, judges, scoring progress, and rankings."
+        description="Contestants, judges, scoring progress, and published tabulation rankings."
         fullReportTo={`/organizer/competition/events/${eventId}/report`}
       >
         <EmptyAnalyticsState
@@ -69,10 +69,13 @@ export default function CompetitionAnalyticsPage() {
   return (
     <AnalyticsLayout
       title="Competition analytics"
-      description="Contestants, judges, scoring progress, and rankings."
+      description={`Contestants, judges, scoring progress, and ${data.isOfficial ? 'published' : 'live preview'} rankings.`}
       fullReportTo={`/organizer/competition/events/${eventId}/report`}
     >
       <AnalyticsStatsGrid stats={stats} columns={4} />
+      {data.isOfficial
+        ? <p className="text-sm text-v-text-subtle">Official results from {data.tabulationMethod ?? 'published tabulation'}.</p>
+        : <p className="text-sm text-v-text-subtle">No published tabulation yet. Rankings shown are a live preview.</p>}
 
       <AnalyticsSection
         title="Scoring progress"

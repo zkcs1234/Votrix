@@ -239,6 +239,19 @@ export function computeRankings({
   }))
   const byContestant = new Map(results.map((r) => [r.contestantId, r]))
 
+  if (method === CALCULATION_METHODS.RANK_BASED) {
+    return computeRankBasedRankings({
+      scores,
+      contestants,
+      criteria,
+      rounds,
+      categories,
+      config: { ...cfg, calculationMethod: CALCULATION_METHODS.WEIGHTED_AVERAGE },
+      roundCriteria,
+      dp,
+    })
+  }
+
   // Feature guard (§8A): only take the scoped path when a round→criteria map is
   // supplied AND rounds exist. Otherwise fall through to the untouched legacy
   // math so existing events keep identical numbers.
@@ -270,6 +283,111 @@ export function computeRankings({
       method,
       dp,
     })
+  }
+
+  function computeRankBasedRankings({
+    scores,
+    contestants,
+    criteria,
+    rounds,
+    categories,
+    config,
+    roundCriteria,
+    dp,
+  }) {
+    const judgeIds = [...new Set((scores ?? []).map((score) => score.judgeId ?? score.judge_id).filter(Boolean))]
+    const byContestant = new Map(contestants.map((contestant) => [
+      contestant.id,
+      {
+        contestantId: contestant.id,
+        contestantName: contestant.name,
+        contestantNumber: contestant.contestant_number ?? contestant.contestantNumber,
+        photo: contestant.photo,
+        divisionId: contestant.division_id ?? contestant.divisionId ?? null,
+        placementTotal: 0,
+        judgeCount: 0,
+        finalScore: 0,
+        rawScoreTotal: 0,
+        categoryTotals: new Map(),
+      },
+    ]))
+
+    for (const judgeId of judgeIds) {
+      const judgeScores = scores.filter((score) => (score.judgeId ?? score.judge_id) === judgeId)
+      const scoredContestantIds = new Set(judgeScores.map((score) => score.contestantId ?? score.contestant_id))
+      const { rankings } = computeRankings({
+        scores: judgeScores,
+        contestants,
+        criteria,
+        rounds,
+        categories,
+        config,
+        roundCriteria,
+      })
+      const scoredRankings = rankings.filter((row) => scoredContestantIds.has(row.contestantId))
+      const placementByScore = new Map()
+      scoredRankings.forEach((row, index) => {
+        const previous = scoredRankings[index - 1]
+        const placement = previous && previous.finalScore === row.finalScore
+          ? placementByScore.get(previous.contestantId)
+          : index + 1
+        placementByScore.set(row.contestantId, placement)
+      })
+      scoredRankings.forEach((row) => {
+        const result = byContestant.get(row.contestantId)
+        if (!result) return
+        result.placementTotal += placementByScore.get(row.contestantId)
+        result.judgeCount++
+        result.rawScoreTotal += Number(row.finalScore ?? 0)
+        for (const category of Object.values(row.perCategory ?? {})) {
+          const current = result.categoryTotals.get(category.categoryId) ?? {
+            categoryId: category.categoryId,
+            categoryName: category.categoryName,
+            total: 0,
+            count: 0,
+          }
+          current.total += Number(category.value ?? 0)
+          current.count++
+          result.categoryTotals.set(category.categoryId, current)
+        }
+      })
+    }
+
+  const sorted = [...byContestant.values()]
+      .map((row) => {
+        const { categoryTotals, ...publicRow } = row
+        return {
+        ...publicRow,
+        finalScore: row.judgeCount ? -row.placementTotal : 0,
+        averagePlacement: row.judgeCount ? row.placementTotal / row.judgeCount : 0,
+        averageRawScore: row.judgeCount ? row.rawScoreTotal / row.judgeCount : 0,
+        perCategory: [...row.categoryTotals.values()].map((category) => ({
+          categoryId: category.categoryId,
+          categoryName: category.categoryName,
+          value: category.count ? category.total / category.count : 0,
+        })),
+        }
+      })
+      .sort((left, right) =>
+        right.finalScore - left.finalScore ||
+        left.averagePlacement - right.averagePlacement ||
+        right.averageRawScore - left.averageRawScore,
+      )
+
+      sorted.forEach((row, index) => {
+        const previous = sorted[index - 1]
+        const samePlacement = previous && row.placementTotal === previous.placementTotal
+        const sameRawScore = previous && row.averageRawScore === previous.averageRawScore
+        row.rank = samePlacement && sameRawScore ? previous.rank : index + 1
+      })
+    return {
+      rankings: sorted,
+      debug: {
+        criterionTotals: round2(criteria.reduce((sum, criterion) => sum + Number(criterion.percentage ?? 0), 0), dp),
+        roundTotals: round2(rounds.reduce((sum, round) => sum + Number(round.weight ?? 0), 0), dp),
+        categoryTotals: round2(categories.reduce((sum, category) => sum + Number(category.weight ?? 0), 0), dp),
+      },
+    }
   }
 
   const effectiveRounds = rounds.length

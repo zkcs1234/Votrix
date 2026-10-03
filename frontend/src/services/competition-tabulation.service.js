@@ -17,7 +17,7 @@ export const competitionTabulationService = {
     return api.post(`${BASE}/events/${eventId}/deductions/${deductionId}/void`)
   },
 
-  calculate(eventId, payload = {}) {
+  calculate(eventId, payload) {
     return api.post(`${BASE}/events/${eventId}/tabulation/calculate`, payload)
   },
 
