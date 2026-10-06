@@ -37,10 +37,11 @@ export default function FilterBar({
   noun = 'results',
   actions = null,
   className = '',
+  inline = false,
 }) {
   return (
-    <div className={`flex flex-col gap-3 ${className}`}>
-      <div className="flex flex-wrap items-center gap-3">
+    <div className={`${inline ? 'flex flex-wrap items-center gap-3' : 'flex flex-col gap-3'} ${className}`}>
+      <div className={`${inline ? 'contents' : 'flex flex-wrap items-center gap-3'}`}>
         <SearchInput
           placeholder={searchPlaceholder}
           value={search}
@@ -86,7 +87,7 @@ export default function FilterBar({
         )}
       </div>
 
-      <p className="text-sm text-v-text-subtle">
+      <p className={`text-sm text-v-text-subtle ${inline ? 'whitespace-nowrap' : ''}`}>
         Showing <span className="font-medium text-v-text">{resultCount}</span> of {totalCount} {noun}
       </p>
     </div>

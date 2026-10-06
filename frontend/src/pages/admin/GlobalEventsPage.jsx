@@ -273,18 +273,18 @@ export default function GlobalEventsPage() {
                               )}`
                             : 'Not set'}
                         </td>
-                        <td>
-                          <div className="flex flex-wrap items-center justify-end gap-1">
-                            <Link to={`/admin/audit-logs?entity=events&entityId=${event.id}`} className="v-press inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-v-text-muted transition hover:bg-v-surface-elevated hover:text-v-text" aria-label={`View activity for ${event.title}`}>
+                        <td className="align-middle">
+                          <div className="grid min-w-[320px] grid-cols-3 items-center gap-2">
+                            <Link to={`/admin/audit-logs?entity=events&entityId=${event.id}`} className="v-press inline-flex h-8 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-xs font-medium text-v-text-muted transition hover:bg-v-surface-elevated hover:text-v-text" aria-label={`View activity for ${event.title}`}>
                               <FileSearch className="h-4 w-4" strokeWidth={1.5} />
                               Activity
                             </Link>
-                            <Button type="button" variant="ghost" size="sm" className="gap-1.5 px-2.5 text-xs" onClick={() => handleEventExport(event)} loading={eventExporting === event.id} aria-label={`Export report for ${event.title}`}>
+                            <Button type="button" variant="ghost" size="sm" className="h-8 w-full justify-center gap-1.5 whitespace-nowrap px-2 text-xs" onClick={() => handleEventExport(event)} loading={eventExporting === event.id} aria-label={`Export report for ${event.title}`}>
                               <Download className="h-4 w-4" strokeWidth={1.5} />
                               Export
                             </Button>
                             {event.organizations?.organizer?.id && (
-                              <Button type="button" variant="ghost" size="sm" className="gap-1.5 px-2.5 text-xs" onClick={() => navigate(`/admin/organizers/${event.organizations.organizer.id}`)} aria-label={`Open organizer for ${event.title}`}>
+                              <Button type="button" variant="ghost" size="sm" className="h-8 w-full justify-center gap-1.5 whitespace-nowrap px-2 text-xs" onClick={() => navigate(`/admin/organizers/${event.organizations.organizer.id}`)} aria-label={`Open organizer for ${event.title}`}>
                                 <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
                                 Organizer
                               </Button>

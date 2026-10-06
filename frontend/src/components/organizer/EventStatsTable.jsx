@@ -71,6 +71,7 @@ export default function EventStatsTable({
             resultCount={resultCount}
             totalCount={totalCount}
             noun="events"
+            inline
           />
         </div>
       )}
