@@ -561,6 +561,21 @@ export async function previewArrangement(eventId, organizerId, config = {}) {
 
 export async function publishArrangement(eventId, organizerId, config = {}) {
   const session = await assertActiveSession(eventId, organizerId)
+
+  // Stage order is setup for the live scoring field, not a way to rearrange
+  // contestants after judges have started submitting. Existing score rows are
+  // keyed by contestant, but changing the order mid-scoring is confusing and
+  // can make the organizer and judges work from different sequences.
+  const { count: scoreCount, error: scoreCountError } = await getClient()
+    .from('competition_session_judge_scores')
+    .select('id', { count: 'exact', head: true })
+    .eq('session_id', session.id)
+
+  if (scoreCountError) throw new ApiError(500, scoreCountError.message)
+  if (scoreCount > 0) {
+    throw new ApiError(409, 'Stage order is locked after scoring begins. Finish or reset the live session before changing it.')
+  }
+
   const preview = await getArrangementPreview(eventId, organizerId, config)
   const contestantOrder = preview.contestants.map((c) => c.id)
   const currentContestantOrder = Math.max(0, contestantOrder.indexOf(session.activeContestantId))
@@ -577,7 +592,7 @@ export async function publishArrangement(eventId, organizerId, config = {}) {
   emitToEvent(eventId, 'session:arrangement-changed', { session: updated })
   recordEventActivity({
     eventId,
-    action: 'competition.session.set_arrangement',
+    action: 'competition.session.set_stage_order',
     userId: organizerId,
     module: 'competition',
     details: { sessionId: session.id, arrangement },

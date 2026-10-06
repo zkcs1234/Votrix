@@ -24,7 +24,6 @@ const AuditLogsPage = lazy(() => import('@/pages/admin/AuditLogsPage'))
 const OrganizerDetailPage = lazy(() => import('@/pages/admin/OrganizerDetailPage'))
 const HealthDashboardPage = lazy(() => import('@/pages/admin/HealthDashboardPage'))
 const AlertConfigPage = lazy(() => import('@/pages/admin/AlertConfigPage'))
-const SessionManagementPage = lazy(() => import('@/pages/admin/SessionManagementPage'))
 const ArchivalPolicyPage = lazy(() => import('@/pages/admin/ArchivalPolicyPage'))
 const OrganizerDashboardPage = lazy(() => import('@/pages/organizer/OrganizerDashboardPage'))
 const VoterDashboardPage = lazy(() => import('@/pages/voter/VoterDashboardPage'))
@@ -174,7 +173,6 @@ export const routeConfig = [
       { path: 'audit-logs', element: <AuditLogsPage /> },
       { path: 'health', element: <HealthDashboardPage /> },
       { path: 'alerts', element: <AlertConfigPage /> },
-      { path: 'sessions', element: <SessionManagementPage /> },
       { path: 'archival', element: <ArchivalPolicyPage /> },
     ],
   },

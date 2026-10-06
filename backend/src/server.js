@@ -4,12 +4,14 @@ import { env, isProduction } from './config/env.js'
 import { createServer } from 'http'
 import { attachWebSocketServer } from './websocket/ws-server.js'
 import { startEventScheduleSync } from './services/event-schedule-sync.service.js'
+import { startArchivalScheduler } from './services/archival.service.js'
 
 const app = createApp()
 const httpServer = createServer(app)
 
 attachWebSocketServer(httpServer)
 startEventScheduleSync()
+startArchivalScheduler()
 
 httpServer.listen(env.port, '0.0.0.0', () => {
   console.log(`[votrix] API listening on port ${env.port}`)

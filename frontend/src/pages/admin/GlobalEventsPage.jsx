@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CalendarDays, Zap, Clock, CheckCircle2, Vote, Trophy, BarChart2, Download, X, Eye, FileSearch, MoreHorizontal } from 'lucide-react'
+import { CalendarDays, Zap, Clock, CheckCircle2, Vote, Trophy, BarChart2, Download, X, FileSearch, MoreHorizontal } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Card from '@/components/ui/Card'
 import { format } from 'date-fns'
@@ -34,7 +34,6 @@ export default function GlobalEventsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [exporting, setExporting] = useState(false)
   const [eventExporting, setEventExporting] = useState(null)
-  const [selectedEvent, setSelectedEvent] = useState(null)
   const showLoader = useDelayedLoading(loading, 300)
   const { success: toastSuccess, error: toastError } = useToast()
   const navigate = useNavigate()
@@ -275,19 +274,19 @@ export default function GlobalEventsPage() {
                             : 'Not set'}
                         </td>
                         <td>
-                          <div className="flex items-center justify-end gap-1">
-                            <Button type="button" variant="ghost" size="sm" className="px-2" onClick={() => setSelectedEvent(event)} aria-label={`View details for ${event.title}`} title="View details">
-                              <Eye className="h-4 w-4" strokeWidth={1.5} />
-                            </Button>
-                            <Link to={`/admin/audit-logs?entity=events&entityId=${event.id}`} className="v-press inline-flex items-center justify-center rounded-lg p-2 text-v-text-muted transition hover:bg-v-surface-elevated" aria-label={`View activity for ${event.title}`} title="View activity">
+                          <div className="flex flex-wrap items-center justify-end gap-1">
+                            <Link to={`/admin/audit-logs?entity=events&entityId=${event.id}`} className="v-press inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-v-text-muted transition hover:bg-v-surface-elevated hover:text-v-text" aria-label={`View activity for ${event.title}`}>
                               <FileSearch className="h-4 w-4" strokeWidth={1.5} />
+                              Activity
                             </Link>
-                            <Button type="button" variant="ghost" size="sm" className="px-2" onClick={() => handleEventExport(event)} loading={eventExporting === event.id} aria-label={`Export report for ${event.title}`} title="Export report">
+                            <Button type="button" variant="ghost" size="sm" className="gap-1.5 px-2.5 text-xs" onClick={() => handleEventExport(event)} loading={eventExporting === event.id} aria-label={`Export report for ${event.title}`}>
                               <Download className="h-4 w-4" strokeWidth={1.5} />
+                              Export
                             </Button>
                             {event.organizations?.organizer?.id && (
-                              <Button type="button" variant="ghost" size="sm" className="px-2" onClick={() => navigate(`/admin/organizers/${event.organizations.organizer.id}`)} aria-label={`Open organizer for ${event.title}`} title="Open organizer">
+                              <Button type="button" variant="ghost" size="sm" className="gap-1.5 px-2.5 text-xs" onClick={() => navigate(`/admin/organizers/${event.organizations.organizer.id}`)} aria-label={`Open organizer for ${event.title}`}>
                                 <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
+                                Organizer
                               </Button>
                             )}
                           </div>
@@ -301,36 +300,6 @@ export default function GlobalEventsPage() {
           </div>
         )}
       </Card>
-      {selectedEvent && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={() => setSelectedEvent(null)}>
-          <div className="v-card-md w-full max-w-lg" role="dialog" aria-modal="true" aria-labelledby="event-details-title" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="v-caption">Event details</p>
-                <h2 id="event-details-title" className="text-xl font-semibold text-v-text">{selectedEvent.title}</h2>
-              </div>
-              <Button type="button" variant="ghost" size="sm" className="px-2" onClick={() => setSelectedEvent(null)} aria-label="Close event details">
-                <X className="h-4 w-4" strokeWidth={1.5} />
-              </Button>
-            </div>
-            <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div><dt className="v-caption">Type</dt><dd className="mt-1 capitalize text-v-text">{eventTypeLabel(selectedEvent.event_type)}</dd></div>
-              <div><dt className="v-caption">Status</dt><dd className="mt-1 capitalize text-v-text">{selectedEvent.status}</dd></div>
-              <div><dt className="v-caption">Organization</dt><dd className="mt-1 text-v-text">{selectedEvent.organizations?.organization_name || 'N/A'}</dd></div>
-              <div><dt className="v-caption">Created</dt><dd className="mt-1 text-v-text">{selectedEvent.created_at ? format(new Date(selectedEvent.created_at), 'MMM d, yyyy') : 'Not available'}</dd></div>
-              <div className="sm:col-span-2"><dt className="v-caption">Date range</dt><dd className="mt-1 text-v-text">{selectedEvent.start_date && selectedEvent.end_date ? `${format(new Date(selectedEvent.start_date), 'MMM d, yyyy h:mm a')} - ${format(new Date(selectedEvent.end_date), 'MMM d, yyyy h:mm a')}` : 'Not set'}</dd></div>
-            </dl>
-            <div className="mt-6 flex flex-wrap justify-end gap-2">
-              <Link to={`/admin/audit-logs?entity=events&entityId=${selectedEvent.id}`} className="v-press inline-flex items-center justify-center gap-2 rounded-lg border border-v-border-strong bg-v-surface px-3 py-1.5 text-sm font-medium text-v-text hover:bg-v-surface-elevated">
-                <FileSearch className="h-4 w-4" strokeWidth={1.5} /> Activity log
-              </Link>
-              <Button type="button" variant="secondary" size="sm" onClick={() => handleEventExport(selectedEvent)} loading={eventExporting === selectedEvent.id}>
-                <Download className="h-4 w-4" strokeWidth={1.5} /> Export report
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

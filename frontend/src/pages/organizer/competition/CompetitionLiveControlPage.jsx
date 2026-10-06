@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   Play, Pause, Square, RefreshCw, Users, Star, CheckCircle, Clock, LockOpen,
+  ListOrdered, ShieldCheck,
 } from 'lucide-react'
 import { competitionSessionService } from '@/services/competition-session.service.js'
 import { pageantService } from '@/services/pageant.service.js'
@@ -146,7 +147,7 @@ export default function CompetitionLiveControlPage() {
       await competitionSessionService.publishArrangement(eventId, arrangement)
       setArrangementPreview(null)
       await loadSession()
-      success('Arrangement published to judges')
+      success('Stage order published to judges')
     } catch (err) {
       toastError(getErrorMessage(err))
     } finally {
@@ -439,7 +440,7 @@ export default function CompetitionLiveControlPage() {
         </div>
       </div>
 
-      <ArrangementControl
+      <StageOrderControl
         arrangement={arrangement}
         setArrangement={setArrangement}
         divisions={foundation?.divisions ?? []}
@@ -447,6 +448,7 @@ export default function CompetitionLiveControlPage() {
         onPreview={previewArrangement}
         onPublish={publishArrangement}
         actionLoading={actionLoading}
+        locked={Boolean(judgeProgress?.progress?.length || judgeProgress?.submitted?.length)}
       />
 
       {/* Current Stage & Contestant */}
@@ -454,7 +456,7 @@ export default function CompetitionLiveControlPage() {
         {/* Current Round/Stage */}
         <div className="rounded-xl border border-v-border bg-v-surface p-6 flex flex-col gap-4">
           <div>
-            <h3 className="mb-1 text-sm font-medium text-v-text-muted uppercase tracking-wider">Current Stage</h3>
+            <h3 className="mb-1 text-sm font-medium text-v-text-muted uppercase tracking-wider">Live Stage</h3>
             <div className="mb-2">
               <p className="text-xl font-bold text-v-text">
                 {session.hasRounds
@@ -480,7 +482,8 @@ export default function CompetitionLiveControlPage() {
           <div className="mt-auto grid gap-4 pt-4 border-t border-v-border">
             {foundation?.event?.divisions_enabled && foundation?.divisions?.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs text-v-text-subtle mb-1">Switch division:</p>
+                <p className="text-xs font-medium text-v-text-muted mb-1">Presentation division</p>
+                <p className="mb-2 text-xs text-v-text-subtle">Changes the stage view only; judge assignments stay unchanged.</p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -515,7 +518,8 @@ export default function CompetitionLiveControlPage() {
 
             {session.availableRounds?.length > 1 && (
               <div className="space-y-1">
-                <p className="text-xs text-v-text-subtle mb-1">Switch round:</p>
+                <p className="text-xs font-medium text-v-text-muted mb-1">Live round</p>
+                <p className="mb-2 text-xs text-v-text-subtle">Choose the round currently presented and scored.</p>
                 <div className="flex flex-wrap gap-2">
                   {session.availableRounds.map((round) => (
                     <button
@@ -542,7 +546,8 @@ export default function CompetitionLiveControlPage() {
                 only see open criteria; opening one exposes its minor criteria. */}
             {session.criteriaControl?.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs text-v-text-subtle mb-1">Criteria open for scoring:</p>
+                <p className="text-xs font-medium text-v-text-muted mb-1">Criteria available to judges</p>
+                <p className="mb-2 text-xs text-v-text-subtle">Open or close scoring criteria without changing judge assignments.</p>
                 <div className="flex flex-wrap gap-2">
                   {session.criteriaControl.map((c) => (
                     <button
@@ -633,7 +638,7 @@ export default function CompetitionLiveControlPage() {
             <div className="rounded-xl border border-v-border bg-v-surface p-6">
               <div className="mb-1 flex items-center justify-between gap-2">
                 <h3 className="text-sm font-medium text-v-text-muted uppercase tracking-wider">
-                  Scoring control{session.hasRounds ? ' — this round' : ''}
+                  Scoring access{session.hasRounds ? ' — this round' : ''}
                 </h3>
                 {roster.length > 0 && (
                   <div className="flex gap-1.5">
@@ -816,27 +821,42 @@ export default function CompetitionLiveControlPage() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function ArrangementControl({ arrangement, setArrangement, divisions, preview, onPreview, onPublish, actionLoading }) {
+function StageOrderControl({ arrangement, setArrangement, divisions, preview, onPreview, onPublish, actionLoading, locked }) {
   const needsDivisions = arrangement.mode !== 'default'
   const update = (key, value) => setArrangement((current) => ({ ...current, [key]: value }))
 
   return (
     <div className="rounded-xl border border-v-border bg-v-surface p-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-medium uppercase tracking-wider text-v-text-muted">Judge arrangement</h3>
-          <p className="mt-1 text-sm text-v-text-subtle">Choose how contestants appear in the published scoring order.</p>
+        <div className="flex items-start gap-3">
+          <ListOrdered className="mt-0.5 h-5 w-5 shrink-0 text-v-primary" aria-hidden />
+          <div>
+            <h3 className="text-sm font-medium uppercase tracking-wider text-v-text-muted">Stage order</h3>
+            <p className="mt-1 text-sm text-v-text-subtle">
+              Choose how contestants appear on the judges' scoring sheet. This does not assign or remove judges.
+            </p>
+          </div>
         </div>
         <Badge variant={preview ? 'warning' : 'default'}>{preview ? 'PREVIEW READY' : 'PUBLISHED ORDER'}</Badge>
       </div>
+      <div className="mb-4 flex items-center gap-2 rounded-lg border border-v-border bg-v-surface-elevated/60 px-3 py-2 text-xs text-v-text-subtle">
+        <ShieldCheck className="h-4 w-4 shrink-0 text-v-success" aria-hidden />
+        Judge assignments remain managed on the Judges page.
+      </div>
+      {locked && (
+        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">
+          Stage order is locked because scoring has started. Existing judge assignments and scores are not changed.
+        </div>
+      )}
 
       <div className="grid gap-3 md:grid-cols-3">
         <label className="text-sm text-v-text-muted">
-          Arrangement mode
+          Presentation mode
           <select
             value={arrangement.mode}
             onChange={(event) => update('mode', event.target.value)}
-            className="mt-1 w-full rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text"
+            disabled={locked}
+            className="mt-1 w-full rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text disabled:opacity-50"
           >
             <option value="default">Default number order</option>
             <option value="primary-first">Primary division first</option>
@@ -845,11 +865,11 @@ function ArrangementControl({ arrangement, setArrangement, divisions, preview, o
           </select>
         </label>
         <label className="text-sm text-v-text-muted">
-          First division
+          First division in sequence
           <select
             value={arrangement.primaryDivisionId}
             onChange={(event) => update('primaryDivisionId', event.target.value)}
-            disabled={!needsDivisions}
+            disabled={!needsDivisions || locked}
             className="mt-1 w-full rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text disabled:opacity-50"
           >
             <option value="">Select division</option>
@@ -857,11 +877,11 @@ function ArrangementControl({ arrangement, setArrangement, divisions, preview, o
           </select>
         </label>
         <label className="text-sm text-v-text-muted">
-          Second division
+          Second division in sequence
           <select
             value={arrangement.secondaryDivisionId}
             onChange={(event) => update('secondaryDivisionId', event.target.value)}
-            disabled={!needsDivisions}
+            disabled={!needsDivisions || locked}
             className="mt-1 w-full rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text disabled:opacity-50"
           >
             <option value="">Select division</option>
@@ -871,17 +891,17 @@ function ArrangementControl({ arrangement, setArrangement, divisions, preview, o
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" onClick={onPreview} loading={actionLoading === 'previewArrangement'}>
-          Preview order
+        <Button size="sm" variant="secondary" onClick={onPreview} loading={actionLoading === 'previewArrangement'} disabled={locked}>
+          Preview stage order
         </Button>
-        <Button size="sm" onClick={onPublish} loading={actionLoading === 'publishArrangement'} disabled={!preview}>
-          Publish to judges
+        <Button size="sm" onClick={onPublish} loading={actionLoading === 'publishArrangement'} disabled={!preview || locked}>
+          Publish stage order
         </Button>
       </div>
 
       {preview && (
         <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-300">Draft preview</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-300">Stage order preview</p>
           <ol className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
             {preview.contestants.map((contestant, index) => (
               <li key={contestant.id} className="rounded-md border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text">
@@ -1153,4 +1173,3 @@ function CompletedSessionView({ session, onStart, actionLoading }) {
     </div>
   )
 }
-

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Archive, Play, RefreshCw } from 'lucide-react'
+import { Archive, Play, RefreshCw, Info, CheckCircle2 } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -10,6 +10,7 @@ export default function ArchivalPolicyPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [running, setRunning] = useState(false)
+  const [lastRunMessage, setLastRunMessage] = useState('')
   const { success: toastSuccess, error: toastError } = useToast()
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function ArchivalPolicyPage() {
     setRunning(true)
     try {
       const { data } = await adminService.runArchivalNow()
+      setLastRunMessage(data.message || `Archived ${data.archived} event(s)`)
       toastSuccess(data.message || `Archived ${data.archived} event(s)`)
     } catch {
       toastError('Archival run failed')
@@ -80,6 +82,23 @@ export default function ArchivalPolicyPage() {
           Run now
         </Button>
       </div>
+
+      <Card>
+        <div className="flex items-start gap-3">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-v-primary" aria-hidden />
+          <div className="space-y-1 text-sm text-v-text-muted">
+            <p className="font-medium text-v-text">What this policy does</p>
+            <p>
+              Archival changes only events with a <strong className="text-v-text">Completed</strong> status.
+              An event is archived when its end date is older than the number of days below.
+              Active, scheduled, draft, and cancelled events are never affected.
+            </p>
+            <p>
+              When enabled, the system checks automatically once a day. Use <strong className="text-v-text">Run now</strong> to check immediately.
+            </p>
+          </div>
+        </div>
+      </Card>
 
       <Card>
         <div className="divide-y divide-v-border">
@@ -128,6 +147,12 @@ export default function ArchivalPolicyPage() {
       </Card>
 
       <div className="flex justify-end">
+        {lastRunMessage && (
+          <p className="mr-auto inline-flex items-center gap-2 self-center text-sm text-v-text-muted">
+            <CheckCircle2 className="h-4 w-4 text-v-success" aria-hidden />
+            {lastRunMessage}
+          </p>
+        )}
         <Button onClick={handleSave} loading={saving}>
           <Archive className="h-4 w-4" strokeWidth={1.5} />
           Save policy

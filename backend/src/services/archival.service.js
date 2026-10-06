@@ -56,8 +56,29 @@ export async function runArchivalNow() {
     .select('id')
 
   if (error) {
-    return { archived: 0, message: error.message }
+    throw new Error(`Event archival failed: ${error.message}`)
   }
   const archived = data?.length ?? 0
   return { archived, message: `Archived ${archived} events older than ${policy.daysAfterCompletion} days` }
+}
+
+// Archival is intentionally lightweight and idempotent, so the API process can
+// run it once a day without creating duplicate work. Admins can still trigger
+// the same operation from the policy page.
+export function startArchivalScheduler() {
+  const run = async () => {
+    try {
+      const result = await runArchivalNow()
+      if (result.archived > 0) {
+        console.log(`[archival] ${result.message}`)
+      }
+    } catch (error) {
+      console.error('[archival] Scheduled run failed:', error.message)
+    }
+  }
+
+  const initialDelay = 60 * 1000
+  const interval = 24 * 60 * 60 * 1000
+  setTimeout(run, initialDelay)
+  return setInterval(run, interval)
 }

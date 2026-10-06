@@ -3,7 +3,7 @@ import { getRoleDashboardPath } from '@/utils/auth'
 import { USER_ROLES } from '@/utils/constants'
 import AppShell from '@/layouts/AppShell'
 import {
-  LayoutDashboard, Users, CalendarDays, Settings, ClipboardList, Bell, Archive, Monitor, ShieldOff,
+  LayoutDashboard, Users, CalendarDays, Settings, ClipboardList, Bell, Archive, Monitor,
 } from 'lucide-react'
 
 export default function DashboardLayout({
@@ -48,12 +48,6 @@ export default function DashboardLayout({
             path: '/admin/settings',
             icon: Settings,
             isActive: (loc) => loc.pathname.startsWith('/admin/settings'),
-          },
-          {
-            label: 'Sessions',
-            path: '/admin/sessions',
-            icon: ShieldOff,
-            isActive: (loc) => loc.pathname.startsWith('/admin/sessions'),
           },
           {
             label: 'Archival Policy',

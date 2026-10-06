@@ -55,10 +55,10 @@ export default function EventStatsTable({
   return (
     <Card padding={false}>
       {events.length > 0 && (
-        <div className="flex flex-col gap-3 border-b border-v-border px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-v-border px-6 py-4">
           <h3 className="font-semibold text-v-text">{title}</h3>
           <FilterBar
-            className="min-w-0 lg:items-end"
+            className="min-w-0 flex-1 flex-row items-center gap-3"
             search={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search events"
