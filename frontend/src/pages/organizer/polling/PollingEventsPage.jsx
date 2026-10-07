@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Edit2, Eye } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
-import { isReadOnlyEventStatus } from '@/utils/constants'
+import { isSetupLocked } from '@/utils/constants'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
@@ -200,7 +200,7 @@ export default function PollingEventsPage() {
               to={`/organizer/polling/events/${event.id}/edit`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
             >
-              {isReadOnlyEventStatus(event.status) ? (
+              {isSetupLocked(event.status) ? (
                 <>
                   <Eye className="h-3.5 w-3.5" strokeWidth={2} />
                   View

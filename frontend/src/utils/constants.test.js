@@ -19,6 +19,7 @@ describe('event lifecycle edit-locking', () => {
       expect(isSetupLocked(EVENT_STATUS.ACTIVE)).toBe(true)
       expect(isSetupLocked(EVENT_STATUS.COMPLETED)).toBe(true)
       expect(isSetupLocked(EVENT_STATUS.CANCELLED)).toBe(true)
+      expect(isSetupLocked(EVENT_STATUS.ARCHIVED)).toBe(true)
     })
 
     it('treats unknown/null status as locked (fail safe)', () => {
@@ -60,6 +61,7 @@ describe('event lifecycle edit-locking', () => {
       expect(isReadOnlyEventStatus(EVENT_STATUS.DRAFT)).toBe(false)
       expect(isReadOnlyEventStatus(EVENT_STATUS.SCHEDULED)).toBe(false)
       expect(isReadOnlyEventStatus(EVENT_STATUS.ACTIVE)).toBe(false)
+      expect(isReadOnlyEventStatus(EVENT_STATUS.ARCHIVED)).toBe(true)
     })
   })
 })

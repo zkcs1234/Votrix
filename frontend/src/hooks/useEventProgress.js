@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-const STORAGE_PREFIX = 'votrix.event-progress'
+const STORAGE_PREFIX = 'votrix.event-progress.v2'
 
 function loadProgress(module, eventId) {
   if (!eventId || eventId === 'new') return []
@@ -24,7 +24,7 @@ function saveProgress(module, eventId, keys) {
 }
 
 /**
- * Tracks which event stages the user has visited/completed.
+ * Tracks explicitly completed event stages.
  * Persisted in localStorage so it survives page reloads.
  *
  * @param {string} module - 'election', 'competition', or 'polling'

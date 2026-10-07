@@ -33,6 +33,7 @@ export const EVENT_STATUS = {
   ACTIVE: 'active',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
+  ARCHIVED: 'archived',
 }
 
 // Terminal states an organizer can no longer edit: the event is done (or

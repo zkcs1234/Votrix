@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
 import { stageKeyFromPath } from '@/utils/eventStages'
 import useEventProgress from '@/hooks/useEventProgress'
@@ -32,24 +31,18 @@ const PAGE_OWNS_FOOTER = {
  * Wraps module page content with the EventStepper (top) and StageFooter
  * (bottom) so every page of a module shows the stage navigation, not just the
  * event-creation form. Tracks stage completion in localStorage via
- * useEventProgress so completed stages stay checked even when editing.
+ * useEventProgress so explicitly completed stages stay checked across visits.
  */
 export default function ModuleStageLayout({ module, children }) {
   const { eventId } = useParams()
   const location = useLocation()
-  const { completedKeys, markComplete } = useEventProgress(module, eventId)
+  const { completedKeys } = useEventProgress(module, eventId)
 
   const currentKey = stageKeyFromPath(module, location.pathname)
   const isFormWizard = currentKey && (FORM_WIZARD_STAGES[module] ?? []).includes(currentKey)
   const pageOwnsFooter = currentKey && (PAGE_OWNS_FOOTER[module] ?? []).includes(currentKey)
 
   const enabled = Boolean(eventId && eventId !== 'new' && currentKey && !isFormWizard)
-
-  // Auto-mark the current stage as completed once the user visits it, so the
-  // stepper keeps it checked on subsequent edits.
-  useEffect(() => {
-    if (enabled && currentKey) markComplete(currentKey)
-  }, [enabled, currentKey, markComplete])
 
   if (!enabled) return <>{children}</>
 

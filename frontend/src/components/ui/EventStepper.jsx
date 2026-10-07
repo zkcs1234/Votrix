@@ -2,7 +2,13 @@ import { Link } from 'react-router-dom'
 import { Check } from 'lucide-react'
 import { EVENT_STAGES, MODULE_BASE_PATH } from '@/utils/eventStages'
 
-export default function EventStepper({ module, currentKey, eventId, completedKeys = [] }) {
+export default function EventStepper({
+  module,
+  currentKey,
+  eventId,
+  completedKeys = [],
+  readOnly = false,
+}) {
   const stages = EVENT_STAGES[module] ?? []
   const currentIndex = stages.findIndex((s) => s.key === currentKey)
   const base = MODULE_BASE_PATH[module]
@@ -14,10 +20,15 @@ export default function EventStepper({ module, currentKey, eventId, completedKey
       <ol className="flex w-full items-start overflow-x-auto pb-2 text-sm">
         {stages.map((stage, idx) => {
           const isCurrent = idx === currentIndex
-          const isCompleted =
-            completedKeys.includes(stage.key) || (idx < currentIndex && currentIndex !== -1)
+          const isCompleted = completedKeys.includes(stage.key)
           const isDone = isCompleted && !isCurrent
-          const status = isCurrent ? 'In progress' : isCompleted ? 'Completed' : 'Not started'
+          const status = isCurrent
+            ? readOnly
+              ? 'Viewing'
+              : 'Current stage'
+            : isCompleted
+              ? 'Completed'
+              : 'Not started'
           const href = eventId && stage.path
             ? eventId === 'new'
               ? `${base}/new`

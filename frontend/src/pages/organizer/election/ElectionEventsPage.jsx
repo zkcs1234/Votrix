@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Edit2, Eye } from 'lucide-react'
 import { electionService } from '@/services/election.service'
-import { isReadOnlyEventStatus } from '@/utils/constants'
+import { isSetupLocked } from '@/utils/constants'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import Button from '@/components/ui/Button'
@@ -143,7 +143,7 @@ function EventCard({ event, onPreview }) {
           to={`/organizer/election/events/${event.id}/edit`}
           className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated"
         >
-          {isReadOnlyEventStatus(event.status) ? (
+          {isSetupLocked(event.status) ? (
             <>
               <Eye className="h-3.5 w-3.5" strokeWidth={2} />
               View
