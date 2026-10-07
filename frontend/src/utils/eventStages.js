@@ -54,6 +54,27 @@ export const MODULE_BASE_PATH = {
   polling: '/organizer/polling/events',
 }
 
+const SETUP_STAGE_KEYS = {
+  election: new Set(['details', 'branding', 'positions', 'candidates', 'voters', 'review']),
+  competition: new Set(['details', 'branding', 'workspace', 'contestants', 'judges', 'review']),
+  polling: new Set(['details', 'branding', 'settings', 'builder', 'respondents', 'review']),
+}
+
+export function getStageProgressStatus(
+  module,
+  stageKey,
+  { currentKey, completedKeys = [], eventStatus, readOnly = false } = {},
+) {
+  if (stageKey === currentKey) return readOnly ? 'Viewing' : 'Current stage'
+  if (completedKeys.includes(stageKey)) return 'Completed'
+
+  const isPublished = eventStatus != null && eventStatus !== 'draft'
+  if (isPublished && SETUP_STAGE_KEYS[module]?.has(stageKey)) return 'Completed'
+  if (isPublished) return 'Available'
+
+  return 'Not started'
+}
+
 export function stagePath(module, stageKey, eventId) {
   const base = MODULE_BASE_PATH[module]
   if (!base) return null

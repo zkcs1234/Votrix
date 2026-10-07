@@ -355,6 +355,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             eventId={stepperEventId}
             completedKeys={completedKeys}
             readOnly={readOnly}
+            eventStatus={eventStatus}
           />
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="election" />}

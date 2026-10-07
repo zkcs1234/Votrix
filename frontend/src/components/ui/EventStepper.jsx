@@ -1,6 +1,10 @@
 import { Link } from 'react-router-dom'
 import { Check } from 'lucide-react'
-import { EVENT_STAGES, MODULE_BASE_PATH } from '@/utils/eventStages'
+import {
+  EVENT_STAGES,
+  MODULE_BASE_PATH,
+  getStageProgressStatus,
+} from '@/utils/eventStages'
 
 export default function EventStepper({
   module,
@@ -8,6 +12,7 @@ export default function EventStepper({
   eventId,
   completedKeys = [],
   readOnly = false,
+  eventStatus = null,
 }) {
   const stages = EVENT_STAGES[module] ?? []
   const currentIndex = stages.findIndex((s) => s.key === currentKey)
@@ -20,15 +25,14 @@ export default function EventStepper({
       <ol className="flex w-full items-start overflow-x-auto pb-2 text-sm">
         {stages.map((stage, idx) => {
           const isCurrent = idx === currentIndex
-          const isCompleted = completedKeys.includes(stage.key)
-          const isDone = isCompleted && !isCurrent
-          const status = isCurrent
-            ? readOnly
-              ? 'Viewing'
-              : 'Current stage'
-            : isCompleted
-              ? 'Completed'
-              : 'Not started'
+          const status = getStageProgressStatus(module, stage.key, {
+            currentKey,
+            completedKeys,
+            eventStatus,
+            readOnly,
+          })
+          const isDone = status === 'Completed' && !isCurrent
+          const isAvailable = status === 'Available'
           const href = eventId && stage.path
             ? eventId === 'new'
               ? `${base}/new`
@@ -45,7 +49,9 @@ export default function EventStepper({
             ? 'font-medium text-v-primary'
             : isDone
               ? 'text-v-success'
-              : 'text-v-text-subtle'
+              : isAvailable
+                ? 'text-v-text-muted'
+                : 'text-v-text-subtle'
 
           const inner = (
             <span className="flex min-w-[7.5rem] flex-1 flex-col">

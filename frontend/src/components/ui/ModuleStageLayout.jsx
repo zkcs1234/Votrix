@@ -1,8 +1,18 @@
 import { useParams, useLocation } from 'react-router-dom'
 import { stageKeyFromPath } from '@/utils/eventStages'
 import useEventProgress from '@/hooks/useEventProgress'
+import useEventStatus from '@/hooks/useEventStatus'
 import EventStepper from '@/components/ui/EventStepper'
 import StageFooter from '@/components/ui/StageFooter'
+import { electionService } from '@/services/election.service'
+import { pageantService } from '@/services/pageant.service'
+import { pollingService } from '@/services/polling.service'
+
+const EVENT_SERVICES = {
+  election: electionService,
+  competition: pageantService,
+  polling: pollingService,
+}
 
 // Stages that are part of the multi-step create/edit wizard and already render
 // their own EventStepper + per-step StageFooter inside the form pages.
@@ -37,6 +47,7 @@ export default function ModuleStageLayout({ module, children }) {
   const { eventId } = useParams()
   const location = useLocation()
   const { completedKeys } = useEventProgress(module, eventId)
+  const { status: eventStatus } = useEventStatus(EVENT_SERVICES[module], eventId)
 
   const currentKey = stageKeyFromPath(module, location.pathname)
   const isFormWizard = currentKey && (FORM_WIZARD_STAGES[module] ?? []).includes(currentKey)
@@ -53,6 +64,8 @@ export default function ModuleStageLayout({ module, children }) {
         currentKey={currentKey}
         eventId={eventId}
         completedKeys={completedKeys}
+        eventStatus={eventStatus}
+        readOnly={eventStatus != null && eventStatus !== 'draft'}
       />
       {children}
       {!pageOwnsFooter && (

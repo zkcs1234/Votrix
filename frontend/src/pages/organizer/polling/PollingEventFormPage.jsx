@@ -380,6 +380,7 @@ const stepperEventId = isNew ? 'new' : eventId
             eventId={stepperEventId}
             completedKeys={completedKeys}
             readOnly={readOnly}
+            eventStatus={eventStatus}
           />
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="poll" />}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-const STORAGE_PREFIX = 'votrix.event-progress.v2'
+const STORAGE_PREFIX = 'votrix.event-progress.v3'
 
 function loadProgress(module, eventId) {
   if (!eventId || eventId === 'new') return []
