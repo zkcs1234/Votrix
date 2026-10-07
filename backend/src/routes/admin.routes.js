@@ -26,6 +26,7 @@ router.patch('/organizers/:organizerId/status', adminActionLimiter, adminControl
 router.post('/organizers/:organizerId/send-onboarding', adminActionLimiter, adminController.sendOrganizerOnboarding)
 
 router.get('/events', adminController.getGlobalEvents)
+router.patch('/events/:eventId/restore', adminActionLimiter, adminController.restoreEvent)
 
 // Voter (student participant) registration — plan Phase 3.
 router.get('/voters', adminController.getVoters)

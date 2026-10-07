@@ -1,10 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { assertEventUpdateAllowed } from '../../src/utils/eventLifecycle.js'
+import { assertEventOperational, assertEventUpdateAllowed } from '../../src/utils/eventLifecycle.js'
 
 describe('assertEventUpdateAllowed', () => {
   it('allows core field updates for draft and scheduled events', () => {
     expect(() => assertEventUpdateAllowed({ status: 'draft' }, { title: 'Updated title' })).not.toThrow()
     expect(() => assertEventUpdateAllowed({ status: 'scheduled' }, { title: 'Updated title' })).not.toThrow()
+  })
+
+  describe('assertEventOperational', () => {
+    it('blocks operational activity for archived events', () => {
+      expect(() => assertEventOperational({ status: 'archived' })).toThrow(
+        /archived.*no longer accepting activity/i,
+      )
+    })
+
+    it('allows operational activity for non-archived events', () => {
+      expect(() => assertEventOperational({ status: 'active' })).not.toThrow()
+    })
   })
 
   it('blocks core field updates for active, completed, cancelled, and archived events', () => {

@@ -32,6 +32,9 @@ export const adminService = {
   getGlobalEvents() {
     return api.get(`${base}/events`)
   },
+  restoreEvent(eventId) {
+    return api.patch(`${base}/events/${eventId}/restore`)
+  },
   getSystemSettings() {
     return api.get(`${base}/settings`)
   },

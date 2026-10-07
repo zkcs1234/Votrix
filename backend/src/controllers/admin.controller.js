@@ -60,6 +60,7 @@ import {
   getArchivalPolicy as fetchArchivalPolicy,
   updateArchivalPolicy as saveArchivalPolicy,
   runArchivalNow as triggerArchival,
+  restoreArchivedEvent,
 } from '../services/archival.service.js'
 import { ApiError } from '../utils/ApiError.js'
 import { validateUUID } from '../utils/sanitize.js'
@@ -220,6 +221,11 @@ export const getOrganizers = asyncHandler(async (_req, res) => {
 export const getGlobalEvents = asyncHandler(async (_req, res) => {
   const events = await fetchGlobalEvents()
   res.json({ success: true, events })
+})
+
+export const restoreEvent = asyncHandler(async (req, res) => {
+  const event = await restoreArchivedEvent(req.params.eventId, req.user.id)
+  res.json({ success: true, event })
 })
 
 export const getSystemSettings = asyncHandler(async (_req, res) => {

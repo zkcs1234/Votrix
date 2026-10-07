@@ -229,7 +229,7 @@ export default function JudgesPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('active')
   const [modal, setModal] = useState(null)
   const [statusTarget, setStatusTarget] = useState(null)
   const [preview, setPreview] = useState(null)

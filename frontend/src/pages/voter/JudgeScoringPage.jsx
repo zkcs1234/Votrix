@@ -47,6 +47,7 @@ export default function JudgeScoringPage() {
   // The shared WS client (socket.service) may already be open before this page
   // mounts (Bootstrap connects on auth), so seed from its live state.
   const [socketConnected, setSocketConnected] = useState(() => isConnected())
+  const isArchived = sheet?.event?.status === 'archived'
   
   // Division selector state
   const [selectedDivisionId, setSelectedDivisionId] = useState(null)
@@ -531,7 +532,7 @@ export default function JudgeScoringPage() {
               variant="outline"
               onClick={handleManualRetry}
               className="shrink-0 border-v-warning/40 text-v-warning hover:bg-v-warning/10"
-              disabled={submissionQueue.length === 0}
+              disabled={submissionQueue.length === 0 || isArchived}
             >
               <RotateCcw className="h-4 w-4 mr-1" />
               Retry Now
@@ -662,6 +663,7 @@ export default function JudgeScoringPage() {
         submittingKey={submittingKey}
         onSubmitCriterion={submitCriterion}
         sessionState={sessionState}
+        disabled={isArchived}
       />
 
       {error && <FormAlert variant="error">{error}</FormAlert>}

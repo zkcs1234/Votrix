@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
+import { DB_TABLES, EVENT_STATUS, EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
 import { isElectionVotingOpen, canVoterViewElectionResults } from '../utils/eventSchedule.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { getOrganizerScope, isStudentInScope, isAllAccess } from './organizer-scope.service.js'
@@ -95,6 +95,7 @@ export async function getOrganizerDashboard(organizerId) {
       .select('id, title, status, voting_enabled, event_type')
       .eq('organization_id', org.id)
       .eq('event_type', EVENT_TYPES.ELECTION)
+      .neq('status', EVENT_STATUS.ARCHIVED)
       .order('created_at', { ascending: false })
 
     if (error) throw new ApiError(500, error.message)
@@ -180,6 +181,7 @@ export async function listElectionEvents(organizerId, { limit = 200, offset = 0 
     .select('id, title, description, banner, status, voting_enabled, event_type, results_visibility, start_date, end_date, created_at, updated_at, organization_id')
     .eq('organization_id', org.id)
     .eq('event_type', EVENT_TYPES.ELECTION)
+    .neq('status', EVENT_STATUS.ARCHIVED)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
@@ -1234,7 +1236,7 @@ export async function listVoterElectionEvents(voterId) {
       `
       id,
       has_voted,
-      events (
+      events!inner (
         id,
         title,
         description,
@@ -1256,6 +1258,7 @@ export async function listVoterElectionEvents(voterId) {
     )
     .eq('user_id', voterId)
     .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
+    .neq('events.status', EVENT_STATUS.ARCHIVED)
 
   if (error) throw new ApiError(500, error.message)
 

@@ -16,9 +16,12 @@ import { Lock } from 'lucide-react'
  */
 export default function ReadOnlyEventBanner({ status, noun = 'event' }) {
   const isScheduled = status === 'scheduled'
+  const isArchived = status === 'archived'
 
   const title = isScheduled
     ? `Published — this ${noun}'s setup is locked`
+    : isArchived
+      ? `Archived — this ${noun} is read-only`
     : status === 'cancelled'
       ? `Read-only — this ${noun} is cancelled`
       : status === 'active'
@@ -27,6 +30,8 @@ export default function ReadOnlyEventBanner({ status, noun = 'event' }) {
 
   const detail = isScheduled
     ? `Setup can no longer be edited while published. Go to Review & Publish to unpublish it back to draft, then make your changes.`
+    : isArchived
+      ? `This ${noun} is kept for historical viewing and reporting. Editing, participant changes, and new activity are disabled.`
     : `You can view every section, but this ${noun} can no longer be edited.`
 
   return (

@@ -119,6 +119,7 @@ export default function VoterEventPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
+  const isArchived = ballot?.event?.status === 'archived'
 
   useEffect(() => {
     if (!ballot?.ballotSectionId) return
@@ -367,7 +368,7 @@ export default function VoterEventPage() {
                   position={position}
                   selectedIds={selections[position.id]}
                   onToggle={toggleCandidate}
-                  disabled={submitting}
+                  disabled={submitting || isArchived}
                 />
               ))}
 
@@ -385,11 +386,11 @@ export default function VoterEventPage() {
               <Button
                 variant="secondary"
                 onClick={() => setIsReviewing(false)}
-                disabled={submitting}
+                disabled={submitting || isArchived}
               >
                 Back to editing
               </Button>
-              <Button onClick={handleSubmit} loading={submitting} disabled={submitting}>
+              <Button onClick={handleSubmit} loading={submitting} disabled={submitting || isArchived}>
                 Submit {ballot.currentSection?.name} ballot
               </Button>
             </div>
@@ -397,7 +398,7 @@ export default function VoterEventPage() {
             <div className="flex flex-col gap-2">
               <Button
                 onClick={handleStartReview}
-                disabled={submitting}
+                disabled={submitting || isArchived}
                 className="w-full"
               >
                 Review ballot

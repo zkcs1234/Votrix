@@ -3,6 +3,7 @@ import { recordEventActivity } from '../foundation/activity.js'
 import { ApiError } from '../utils/ApiError.js'
 import {
   DB_TABLES,
+  EVENT_STATUS,
   COMPETITION_SCORING_EVENT_TYPES,
   PARTICIPANT_TYPES,
   USER_ROLES,
@@ -113,6 +114,7 @@ export async function getOrganizerDashboard(organizerId) {
     .select('id, title, status, scoring_enabled, event_type')
     .eq('organization_id', org.id)
     .in('event_type', Array.from(COMPETITION_SCORING_EVENT_TYPES))
+    .neq('status', EVENT_STATUS.ARCHIVED)
     .order('created_at', { ascending: false })
 
   if (error) throw new ApiError(500, error.message)
@@ -225,6 +227,7 @@ export async function listCompetitionEvents(organizerId, { limit = 200, offset =
     .select('id, title, description, banner, status, scoring_enabled, event_type, start_date, end_date, created_at, updated_at, organization_id, scoring_config')
     .eq('organization_id', org.id)
     .in('event_type', Array.from(COMPETITION_SCORING_EVENT_TYPES))
+    .neq('status', EVENT_STATUS.ARCHIVED)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
@@ -1406,6 +1409,7 @@ export async function assertJudgeEnrolled(eventId, judgeId) {
     .eq('event_id', eventId)
     .eq('user_id', judgeId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .neq('events.status', EVENT_STATUS.ARCHIVED)
     .maybeSingle()
 
   if (error) throw new ApiError(500, error.message)
@@ -1789,7 +1793,7 @@ export async function listJudgeCompetitionEvents(judgeId) {
     .select(
       `
       has_scored,
-      events (
+      events!inner (
         id,
         title,
         description,

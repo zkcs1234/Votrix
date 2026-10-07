@@ -1,11 +1,16 @@
 import { ApiError } from '../utils/ApiError.js'
 import { EVENT_STATUS } from '../utils/constants.js'
 import { getEventById } from '../services/event.service.js'
+import { assertEventOperational } from '../utils/eventLifecycle.js'
 
-// Terminal states an organizer can no longer edit. A completed or cancelled
-// event is locked: the UI shows a read-only "View", and every mutation is
-// rejected here so the lock holds even if a page or request is reached directly.
-const READ_ONLY_EVENT_STATUSES = new Set([EVENT_STATUS.COMPLETED, EVENT_STATUS.CANCELLED])
+// Terminal states an organizer can no longer edit. A completed, cancelled, or
+// archived event is locked: every mutation is rejected here so the lock holds
+// even if a page or request is reached directly.
+const READ_ONLY_EVENT_STATUSES = new Set([
+  EVENT_STATUS.COMPLETED,
+  EVENT_STATUS.CANCELLED,
+  EVENT_STATUS.ARCHIVED,
+])
 
 const MUTATING_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE'])
 
@@ -17,9 +22,8 @@ const EVENT_DUPLICATE_RE = /\/events\/[^/]+\/duplicate$/
 
 // Paths that stay allowed even on a read-only event:
 //  - the whole-event duplicate (above).
-//  - /session/...: competition live-session controls manage the scoring
-//    lifecycle (start/pause/complete/advance), not the event's setup or
-//    details, and remain governed by their own service rules.
+//  - /session/...: competition live-session controls remain available for
+//    completed/cancelled events, but never for archived events.
 function isExemptPath(originalUrl) {
   const path = (originalUrl || '').split('?')[0]
   return EVENT_DUPLICATE_RE.test(path) || path.includes('/session/')
@@ -40,12 +44,36 @@ export async function requireEditableEvent(req, _res, next) {
     if (isExemptPath(req.originalUrl)) return next()
 
     const event = await getEventById(eventId)
-    if (event && READ_ONLY_EVENT_STATUSES.has(event.status)) {
+    if (
+      event &&
+      READ_ONLY_EVENT_STATUSES.has(event.status) &&
+      !(event.status !== EVENT_STATUS.ARCHIVED && isExemptPath(req.originalUrl))
+    ) {
       throw new ApiError(
         409,
         `This event is ${event.status} and can no longer be edited.`,
       )
     }
+
+    next()
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Blocks operational submissions for archived events while leaving historical
+ * GET endpoints available for read-only results and reports.
+ */
+export async function requireOperationalEvent(req, _res, next) {
+  try {
+    if (req.method.toUpperCase() !== 'POST') return next()
+
+    const { eventId } = req.params
+    if (!eventId) return next()
+
+    const event = await getEventById(eventId)
+    assertEventOperational(event)
 
     next()
   } catch (err) {

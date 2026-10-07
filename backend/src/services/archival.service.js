@@ -1,6 +1,8 @@
 import { db, wrap } from '../foundation/db.js'
 import { DB_TABLES, EVENT_STATUS } from '../utils/constants.js'
 import { getSystemSettings, saveSystemSetting } from './admin.service.js'
+import { recordAudit } from '../foundation/audit.js'
+import { ApiError } from '../utils/ApiError.js'
 
 const ARCHIVAL_POLICY_KEY = 'event_archival_policy'
 
@@ -60,6 +62,31 @@ export async function runArchivalNow() {
   }
   const archived = data?.length ?? 0
   return { archived, message: `Archived ${archived} events older than ${policy.daysAfterCompletion} days` }
+}
+
+export async function restoreArchivedEvent(eventId, adminId) {
+  const { data, error } = await db()
+    .from(DB_TABLES.EVENTS)
+    .update({ status: EVENT_STATUS.COMPLETED })
+    .eq('id', eventId)
+    .eq('status', EVENT_STATUS.ARCHIVED)
+    .select('id, status, archived_at')
+    .maybeSingle()
+
+  if (error) throw new Error(`Event restoration failed: ${error.message}`)
+  if (!data) {
+    throw new ApiError(404, 'Archived event not found')
+  }
+
+  await recordAudit({
+    userId: adminId,
+    action: 'event.restored',
+    entity: 'events',
+    entityId: eventId,
+    details: { status: EVENT_STATUS.COMPLETED },
+  })
+
+  return data
 }
 
 // Archival is intentionally lightweight and idempotent, so the API process can

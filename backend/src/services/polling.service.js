@@ -1,6 +1,6 @@
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, EVENT_TYPES } from '../utils/constants.js'
+import { DB_TABLES, EVENT_STATUS, EVENT_TYPES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { getOrganizerScope, isStudentInScope, isAllAccess } from './organizer-scope.service.js'
 import { getOrCreatePollingOrganization, mapOrganization } from './organization.service.js'
@@ -527,6 +527,7 @@ export async function getOrganizerDashboard(organizerId) {
     .select('id, title, status, polling_enabled, poll_expires_at')
     .eq('organization_id', org.id)
     .eq('event_type', EVENT_TYPES.POLLING)
+    .neq('status', EVENT_STATUS.ARCHIVED)
     .order('created_at', { ascending: false })
 
   if (error) throw new ApiError(500, error.message)
@@ -604,6 +605,7 @@ export async function listPollEvents(organizerId, { limit = 200, offset = 0 } = 
     .select('id, title, description, banner, status, event_type, polling_enabled, poll_anonymous, poll_allow_multiple_submissions, poll_expires_at, start_date, end_date')
     .eq('organization_id', org.id)
     .eq('event_type', EVENT_TYPES.POLLING)
+    .neq('status', EVENT_STATUS.ARCHIVED)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
@@ -1215,6 +1217,7 @@ export async function assertVoterCanRespond(eventId, voterId) {
     .eq('event_id', eventId)
     .eq('user_id', voterId)
     .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+    .neq('events.status', EVENT_STATUS.ARCHIVED)
     .maybeSingle()
 
   if (error) throw new ApiError(500, error.message)
@@ -1413,7 +1416,7 @@ export async function listVoterPollEvents(voterId) {
     .select(
       `
       has_responded,
-      events (
+      events!inner (
         id,
         title,
         description,

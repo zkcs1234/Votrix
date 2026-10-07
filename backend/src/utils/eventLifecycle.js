@@ -77,3 +77,12 @@ export function assertParticipantsEditable(event) {
     )
   }
 }
+
+export function assertEventOperational(event) {
+  if (event?.status === EVENT_STATUS.ARCHIVED) {
+    throw new ApiError(
+      409,
+      'This event has been archived and is no longer accepting activity.',
+    )
+  }
+}

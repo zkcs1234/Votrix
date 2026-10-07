@@ -91,6 +91,12 @@ export default function VoterEventHeader({ event, eyebrow, children }) {
             </div>
           )}
 
+          {event?.status === 'archived' && (
+            <div className="mt-3 rounded-lg border border-amber-200/30 bg-amber-950/40 px-3 py-2 text-sm text-amber-100" role="status">
+              <strong>This event is archived.</strong> Historical information remains available, but voting, responding, and scoring are closed.
+            </div>
+          )}
+
           {children}
         </div>
       </div>

@@ -35,6 +35,7 @@ export default function VoterPollPage() {
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
   const [startedAt] = useState(() => new Date().toISOString())
+  const isArchived = poll?.event?.status === 'archived'
 
   // Auto-dismiss the draft restoration toast after 4 seconds
   useEffect(() => {
@@ -247,7 +248,7 @@ export default function VoterPollPage() {
               index={idx}
               value={answers[q.id]}
               onChange={(val) => setAnswer(q.id, val)}
-              disabled={submitting}
+              disabled={submitting || isArchived}
             />
           ))}
 
@@ -258,7 +259,7 @@ export default function VoterPollPage() {
       {/* ===== FIXED BOTTOM: Submit footer (does not scroll) ===== */}
       <div className="shrink-0 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:px-8 pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto max-w-2xl">
-          <Button type="submit" loading={submitting} className="w-full">
+          <Button type="submit" loading={submitting} disabled={submitting || isArchived} className="w-full">
             {submitting ? 'Submitting…' : 'Submit response'}
           </Button>
         </div>

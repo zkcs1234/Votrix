@@ -195,7 +195,7 @@ export default function VotersPanel() {
   const [search, setSearch] = useState('')
   const [programFilter, setProgramFilter] = useState('')
   const [sectionFilter, setSectionFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('active')
   const [taxonomy, setTaxonomy] = useState({ programs: [], sections: [] })
   const [modal, setModal] = useState(null) // { mode: 'add'|'edit', voter }
   const [statusTarget, setStatusTarget] = useState(null)

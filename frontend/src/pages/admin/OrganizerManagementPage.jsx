@@ -118,7 +118,7 @@ export default function OrganizerManagementPage() {
   const [editingOrg, setEditingOrg] = useState(null)
   const [statusTarget, setStatusTarget] = useState(null)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('active')
   const [savingKey, setSavingKey] = useState(null)
   const showLoader = useDelayedLoading(loading, 300)
   const { success: toastSuccess, error: toastError } = useToast()

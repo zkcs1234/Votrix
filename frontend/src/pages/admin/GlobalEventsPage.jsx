@@ -34,6 +34,7 @@ export default function GlobalEventsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [exporting, setExporting] = useState(false)
   const [eventExporting, setEventExporting] = useState(null)
+  const [eventRestoring, setEventRestoring] = useState(null)
   const showLoader = useDelayedLoading(loading, 300)
   const { success: toastSuccess, error: toastError } = useToast()
   const navigate = useNavigate()
@@ -78,6 +79,24 @@ export default function GlobalEventsPage() {
     }
   }
 
+  const handleEventRestore = async (event) => {
+    if (!window.confirm(`Restore "${event.title}" as a completed, read-only event?`)) return
+    setEventRestoring(event.id)
+    try {
+      await adminService.restoreEvent(event.id)
+      setEvents((current) =>
+        current.map((item) =>
+          item.id === event.id ? { ...item, status: 'completed' } : item,
+        ),
+      )
+      toastSuccess('Event restored as completed')
+    } catch {
+      toastError('Event restoration failed')
+    } finally {
+      setEventRestoring(null)
+    }
+  }
+
   useEffect(() => {
     const fetchEvents = async () => {
       try {
@@ -99,7 +118,8 @@ export default function GlobalEventsPage() {
     const active = events.filter((event) => event.status === 'active').length
     const scheduled = events.filter((event) => event.status === 'scheduled').length
     const completed = events.filter((event) => event.status === 'completed').length
-    return { total, active, scheduled, completed }
+    const archived = events.filter((event) => event.status === 'archived').length
+    return { total, active, scheduled, completed, archived }
   }, [events])
 
   const filteredEvents = useMemo(() => {
@@ -212,6 +232,7 @@ export default function GlobalEventsPage() {
                 <option value="active">Active</option>
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
+                <option value="archived">Archived</option>
               </select>
               {hasActiveFilters && (
                 <Button
@@ -287,6 +308,11 @@ export default function GlobalEventsPage() {
                               <Button type="button" variant="ghost" size="sm" className="h-8 w-full justify-center gap-1.5 whitespace-nowrap px-2 text-xs" onClick={() => navigate(`/admin/organizers/${event.organizations.organizer.id}`)} aria-label={`Open organizer for ${event.title}`}>
                                 <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
                                 Organizer
+                              </Button>
+                            )}
+                            {event.status === 'archived' && (
+                              <Button type="button" variant="ghost" size="sm" className="h-8 w-full justify-center gap-1.5 whitespace-nowrap px-2 text-xs" onClick={() => handleEventRestore(event)} loading={eventRestoring === event.id} aria-label={`Restore ${event.title}`}>
+                                Restore
                               </Button>
                             )}
                           </div>
