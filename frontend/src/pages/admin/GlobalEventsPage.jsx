@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CalendarDays, Zap, Clock, CheckCircle2, Vote, Trophy, BarChart2, Download, X, FileSearch, MoreHorizontal } from 'lucide-react'
+import { CalendarDays, Zap, Clock, CheckCircle2, Archive, Vote, Trophy, BarChart2, Download, X, FileSearch, MoreHorizontal } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Card from '@/components/ui/Card'
 import { format } from 'date-fns'
@@ -151,7 +151,7 @@ export default function GlobalEventsPage() {
           <div className="mt-2 h-4 w-72 animate-pulse rounded-lg bg-v-surface-elevated" />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <div className="v-card-sm h-20 animate-pulse bg-v-surface-elevated" />
           <div className="v-card-sm h-20 animate-pulse bg-v-surface-elevated" />
           <div className="v-card-sm h-20 animate-pulse bg-v-surface-elevated" />
@@ -195,6 +195,7 @@ export default function GlobalEventsPage() {
         <StatCard label="Active" value={stats.active} icon={Zap} />
         <StatCard label="Scheduled" value={stats.scheduled} icon={Clock} />
         <StatCard label="Completed" value={stats.completed} icon={CheckCircle2} />
+        <StatCard label="Archived" value={stats.archived} icon={Archive} />
       </div>
 
       <Card>

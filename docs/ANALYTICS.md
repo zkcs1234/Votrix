@@ -1,6 +1,6 @@
 # Phase 12 — Analytics & reports
 
-Unified reporting API for organizers across election, pageant, and polling modules.
+Unified reporting API for organizers across election, competition, and polling modules.
 
 ## API (`/api/organizer/reports`)
 
@@ -8,7 +8,7 @@ Unified reporting API for organizers across election, pageant, and polling modul
 |--------|------|-------------|
 | GET | `/overview` | All events with quick stats |
 | GET | `/election/:eventId` | Turnout + vote summary by position |
-| GET | `/pageant/:eventId` | Judge turnout + weighted rankings |
+| GET | `/competition/:eventId` | Judge turnout + weighted rankings |
 | GET | `/polling/:eventId` | Response summary + question charts |
 
 All routes require organizer authentication.
@@ -36,7 +36,7 @@ All routes require organizer authentication.
 These endpoints remain available inside each module:
 
 - `GET /api/organizer/election/events/:id/analytics` (includes `positionSummaries`)
-- `GET /api/organizer/pageant/events/:id/rankings`
+- `GET /api/organizer/competition/events/:id/rankings`
 - `GET /api/organizer/polling/events/:id/analytics`
 
 ## UI routes
@@ -45,7 +45,7 @@ These endpoints remain available inside each module:
 |-------|------|
 | `/organizer/reports` | Reports overview |
 | `/organizer/reports/election/:eventId` | Full election report |
-| `/organizer/reports/pageant/:eventId` | Rankings + judge turnout |
+| `/organizer/reports/competition/:eventId` | Rankings + judge turnout |
 | `/organizer/reports/polling/:eventId` | Poll charts report |
 
-Export: CSV (election vote summary, pageant rankings) and JSON on report pages.
+Export: CSV (election vote summary, competition rankings) and JSON on report pages.

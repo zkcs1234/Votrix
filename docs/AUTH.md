@@ -4,10 +4,15 @@
 
 | Token | Lifetime | Delivery |
 |-------|----------|----------|
-| **Access** | 15m (configurable) | JSON body + `Authorization: Bearer` + httpOnly cookie |
+| **Access** | 15m (configurable) | httpOnly cookie only |
 | **Refresh** | 7d (configurable) | httpOnly cookie only |
 
 Rotate both via `POST /api/auth/refresh`.
+
+The frontend does not read or persist the access token. Browsers send the
+httpOnly access cookie automatically with API requests; clients must not expect
+an access token in the login or refresh JSON response and must not add a
+`Bearer` authorization header.
 
 ## Endpoints
 

@@ -41,13 +41,21 @@ export async function requireEditableEvent(req, _res, next) {
 
     const { eventId } = req.params
     if (!eventId) return next()
-    if (isExemptPath(req.originalUrl)) return next()
 
     const event = await getEventById(eventId)
+    if (event?.status === EVENT_STATUS.ARCHIVED) {
+      throw new ApiError(
+        409,
+        'This event has been archived and can no longer be modified.',
+      )
+    }
+
+    if (isExemptPath(req.originalUrl)) return next()
+
     if (
       event &&
       READ_ONLY_EVENT_STATUSES.has(event.status) &&
-      !(event.status !== EVENT_STATUS.ARCHIVED && isExemptPath(req.originalUrl))
+      isExemptPath(req.originalUrl) === false
     ) {
       throw new ApiError(
         409,

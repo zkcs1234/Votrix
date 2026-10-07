@@ -41,6 +41,7 @@ export const EVENT_STATUS = {
 export const READ_ONLY_EVENT_STATUSES = new Set([
   EVENT_STATUS.COMPLETED,
   EVENT_STATUS.CANCELLED,
+  EVENT_STATUS.ARCHIVED,
 ])
 
 export function isReadOnlyEventStatus(status) {

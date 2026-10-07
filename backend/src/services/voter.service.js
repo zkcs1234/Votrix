@@ -3,17 +3,32 @@ import { listJudgeCompetitionEvents } from './pageant.service.js'
 import { listVoterPollEvents } from './polling.service.js'
 import { enrichEventWithParticipantType } from './participant.service.js'
 import { PARTICIPANT_TYPES } from '../utils/constants.js'
-import { canVoterViewElectionResults } from '../utils/eventSchedule.js'
+import {
+  canVoterViewElectionResults,
+  isCompetitionScoringOpen,
+  isElectionVotingOpen,
+  isPollOpen as isPollOpenForSchedule,
+} from '../utils/eventSchedule.js'
 
 function isPollOpen(event) {
-  if (!event.pollingEnabled) return false
-  return true
+  return isPollOpenForSchedule({
+    polling_enabled: event.pollingEnabled,
+    poll_expires_at: event.pollExpiresAt,
+    start_date: event.startDate,
+    end_date: event.endDate,
+    status: event.status,
+  })
 }
 
 function classifyElection(event) {
   let bucket = 'assigned'
   if (event.hasVoted) bucket = 'completed'
-  else if (event.votingEnabled) bucket = 'active'
+  else if (isElectionVotingOpen({
+    voting_enabled: event.votingEnabled,
+    start_date: event.startDate,
+    end_date: event.endDate,
+    status: event.status,
+  })) bucket = 'active'
 
   // Check if voter can view results
   const canViewResults = canVoterViewElectionResults(event)
@@ -27,7 +42,7 @@ function classifyElection(event) {
     eventType: 'election',
     bucket,
     participantType: PARTICIPANT_TYPES.ELECTION_VOTER,
-    statusLabel: bucket === 'completed' ? 'Voted' : event.votingEnabled ? 'Voting open' : 'Waiting to open',
+    statusLabel: bucket === 'completed' ? 'Voted' : bucket === 'active' ? 'Voting open' : 'Waiting to open',
     actionPath: `/voter/events/${event.id}`,
     actionLabel:
       bucket === 'active' ? 'Cast vote' : bucket === 'completed' ? 'View ballot' : 'View event',
@@ -44,7 +59,12 @@ function classifyElection(event) {
 function classifyCompetition(event) {
   let bucket = 'assigned'
   if (event.hasScored) bucket = 'completed'
-  else if (event.scoringEnabled) bucket = 'active'
+  else if (isCompetitionScoringOpen({
+    scoring_enabled: event.scoringEnabled,
+    start_date: event.startDate,
+    end_date: event.endDate,
+    status: event.status,
+  })) bucket = 'active'
 
   return enrichEventWithParticipantType({
     id: event.id,
@@ -55,7 +75,7 @@ function classifyCompetition(event) {
     eventType: 'competition_scoring',
     bucket,
     participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE,
-    statusLabel: bucket === 'completed' ? 'Scores submitted' : event.scoringEnabled ? 'Scoring open' : 'Waiting to open',
+    statusLabel: bucket === 'completed' ? 'Scores submitted' : bucket === 'active' ? 'Scoring open' : 'Waiting to open',
     actionPath: `/voter/competition/events/${event.id}/score`,
     actionLabel:
       bucket === 'active' ? 'Score contestants' : bucket === 'completed' ? 'View scores' : 'View event',
