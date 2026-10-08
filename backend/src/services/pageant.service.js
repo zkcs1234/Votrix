@@ -1353,7 +1353,7 @@ export async function listJudges(eventId, organizerId) {
 export async function assertJudgeEnrolled(eventId, judgeId) {
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id, event_id, user_id, has_scored')
+    .select('id, event_id, user_id, has_scored, events!inner(status)')
     .eq('event_id', eventId)
     .eq('user_id', judgeId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
