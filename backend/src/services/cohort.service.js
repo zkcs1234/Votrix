@@ -40,7 +40,7 @@ export async function getEventCohorts(eventId, organizerId) {
   // Active accounts in the pool for this event type.
   const { data: pool, error: poolErr } = await getClient()
     .from(DB_TABLES.USER_PARTICIPANT_TYPES)
-    .select('users!inner(program, year_section, account_status)')
+    .select('users!user_participant_types_user_id_fkey!inner(program, year_section, account_status)')
     .eq('participant_type', participantType)
     .eq('is_active', true)
     .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
@@ -111,7 +111,7 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
   // Matching active accounts that have this event's participant type.
   const { data: students, error } = await getClient()
     .from(DB_TABLES.USER_PARTICIPANT_TYPES)
-    .select('users!inner(id, email, account_status, program, year_section)')
+    .select('users!user_participant_types_user_id_fkey!inner(id, email, account_status, program, year_section)')
     .eq('participant_type', participantType)
     .eq('is_active', true)
     .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)

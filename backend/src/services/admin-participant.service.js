@@ -156,7 +156,7 @@ async function listSchoolParticipantType(participantType, { search, program, yea
 
   let query = getClient()
     .from(DB_TABLES.USERS)
-    .select('*, user_participant_types!inner(participant_type, is_active)', { count: 'exact' })
+    .select('*, user_participant_types!user_participant_types_user_id_fkey!inner(participant_type, is_active)', { count: 'exact' })
     .eq('user_participant_types.participant_type', participantType)
     .eq('user_participant_types.is_active', true)
     .in('role', [USER_ROLES.PARTICIPANT, USER_ROLES.VOTER])
@@ -712,7 +712,7 @@ export async function listJudges({ search, status, page = 1, limit = 50 } = {}) 
 
   let query = getClient()
     .from(DB_TABLES.USERS)
-    .select('*, user_participant_types!inner(participant_type, is_active)', { count: 'exact' })
+    .select('*, user_participant_types!user_participant_types_user_id_fkey!inner(participant_type, is_active)', { count: 'exact' })
     .eq('user_participant_types.participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .eq('user_participant_types.is_active', true)
     .in('role', [USER_ROLES.PARTICIPANT, USER_ROLES.VOTER])

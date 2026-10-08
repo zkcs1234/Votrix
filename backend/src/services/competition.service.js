@@ -680,7 +680,7 @@ export async function getJudgePool(eventId, organizerId, { search } = {}) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.USER_PARTICIPANT_TYPES)
-    .select('users!inner(id, email, first_name, last_name, profile_data, account_status)')
+    .select('users!user_participant_types_user_id_fkey!inner(id, email, first_name, last_name, profile_data, account_status)')
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .eq('is_active', true)
     .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
@@ -726,7 +726,7 @@ export async function pickJudges(eventId, organizerId, { userIds, notify = false
 
   const { data: membershipRows, error } = await getClient()
     .from(DB_TABLES.USER_PARTICIPANT_TYPES)
-    .select('users!inner(id, email, first_name, last_name, account_status)')
+    .select('users!user_participant_types_user_id_fkey!inner(id, email, first_name, last_name, account_status)')
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .eq('is_active', true)
     .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
