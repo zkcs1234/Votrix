@@ -139,19 +139,19 @@ export default function AdminDashboardPage() {
                 Add organizer
               </Button>
             </Link>
-            <Link to="/admin/users?tab=voters">
+            <Link to="/admin/users?tab=participants&type=election-voter">
               <Button size="sm" variant="secondary">
                 <UserPlus className="h-4 w-4" strokeWidth={2} />
                 Add Election Voter
               </Button>
             </Link>
-            <Link to="/admin/users?tab=judges">
+            <Link to="/admin/users?tab=participants&type=competition-judge">
               <Button size="sm" variant="secondary">
                 <Gavel className="h-4 w-4" strokeWidth={2} />
                 Add Competition Judge
               </Button>
             </Link>
-            <Link to="/admin/users?tab=respondents">
+            <Link to="/admin/users?tab=participants&type=polling-respondent">
               <Button size="sm" variant="secondary">
                 <UserPlus className="h-4 w-4" strokeWidth={2} />
                 Add Polling Respondent
@@ -224,7 +224,7 @@ export default function AdminDashboardPage() {
             </li>
             <li>
               <Link
-                to="/admin/users?tab=voters"
+                to="/admin/users?tab=participants&type=election-voter"
                 className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
                 <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
@@ -233,7 +233,7 @@ export default function AdminDashboardPage() {
             </li>
             <li>
               <Link
-                to="/admin/users?tab=judges"
+                to="/admin/users?tab=participants&type=competition-judge"
                 className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
                 <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
@@ -242,7 +242,7 @@ export default function AdminDashboardPage() {
             </li>
             <li>
               <Link
-                to="/admin/users?tab=respondents"
+                to="/admin/users?tab=participants&type=polling-respondent"
                 className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
                 <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
