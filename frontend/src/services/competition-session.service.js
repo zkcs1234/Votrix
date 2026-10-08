@@ -1,7 +1,7 @@
 import api from '@/services/api'
 
 const BASE = '/organizer/competition'
-const JUDGE_BASE = '/voter/competition'
+const JUDGE_BASE = '/participant/competition'
 
 export const competitionSessionService = {
   // --- Organizer session management ---

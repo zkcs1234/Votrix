@@ -15,8 +15,9 @@
 
 import { db } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, PARTICIPANT_TYPES, EVENT_TYPES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
+import { DB_TABLES, PARTICIPANT_TYPES, EVENT_TYPES, COMPETITION_SCORING_EVENT_TYPES, ACCOUNT_STATUS, isParticipantRole } from '../utils/constants.js'
 import { recordAudit } from '../foundation/audit.js'
+import { hasParticipantTypeMembership } from './user-participant-type.service.js'
 
 // ─── Lookup ────────────────────────────────────────────────────────────────
 
@@ -113,19 +114,35 @@ export function resolveParticipantType(eventType) {
 export async function registerParticipant(eventId, userId, options = {}) {
   const { participantType, firstName, lastName, metadata, judgeRole, displayName, isActive } = options
 
-  // If participantType not explicitly provided, resolve from event type
-  let resolvedType = participantType
-  if (!resolvedType) {
-    const { data: event, error: evErr } = await db()
-      .from(DB_TABLES.EVENTS)
-      .select('event_type')
-      .eq('id', eventId)
-      .maybeSingle()
+  const { data: event, error: evErr } = await db()
+    .from(DB_TABLES.EVENTS)
+    .select('event_type')
+    .eq('id', eventId)
+    .maybeSingle()
+  if (evErr) throw new ApiError(500, evErr.message)
+  if (!event) throw new ApiError(404, 'Event not found')
 
-    if (evErr) throw new ApiError(500, evErr.message)
-    if (!event) throw new ApiError(404, 'Event not found')
+  const expectedType = resolveParticipantType(event.event_type)
+  if (participantType && participantType !== expectedType) {
+    throw new ApiError(400, 'Participant type does not match the event type')
+  }
+  const resolvedType = expectedType
 
-    resolvedType = resolveParticipantType(event.event_type)
+  const { data: account, error: accountError } = await db()
+    .from(DB_TABLES.USERS)
+    .select('role, account_status')
+    .eq('id', userId)
+    .maybeSingle()
+  if (accountError) throw new ApiError(500, accountError.message)
+  if (!account || !isParticipantRole(account.role)) {
+    throw new ApiError(403, 'Account is not a participant')
+  }
+  if (account.account_status !== ACCOUNT_STATUS.ACTIVE) {
+    throw new ApiError(403, 'Participant account is not active')
+  }
+
+  if (!(await hasParticipantTypeMembership(userId, resolvedType))) {
+    throw new ApiError(403, 'Account is not eligible for this participant type')
   }
 
   const payload = {

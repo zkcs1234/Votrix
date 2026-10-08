@@ -50,6 +50,29 @@ export const adminService = {
   getVoters(params = {}) {
     return api.get(`${base}/voters`, { params })
   },
+  getRespondents(params = {}) {
+    return api.get(`${base}/respondents`, { params })
+  },
+  createRespondent(data) {
+    return api.post(`${base}/respondents`, data)
+  },
+  updateRespondent(userId, data) {
+    return api.patch(`${base}/respondents/${userId}`, data)
+  },
+  updateRespondentStatus(userId, accountStatus) {
+    return api.patch(`${base}/respondents/${userId}/status`, { accountStatus })
+  },
+  removeRespondentMembership(userId) {
+    return api.delete(`${base}/respondents/${userId}/membership`)
+  },
+  previewRespondentsCsv(file) {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`${base}/respondents/import-preview`, form)
+  },
+  registerRespondentsCsv(data) {
+    return api.post(`${base}/respondents/import-register`, { data })
+  },
   createVoter(data) {
     return api.post(`${base}/voters`, data)
   },
@@ -58,6 +81,9 @@ export const adminService = {
   },
   updateVoterStatus(userId, accountStatus) {
     return api.patch(`${base}/voters/${userId}/status`, { accountStatus })
+  },
+  removeVoterMembership(userId) {
+    return api.delete(`${base}/voters/${userId}/membership`)
   },
   previewVotersCsv(file) {
     const form = new FormData()
@@ -78,6 +104,9 @@ export const adminService = {
   },
   updateJudgeStatus(userId, accountStatus) {
     return api.patch(`${base}/judges/${userId}/status`, { accountStatus })
+  },
+  removeJudgeMembership(userId) {
+    return api.delete(`${base}/judges/${userId}/membership`)
   },
   previewJudgesCsv(file) {
     const form = new FormData()
@@ -114,11 +143,17 @@ export const adminService = {
   getVoterCsvTemplate() {
     return api.get(`${base}/voters/template`, { responseType: 'blob' })
   },
+  getRespondentCsvTemplate() {
+    return api.get(`${base}/respondents/template`, { responseType: 'blob' })
+  },
   getJudgeCsvTemplate() {
     return api.get(`${base}/judges/template`, { responseType: 'blob' })
   },
   exportVoters() {
     return api.get(`${base}/export/voters`, { responseType: 'blob' })
+  },
+  exportRespondents() {
+    return api.get(`${base}/export/respondents`, { responseType: 'blob' })
   },
   exportJudges() {
     return api.get(`${base}/export/judges`, { responseType: 'blob' })

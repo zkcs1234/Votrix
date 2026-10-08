@@ -22,6 +22,7 @@ router.use('/health', healthRoutes)
 router.use('/auth', authRoutes)
 router.use('/admin', adminRoutes)
 router.use('/organizer', organizerRoutes)
+router.use('/participant', voterRoutes)
 router.use('/voter', voterRoutes)
 router.use('/notifications', notificationsRoutes)
 

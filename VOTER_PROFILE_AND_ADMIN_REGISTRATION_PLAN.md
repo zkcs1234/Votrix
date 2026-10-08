@@ -3,6 +3,8 @@
 > **Status:** ✅ IMPLEMENTED — Phases 1–9 complete (migration 075 applied). Participant profile shown in the header account dropdown (§6.5). Remaining follow-up: full `voting_nonce` ballot anonymization (separate mini-plan, D12 tail).
 > **Date:** 2026-09-25 (rev 3 — decisions locked)
 > **Scope:** All three participant types — Election Voters, Polling Respondents, and Competition Judges.
+>
+> **Current-model notice:** This document records the earlier implementation and remains useful as historical context. Its exclusive `profile_type` and disjoint student/judge pool decisions (D6/D7) are superseded by [PARTICIPANT_ROLE_AND_TYPE_MEMBERSHIP_PLAN.md](PARTICIPANT_ROLE_AND_TYPE_MEMBERSHIP_PLAN.md). Use that plan and [PARTICIPANT_ROLE_MIGRATION_RUNBOOK.md](PARTICIPANT_ROLE_MIGRATION_RUNBOOK.md) for the current multi-type account model and migrations.
 
 ---
 

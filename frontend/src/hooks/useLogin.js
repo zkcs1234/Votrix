@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { getRoleDashboardPath, getSafeVoterDestination } from '@/utils/auth'
 import { useToast } from '@/hooks/useToast'
 import { voterService } from '@/services/voter.service'
-import { USER_ROLES } from '@/utils/constants'
+import { isParticipantRole } from '@/utils/constants'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 
 
@@ -55,15 +55,15 @@ export function useLogin(loginFn) {
           replace: true,
           state: voterDestination ? { from: voterDestination } : null,
         })
-      } else if (data.user.role === USER_ROLES.VOTER) {
+      } else if (isParticipantRole(data.user.role)) {
         if (voterDestination) {
           navigate(voterDestination, { replace: true })
         } else {
           try {
             const { data: res } = await voterService.getLoginRedirect()
-            navigate(res.redirect?.path || '/voter', { replace: true })
+            navigate(res.redirect?.path || '/participant', { replace: true })
           } catch {
-            navigate('/voter', { replace: true })
+            navigate('/participant', { replace: true })
           }
         }
       } else {

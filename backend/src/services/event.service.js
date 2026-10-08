@@ -4,7 +4,7 @@
 
 import { db, wrap } from '../foundation/db.js'
 import { notFound, forbidden, badRequest } from '../foundation/errors.js'
-import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
+import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES, isParticipantRole } from '../utils/constants.js'
 import { assertSetupEditable } from '../utils/eventLifecycle.js'
 import { sendEventNotificationEmail } from './mailer.service.js'
 import { createNotificationsForUsers } from './notification.service.js'
@@ -59,7 +59,7 @@ export async function getEventVoterAccounts(eventId) {
 
   return (data ?? [])
     .map((row) => row.users)
-    .filter((u) => u?.email && u?.role === 'voter')
+    .filter((u) => u?.email && isParticipantRole(u?.role))
 }
 
 function formatDate(iso) {
@@ -110,10 +110,10 @@ export async function notifyEventParticipants(eventId, organizerId, { message })
       title: `New update for ${event.title}`,
       message: defaultMessage,
       actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
-        ? `/voter/competition/events/${event.id}/score`
+        ? `/participant/competition/events/${event.id}/score`
         : event.event_type === 'polling'
-          ? `/voter/polling/events/${event.id}`
-          : `/voter/events/${event.id}`,
+          ? `/participant/polling/events/${event.id}`
+          : `/participant/events/${event.id}`,
       entity: 'events',
       entityId: event.id,
       metadata: {

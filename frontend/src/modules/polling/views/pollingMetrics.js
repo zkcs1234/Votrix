@@ -27,9 +27,9 @@ export function buildPollingStats(analytics) {
   const enrolled = analytics?.enrolledRespondents ?? 0
 
   return [
-    { id: 'respondents', label: 'Registered students', value: enrolled },
-    { id: 'responses', label: 'Students who responded', value: total, tone: 'success' },
-    { id: 'not-responded', label: 'Students who have not responded', value: Math.max(enrolled - total, 0) },
+    { id: 'respondents', label: 'Registered respondents', value: enrolled },
+    { id: 'responses', label: 'Respondents who responded', value: total, tone: 'success' },
+    { id: 'not-responded', label: 'Respondents who have not responded', value: Math.max(enrolled - total, 0) },
     {
       id: 'rate',
       label: 'Overall response rate',

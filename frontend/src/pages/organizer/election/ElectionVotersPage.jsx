@@ -27,9 +27,9 @@ export default function ElectionVotersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="v-page-title">Voters</h1>
+        <h1 className="v-page-title">Election Voters</h1>
         <p className="v-caption">
-          Invite students to vote in this election by program or year &amp; section.
+          Invite eligible election voters by program or year &amp; section.
         </p>
       </div>
 

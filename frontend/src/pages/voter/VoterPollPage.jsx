@@ -136,7 +136,7 @@ export default function VoterPollPage() {
             Submit another response
           </button>
         )}
-        <Link to="/voter" className="mt-6 block text-v-text-muted hover:text-v-text">
+        <Link to="/participant" className="mt-6 block text-v-text-muted hover:text-v-text">
           Back to dashboard
         </Link>
       </div>
@@ -163,7 +163,7 @@ export default function VoterPollPage() {
           </p>
         )}
 
-        <Link to="/voter" className="mt-4 inline-block text-v-text-muted">
+        <Link to="/participant" className="mt-4 inline-block text-v-text-muted">
           Back to dashboard
         </Link>
       </div>
@@ -174,7 +174,7 @@ export default function VoterPollPage() {
     return (
       <div className="mx-auto max-w-lg v-card p-8 text-center">
         <p className="text-v-text">You have already responded to this poll.</p>
-        <Link to="/voter" className="mt-4 inline-block text-v-text-muted">
+        <Link to="/participant" className="mt-4 inline-block text-v-text-muted">
           Back to dashboard
         </Link>
       </div>

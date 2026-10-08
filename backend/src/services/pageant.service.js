@@ -7,6 +7,7 @@ import {
   COMPETITION_SCORING_EVENT_TYPES,
   PARTICIPANT_TYPES,
   USER_ROLES,
+  isParticipantRole,
 } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import {
@@ -952,46 +953,17 @@ export async function deleteCriteria(eventId, organizerId, criteriaId) {
 
 // ——— Judges ———
 
-async function ensureJudgeAccount(email, plainPassword, resetPasswordForExisting = true) {
+async function ensureJudgeAccount(email) {
   const normalizedEmail = email.toLowerCase().trim()
   const existing = await findUserByEmail(normalizedEmail)
 
-  if (existing && existing.role !== USER_ROLES.VOTER) {
+  if (!existing) {
+    throw new ApiError(404, 'Participant account not found. Ask an administrator to add this account to the Competition Judge pool.')
+  }
+  if (!isParticipantRole(existing.role)) {
     throw new ApiError(409, 'This email is already used by another account type')
   }
-
-  // If user exists and we're not resetting password, just return them
-  if (existing && !resetPasswordForExisting) {
-    return { user: sanitizeUser(existing), isNew: false }
-  }
-
-  const passwordHash = await hashPassword(plainPassword)
-
-  if (existing) {
-    const { data, error } = await getClient()
-      .from(DB_TABLES.USERS)
-      .update({ password: passwordHash, must_change_password: true })
-      .eq('id', existing.id)
-      .select('*')
-      .single()
-
-    if (error) throw new ApiError(500, error.message)
-    return { user: sanitizeUser(data), isNew: false }
-  }
-
-  const { data, error } = await getClient()
-    .from(DB_TABLES.USERS)
-    .insert({
-      email: normalizedEmail,
-      password: passwordHash,
-      role: USER_ROLES.VOTER,
-      must_change_password: true,
-    })
-    .select('*')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
-  return { user: sanitizeUser(data), isNew: true }
+  return { user: sanitizeUser(existing), isNew: false }
 }
 
 function resolveDisplayName(firstName, lastName, fallback = null) {
@@ -1118,39 +1090,15 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
 
   const userId = judgeRow.user_id
   const judgeEmail = judgeRow.users?.email
-  const mustChangePassword = judgeRow.users?.must_change_password ?? true
-
-  // A judge who has already set their own password is an existing account.
-  const isExistingAccount = !mustChangePassword
-
-  let tempPassword = null
+  const invitationType = 'registered'
   let emailResult = null
-  let invitationType = isExistingAccount ? 'existing' : 'new'
 
   try {
-    if (isExistingAccount) {
-      // Existing account - send registered email without password reset
-      console.log(`[sendJudgeInvitation] existing account detected for ${judgeEmail}, sending registered email`)
-
-      emailResult = await sendJudgeInvitationEmailRegistered({
-        email: judgeEmail,
-        eventId: event.id,
-        eventTitle: event.title,
-      })
-    } else {
-      // New account - generate temp password
-      tempPassword = generateTemporaryPassword()
-      const passwordHash = await hashPassword(tempPassword)
-
-      await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', userId)
-
-      emailResult = await sendJudgeInvitationEmail({
-        email: judgeEmail,
-        temporaryPassword: tempPassword,
-        eventId: event.id,
-        eventTitle: event.title,
-      })
-    }
+    emailResult = await sendJudgeInvitationEmailRegistered({
+      email: judgeEmail,
+      eventId: event.id,
+      eventTitle: event.title,
+    })
   } catch (emailError) {
     console.error(`[sendJudgeInvitation] email sending failed for ${judgeEmail}:`, emailError.message)
     emailResult = { 
@@ -1164,7 +1112,7 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
     try {
       await upsertJudgeInvitationStatus(eventId, userId, {
         invitation_sent: true,
-        is_new_account: !isExistingAccount,
+        is_new_account: false,
       })
     } catch (dbErr) {
       console.error('[sendJudgeInvitation] failed to mark invitation_sent=true:', dbErr.message)
@@ -1184,7 +1132,7 @@ export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
     email: emailResult,
     invitationSent: emailResult?.sent || false,
     invitationType,
-    temporaryPassword: tempPassword,
+    temporaryPassword: null,
     message: emailResult?.sent
       ? `Invitation sent successfully to ${judgeEmail}`
       : `Invitation failed: ${emailResult?.error || 'Unknown error'}`

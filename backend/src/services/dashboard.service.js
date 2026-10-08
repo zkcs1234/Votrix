@@ -219,7 +219,7 @@ export async function getAdminDashboardStats() {
   ] = await Promise.all([
     getClient().from(DB_TABLES.ORGANIZATIONS).select('organizer_id, status'),
     getClient().from(DB_TABLES.EVENTS).select('id, status, event_type, created_at'),
-    getClient().from(DB_TABLES.USERS).select('id', { count: 'exact', head: true }).eq('role', USER_ROLES.VOTER),
+    getClient().from(DB_TABLES.USERS).select('id', { count: 'exact', head: true }).in('role', [USER_ROLES.PARTICIPANT, USER_ROLES.VOTER]),
     getClient().from(DB_TABLES.ELECTION_VOTES).select('*', { count: 'exact', head: true }),
     getClient().from(DB_TABLES.JUDGE_SCORES).select('*', { count: 'exact', head: true }),
     getClient().from(DB_TABLES.POLL_ANSWERS).select('*', { count: 'exact', head: true }),
@@ -243,6 +243,7 @@ export async function getAdminDashboardStats() {
   const events = eventsRes.data ?? []
   const totalVotesCast =
     (electionVotesRes.count ?? 0) + (judgeScoresRes.count ?? 0) + (pollAnswersRes.count ?? 0)
+  const totalParticipants = usersRes.count ?? 0
 
   // Count total organizers - both from users table (more accurate) and active organizations
   const totalOrganizersCount = organizersRes.count ?? 0
@@ -262,7 +263,8 @@ export async function getAdminDashboardStats() {
       totalPollingEvents: events.filter((e) => e.event_type === EVENT_TYPES.POLLING).length,
       activeEvents: events.filter((e) => e.status === EVENT_STATUS.ACTIVE).length,
       finishedEvents: events.filter((e) => e.status === EVENT_STATUS.COMPLETED).length,
-      totalVoters: usersRes.count ?? 0,
+      totalParticipants,
+      totalVoters: totalParticipants,
       totalVotesCast,
     },
     recentActivity,
@@ -273,7 +275,7 @@ export async function getAdminAnalytics() {
   const [eventsRes, usersRes, electionVotesRes, judgeScoresRes, pollAnswersRes] =
     await Promise.all([
       getClient().from(DB_TABLES.EVENTS).select('id, event_type, status, created_at'),
-      getClient().from(DB_TABLES.USERS).select('id, role, created_at').eq('role', USER_ROLES.VOTER),
+      getClient().from(DB_TABLES.USERS).select('id, role, created_at').in('role', [USER_ROLES.PARTICIPANT, USER_ROLES.VOTER]),
       getClient().from(DB_TABLES.ELECTION_VOTES).select('created_at'),
       getClient().from(DB_TABLES.JUDGE_SCORES).select('created_at'),
       getClient().from(DB_TABLES.POLL_ANSWERS).select('created_at'),
@@ -287,7 +289,7 @@ export async function getAdminAnalytics() {
 
   const events = eventsRes.data ?? []
   const monthlyEvents = aggregateByMonth(events)
-  const voterGrowth = aggregateByMonth(usersRes.data ?? [])
+  const participantGrowth = aggregateByMonth(usersRes.data ?? [])
   const participationGrowth = aggregateByMonth([
     ...(electionVotesRes.data ?? []),
     ...(judgeScoresRes.data ?? []),
@@ -297,7 +299,8 @@ export async function getAdminAnalytics() {
   return {
     charts: {
       monthlyEvents,
-      voterGrowth,
+      participantGrowth,
+      voterGrowth: participantGrowth,
       participationGrowth,
       eventTypes: [
         {

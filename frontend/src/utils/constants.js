@@ -10,8 +10,13 @@ export const API_BASE_URL = configuredApiUrl
 export const USER_ROLES = {
   ADMIN: 'admin',
   ORGANIZER: 'organizer',
+  PARTICIPANT: 'participant',
+  // Legacy role accepted while existing sessions and deployments roll over.
   VOTER: 'voter',
 }
+
+export const isParticipantRole = (role) =>
+  role === USER_ROLES.PARTICIPANT || role === USER_ROLES.VOTER
 
 export const ORG_TYPES = {
   ELECTION: 'election',

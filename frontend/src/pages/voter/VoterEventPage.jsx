@@ -73,7 +73,7 @@ function BallotSubmittedScreen({ ballot, eventId }) {
         <p className="v-caption mt-2">
           Your {ballot?.event?.title} ballots have been recorded and locked.
         </p>
-        <Link to="/voter" className="v-btn-tertiary mt-6 inline-block">
+        <Link to="/participant" className="v-btn-tertiary mt-6 inline-block">
           Back to dashboard
         </Link>
       </div>
@@ -254,7 +254,7 @@ export default function VoterEventPage() {
       <div className="mx-auto max-w-lg v-card-md text-center">
         <p className="v-body-text">Voting is not open for this event yet.</p>
         <p className="v-caption mt-2">Check back when the organizer opens voting.</p>
-        <Link to="/voter" className="v-btn-tertiary mt-4 inline-block">
+        <Link to="/participant" className="v-btn-tertiary mt-4 inline-block">
           Back to dashboard
         </Link>
       </div>

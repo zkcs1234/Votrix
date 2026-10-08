@@ -20,7 +20,7 @@ async function ensureFreshCsrfToken() {
 }
 
 export const authService = {
-  // Unified login - works for admin, organizer, and voter
+  // Unified login for admin, organizer, and participant accounts.
   login(credentials) {
     return api.post('/auth/login', credentials)
   },

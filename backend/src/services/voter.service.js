@@ -43,7 +43,7 @@ function classifyElection(event) {
     bucket,
     participantType: PARTICIPANT_TYPES.ELECTION_VOTER,
     statusLabel: bucket === 'completed' ? 'Voted' : bucket === 'active' ? 'Voting open' : 'Waiting to open',
-    actionPath: `/voter/events/${event.id}`,
+    actionPath: `/participant/events/${event.id}`,
     actionLabel:
       bucket === 'active' ? 'Cast vote' : bucket === 'completed' ? 'View ballot' : 'View event',
     votingEnabled: Boolean(event.votingEnabled),
@@ -76,7 +76,7 @@ function classifyCompetition(event) {
     bucket,
     participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE,
     statusLabel: bucket === 'completed' ? 'Scores submitted' : bucket === 'active' ? 'Scoring open' : 'Waiting to open',
-    actionPath: `/voter/competition/events/${event.id}/score`,
+    actionPath: `/participant/competition/events/${event.id}/score`,
     actionLabel:
       bucket === 'active' ? 'Score contestants' : bucket === 'completed' ? 'View scores' : 'View event',
     scoringEnabled: Boolean(event.scoringEnabled),
@@ -110,7 +110,7 @@ function classifyPoll(event) {
     bucket,
     participantType: PARTICIPANT_TYPES.POLLING_RESPONDENT,
     statusLabel,
-    actionPath: `/voter/polling/events/${event.id}`,
+    actionPath: `/participant/polling/events/${event.id}`,
     actionLabel:
       bucket === 'active'
         ? event.hasResponded

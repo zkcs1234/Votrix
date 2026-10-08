@@ -1,6 +1,6 @@
 import { useAuth } from '@/hooks/useAuth'
 import { getRoleDashboardPath } from '@/utils/auth'
-import { USER_ROLES } from '@/utils/constants'
+import { USER_ROLES, isParticipantRole } from '@/utils/constants'
 import AppShell from '@/layouts/AppShell'
 import {
   LayoutDashboard, Users, CalendarDays, Settings, ClipboardList, Bell, Archive, Monitor,
@@ -10,7 +10,7 @@ export default function DashboardLayout({
   title = 'Dashboard',
   showSidebar = true,
   showBackButton = false,
-  backButtonPath = '/voter',
+  backButtonPath = '/participant',
 }) {
   const { role } = useAuth()
   const home = getRoleDashboardPath(role)
@@ -86,7 +86,7 @@ export default function DashboardLayout({
       homeLink={home}
       navItems={navItems}
       showSidebar={showSidebar}
-      showSearch={role !== USER_ROLES.VOTER}
+      showSearch={!isParticipantRole(role)}
       showBackButton={showBackButton}
       backButtonPath={backButtonPath}
     />

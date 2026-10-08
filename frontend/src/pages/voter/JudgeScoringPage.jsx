@@ -504,7 +504,7 @@ export default function JudgeScoringPage() {
           {sessionState?.status === 'completed' && (
             <p className="text-sm text-emerald-400">Session has ended</p>
           )}
-          <Link to="/voter" className="inline-block text-v-primary hover:underline text-sm">
+          <Link to="/participant" className="inline-block text-v-primary hover:underline text-sm">
             Back to dashboard
           </Link>
         </div>

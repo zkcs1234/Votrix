@@ -4,8 +4,8 @@ import api from '@/services/api'
 // while the rest of the app migrates from `/pageant` to `/competition`.
 const org = '/organizer/competition'
 const orgLegacy = '/organizer/pageant'
-const judge = '/voter/competition'
-const judgeLegacy = '/voter/pageant'
+const judge = '/participant/competition'
+const judgeLegacy = '/participant/pageant'
 
 export const pageantService = {
   getDashboard() {

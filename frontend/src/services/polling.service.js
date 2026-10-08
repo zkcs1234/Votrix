@@ -1,7 +1,7 @@
 import api from '@/services/api'
 
 const org = '/organizer/polling'
-const voter = '/voter/polling'
+const voter = '/participant/polling'
 
 export const pollingService = {
   getDashboard() {

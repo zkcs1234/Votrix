@@ -138,7 +138,7 @@ export default function ElectionAnalyticsPage() {
 
       <AnalyticsSection
         title="Voting progress"
-        description="How many registered students have cast their ballot so far."
+        description="How many registered voters have cast their ballot so far."
       >
         <DistributionList
           items={trend}
@@ -164,14 +164,14 @@ export default function ElectionAnalyticsPage() {
 
       <AnalyticsSection
         title="Participation by program"
-        description="Turnout among the registered students in each program."
+        description="Turnout among registered voters in each program."
       >
         <ParticipationTable rows={programParticipation} />
       </AnalyticsSection>
 
       <AnalyticsSection
         title="Participation by year & section"
-        description="The system stores year and section together as one managed student field."
+        description="The system stores year and section together as one managed cohort field."
       >
         <ParticipationTable rows={yearSectionParticipation} />
       </AnalyticsSection>

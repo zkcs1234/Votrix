@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Users, UserPlus, Upload, Download, Pencil, ShieldOff, UserCheck } from 'lucide-react'
+import { Users, UserPlus, Upload, Download, Pencil, ShieldOff, UserCheck, UserMinus } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -22,7 +22,7 @@ function fullName(v) {
 }
 
 // ---- Add / Edit modal ------------------------------------------------------
-function VoterFormModal({ mode, initial, programs, sections, onClose, onSaved }) {
+function VoterFormModal({ mode, initial, programs, sections, participantLabel, api, onClose, onSaved }) {
   const isEdit = mode === 'edit'
   const [form, setForm] = useState({
     email: initial?.email ?? '',
@@ -44,11 +44,11 @@ function VoterFormModal({ mode, initial, programs, sections, onClose, onSaved })
     setError(null)
     try {
       if (isEdit) {
-        await adminService.updateVoter(initial.id, form)
-        success('Voter updated')
+        await api.update(initial.id, form)
+        success(`${participantLabel} updated`)
       } else {
-        await adminService.createVoter(form)
-        success('Voter registered — credentials emailed')
+        const { data } = await api.create(form)
+        success(data.email?.sent ? `${participantLabel} added — credentials emailed` : `${participantLabel} added to the pool`)
       }
       onSaved()
     } catch (err) {
@@ -62,14 +62,14 @@ function VoterFormModal({ mode, initial, programs, sections, onClose, onSaved })
   }
 
   return (
-    <Modal open onClose={onClose} title={isEdit ? 'Edit voter' : 'Add voter'} size="md">
+    <Modal open onClose={onClose} title={isEdit ? `Edit ${participantLabel}` : `Add ${participantLabel}`} size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         <fieldset className="space-y-3">
           <legend className="v-label">Identity</legend>
-          <p className="v-caption">Login email and voter identification.</p>
+          <p className="v-caption">Login email and school identification.</p>
           <div>
             <label htmlFor="voter-email" className="v-label">Email</label>
-            <input id="voter-email" type="email" value={form.email} onChange={set('email')} className={INPUT_CLASS} required disabled={isEdit} placeholder="voter@example.com" />
+            <input id="voter-email" type="email" value={form.email} onChange={set('email')} className={INPUT_CLASS} required disabled={isEdit} placeholder="participant@example.com" />
             {isEdit && <p className="v-caption mt-1">Email can&apos;t be changed here.</p>}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -89,7 +89,7 @@ function VoterFormModal({ mode, initial, programs, sections, onClose, onSaved })
         </fieldset>
         <fieldset className="space-y-3 border-t border-v-border pt-4">
           <legend className="v-label">Academic placement</legend>
-          <p className="v-caption">Choose the program and year/section for this voter.</p>
+          <p className="v-caption">Choose the program and year/section for this participant.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="voter-program" className="v-label">Program</label>
@@ -110,7 +110,7 @@ function VoterFormModal({ mode, initial, programs, sections, onClose, onSaved })
 
         {(programs.length === 0 || sections.length === 0) && (
           <FormAlert variant="warning">
-            Define Programs and Year &amp; Sections in System Settings before registering voters.{' '}
+            Define Programs and Year &amp; Sections in System Settings before adding participants.{' '}
             <Link to="/admin/settings" onClick={onClose} className="font-medium text-v-primary hover:underline">Open System Settings</Link>
           </FormAlert>
         )}
@@ -118,7 +118,7 @@ function VoterFormModal({ mode, initial, programs, sections, onClose, onSaved })
 
         <div className="flex justify-end gap-2 border-t border-v-border pt-4">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={saving} disabled={!programs.length || !sections.length}>{isEdit ? 'Save changes' : 'Register voter'}</Button>
+          <Button type="submit" loading={saving} disabled={!programs.length || !sections.length}>{isEdit ? 'Save changes' : `Add ${participantLabel}`}</Button>
         </div>
       </form>
     </Modal>
@@ -126,7 +126,7 @@ function VoterFormModal({ mode, initial, programs, sections, onClose, onSaved })
 }
 
 // ---- CSV preview modal -----------------------------------------------------
-function CsvPreviewModal({ preview, onClose, onRegister, registering }) {
+function CsvPreviewModal({ preview, onClose, onRegister, registering, importName }) {
   return (
     <Modal open onClose={onClose} title="Review & Register" size="lg">
       {preview.errors?.length > 0 && (
@@ -141,7 +141,7 @@ function CsvPreviewModal({ preview, onClose, onRegister, registering }) {
             size="sm"
             variant="secondary"
             className="mt-3"
-            onClick={() => downloadCsv('voter-import-errors.csv', ['Issue'], preview.errors.map((issue) => [issue]))}
+            onClick={() => downloadCsv(`${importName}-import-errors.csv`, ['Issue'], preview.errors.map((issue) => [issue]))}
           >
             <Download className="h-4 w-4" strokeWidth={1.5} /> Download errors
           </Button>
@@ -187,7 +187,33 @@ function CsvPreviewModal({ preview, onClose, onRegister, registering }) {
 }
 
 // ---- Panel -----------------------------------------------------------------
-export default function VotersPanel() {
+export default function VotersPanel({ pool = 'election' }) {
+  const isRespondentPool = pool === 'polling'
+  const participantLabel = isRespondentPool ? 'Polling Respondent' : 'Election Voter'
+  const pluralLabel = isRespondentPool ? 'Polling Respondents' : 'Election Voters'
+  const api = isRespondentPool
+    ? {
+        list: adminService.getRespondents,
+        create: adminService.createRespondent,
+        update: adminService.updateRespondent,
+        updateStatus: adminService.updateRespondentStatus,
+        remove: adminService.removeRespondentMembership,
+        preview: adminService.previewRespondentsCsv,
+        register: adminService.registerRespondentsCsv,
+        export: adminService.exportRespondents,
+        template: adminService.getRespondentCsvTemplate,
+      }
+    : {
+        list: adminService.getVoters,
+        create: adminService.createVoter,
+        update: adminService.updateVoter,
+        updateStatus: adminService.updateVoterStatus,
+        remove: adminService.removeVoterMembership,
+        preview: adminService.previewVotersCsv,
+        register: adminService.registerVotersCsv,
+        export: adminService.exportVoters,
+        template: adminService.getVoterCsvTemplate,
+      }
   const [voters, setVoters] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -199,6 +225,8 @@ export default function VotersPanel() {
   const [taxonomy, setTaxonomy] = useState({ programs: [], sections: [] })
   const [modal, setModal] = useState(null) // { mode: 'add'|'edit', voter }
   const [statusTarget, setStatusTarget] = useState(null)
+  const [removeTarget, setRemoveTarget] = useState(null)
+  const [removing, setRemoving] = useState(false)
   const [preview, setPreview] = useState(null)
   const [registering, setRegistering] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -216,18 +244,18 @@ export default function VotersPanel() {
   const fetchVoters = async () => {
     setLoading(true)
     try {
-      const { data } = await adminService.getVoters({
+      const { data } = await api.list({
         search: search || undefined,
         program: programFilter || undefined,
         yearSection: sectionFilter || undefined,
         status: statusFilter || undefined,
         limit: 100,
       })
-      setVoters(data.voters ?? [])
+      setVoters(data.voters ?? data.respondents ?? [])
       setTotal(data.total ?? 0)
       setError(null)
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to load voters'))
+      setError(getErrorMessage(err, `Failed to load ${pluralLabel.toLowerCase()}`))
     } finally {
       setLoading(false)
     }
@@ -251,7 +279,7 @@ export default function VotersPanel() {
     if (!file) return
     setError(null)
     try {
-      const { data } = await adminService.previewVotersCsv(file)
+      const { data } = await api.preview(file)
       setPreview(data)
     } catch (err) {
       const details = err.response?.data?.details?.errors
@@ -266,7 +294,7 @@ export default function VotersPanel() {
     if (!preview?.data?.length) return
     setRegistering(true)
     try {
-      const { data } = await adminService.registerVotersCsv(preview.data)
+      const { data } = await api.register(preview.data)
       success(`Registered ${data.succeeded} of ${data.total}${data.failed ? ` (${data.failed} failed)` : ''}`)
       setPreview(null)
       await fetchVoters()
@@ -280,9 +308,9 @@ export default function VotersPanel() {
   const handleExport = async () => {
     setExporting(true)
     try {
-      const { data } = await adminService.exportVoters()
-      downloadBlob('voters.csv', data)
-      success('Voters exported')
+      const { data } = await api.export()
+      downloadBlob(`${isRespondentPool ? 'polling-respondents' : 'election-voters'}.csv`, data)
+      success(`${pluralLabel} exported`)
     } catch (err) {
       toastError(getErrorMessage(err, 'Export failed'))
     } finally {
@@ -293,8 +321,8 @@ export default function VotersPanel() {
   const handleStatus = async (voter, accountStatus) => {
     setSavingId(voter.id)
     try {
-      await adminService.updateVoterStatus(voter.id, accountStatus)
-      success(`Voter ${accountStatus}`)
+      await api.updateStatus(voter.id, accountStatus)
+      success(`${participantLabel} account ${accountStatus}`)
       setStatusTarget(null)
       await fetchVoters()
     } catch (err) {
@@ -304,10 +332,25 @@ export default function VotersPanel() {
     }
   }
 
+  const handleRemoveFromPool = async () => {
+    if (!removeTarget) return
+    setRemoving(true)
+    try {
+      await api.remove(removeTarget.id)
+      success(`${participantLabel} removed from this pool`)
+      setRemoveTarget(null)
+      await fetchVoters()
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Failed to remove participant type'))
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   const downloadTemplate = async () => {
     try {
-      const { data } = await adminService.getVoterCsvTemplate()
-      downloadBlob('voter-template.csv', data)
+      const { data } = await api.template()
+      downloadBlob(`${isRespondentPool ? 'polling-respondent' : 'election-voter'}-template.csv`, data)
     } catch (err) {
       const message = getErrorMessage(err, 'Could not download the voter template')
       setError(message)
@@ -319,14 +362,14 @@ export default function VotersPanel() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="v-page-title">Voters</h1>
+          <h1 className="v-page-title">{pluralLabel}</h1>
           <p className="v-caption">
-            Register election voters and polling respondents. They&apos;re invited to specific events by organizers.
+            Manage this participant type. Organizers enroll eligible accounts into specific events.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={downloadTemplate}>
-            <Download className="h-4 w-4" strokeWidth={1.5} /> Template
+            <Download className="h-4 w-4" strokeWidth={1.5} /> Import template
           </Button>
           <Button variant="secondary" onClick={handleExport} loading={exporting}>
             <Download className="h-4 w-4" strokeWidth={1.5} /> Export CSV
@@ -336,13 +379,13 @@ export default function VotersPanel() {
           </Button>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFile} />
           <Button onClick={() => setModal({ mode: 'add' })}>
-            <UserPlus className="h-4 w-4" strokeWidth={2} /> Add voter
+            <UserPlus className="h-4 w-4" strokeWidth={2} /> Add {participantLabel}
           </Button>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard label="Voters (this view)" value={total} icon={Users} />
+        <StatCard label={`${pluralLabel} (this view)`} value={total} icon={Users} />
         <StatCard label="Active" value={summary.active} icon={UserCheck} />
         <StatCard label="Suspended" value={summary.suspended} icon={ShieldOff} />
       </div>
@@ -382,8 +425,8 @@ export default function VotersPanel() {
         ) : voters.length === 0 ? (
           <div className="p-8 text-center v-caption">
             {search || programFilter || sectionFilter || statusFilter
-              ? 'No voters match the current filters.'
-              : 'No voters yet. Add one or import a CSV.'}
+              ? `No ${pluralLabel.toLowerCase()} match the current filters.`
+              : `No ${pluralLabel.toLowerCase()} yet. Add one or import a CSV.`}
           </div>
         ) : (
           <div className="v-table-wrap">
@@ -424,6 +467,9 @@ export default function VotersPanel() {
                             Archive
                           </Button>
                         )}
+                        <Button size="sm" variant="ghost" onClick={() => setRemoveTarget(v)} title={`Remove ${participantLabel} pool membership`}>
+                          <UserMinus className="h-4 w-4" strokeWidth={1.5} /> Remove from pool
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -440,6 +486,8 @@ export default function VotersPanel() {
           initial={modal.voter}
           programs={taxonomy.programs}
           sections={taxonomy.sections}
+          participantLabel={participantLabel}
+          api={api}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); fetchVoters() }}
         />
@@ -451,11 +499,24 @@ export default function VotersPanel() {
           name: fullName(statusTarget.user),
           email: statusTarget.user.email,
         } : null}
-        accountType="Voter"
+        accountType={participantLabel}
         onClose={() => setStatusTarget(null)}
         onConfirm={() => handleStatus(statusTarget.user, statusTarget.accountStatus)}
         loading={Boolean(savingId)}
       />
+
+      <Modal open={Boolean(removeTarget)} onClose={() => setRemoveTarget(null)} title={`Remove ${participantLabel} membership?`} size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-v-text">
+            {removeTarget ? `${fullName(removeTarget)} (${removeTarget.email}) will no longer be available for future event selection from this pool.` : ''}
+          </p>
+          <p className="v-caption">The account, its other participant types, and existing event history remain unchanged. Existing event enrollment is not removed.</p>
+          <div className="flex justify-end gap-2 border-t border-v-border pt-4">
+            <Button type="button" variant="secondary" onClick={() => setRemoveTarget(null)}>Cancel</Button>
+            <Button type="button" variant="danger" onClick={handleRemoveFromPool} loading={removing}>Remove from pool</Button>
+          </div>
+        </div>
+      </Modal>
 
       {preview && (
         <CsvPreviewModal
@@ -463,6 +524,7 @@ export default function VotersPanel() {
           onClose={() => setPreview(null)}
           onRegister={handleRegisterCsv}
           registering={registering}
+          importName={isRespondentPool ? 'polling-respondent' : 'election-voter'}
         />
       )}
     </div>

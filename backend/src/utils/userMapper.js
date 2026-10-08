@@ -9,9 +9,7 @@ export function sanitizeUser(row) {
     accountStatus: row.account_status ?? 'active',
     mustChangePassword: Boolean(row.must_change_password),
     createdAt: row.created_at,
-    // Participant profile fields (migration 075). Present as null for
-    // admin/organizer accounts and for voters not yet backfilled.
-    profileType: row.profile_type ?? null,
+    // Shared participant identity fields; optional for other global roles.
     firstName: row.first_name ?? null,
     lastName: row.last_name ?? null,
     schoolId: row.school_id ?? null,

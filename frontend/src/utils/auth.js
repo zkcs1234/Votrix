@@ -6,14 +6,18 @@ export function getRoleDashboardPath(role) {
       return '/admin'
     case USER_ROLES.ORGANIZER:
       return '/organizer'
+    case USER_ROLES.PARTICIPANT:
     case USER_ROLES.VOTER:
-      return '/voter'
+      return '/participant'
     default:
       return '/'
   }
 }
 
-const VOTER_EVENT_PATHS = [
+const PARTICIPANT_EVENT_PATHS = [
+  /^\/participant\/events\/[^/]+\/?$/,
+  /^\/participant\/polling\/events\/[^/]+\/?$/,
+  /^\/participant\/competition\/events\/[^/]+\/score\/?$/,
   /^\/voter\/events\/[^/]+\/?$/,
   /^\/voter\/polling\/events\/[^/]+\/?$/,
   /^\/voter\/competition\/events\/[^/]+\/score\/?$/,
@@ -29,7 +33,7 @@ export function getSafeVoterDestination(from) {
   }
 
   const { pathname, search = '', hash = '' } = location
-  if (!pathname || !VOTER_EVENT_PATHS.some((pattern) => pattern.test(pathname))) {
+  if (!pathname || !PARTICIPANT_EVENT_PATHS.some((pattern) => pattern.test(pathname))) {
     return null
   }
 

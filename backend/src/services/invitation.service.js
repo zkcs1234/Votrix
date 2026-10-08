@@ -1,6 +1,6 @@
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, USER_ROLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
+import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES, isParticipantRole } from '../utils/constants.js'
 import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
 import { findUserByEmail, findUserById, sanitizeUser } from './user.service.js'
@@ -12,59 +12,27 @@ import { registerParticipant } from './participant.service.js'
 import { recordEventActivity } from '../foundation/activity.js'
 
 
-async function ensureVoterAccount(email, plainPassword, resetPasswordForExisting = true) {
+async function ensureVoterAccount(email) {
   const normalizedEmail = email.toLowerCase().trim()
   const existing = await findUserByEmail(normalizedEmail)
 
-  if (existing && existing.role !== USER_ROLES.VOTER) {
+  if (!existing) {
+    throw new ApiError(404, 'Participant account not found. Ask an administrator to add this account to the required participant pool.')
+  }
+  if (!isParticipantRole(existing.role)) {
     throw new ApiError(409, 'This email is already used by another account type')
   }
-
-  // Existing account that already has its own password — never reset it
-  if (existing && !resetPasswordForExisting) {
-    return { user: sanitizeUser(existing), isNew: false }
-  }
-
-  const passwordHash = await hashPassword(plainPassword)
-
-  if (existing) {
-    const { data, error } = await getClient()
-      .from(DB_TABLES.USERS)
-      .update({
-        password: passwordHash,
-        must_change_password: true,
-      })
-      .eq('id', existing.id)
-      .select('*')
-      .single()
-
-    if (error) throw new ApiError(500, error.message)
-    return { user: sanitizeUser(data), isNew: false }
-  }
-
-  const { data, error } = await getClient()
-    .from(DB_TABLES.USERS)
-    .insert({
-      email: normalizedEmail,
-      password: passwordHash,
-      role: USER_ROLES.VOTER,
-      must_change_password: true,
-    })
-    .select('*')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
-  return { user: sanitizeUser(data), isNew: true }
+  return { user: sanitizeUser(existing), isNew: false }
 }
 
-export async function inviteVoterToEvent({ eventId, email, organizerId, temporaryPassword }) {
+export async function inviteVoterToEvent({ eventId, email, organizerId }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
   assertParticipantsEditable(event)
 
-  const tempPassword = temporaryPassword || generateTemporaryPassword()
-  // Existing voters keep their own password — never reset. isNew decides which email to send.
-  const { user, isNew } = await ensureVoterAccount(email, tempPassword, false)
+  // Organizer invitations may only target an account already provisioned and
+  // assigned to the event's participant-type pool by an administrator.
+  const { user, isNew } = await ensureVoterAccount(email)
 
   // Enroll voter in event — required for them to access it
   try {
@@ -129,10 +97,10 @@ export async function inviteVoterToEvent({ eventId, email, organizerId, temporar
           ? `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`
           : `You've been added to ${event.title}. Sign in with your existing password.`,
         actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
-          ? `/voter/competition/events/${event.id}/score`
+          ? `/participant/competition/events/${event.id}/score`
           : event.event_type === 'polling'
-            ? `/voter/polling/events/${event.id}`
-            : `/voter/events/${event.id}`,
+            ? `/participant/polling/events/${event.id}`
+            : `/participant/events/${event.id}`,
         entity: 'events',
         entityId: event.id,
         metadata: { eventType: event.event_type, organizationName: event.organizations?.organization_name },
@@ -175,7 +143,7 @@ export async function inviteRegisteredVoter({ eventId, email, organizerId }) {
     throw new ApiError(404, 'Voter not found. Use the "Invite New" method to create a new voter account.')
   }
 
-  if (voter.role !== USER_ROLES.VOTER) {
+  if (!isParticipantRole(voter.role)) {
     throw new ApiError(400, 'This email belongs to a different account type')
   }
 
@@ -234,7 +202,7 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
   assertParticipantsEditable(event)
 
   const voter = await findUserById(voterId)
-  if (!voter || voter.role !== USER_ROLES.VOTER) {
+  if (!voter || !isParticipantRole(voter.role)) {
     throw new ApiError(404, 'Voter not found')
   }
 
@@ -250,44 +218,13 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
     throw new ApiError(404, 'Voter is not enrolled in this event')
   }
 
-  // A voter who has already set their own password is an existing account.
-  const isExistingAccount = !voter.must_change_password
-
-  let tempPassword = null
-  let emailResult = null
-  let invitationType = isExistingAccount ? 'existing' : 'new'
-
-  if (isExistingAccount) {
-    // Existing account - send "you're invited" email without password reset
-    console.log(`[resend-invitation] existing account detected for ${voter.email}, sending registered email`)
-
-    emailResult = await sendVoterInvitationEmailRegistered({
-      email: voter.email,
-      eventId: event.id,
-      eventTitle: event.title,
-      eventType: event.event_type,
-    })
-  } else {
-    // New account - generate new temp password
-    tempPassword = generateTemporaryPassword()
-    const passwordHash = await hashPassword(tempPassword)
-
-    await getClient()
-      .from(DB_TABLES.USERS)
-      .update({
-        password: passwordHash,
-        must_change_password: true,
-      })
-      .eq('id', voterId)
-
-    emailResult = await sendVoterInvitationEmail({
-      email: voter.email,
-      temporaryPassword: tempPassword,
-      eventId: event.id,
-      eventTitle: event.title,
-      eventType: event.event_type,
-    })
-  }
+  const invitationType = 'registered'
+  const emailResult = await sendVoterInvitationEmailRegistered({
+    email: voter.email,
+    eventId: event.id,
+    eventTitle: event.title,
+    eventType: event.event_type,
+  })
 
   if (emailResult?.sent) {
     await getClient()
@@ -298,16 +235,14 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
 
     await createNotification({
       userId: voterId,
-      type: isExistingAccount ? 'voter.invitation.registered' : 'voter.invitation.resend',
-      title: isExistingAccount ? `You're invited to ${event.title}` : `Invitation resent for ${event.title}`,
-      message: isExistingAccount
-        ? `You've been added to ${event.title}. Sign in with your existing password.`
-        : `A new temporary password was sent for ${event.title}.`,
+      type: 'participant.invitation.registered',
+      title: `You're invited to ${event.title}`,
+      message: `You've been added to ${event.title}. Sign in with your account password.`,
       actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
-        ? `/voter/competition/events/${event.id}/score`
+        ? `/participant/competition/events/${event.id}/score`
         : event.event_type === 'polling'
-          ? `/voter/polling/events/${event.id}`
-          : `/voter/events/${event.id}`,
+          ? `/participant/polling/events/${event.id}`
+          : `/participant/events/${event.id}`,
       entity: 'events',
       entityId: event.id,
       metadata: { eventType: event.event_type, organizationName: event.organizations?.organization_name },
@@ -325,7 +260,7 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
   return {
     email: emailResult,
     invitationType,
-    temporaryPassword: tempPassword, // null for existing accounts
+    temporaryPassword: null,
   }
 }
 
@@ -344,47 +279,20 @@ export async function resendVoterInvitation({ eventId, voterId, organizerId }) {
  * @param {string} [params.temporaryPassword] - Optional password (auto-generated if not provided)
  * @param {boolean} [params.resetPasswordForExisting] - If false, won't reset password for existing voters (default: false — existing voters keep their password)
  */
-export async function registerVoterToEvent({ eventId, email, organizerId, temporaryPassword, resetPasswordForExisting = false }) {
+export async function registerVoterToEvent({ eventId, email, organizerId }) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
   assertParticipantsEditable(event)
 
-  // Check if voter already exists
   const existingVoter = await findUserByEmail(email.toLowerCase().trim())
-
-  let user
-  let isNew = false
-
-  if (existingVoter) {
-    // Existing voter - decide whether to reset password
-    if (resetPasswordForExisting) {
-      // Reset password (used for CSV import)
-      const tempPassword = temporaryPassword || generateTemporaryPassword()
-      const passwordHash = await hashPassword(tempPassword)
-
-      const { data, error } = await getClient()
-        .from(DB_TABLES.USERS)
-        .update({
-          password: passwordHash,
-          must_change_password: true,
-        })
-        .eq('id', existingVoter.id)
-        .select('*')
-        .single()
-
-      if (error) throw new ApiError(500, error.message)
-      user = sanitizeUser(data)
-    } else {
-      user = sanitizeUser(existingVoter)
-    }
-  } else {
-    // New voter - create account with password
-    isNew = true
-    const tempPassword = temporaryPassword || generateTemporaryPassword()
-    const { user: newUser, isNew: newIsNew } = await ensureVoterAccount(email, tempPassword)
-    user = newUser
-    isNew = newIsNew
+  if (!existingVoter) {
+    throw new ApiError(404, 'Participant account not found. Ask an administrator to add this account to the required participant pool.')
   }
+  if (!isParticipantRole(existingVoter.role)) {
+    throw new ApiError(409, 'This email belongs to a different account type')
+  }
+  const user = sanitizeUser(existingVoter)
+  const isNew = false
 
   // Enroll voter in event — required for them to access it
   try {
@@ -443,7 +351,7 @@ export async function registerExistingVoter({ eventId, email, organizerId }) {
     throw new ApiError(404, 'Voter not found. Use the "Register New" method to create a new voter account.')
   }
 
-  if (voter.role !== USER_ROLES.VOTER) {
+  if (!isParticipantRole(voter.role)) {
     throw new ApiError(400, 'This email belongs to a different account type')
   }
 
@@ -502,7 +410,7 @@ export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
   assertParticipantsEditable(event)
 
   const voter = await findUserById(voterId)
-  if (!voter || voter.role !== USER_ROLES.VOTER) {
+  if (!voter || !isParticipantRole(voter.role)) {
     throw new ApiError(404, 'Voter not found')
   }
 
@@ -586,10 +494,10 @@ export async function sendVoterInvitation({ eventId, voterId, organizerId }) {
           ? `You've been added to ${event.title}. Sign in with your existing password.`
           : `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
         actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
-          ? `/voter/competition/events/${event.id}/score`
+          ? `/participant/competition/events/${event.id}/score`
           : event.event_type === 'polling'
-            ? `/voter/polling/events/${event.id}`
-            : `/voter/events/${event.id}`,
+            ? `/participant/polling/events/${event.id}`
+            : `/participant/events/${event.id}`,
         entity: 'events',
         entityId: event.id,
         metadata: { eventType: event.event_type, organizationName: event.organizations?.organization_name },
@@ -706,10 +614,10 @@ export async function sendAllPendingInvitations({ eventId, organizerId }) {
               ? `You've been added to ${event.title}. Sign in with your existing password.`
               : `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
             actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
-              ? `/voter/competition/events/${event.id}/score`
+              ? `/participant/competition/events/${event.id}/score`
               : event.event_type === 'polling'
-                ? `/voter/polling/events/${event.id}`
-                : `/voter/events/${event.id}`,
+                ? `/participant/polling/events/${event.id}`
+                : `/participant/events/${event.id}`,
             entity: 'events',
             entityId: event.id,
             metadata: { eventType: event.event_type, organizationName: event.organizations?.organization_name },

@@ -46,7 +46,7 @@ export default function VoterEventHeader({ event, eyebrow, children }) {
 
         <div className="relative z-10">
           <Link
-            to="/voter"
+            to="/participant"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-white/80 transition hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />

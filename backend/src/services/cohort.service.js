@@ -1,6 +1,6 @@
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, PROFILE_TYPES, ACCOUNT_STATUS } from '../utils/constants.js'
+import { DB_TABLES, ACCOUNT_STATUS } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { assertParticipantsEditable } from '../utils/eventLifecycle.js'
 import { registerParticipant, resolveParticipantType } from './participant.service.js'
@@ -34,28 +34,33 @@ function tally(rows, column) {
  */
 export async function getEventCohorts(eventId, organizerId) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
+  const event = await getEventById(eventId)
+  const participantType = resolveParticipantType(event.event_type)
 
-  // Active student pool.
+  // Active accounts in the pool for this event type.
   const { data: pool, error: poolErr } = await getClient()
-    .from(DB_TABLES.USERS)
-    .select('program, year_section')
-    .eq('profile_type', PROFILE_TYPES.STUDENT)
-    .eq('account_status', ACCOUNT_STATUS.ACTIVE)
+    .from(DB_TABLES.USER_PARTICIPANT_TYPES)
+    .select('users!inner(program, year_section, account_status)')
+    .eq('participant_type', participantType)
+    .eq('is_active', true)
+    .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
   if (poolErr) throw new ApiError(500, poolErr.message)
 
-  // Already-enrolled students for this event.
+  // Already-enrolled accounts for this event and participant type.
   const { data: enrolled, error: enrErr } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('users!inner (program, year_section, profile_type)')
+    .select('users!inner (program, year_section)')
     .eq('event_id', eventId)
+    .eq('participant_type', participantType)
   if (enrErr) throw new ApiError(500, enrErr.message)
 
   const enrolledStudents = (enrolled ?? [])
     .map((r) => r.users)
-    .filter((u) => u && u.profile_type === PROFILE_TYPES.STUDENT)
+    .filter(Boolean)
 
-  const poolPrograms = tally(pool ?? [], 'program')
-  const poolSections = tally(pool ?? [], 'year_section')
+  const poolProfiles = (pool ?? []).map((row) => row.users).filter(Boolean)
+  const poolPrograms = tally(poolProfiles, 'program')
+  const poolSections = tally(poolProfiles, 'year_section')
   const enrProgramsMap = tally(enrolledStudents, 'program')
   const enrSectionsMap = tally(enrolledStudents, 'year_section')
 
@@ -78,9 +83,9 @@ export async function getEventCohorts(eventId, organizerId) {
 }
 
 /**
- * Enroll every active student in the chosen cohort(s) into the event. Idempotent
+ * Enroll every active account in the chosen cohort(s) into the event. Idempotent
  * (already-enrolled students are skipped). Only students are ever matched, so a
- * judge account can never be enrolled here (plan D7). Optionally emails an event
+ * judge-only account cannot be enrolled here. Optionally emails an event
  * invitation (Email B — no credentials) to the newly enrolled.
  */
 export async function inviteCohort(eventId, organizerId, { cohortType, values, notify = false } = {}) {
@@ -103,21 +108,23 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
 
   const participantType = resolveParticipantType(event.event_type)
 
-  // Matching active students.
+  // Matching active accounts that have this event's participant type.
   const { data: students, error } = await getClient()
-    .from(DB_TABLES.USERS)
-    .select('id, email')
-    .eq('profile_type', PROFILE_TYPES.STUDENT)
-    .eq('account_status', ACCOUNT_STATUS.ACTIVE)
-    .in(column, values)
+    .from(DB_TABLES.USER_PARTICIPANT_TYPES)
+    .select('users!inner(id, email, account_status, program, year_section)')
+    .eq('participant_type', participantType)
+    .eq('is_active', true)
+    .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
+    .in(`users.${column}`, values)
   if (error) throw new ApiError(500, error.message)
+  const matchingAccounts = (students ?? []).map((row) => row.users).filter(Boolean)
 
-  if (!students?.length) {
+  if (!matchingAccounts.length) {
     return { matched: 0, enrolled: 0, alreadyEnrolled: 0, notified: 0 }
   }
 
   // Which of them are already enrolled in this event.
-  const ids = students.map((s) => s.id)
+  const ids = matchingAccounts.map((s) => s.id)
   const { data: existing, error: exErr } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('user_id')
@@ -126,7 +133,7 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
   if (exErr) throw new ApiError(500, exErr.message)
   const enrolledSet = new Set((existing ?? []).map((r) => r.user_id))
 
-  const toEnroll = students.filter((s) => !enrolledSet.has(s.id))
+  const toEnroll = matchingAccounts.filter((s) => !enrolledSet.has(s.id))
 
   let enrolled = 0
   for (const student of toEnroll) {

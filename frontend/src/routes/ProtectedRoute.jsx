@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { getRoleDashboardPath } from '@/utils/auth'
+import { isParticipantRole } from '@/utils/constants'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 // Organizer onboarding was removed (organizer plan Phase C): the admin now
@@ -35,7 +36,8 @@ export default function ProtectedRoute({
     )
   }
 
-  if (allowedRoles?.length && !allowedRoles.includes(role)) {
+  const participantRoleAllowed = allowedRoles?.some(isParticipantRole) && isParticipantRole(role)
+  if (allowedRoles?.length && !allowedRoles.includes(role) && !participantRoleAllowed) {
     return <Navigate to={getRoleDashboardPath(role)} replace />
   }
 

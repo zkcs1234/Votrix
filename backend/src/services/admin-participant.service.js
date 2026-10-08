@@ -1,17 +1,18 @@
 import * as XLSX from 'xlsx'
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, USER_ROLES, PROFILE_TYPES, ACCOUNT_STATUS } from '../utils/constants.js'
+import { DB_TABLES, USER_ROLES, PARTICIPANT_TYPES, ACCOUNT_STATUS, isParticipantRole } from '../utils/constants.js'
 import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
 import { sanitizeUser } from '../utils/userMapper.js'
 import { getParticipantTaxonomy } from './participant-taxonomy.service.js'
 import { sendVoterAccountCreatedEmail } from './mailer.service.js'
+import { addParticipantTypeMembership, setParticipantTypeMembership } from './user-participant-type.service.js'
 
 // Phase 3 of VOTER_PROFILE_AND_ADMIN_REGISTRATION_PLAN.md.
-// Admin-owned registration of STUDENT participants (election voters + polling
-// respondents). Fixed 6-column profile (§4A), validated against the managed
-// taxonomy (D13). Accounts are global voter accounts (profile_type='student').
+// Admin-owned registration for the school-based election-voter and polling-
+// respondent pools. Both use shared account profile fields and separate type
+// memberships.
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -29,8 +30,8 @@ const REQUIRED_FIELDS = ['email', 'school_id', 'last_name', 'first_name', 'progr
 
 export const VOTER_CSV_TEMPLATE_HEADERS = ['email', 'school id', 'last name', 'first name', 'program', 'year & section']
 
-// Judge fixed schema (§3.5). Judges are global accounts (profile_type='judge')
-// with name columns on `users` and the professional fields in profile_data.
+// Judges share the user identity fields; professional details are stored in
+// profile_data and Competition Judge eligibility is stored as a membership.
 const JUDGE_COLUMN_ALIASES = {
   email: ['email', 'e_mail', 'email_address', 'mail', 'emailaddress'],
   last_name: ['last_name', 'lastname', 'surname', 'family_name'],
@@ -137,7 +138,7 @@ async function findStudentBySchoolId(schoolId, { excludeUserId } = {}) {
   let query = getClient()
     .from(DB_TABLES.USERS)
     .select('id, email, school_id')
-    .eq('profile_type', PROFILE_TYPES.STUDENT)
+    .in('role', [USER_ROLES.PARTICIPANT, USER_ROLES.VOTER])
     .ilike('school_id', schoolId)
   if (excludeUserId) query = query.neq('id', excludeUserId)
   const { data, error } = await query.maybeSingle()
@@ -148,15 +149,17 @@ async function findStudentBySchoolId(schoolId, { excludeUserId } = {}) {
 // ---------------------------------------------------------------------------
 // Listing
 // ---------------------------------------------------------------------------
-export async function listVoters({ search, program, yearSection, status, page = 1, limit = 50 } = {}) {
+async function listSchoolParticipantType(participantType, { search, program, yearSection, status, page = 1, limit = 50 } = {}) {
   const safeLimit = Math.min(Math.max(1, parseInt(limit, 10) || 50), 200)
   const safePage = Math.max(1, parseInt(page, 10) || 1)
   const offset = (safePage - 1) * safeLimit
 
   let query = getClient()
     .from(DB_TABLES.USERS)
-    .select('*', { count: 'exact' })
-    .eq('profile_type', PROFILE_TYPES.STUDENT)
+    .select('*, user_participant_types!inner(participant_type, is_active)', { count: 'exact' })
+    .eq('user_participant_types.participant_type', participantType)
+    .eq('user_participant_types.is_active', true)
+    .in('role', [USER_ROLES.PARTICIPANT, USER_ROLES.VOTER])
 
   if (search) {
     // Strip characters that would break the PostgREST `or` filter grammar.
@@ -177,11 +180,21 @@ export async function listVoters({ search, program, yearSection, status, page = 
   if (error) throw new ApiError(500, error.message)
 
   return {
-    voters: (data ?? []).map(sanitizeUser),
+    participants: (data ?? []).map(sanitizeUser),
     total: count ?? 0,
     page: safePage,
     limit: safeLimit,
   }
+}
+
+export async function listVoters(options = {}) {
+  const result = await listSchoolParticipantType(PARTICIPANT_TYPES.ELECTION_VOTER, options)
+  return { ...result, voters: result.participants }
+}
+
+export async function listRespondents(options = {}) {
+  const result = await listSchoolParticipantType(PARTICIPANT_TYPES.POLLING_RESPONDENT, options)
+  return { ...result, respondents: result.participants }
 }
 
 // ---------------------------------------------------------------------------
@@ -215,15 +228,14 @@ function applyTaxonomy(row, { programMap, sectionMap }) {
   return { row: out, errors }
 }
 
-async function insertStudent(row, temporaryPassword) {
+async function insertStudent(row, temporaryPassword, participantType) {
   const passwordHash = await hashPassword(temporaryPassword)
   const { data, error } = await getClient()
     .from(DB_TABLES.USERS)
     .insert({
       email: row.email.toLowerCase(),
       password: passwordHash,
-      role: USER_ROLES.VOTER,
-      profile_type: PROFILE_TYPES.STUDENT,
+      role: USER_ROLES.PARTICIPANT,
       account_status: ACCOUNT_STATUS.ACTIVE,
       must_change_password: true,
       first_name: row.first_name,
@@ -235,6 +247,7 @@ async function insertStudent(row, temporaryPassword) {
     .select('*')
     .single()
   if (error) throw new ApiError(500, error.message)
+  await addParticipantTypeMembership(data.id, participantType)
   return data
 }
 
@@ -258,7 +271,7 @@ async function updateStudentProfile(userId, row) {
 // ---------------------------------------------------------------------------
 // Manual single add
 // ---------------------------------------------------------------------------
-export async function createVoter(input) {
+async function createSchoolParticipant(input, participantType) {
   const row = {
     email: String(input?.email ?? '').trim().toLowerCase(),
     school_id: String(input?.schoolId ?? '').trim(),
@@ -275,35 +288,73 @@ export async function createVoter(input) {
   if (errors.length) throw new ApiError(400, 'Validation failed', { errors })
 
   const existingEmail = await findStudentByEmail(canonical.email)
-  if (existingEmail) throw new ApiError(409, 'A user with this email already exists')
+  if (existingEmail && !isParticipantRole(existingEmail.role)) {
+    throw new ApiError(409, 'This email belongs to an admin or organizer account')
+  }
+  if (existingEmail) {
+    const sharedFields = ['school_id', 'first_name', 'last_name', 'program', 'year_section']
+    const conflicts = sharedFields.filter((field) => {
+      const current = String(existingEmail[field] ?? '').trim().toLowerCase()
+      const incoming = String(canonical[field] ?? '').trim().toLowerCase()
+      return current && incoming && current !== incoming
+    })
+    if (conflicts.length) {
+      throw new ApiError(409, 'Existing account has conflicting shared profile details; edit the account before adding this participant type', { fields: conflicts })
+    }
+  }
   const existingSchoolId = await findStudentBySchoolId(canonical.school_id)
-  if (existingSchoolId) throw new ApiError(409, 'A student with this school ID already exists')
+  if (existingSchoolId && existingSchoolId.id !== existingEmail?.id) {
+    throw new ApiError(409, 'Another participant already uses this school ID')
+  }
+
+  if (existingEmail) {
+    const user = await updateStudentProfile(existingEmail.id, canonical)
+    await addParticipantTypeMembership(user.id, participantType)
+    return { user: sanitizeUser(user), email: null, created: false }
+  }
 
   const tempPassword = generateTemporaryPassword()
-  const user = await insertStudent(canonical, tempPassword)
+  const user = await insertStudent(canonical, tempPassword, participantType)
   const email = await sendVoterAccountCreatedEmail({ email: user.email, temporaryPassword: tempPassword })
 
-  return { user: sanitizeUser(user), email }
+  return { user: sanitizeUser(user), email, created: true }
+}
+
+export async function createVoter(input) {
+  return createSchoolParticipant(input, PARTICIPANT_TYPES.ELECTION_VOTER)
+}
+
+export async function createRespondent(input) {
+  return createSchoolParticipant(input, PARTICIPANT_TYPES.POLLING_RESPONDENT)
 }
 
 // ---------------------------------------------------------------------------
 // Edit profile / status
 // ---------------------------------------------------------------------------
-async function assertStudent(userId) {
+async function assertSchoolParticipant(userId, participantType) {
   const { data, error } = await getClient()
     .from(DB_TABLES.USERS)
     .select('*')
     .eq('id', userId)
     .maybeSingle()
   if (error) throw new ApiError(500, error.message)
-  if (!data || data.profile_type !== PROFILE_TYPES.STUDENT) {
-    throw new ApiError(404, 'Voter not found')
+  if (!data || !isParticipantRole(data.role)) {
+    throw new ApiError(404, 'Participant not found')
   }
+  const { data: membership, error: membershipError } = await getClient()
+    .from(DB_TABLES.USER_PARTICIPANT_TYPES)
+    .select('user_id')
+    .eq('user_id', userId)
+    .eq('participant_type', participantType)
+    .eq('is_active', true)
+    .maybeSingle()
+  if (membershipError) throw new ApiError(500, membershipError.message)
+  if (!membership) throw new ApiError(404, 'Participant type membership not found')
   return data
 }
 
-export async function updateVoter(userId, input) {
-  const current = await assertStudent(userId)
+async function updateSchoolParticipant(userId, input, participantType) {
+  const current = await assertSchoolParticipant(userId, participantType)
   const row = {
     email: current.email,
     school_id: String(input?.schoolId ?? current.school_id ?? '').trim(),
@@ -326,11 +377,19 @@ export async function updateVoter(userId, input) {
   return { user: sanitizeUser(updated) }
 }
 
-export async function updateVoterStatus(userId, accountStatus) {
+export async function updateVoter(userId, input) {
+  return updateSchoolParticipant(userId, input, PARTICIPANT_TYPES.ELECTION_VOTER)
+}
+
+export async function updateRespondent(userId, input) {
+  return updateSchoolParticipant(userId, input, PARTICIPANT_TYPES.POLLING_RESPONDENT)
+}
+
+async function updateSchoolParticipantStatus(userId, accountStatus, participantType) {
   if (!Object.values(ACCOUNT_STATUS).includes(accountStatus)) {
     throw new ApiError(400, 'Invalid account status')
   }
-  await assertStudent(userId)
+  await assertSchoolParticipant(userId, participantType)
   const { data, error } = await getClient()
     .from(DB_TABLES.USERS)
     .update({ account_status: accountStatus })
@@ -341,10 +400,28 @@ export async function updateVoterStatus(userId, accountStatus) {
   return { user: sanitizeUser(data) }
 }
 
+export async function updateVoterStatus(userId, accountStatus) {
+  return updateSchoolParticipantStatus(userId, accountStatus, PARTICIPANT_TYPES.ELECTION_VOTER)
+}
+
+export async function updateRespondentStatus(userId, accountStatus) {
+  return updateSchoolParticipantStatus(userId, accountStatus, PARTICIPANT_TYPES.POLLING_RESPONDENT)
+}
+
+export async function removeVoterMembership(userId) {
+  await assertSchoolParticipant(userId, PARTICIPANT_TYPES.ELECTION_VOTER)
+  await setParticipantTypeMembership(userId, PARTICIPANT_TYPES.ELECTION_VOTER, false)
+}
+
+export async function removeRespondentMembership(userId) {
+  await assertSchoolParticipant(userId, PARTICIPANT_TYPES.POLLING_RESPONDENT)
+  await setParticipantTypeMembership(userId, PARTICIPANT_TYPES.POLLING_RESPONDENT, false)
+}
+
 // ---------------------------------------------------------------------------
 // CSV import — preview (no writes) then register
 // ---------------------------------------------------------------------------
-export async function previewVoterImport(fileBuffer) {
+async function previewSchoolParticipantImport(fileBuffer) {
   if (!Buffer.isBuffer(fileBuffer)) throw new ApiError(400, 'Invalid file data')
 
   const fileRows = parseVoterFile(fileBuffer)
@@ -389,8 +466,18 @@ export async function previewVoterImport(fileBuffer) {
   for (const row of validRows) {
     const existingEmail = await findStudentByEmail(row.email)
     if (existingEmail) {
-      if (existingEmail.role !== USER_ROLES.VOTER || existingEmail.profile_type === PROFILE_TYPES.JUDGE) {
-        errors.push(`Row ${row.rowNumber}: ${row.email} is used by another account type`)
+      if (!isParticipantRole(existingEmail.role)) {
+        errors.push(`Row ${row.rowNumber}: ${row.email} belongs to an admin or organizer account`)
+        continue
+      }
+      const sharedFields = ['school_id', 'first_name', 'last_name', 'program', 'year_section']
+      const conflicts = sharedFields.filter((field) => {
+        const current = String(existingEmail[field] ?? '').trim().toLowerCase()
+        const incoming = String(row[field] ?? '').trim().toLowerCase()
+        return current && incoming && current !== incoming
+      })
+      if (conflicts.length) {
+        errors.push(`Row ${row.rowNumber}: ${row.email} has conflicting shared profile fields (${conflicts.join(', ')}); edit the account before importing this type`)
         continue
       }
       // Guard against school_id collision with a different account.
@@ -421,7 +508,15 @@ export async function previewVoterImport(fileBuffer) {
   }
 }
 
-export async function registerVoterImport(parsedData) {
+export async function previewVoterImport(fileBuffer) {
+  return previewSchoolParticipantImport(fileBuffer)
+}
+
+export async function previewRespondentImport(fileBuffer) {
+  return previewSchoolParticipantImport(fileBuffer)
+}
+
+async function registerSchoolParticipantImport(parsedData, participantType) {
   if (!Array.isArray(parsedData) || !parsedData.length) {
     throw new ApiError(400, 'No rows to register')
   }
@@ -436,12 +531,13 @@ export async function registerVoterImport(parsedData) {
         const existing = await findStudentByEmail(row.email)
         if (!existing) throw new ApiError(409, 'account no longer exists')
         await updateStudentProfile(existing.id, row)
-        results.push({ email: row.email, success: true, isNewVoter: false, emailSent: false })
+        await addParticipantTypeMembership(existing.id, participantType)
+        results.push({ email: row.email, success: true, isNewParticipant: false, emailSent: false })
       } else {
         const tempPassword = generateTemporaryPassword()
-        const user = await insertStudent(row, tempPassword)
+        const user = await insertStudent(row, tempPassword, participantType)
         const email = await sendVoterAccountCreatedEmail({ email: user.email, temporaryPassword: tempPassword })
-        results.push({ email: row.email, success: true, isNewVoter: true, emailSent: Boolean(email?.sent) })
+        results.push({ email: row.email, success: true, isNewParticipant: true, emailSent: Boolean(email?.sent) })
       }
       succeeded += 1
     } catch (err) {
@@ -453,9 +549,17 @@ export async function registerVoterImport(parsedData) {
   return { total: parsedData.length, succeeded, failed, results }
 }
 
+export async function registerVoterImport(parsedData) {
+  return registerSchoolParticipantImport(parsedData, PARTICIPANT_TYPES.ELECTION_VOTER)
+}
+
+export async function registerRespondentImport(parsedData) {
+  return registerSchoolParticipantImport(parsedData, PARTICIPANT_TYPES.POLLING_RESPONDENT)
+}
+
 // ===========================================================================
-// JUDGES — plan Phase 4. Fixed judge schema, global accounts (profile_type=
-// 'judge'). No taxonomy, no school_id. Extras stored in profile_data.
+// JUDGES — fixed judge-specific fields in profile_data; shared name/email and
+// independently assignable Competition Judge membership.
 // ===========================================================================
 
 function parseJudgeFile(buffer) {
@@ -552,8 +656,7 @@ async function insertJudge(row, temporaryPassword) {
     .insert({
       email: row.email.toLowerCase(),
       password: passwordHash,
-      role: USER_ROLES.VOTER,
-      profile_type: PROFILE_TYPES.JUDGE,
+      role: USER_ROLES.PARTICIPANT,
       account_status: ACCOUNT_STATUS.ACTIVE,
       must_change_password: true,
       first_name: row.first_name,
@@ -563,6 +666,7 @@ async function insertJudge(row, temporaryPassword) {
     .select('*')
     .single()
   if (error) throw new ApiError(500, error.message)
+  await addParticipantTypeMembership(data.id, PARTICIPANT_TYPES.COMPETITION_JUDGE)
   return data
 }
 
@@ -588,7 +692,16 @@ async function assertJudge(userId) {
     .eq('id', userId)
     .maybeSingle()
   if (error) throw new ApiError(500, error.message)
-  if (!data || data.profile_type !== PROFILE_TYPES.JUDGE) throw new ApiError(404, 'Judge not found')
+  if (!data || !isParticipantRole(data.role)) throw new ApiError(404, 'Judge not found')
+  const { data: membership, error: membershipError } = await getClient()
+    .from(DB_TABLES.USER_PARTICIPANT_TYPES)
+    .select('user_id')
+    .eq('user_id', userId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .eq('is_active', true)
+    .maybeSingle()
+  if (membershipError) throw new ApiError(500, membershipError.message)
+  if (!membership) throw new ApiError(404, 'Judge type membership not found')
   return data
 }
 
@@ -599,8 +712,10 @@ export async function listJudges({ search, status, page = 1, limit = 50 } = {}) 
 
   let query = getClient()
     .from(DB_TABLES.USERS)
-    .select('*', { count: 'exact' })
-    .eq('profile_type', PROFILE_TYPES.JUDGE)
+    .select('*, user_participant_types!inner(participant_type, is_active)', { count: 'exact' })
+    .eq('user_participant_types.participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .eq('user_participant_types.is_active', true)
+    .in('role', [USER_ROLES.PARTICIPANT, USER_ROLES.VOTER])
 
   if (search) {
     const s = String(search).replace(/[,()%]/g, '').trim()
@@ -616,11 +731,10 @@ export async function listJudges({ search, status, page = 1, limit = 50 } = {}) 
   return { judges: (data ?? []).map(sanitizeUser), total: count ?? 0, page: safePage, limit: safeLimit }
 }
 
-// Classify an existing email against the judge pool. Returns 'conflict' when the
-// address belongs to a student (D7) or a non-voter account.
+// Only admin and organizer accounts cannot be added to a participant pool.
 function judgeEmailConflict(existing) {
   if (!existing) return null
-  if (existing.role !== USER_ROLES.VOTER || existing.profile_type === PROFILE_TYPES.STUDENT) {
+  if (!isParticipantRole(existing.role)) {
     return 'used by another account type'
   }
   return null
@@ -643,14 +757,22 @@ export async function createJudge(input) {
   const existing = await findStudentByEmail(row.email)
   if (existing) {
     if (judgeEmailConflict(existing)) throw new ApiError(409, 'This email is used by another account type')
-    throw new ApiError(409, 'A judge with this email already exists')
+    const nameConflicts = ['first_name', 'last_name'].filter((field) =>
+      existing[field] && row[field] && existing[field].trim().toLowerCase() !== row[field].trim().toLowerCase(),
+    )
+    if (nameConflicts.length) {
+      throw new ApiError(409, 'Existing account has conflicting shared name details; edit the account before adding this participant type', { fields: nameConflicts })
+    }
+    const user = await updateJudgeRow(existing.id, row)
+    await addParticipantTypeMembership(existing.id, PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    return { user: sanitizeUser(user), email: null, created: false }
   }
 
   const tempPassword = generateTemporaryPassword()
   const user = await insertJudge(row, tempPassword)
   const email = await sendVoterAccountCreatedEmail({ email: user.email, temporaryPassword: tempPassword })
 
-  return { user: sanitizeUser(user), email }
+  return { user: sanitizeUser(user), email, created: true }
 }
 
 export async function updateJudge(userId, input) {
@@ -686,6 +808,11 @@ export async function updateJudgeStatus(userId, accountStatus) {
   return { user: sanitizeUser(data) }
 }
 
+export async function removeJudgeMembership(userId) {
+  await assertJudge(userId)
+  await setParticipantTypeMembership(userId, PARTICIPANT_TYPES.COMPETITION_JUDGE, false)
+}
+
 export async function previewJudgeImport(fileBuffer) {
   if (!Buffer.isBuffer(fileBuffer)) throw new ApiError(400, 'Invalid file data')
 
@@ -718,6 +845,13 @@ export async function previewJudgeImport(fileBuffer) {
     if (existing) {
       if (judgeEmailConflict(existing)) {
         errors.push(`Row ${row.rowNumber}: ${row.email} is used by another account type`)
+        continue
+      }
+      const nameConflicts = ['first_name', 'last_name'].filter((field) =>
+        existing[field] && row[field] && existing[field].trim().toLowerCase() !== row[field].trim().toLowerCase(),
+      )
+      if (nameConflicts.length) {
+        errors.push(`Row ${row.rowNumber}: ${row.email} has conflicting shared profile fields (${nameConflicts.join(', ')}); edit the account before importing this type`)
         continue
       }
       existingCount += 1
@@ -761,6 +895,7 @@ export async function registerJudgeImport(parsedData) {
         const existing = await findStudentByEmail(row.email)
         if (!existing) throw new ApiError(409, 'account no longer exists')
         await updateJudgeRow(existing.id, row)
+        await addParticipantTypeMembership(existing.id, PARTICIPANT_TYPES.COMPETITION_JUDGE)
         results.push({ email: row.email, success: true, isNewJudge: false, emailSent: false })
       } else {
         const tempPassword = generateTemporaryPassword()

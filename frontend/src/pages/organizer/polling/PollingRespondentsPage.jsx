@@ -27,9 +27,9 @@ export default function PollingRespondentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="v-page-title">Respondents</h1>
+        <h1 className="v-page-title">Polling Respondents</h1>
         <p className="v-caption">
-          Invite students to respond to this poll by program or year &amp; section.
+          Invite eligible polling respondents by program or year &amp; section.
         </p>
       </div>
 

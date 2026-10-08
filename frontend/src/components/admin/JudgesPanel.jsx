@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Trophy, UserPlus, Upload, Download, Pencil, ShieldOff, UserCheck, ChevronDown } from 'lucide-react'
+import { Trophy, UserPlus, Upload, Download, Pencil, ShieldOff, UserCheck, ChevronDown, UserMinus } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -57,10 +57,10 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
       const payload = { ...form, organizerIds }
       if (isEdit) {
         await adminService.updateJudge(initial.id, payload)
-        success('Judge updated')
+        success('Competition Judge updated')
       } else {
         await adminService.createJudge(payload)
-        success('Judge registered — credentials emailed')
+        success('Competition Judge added — credentials emailed')
       }
       onSaved()
     } catch (err) {
@@ -74,7 +74,7 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
   }
 
   return (
-    <Modal open onClose={onClose} title={isEdit ? 'Edit judge' : 'Add judge'} size="md">
+    <Modal open onClose={onClose} title={isEdit ? 'Edit Competition Judge' : 'Add Competition Judge'} size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="v-label">Email</label>
@@ -124,7 +124,7 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
         <div className="rounded-2xl border border-v-border p-3">
           <p className="v-label mb-1">Assign to organizers</p>
           <p className="v-caption mb-2">
-            Only assigned organizers can pick this judge. Leave empty to make the judge available to all organizers.
+            Only assigned organizers can pick this Competition Judge. Leave empty to make them available to all organizers.
           </p>
           {organizers.length === 0 ? (
             <p className="v-caption">No organizers registered yet.</p>
@@ -156,7 +156,7 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
 
         <div className="flex justify-end gap-2 border-t border-v-border pt-4">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={saving}>{isEdit ? 'Save changes' : 'Register judge'}</Button>
+          <Button type="submit" loading={saving}>{isEdit ? 'Save changes' : 'Add Competition Judge'}</Button>
         </div>
       </form>
     </Modal>
@@ -232,6 +232,8 @@ export default function JudgesPanel() {
   const [statusFilter, setStatusFilter] = useState('active')
   const [modal, setModal] = useState(null)
   const [statusTarget, setStatusTarget] = useState(null)
+  const [removeTarget, setRemoveTarget] = useState(null)
+  const [removing, setRemoving] = useState(false)
   const [preview, setPreview] = useState(null)
   const [registering, setRegistering] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -305,7 +307,7 @@ export default function JudgesPanel() {
     try {
       const { data } = await adminService.exportJudges()
       downloadBlob('judges.csv', data)
-      success('Judges exported')
+      success('Competition Judges exported')
     } catch (err) {
       toastError(getErrorMessage(err, 'Export failed'))
     } finally {
@@ -317,7 +319,7 @@ export default function JudgesPanel() {
     setSavingId(judge.id)
     try {
       await adminService.updateJudgeStatus(judge.id, accountStatus)
-      success(`Judge ${accountStatus}`)
+      success(`Competition Judge account ${accountStatus}`)
       setStatusTarget(null)
       await fetchJudges()
     } catch (err) {
@@ -327,12 +329,27 @@ export default function JudgesPanel() {
     }
   }
 
+  const handleRemoveFromPool = async () => {
+    if (!removeTarget) return
+    setRemoving(true)
+    try {
+      await adminService.removeJudgeMembership(removeTarget.id)
+      success('Competition Judge removed from this pool')
+      setRemoveTarget(null)
+      await fetchJudges()
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Failed to remove judge membership'))
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   const downloadTemplate = async () => {
     try {
       const { data } = await adminService.getJudgeCsvTemplate()
       downloadBlob('judge-template.csv', data)
     } catch (err) {
-      const message = getErrorMessage(err, 'Could not download the judge template')
+      const message = getErrorMessage(err, 'Could not download the Competition Judge template')
       setError(message)
       toastError(message)
     }
@@ -342,14 +359,14 @@ export default function JudgesPanel() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="v-page-title">Judges</h1>
+          <h1 className="v-page-title">Competition Judges</h1>
           <p className="v-caption">
             Register competition judges. Organizers pick them from this pool when setting up a competition.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={downloadTemplate}>
-            <Download className="h-4 w-4" strokeWidth={1.5} /> Template
+            <Download className="h-4 w-4" strokeWidth={1.5} /> Import template
           </Button>
           <Button variant="secondary" onClick={handleExport} loading={exporting}>
             <Download className="h-4 w-4" strokeWidth={1.5} /> Export CSV
@@ -359,13 +376,13 @@ export default function JudgesPanel() {
           </Button>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFile} />
           <Button onClick={() => setModal({ mode: 'add' })}>
-            <UserPlus className="h-4 w-4" strokeWidth={2} /> Add judge
+            <UserPlus className="h-4 w-4" strokeWidth={2} /> Add Competition Judge
           </Button>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard label="Judges (this view)" value={total} icon={Trophy} />
+        <StatCard label="Competition Judges (this view)" value={total} icon={Trophy} />
         <StatCard label="Active" value={summary.active} icon={UserCheck} />
         <StatCard label="Suspended" value={summary.suspended} icon={ShieldOff} />
       </div>
@@ -396,7 +413,7 @@ export default function JudgesPanel() {
           </div>
         ) : judges.length === 0 ? (
           <div className="p-8 text-center v-caption">
-            {search || statusFilter ? 'No judges match the current filters.' : 'No judges yet. Add one or import a CSV.'}
+            {search || statusFilter ? 'No Competition Judges match the current filters.' : 'No Competition Judges yet. Add one or import a CSV.'}
           </div>
         ) : (
           <div className="v-table-wrap">
@@ -435,6 +452,9 @@ export default function JudgesPanel() {
                             Archive
                           </Button>
                         )}
+                        <Button size="sm" variant="ghost" onClick={() => setRemoveTarget(v)} title="Remove Competition Judge pool membership">
+                          <UserMinus className="h-4 w-4" strokeWidth={1.5} /> Remove from pool
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -460,11 +480,24 @@ export default function JudgesPanel() {
           name: fullName(statusTarget.user),
           email: statusTarget.user.email,
         } : null}
-        accountType="Judge"
+        accountType="Competition Judge"
         onClose={() => setStatusTarget(null)}
         onConfirm={() => handleStatus(statusTarget.user, statusTarget.accountStatus)}
         loading={Boolean(savingId)}
       />
+
+      <Modal open={Boolean(removeTarget)} onClose={() => setRemoveTarget(null)} title="Remove Competition Judge membership?" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-v-text">
+            {removeTarget ? `${fullName(removeTarget)} (${removeTarget.email}) will no longer be available for future competition selection.` : ''}
+          </p>
+          <p className="v-caption">The account, its other participant types, and existing event history remain unchanged. Existing event enrollment is not removed.</p>
+          <div className="flex justify-end gap-2 border-t border-v-border pt-4">
+            <Button type="button" variant="secondary" onClick={() => setRemoveTarget(null)}>Cancel</Button>
+            <Button type="button" variant="danger" onClick={handleRemoveFromPool} loading={removing}>Remove from pool</Button>
+          </div>
+        </div>
+      </Modal>
 
       {preview && (
         <CsvPreviewModal

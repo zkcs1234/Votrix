@@ -137,8 +137,8 @@ export default function CohortInviteManager({ eventId, service, participantLabel
             <div>
               <h2 className="v-section-title">Invite a cohort</h2>
               <p className="v-caption mt-1">
-                Choose a Program or Year &amp; Section to enroll all its students as {participantLabel}.
-                Already-enrolled students are skipped.
+                Choose a Program or Year &amp; Section to enroll eligible accounts as {participantLabel}.
+                Already-enrolled participants are skipped.
               </p>
             </div>
 

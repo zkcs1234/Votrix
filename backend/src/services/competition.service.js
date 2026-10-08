@@ -8,7 +8,6 @@ import {
   JUDGE_ROLES,
   ASSIGNMENT_SCOPES,
   PARTICIPANT_TYPES,
-  PROFILE_TYPES,
   ACCOUNT_STATUS,
 } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
@@ -670,9 +669,8 @@ export async function getCompetitionJudgesView(eventId, organizerId) {
 }
 
 // ---------------------------------------------------------------------------
-// Judge pool + pick (plan Phase 6). Judges are registered globally by the admin
-// (profile_type='judge'); organizers pick them into a competition instead of
-// creating accounts.
+// Judge pool + pick. Admin-managed competition-judge memberships define pool
+// eligibility; organizers select existing participant accounts.
 // ---------------------------------------------------------------------------
 
 // The global judge pool, annotated with whether each judge is already enrolled
@@ -680,19 +678,12 @@ export async function getCompetitionJudgesView(eventId, organizerId) {
 export async function getJudgePool(eventId, organizerId, { search } = {}) {
   await assertCompetitionEvent(eventId, organizerId)
 
-  let query = getClient()
-    .from(DB_TABLES.USERS)
-    .select('id, email, first_name, last_name, profile_data')
-    .eq('profile_type', PROFILE_TYPES.JUDGE)
-    .eq('account_status', ACCOUNT_STATUS.ACTIVE)
-    .order('last_name', { ascending: true })
-
-  if (search) {
-    const s = String(search).replace(/[,()%]/g, '').trim()
-    if (s) query = query.or(`email.ilike.%${s}%,first_name.ilike.%${s}%,last_name.ilike.%${s}%`)
-  }
-
-  const { data, error } = await query
+  const { data, error } = await getClient()
+    .from(DB_TABLES.USER_PARTICIPANT_TYPES)
+    .select('users!inner(id, email, first_name, last_name, profile_data, account_status)')
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .eq('is_active', true)
+    .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
   if (error) throw new ApiError(500, error.message)
 
   const { data: enrolled, error: enrErr } = await getClient()
@@ -706,7 +697,10 @@ export async function getJudgePool(eventId, organizerId, { search } = {}) {
   // Judge → organizer assignment (organizer plan O7). A judge with an
   // organizerIds list is visible only to those organizers; a judge with no
   // assignment stays visible to everyone (backward-compatible default).
-  const visible = (data ?? []).filter((u) => {
+  const searchTerm = String(search ?? '').trim().toLowerCase()
+  const visible = (data ?? []).map((row) => row.users).filter((u) => {
+    if (!u) return false
+    if (searchTerm && ![u.email, u.first_name, u.last_name].some((value) => String(value ?? '').toLowerCase().includes(searchTerm))) return false
     const ids = u.profile_data?.organizerIds
     if (!Array.isArray(ids) || ids.length === 0) return true
     return ids.map(String).includes(String(organizerId))
@@ -730,13 +724,15 @@ export async function pickJudges(eventId, organizerId, { userIds, notify = false
     throw new ApiError(400, 'Select at least one judge')
   }
 
-  const { data: judges, error } = await getClient()
-    .from(DB_TABLES.USERS)
-    .select('id, email, first_name, last_name')
-    .eq('profile_type', PROFILE_TYPES.JUDGE)
-    .eq('account_status', ACCOUNT_STATUS.ACTIVE)
-    .in('id', userIds)
+  const { data: membershipRows, error } = await getClient()
+    .from(DB_TABLES.USER_PARTICIPANT_TYPES)
+    .select('users!inner(id, email, first_name, last_name, account_status)')
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .eq('is_active', true)
+    .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
+    .in('user_id', userIds)
   if (error) throw new ApiError(500, error.message)
+  const judges = (membershipRows ?? []).map((row) => row.users).filter(Boolean)
   if (!judges?.length) return { matched: 0, enrolled: 0, alreadyEnrolled: 0, notified: 0 }
 
   const { data: existing, error: exErr } = await getClient()

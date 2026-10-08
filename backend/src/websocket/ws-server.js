@@ -150,7 +150,7 @@ async function setupRooms(ws) {
   }
 
   // Voters join rooms for their assigned events
-  if (role === 'voter') {
+  if (role === 'voter' || role === 'participant') {
     const db = getClient()
     const { data: assignments } = await db
       .from('event_participants')

@@ -226,7 +226,7 @@ export default function AppShell({
   showSidebar = true,
   showSearch = true,
   showBackButton = false,
-  backButtonPath = '/voter',
+  backButtonPath = '/participant',
   children,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -526,25 +526,18 @@ export default function AppShell({
                     <p className="text-xs text-v-text-subtle mt-0.5">{user?.email || ''}</p>
                   </div>
 
-                  {/* Participant profile (plan §6.5) — admin-managed, view-only. */}
-                  {user?.profileType && (
+                  {/* Shared participant account details; fields can span multiple types. */}
+                  {(user?.firstName || user?.lastName || user?.schoolId || user?.program || user?.yearSection || user?.profileData?.title || user?.profileData?.affiliation || user?.profileData?.expertise) && (
                     <dl className="border-b border-v-border px-4 py-3 space-y-2">
                       {[user.firstName, user.lastName].filter(Boolean).length > 0 && (
                         <ProfileRow label="Name" value={[user.firstName, user.lastName].filter(Boolean).join(' ')} />
                       )}
-                      {user.profileType === 'judge' ? (
-                        <>
-                          <ProfileRow label="Title" value={user.profileData?.title} />
-                          <ProfileRow label="Affiliation" value={user.profileData?.affiliation} />
-                          <ProfileRow label="Expertise" value={user.profileData?.expertise} />
-                        </>
-                      ) : (
-                        <>
-                          <ProfileRow label="School ID" value={user.schoolId} />
-                          <ProfileRow label="Program" value={user.program} />
-                          <ProfileRow label="Year & Section" value={user.yearSection} />
-                        </>
-                      )}
+                      <ProfileRow label="School ID" value={user.schoolId} />
+                      <ProfileRow label="Program" value={user.program} />
+                      <ProfileRow label="Year & Section" value={user.yearSection} />
+                      <ProfileRow label="Title" value={user.profileData?.title} />
+                      <ProfileRow label="Affiliation" value={user.profileData?.affiliation} />
+                      <ProfileRow label="Expertise" value={user.profileData?.expertise} />
                     </dl>
                   )}
 

@@ -110,14 +110,14 @@ export default function PollingAnalyticsPage() {
 
       <AnalyticsSection
         title="Participation by program"
-        description="Response rate among the registered students in each program."
+        description="Response rate among registered respondents in each program."
       >
         <ParticipationTable rows={programParticipation} />
       </AnalyticsSection>
 
       <AnalyticsSection
         title="Participation by year & section"
-        description="The system stores year and section together as one managed student field."
+        description="The system stores year and section together as one managed cohort field."
       >
         <ParticipationTable rows={yearSectionParticipation} />
       </AnalyticsSection>

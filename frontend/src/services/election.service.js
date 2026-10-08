@@ -1,7 +1,7 @@
 import api from '@/services/api'
 
 const base = '/organizer/election'
-const voterBase = '/voter/election'
+const voterBase = '/participant/election'
 
 export const electionService = {
   getDashboard() {

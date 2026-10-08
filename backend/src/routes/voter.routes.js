@@ -9,7 +9,7 @@ import pollingVoterRoutes from './polling-voter.routes.js'
 
 const router = Router()
 
-router.use(authenticate, authorize(USER_ROLES.VOTER), requireActiveAccount, requirePasswordChanged)
+router.use(authenticate, authorize(USER_ROLES.PARTICIPANT), requireActiveAccount, requirePasswordChanged)
 
 // Module-specific sub-routers (protected by legacy enrollment checks)
 router.use('/election', electionVoterRoutes)

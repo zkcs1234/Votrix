@@ -124,7 +124,7 @@ export default function AdminDashboardPage() {
   const stats = dashboard?.stats
   const recentActivity = dashboard?.recentActivity ?? []
   const monthlyEvents = analytics?.charts?.monthlyEvents ?? []
-  const voterGrowth = analytics?.charts?.voterGrowth ?? []
+  const participantGrowth = analytics?.charts?.participantGrowth ?? analytics?.charts?.voterGrowth ?? []
 
   return (
     <div className="space-y-6">
@@ -142,13 +142,19 @@ export default function AdminDashboardPage() {
             <Link to="/admin/users?tab=voters">
               <Button size="sm" variant="secondary">
                 <UserPlus className="h-4 w-4" strokeWidth={2} />
-                Add voter
+                Add Election Voter
               </Button>
             </Link>
             <Link to="/admin/users?tab=judges">
               <Button size="sm" variant="secondary">
                 <Gavel className="h-4 w-4" strokeWidth={2} />
-                Add judge
+                Add Competition Judge
+              </Button>
+            </Link>
+            <Link to="/admin/users?tab=respondents">
+              <Button size="sm" variant="secondary">
+                <UserPlus className="h-4 w-4" strokeWidth={2} />
+                Add Polling Respondent
               </Button>
             </Link>
           </div>
@@ -158,7 +164,7 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total organizers" value={stats?.totalOrganizers ?? 0} icon={Users} />
         <StatCard label="Total events" value={stats?.totalEvents ?? 0} icon={CalendarDays} />
-        <StatCard label="Voter accounts" value={stats?.totalVoters ?? 0} hint="Voters, judges & respondents" icon={UserCheck} />
+        <StatCard label="Participant accounts" value={stats?.totalParticipants ?? stats?.totalVoters ?? 0} hint="Election voters, competition judges & polling respondents" icon={UserCheck} />
         <StatCard label="Active events" value={stats?.activeEvents ?? 0} icon={Zap} />
         <StatCard label="Votes cast" value={stats?.totalVotesCast ?? 0} icon={CheckSquare} />
       </div>
@@ -222,7 +228,7 @@ export default function AdminDashboardPage() {
                 className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
                 <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                Add voter account
+                Add Election Voter account
               </Link>
             </li>
             <li>
@@ -231,7 +237,16 @@ export default function AdminDashboardPage() {
                 className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
                 <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                Add judge account
+                Add Competition Judge account
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/admin/users?tab=respondents"
+                className="v-btn-tertiary inline-flex items-center gap-1.5"
+              >
+                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+                Add Polling Respondent account
               </Link>
             </li>
             <li>
@@ -291,14 +306,14 @@ export default function AdminDashboardPage() {
           )}
         </Card>
         <Card padding="sm">
-          <h3 className="v-section-title">Voter growth</h3>
-          {!voterGrowth.length ? (
-            <p className="v-caption mt-3">No voter data yet</p>
+          <h3 className="v-section-title">Participant growth</h3>
+          {!participantGrowth.length ? (
+            <p className="v-caption mt-3">No participant account data yet</p>
           ) : (
             <div className="mt-3">
               <AreaChartView
-                data={voterGrowth.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
-                areas={[{ dataKey: 'value', name: 'Voters', color: '#34d399' }]}
+                data={participantGrowth.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
+                areas={[{ dataKey: 'value', name: 'Participants', color: '#34d399' }]}
                 height={220}
                 showLegend={false}
               />

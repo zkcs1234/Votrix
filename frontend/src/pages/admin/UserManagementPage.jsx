@@ -4,13 +4,12 @@ import OrganizerManagementPage from './OrganizerManagementPage'
 import VotersPanel from '@/components/admin/VotersPanel'
 import JudgesPanel from '@/components/admin/JudgesPanel'
 
-// Plan Phase 3/4 (D14): the admin "Organizer Management" area becomes
-// "User Management" with tabs. Organizers keeps the existing view; Voters is
-// admin-owned student registration; Judges is admin-owned judge registration.
+// Participant type pools remain separate views over shared user accounts.
 const TABS = [
   { id: 'organizers', label: 'Organizers' },
-  { id: 'voters', label: 'Voters' },
-  { id: 'judges', label: 'Judges' },
+  { id: 'voters', label: 'Election Voters' },
+  { id: 'judges', label: 'Competition Judges' },
+  { id: 'respondents', label: 'Polling Respondents' },
 ]
 
 export default function UserManagementPage() {
@@ -44,8 +43,9 @@ export default function UserManagementPage() {
       </div>
 
       {tab === 'organizers' && <OrganizerManagementPage />}
-      {tab === 'voters' && <VotersPanel />}
+      {tab === 'voters' && <VotersPanel key="election-voters" pool="election" />}
       {tab === 'judges' && <JudgesPanel />}
+      {tab === 'respondents' && <VotersPanel key="polling-respondents" pool="polling" />}
     </div>
   )
 }

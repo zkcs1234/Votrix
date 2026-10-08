@@ -9,7 +9,7 @@ import { authService } from '@/services/auth.service'
 import { useAuth } from '@/hooks/useAuth'
 import { getRoleDashboardPath, getSafeVoterDestination } from '@/utils/auth'
 import { voterService } from '@/services/voter.service'
-import { USER_ROLES } from '@/utils/constants'
+import { isParticipantRole, USER_ROLES } from '@/utils/constants'
 import AuthFormField from '@/components/auth/AuthFormField'
 import SubmitButton from '@/components/auth/SubmitButton'
 import PasswordInput from '@/components/ui/PasswordInput'
@@ -31,7 +31,7 @@ export default function ChangePasswordPage() {
   })
 
   const continueAfterPasswordChange = async (userRole) => {
-    if (userRole !== USER_ROLES.VOTER) {
+    if (!isParticipantRole(userRole)) {
       navigate(getRoleDashboardPath(userRole), { replace: true })
       return
     }
@@ -44,9 +44,9 @@ export default function ChangePasswordPage() {
 
     try {
       const { data } = await voterService.getLoginRedirect()
-      navigate(data.redirect?.path || '/voter', { replace: true })
+      navigate(data.redirect?.path || '/participant', { replace: true })
     } catch {
-      navigate('/voter', { replace: true })
+      navigate('/participant', { replace: true })
     }
   }
 
@@ -87,7 +87,7 @@ export default function ChangePasswordPage() {
   }
 
   // Show optional skip button for voters and organizers (not admins)
-  const canSkip = role === 'voter' || role === 'organizer'
+  const canSkip = isParticipantRole(role) || role === USER_ROLES.ORGANIZER
 
   return (
     <div>

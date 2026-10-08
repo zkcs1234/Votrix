@@ -4,7 +4,7 @@ import { verifyAccessToken } from '../utils/jwt.js'
 import { env } from '../config/env.js'
 import { findUserById } from '../services/user.service.js'
 import { isSessionActive } from '../services/session.service.js'
-import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
+import { DB_TABLES, USER_ROLES, isParticipantRole } from '../utils/constants.js'
 import { db } from '../foundation/db.js'
 
 // CWE-208: Constant-time integer comparison for token version.
@@ -66,7 +66,8 @@ export function authorize(...roles) {
     if (!req.user) {
       return next(new ApiError(401, 'Authentication required'))
     }
-    if (roles.length && !roles.includes(req.user.role)) {
+    const participantRoleAllowed = roles.some(isParticipantRole) && isParticipantRole(req.user.role)
+    if (roles.length && !roles.includes(req.user.role) && !participantRoleAllowed) {
       console.error('[authorize] Insufficient permissions:', {
         userRole: req.user.role,
         requiredRoles: roles,

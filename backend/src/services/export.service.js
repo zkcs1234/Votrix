@@ -1,6 +1,6 @@
 import { stringify } from 'csv-stringify/sync'
 import { getOrganizersList, getGlobalEvents } from './admin.service.js'
-import { listVoters, listJudges } from './admin-participant.service.js'
+import { listVoters, listRespondents, listJudges } from './admin-participant.service.js'
 import { listAuditTrail } from '../foundation/audit.js'
 
 function toCSV(rows, columns) {
@@ -40,6 +40,20 @@ async function listAllParticipants(listPage, key) {
 export async function exportVotersCSV() {
   const voters = await listAllParticipants(listVoters, 'voters')
   return toCSV(voters, [
+    { key: 'email', header: 'email' },
+    { key: 'schoolId', header: 'school_id' },
+    { key: 'firstName', header: 'first_name' },
+    { key: 'lastName', header: 'last_name' },
+    { key: 'program', header: 'program' },
+    { key: 'yearSection', header: 'year_section' },
+    { key: 'accountStatus', header: 'account_status' },
+    { key: 'createdAt', header: 'created_at' },
+  ])
+}
+
+export async function exportRespondentsCSV() {
+  const respondents = await listAllParticipants(listRespondents, 'respondents')
+  return toCSV(respondents, [
     { key: 'email', header: 'email' },
     { key: 'schoolId', header: 'school_id' },
     { key: 'firstName', header: 'first_name' },

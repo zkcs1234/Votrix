@@ -28,7 +28,7 @@ import { generateTemporaryPassword } from '../utils/crypto.js'
 import { findUserByEmail, findUserById, sanitizeUser } from './user.service.js'
 import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './mailer.service.js'
 import { createNotification, notifyAdminsEventPublished } from './notification.service.js'
-import { USER_ROLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
+import { USER_ROLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES, isParticipantRole } from '../utils/constants.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
 import {
   assertEventUpdateAllowed,
@@ -133,46 +133,17 @@ function computeParticipationRate(responded, total) {
   return Math.round((responded / total) * 10000) / 100
 }
 
-async function ensureRespondentAccount(email, plainPassword, resetPasswordForExisting = true) {
+async function ensureRespondentAccount(email) {
   const normalizedEmail = email.toLowerCase().trim()
   const existing = await findUserByEmail(normalizedEmail)
 
-  if (existing && existing.role !== USER_ROLES.VOTER) {
+  if (!existing) {
+    throw new ApiError(404, 'Participant account not found. Ask an administrator to add this account to the respondent pool.')
+  }
+  if (!isParticipantRole(existing.role)) {
     throw new ApiError(409, 'This email is already used by another account type')
   }
-
-  // Existing account that already has its own password — never reset it
-  if (existing && !resetPasswordForExisting) {
-    return { user: sanitizeUser(existing), isNew: false }
-  }
-
-  const passwordHash = await hashPassword(plainPassword)
-
-  if (existing) {
-    const { data, error } = await getClient()
-      .from(DB_TABLES.USERS)
-      .update({ password: passwordHash, must_change_password: true })
-      .eq('id', existing.id)
-      .select('*')
-      .single()
-
-    if (error) throw new ApiError(500, error.message)
-    return { user: sanitizeUser(data), isNew: false }
-  }
-
-  const { data, error } = await getClient()
-    .from(DB_TABLES.USERS)
-    .insert({
-      email: normalizedEmail,
-      password: passwordHash,
-      role: USER_ROLES.VOTER,
-      must_change_password: true,
-    })
-    .select('*')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
-  return { user: sanitizeUser(data), isNew: true }
+  return { user: sanitizeUser(existing), isNew: false }
 }
 
 export async function listEventRespondents(eventId, organizerId, page = 1, limit = 50) {
@@ -250,11 +221,10 @@ export async function listEventRespondents(eventId, organizerId, page = 1, limit
   }
 }
 
-export async function registerRespondentToPoll({ eventId, email, organizerId, temporaryPassword, resetPasswordForExisting = false }) {
+export async function registerRespondentToPoll({ eventId, email, organizerId }) {
   assertParticipantsEditable(await assertPollingEvent(eventId, organizerId))
 
-  const tempPassword = temporaryPassword || generateTemporaryPassword()
-  const { user, isNew } = await ensureRespondentAccount(email, tempPassword, resetPasswordForExisting)
+  const { user, isNew } = await ensureRespondentAccount(email)
 
   await registerParticipant(eventId, user.id, {
     participantType: PARTICIPANT_TYPES.POLLING_RESPONDENT,
@@ -282,7 +252,7 @@ export async function registerRespondentToPoll({ eventId, email, organizerId, te
     user: sanitizeUser(user),
     isNewRespondent: isNew,
     invitationSent: false,
-    temporaryPassword: resetPasswordForExisting ? tempPassword : null,
+    temporaryPassword: null,
   }
 }
 
@@ -294,7 +264,7 @@ export async function registerExistingRespondent({ eventId, email, organizerId }
     throw new ApiError(404, 'Respondent not found. Use the register flow to create a new respondent account.')
   }
 
-  if (voter.role !== USER_ROLES.VOTER) {
+  if (!isParticipantRole(voter.role)) {
     throw new ApiError(400, 'This email belongs to a different account type')
   }
 
@@ -339,7 +309,7 @@ export async function sendRespondentInvitation({ eventId, voterId, organizerId }
   assertParticipantsEditable(event)
   const voter = await findUserById(voterId)
 
-  if (!voter || voter.role !== USER_ROLES.VOTER) {
+  if (!voter || !isParticipantRole(voter.role)) {
     throw new ApiError(404, 'Respondent not found')
   }
 
@@ -407,10 +377,10 @@ export async function sendRespondentInvitation({ eventId, voterId, organizerId }
           ? `You've been added to ${event.title}. Sign in with your existing password.`
           : `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
         actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
-          ? `/voter/competition/events/${event.id}/score`
+          ? `/participant/competition/events/${event.id}/score`
           : event.event_type === 'polling'
-            ? `/voter/polling/events/${event.id}`
-            : `/voter/events/${event.id}`,
+            ? `/participant/polling/events/${event.id}`
+            : `/participant/events/${event.id}`,
         entity: 'events',
         entityId: event.id,
         metadata: { eventType: event.event_type, organizationName: event.organizations?.organization_name },

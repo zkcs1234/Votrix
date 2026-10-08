@@ -1,8 +1,13 @@
 export const USER_ROLES = {
   ADMIN: 'admin',
   ORGANIZER: 'organizer',
+  PARTICIPANT: 'participant',
+  // Read-only compatibility value until migration 085 has been deployed.
   VOTER: 'voter',
 }
+
+export const isParticipantRole = (role) =>
+  role === USER_ROLES.PARTICIPANT || role === USER_ROLES.VOTER
 
 export const ACCOUNT_STATUS = {
   PENDING: 'pending',
@@ -128,24 +133,8 @@ export const PARTICIPANT_TYPE_LABELS = {
   [PARTICIPANT_TYPES.POLLING_RESPONDENT]: { label: 'Respondent', color: 'cyan', icon: 'BarChart2' },
 }
 
-// Account-level profile discriminator on `users` (migration 075).
-// Distinct from PARTICIPANT_TYPES, which is the per-event enrollment role.
-//   - STUDENT accounts may be enrolled as ELECTION_VOTER and/or POLLING_RESPONDENT.
-//   - JUDGE accounts may be enrolled only as COMPETITION_JUDGE.
-// The two pools never overlap (plan D6/D7).
-export const PROFILE_TYPES = {
-  STUDENT: 'student',
-  JUDGE: 'judge',
-}
-
-// Which participant types each profile_type may be enrolled as (plan D7).
-export const PROFILE_TYPE_PARTICIPANT_TYPES = {
-  [PROFILE_TYPES.STUDENT]: [PARTICIPANT_TYPES.ELECTION_VOTER, PARTICIPANT_TYPES.POLLING_RESPONDENT],
-  [PROFILE_TYPES.JUDGE]: [PARTICIPANT_TYPES.COMPETITION_JUDGE],
-}
-
 // system_settings key holding the admin-managed lists of valid Programs and
-// Year & Sections for student participants (plan D13). Shape:
+// Year & Sections used by election/polling participant cohorts. Shape:
 //   { programs: string[], sections: string[] }
 export const PARTICIPANT_TAXONOMY_SETTING_KEY = 'participant_taxonomy'
 
@@ -159,6 +148,7 @@ export const ORGANIZER_SCOPE_TYPES = {
 
 export const DB_TABLES = {
   USERS: 'users',
+  USER_PARTICIPANT_TYPES: 'user_participant_types',
   ORGANIZATIONS: 'organizations',
   EVENTS: 'events',
   EVENT_PARTICIPANTS: 'event_participants',

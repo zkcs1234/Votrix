@@ -5,7 +5,17 @@ import {
   isParticipantsLocked,
   canUnpublishEventStatus,
   isReadOnlyEventStatus,
+  USER_ROLES,
+  isParticipantRole,
 } from './constants'
+
+describe('participant global role compatibility', () => {
+  it('recognizes the canonical and legacy global role values', () => {
+    expect(isParticipantRole(USER_ROLES.PARTICIPANT)).toBe(true)
+    expect(isParticipantRole(USER_ROLES.VOTER)).toBe(true)
+    expect(isParticipantRole(USER_ROLES.ORGANIZER)).toBe(false)
+  })
+})
 
 // Locks the staged edit-locking model shipped for the publish-before-invite work.
 describe('event lifecycle edit-locking', () => {

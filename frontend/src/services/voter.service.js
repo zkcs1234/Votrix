@@ -2,14 +2,14 @@ import api from '@/services/api'
 
 export const voterService = {
   getOverview() {
-    return api.get('/voter/overview')
+    return api.get('/participant/overview')
   },
   getLoginRedirect() {
-    return api.get('/voter/login-redirect')
+    return api.get('/participant/login-redirect')
   },
   /** Get all participant roles for the current user across all events */
   getMyParticipantTypes() {
-    return api.get('/voter/participant-types')
+    return api.get('/participant/participant-types')
   },
   /** Get participant type and status for a specific event */
   getMyEventRole(eventId) {

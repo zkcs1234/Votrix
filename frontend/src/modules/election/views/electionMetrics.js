@@ -25,9 +25,9 @@ export function buildElectionStats(analytics) {
   const total = analytics?.totalVoters ?? 0
   const voted = analytics?.votedCount ?? 0
   return [
-    { id: 'voters', label: 'Registered students', value: total },
-    { id: 'voted', label: 'Students who voted', value: voted, tone: 'success' },
-    { id: 'not-voted', label: 'Students who have not voted', value: Math.max(total - voted, 0) },
+    { id: 'voters', label: 'Registered voters', value: total },
+    { id: 'voted', label: 'Voters who voted', value: voted, tone: 'success' },
+    { id: 'not-voted', label: 'Voters who have not voted', value: Math.max(total - voted, 0) },
     {
       id: 'turnout',
       label: 'Overall turnout',

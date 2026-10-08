@@ -30,7 +30,7 @@ function ParticipationTable({ rows }) {
   return (
     <AnalyticsSection
       title="Program participation"
-      description="Response rate among registered students by program."
+      description="Response rate among registered respondents by program."
     >
       <div className="overflow-x-auto">
         <table className="w-full min-w-140 text-left text-sm">

@@ -7,7 +7,7 @@ const router = Router()
 
 router.use(
   authenticate,
-  authorize(USER_ROLES.ADMIN, USER_ROLES.ORGANIZER, USER_ROLES.VOTER),
+  authorize(USER_ROLES.ADMIN, USER_ROLES.ORGANIZER, USER_ROLES.PARTICIPANT),
   requireActiveAccount,
   requirePasswordChanged,
 )

@@ -2,9 +2,9 @@ import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 
 const STATUS_MESSAGES = {
-  suspended: 'This blocks the account from using protected areas. You can reinstate access later.',
-  archived: 'This blocks access but keeps the account and its event history. You can restore it later.',
-  active: 'This restores access to the account.',
+  suspended: 'This blocks the shared account from signing in across all participant types. You can reinstate access later.',
+  archived: 'This blocks the shared account across all participant types but keeps event history. You can restore it later.',
+  active: 'This restores access to the shared account across its participant types.',
 }
 
 export default function AccountStatusConfirmModal({ target, accountType, onClose, onConfirm, loading }) {

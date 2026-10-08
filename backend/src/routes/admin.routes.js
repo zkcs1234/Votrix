@@ -36,6 +36,17 @@ router.post('/voters/import-preview', csvImportLimiter, uploadSingle('file'), ad
 router.post('/voters/import-register', csvImportLimiter, adminController.registerVotersCsv)
 router.patch('/voters/:userId', adminActionLimiter, adminController.updateVoter)
 router.patch('/voters/:userId/status', adminActionLimiter, adminController.updateVoterStatus)
+router.delete('/voters/:userId/membership', adminActionLimiter, adminController.removeVoterFromPool)
+
+// Polling respondents have an independent pool but reuse participant accounts.
+router.get('/respondents', adminController.getRespondents)
+router.get('/respondents/template', adminController.getRespondentCsvTemplate)
+router.post('/respondents', adminActionLimiter, adminController.createRespondent)
+router.post('/respondents/import-preview', csvImportLimiter, uploadSingle('file'), adminController.previewRespondentsCsv)
+router.post('/respondents/import-register', csvImportLimiter, adminController.registerRespondentsCsv)
+router.patch('/respondents/:userId', adminActionLimiter, adminController.updateRespondent)
+router.patch('/respondents/:userId/status', adminActionLimiter, adminController.updateRespondentStatus)
+router.delete('/respondents/:userId/membership', adminActionLimiter, adminController.removeRespondentFromPool)
 
 // Judge registration — plan Phase 4.
 router.get('/judges', adminController.getJudges)
@@ -45,6 +56,7 @@ router.post('/judges/import-preview', csvImportLimiter, uploadSingle('file'), ad
 router.post('/judges/import-register', csvImportLimiter, adminController.registerJudgesCsv)
 router.patch('/judges/:userId', adminActionLimiter, adminController.updateJudge)
 router.patch('/judges/:userId/status', adminActionLimiter, adminController.updateJudgeStatus)
+router.delete('/judges/:userId/membership', adminActionLimiter, adminController.removeJudgeFromPool)
 
 router.get('/settings', adminController.getSystemSettings)
 router.put('/settings', adminController.updateSystemSettings)
@@ -62,6 +74,7 @@ router.put('/alerts/config', adminActionLimiter, adminController.updateAlertConf
 
 router.get('/export/organizers', adminActionLimiter, adminController.exportOrganizersData)
 router.get('/export/voters', adminActionLimiter, adminController.exportVotersData)
+router.get('/export/respondents', adminActionLimiter, adminController.exportRespondentsData)
 router.get('/export/judges', adminActionLimiter, adminController.exportJudgesData)
 router.get('/export/events', adminActionLimiter, adminController.exportEventsData)
 router.get('/export/audit-logs', adminActionLimiter, adminController.exportAuditLogsData)

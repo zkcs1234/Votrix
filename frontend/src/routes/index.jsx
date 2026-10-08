@@ -1,6 +1,5 @@
-/* eslint-disable react-refresh/only-export-components */
 import { lazy } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useParams } from 'react-router-dom'
 // AuthLayout is the only framer-motion consumer; lazy-loading it keeps that
 // ~100 KB animation library out of the main bundle (loaded only on auth routes).
 const AuthLayout = lazy(() => import('@/layouts/AuthLayout'))
@@ -100,6 +99,12 @@ const PollingReportPage = lazy(() => import('@/pages/organizer/reports/PollingRe
 function ReportRedirect({ module }) {
   const { eventId } = useParams()
   return <Navigate to={`/organizer/${module}/events/${eventId}/report`} replace />
+}
+
+function LegacyParticipantRedirect() {
+  const location = useLocation()
+  const path = location.pathname.replace(/^\/voter(?=\/|$)/, '/participant')
+  return <Navigate to={`${path}${location.search}${location.hash}`} replace />
 }
 
 export const routeConfig = [
@@ -266,41 +271,42 @@ export const routeConfig = [
     ],
   },
   {
-    path: '/voter',
+    path: '/participant',
     element: (
-      <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
-        <DashboardLayout title="Voter" showSidebar={false} />
+      <ProtectedRoute allowedRoles={[USER_ROLES.PARTICIPANT]}>
+        <DashboardLayout title="Participant" showSidebar={false} />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <VoterDashboardPage /> }],
   },
   {
-    path: '/voter/events/:eventId',
+    path: '/participant/events/:eventId',
     element: (
-      <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
+      <ProtectedRoute allowedRoles={[USER_ROLES.PARTICIPANT]}>
         <DashboardLayout title="Vote" showSidebar={false} />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <VoterEventPage /> }],
   },
   {
-    path: '/voter/polling/events/:eventId',
+    path: '/participant/polling/events/:eventId',
     element: (
-      <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
+      <ProtectedRoute allowedRoles={[USER_ROLES.PARTICIPANT]}>
         <DashboardLayout title="Poll" showSidebar={false} />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <VoterPollPage /> }],
   },
   {
-    path: '/voter/competition/events/:eventId/score',
+    path: '/participant/competition/events/:eventId/score',
     element: (
-      <ProtectedRoute allowedRoles={[USER_ROLES.VOTER]}>
+      <ProtectedRoute allowedRoles={[USER_ROLES.PARTICIPANT]}>
         <DashboardLayout title="Judge scoring" showSidebar={false} />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <JudgeScoringPage /> }],
   },
+  { path: '/voter/*', element: <LegacyParticipantRedirect /> },
   // Catch-all 404
   {
     path: '*',
