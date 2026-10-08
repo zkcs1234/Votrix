@@ -8,17 +8,17 @@
 
 ## 1. Agreed Decisions
 
-| Area | Decision |
-|---|---|
-| Global account role | Use `participant` for the global participant account role; retain `admin` and `organizer`. |
-| Event participant types | Keep the existing types: `ELECTION_VOTER`, `COMPETITION_JUDGE`, and `POLLING_RESPONDENT`. |
-| Admin experience | Keep three distinct participant management areas. Do not merge the types into one list and do not use `Student` as a participant category. |
-| Account identity | One person has one user account. Adding a type to an existing email adds that type membership to the same account. |
-| Multiple types | A participant account may belong to any combination of the three type pools. A person's actual role in an event is determined by that event's enrollment. |
-| Contestants | Contestants remain event records, not user accounts or participant types. No account-level contestant role is introduced. |
-| Event access | `event_participants` remains the canonical source for event enrollment and event-specific access checks. Pool membership alone never enrolls a person in an event. |
-| Shared profile data | Name, email, and applicable school/program/year-section fields belong to the shared account profile. Judge-specific qualifications remain available as judge profile data. Do not duplicate the account to store different types. |
-| Existing information-form work | This plan does not restore or redesign the information form removed by the existing participant-profile plan. |
+| Area                           | Decision                                                                                                                                                                                                                          |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Global account role            | Use `participant` for the global participant account role; retain `admin` and `organizer`.                                                                                                                                        |
+| Event participant types        | Keep the existing types: `ELECTION_VOTER`, `COMPETITION_JUDGE`, and `POLLING_RESPONDENT`.                                                                                                                                         |
+| Admin experience               | Keep three distinct participant management areas. Do not merge the types into one list and do not use `Student` as a participant category.                                                                                        |
+| Account identity               | One person has one user account. Adding a type to an existing email adds that type membership to the same account.                                                                                                                |
+| Multiple types                 | A participant account may belong to any combination of the three type pools. A person's actual role in an event is determined by that event's enrollment.                                                                         |
+| Contestants                    | Contestants remain event records, not user accounts or participant types. No account-level contestant role is introduced.                                                                                                         |
+| Event access                   | `event_participants` remains the canonical source for event enrollment and event-specific access checks. Pool membership alone never enrolls a person in an event.                                                                |
+| Shared profile data            | Name, email, and applicable school/program/year-section fields belong to the shared account profile. Judge-specific qualifications remain available as judge profile data. Do not duplicate the account to store different types. |
+| Existing information-form work | This plan does not restore or redesign the information form removed by the existing participant-profile plan.                                                                                                                     |
 
 ### Admin terminology
 
@@ -52,13 +52,13 @@ During rollout, application code must temporarily recognize both `voter` (legacy
 
 Add a normalized table, tentatively `user_participant_types`, with:
 
-| Column | Purpose |
-|---|---|
-| `user_id` | FK to `users.id`, cascading on account deletion. |
-| `participant_type` | One of the existing participant types: `ELECTION_VOTER`, `COMPETITION_JUDGE`, or `POLLING_RESPONDENT`. |
-| `created_at`, `updated_at` | Membership lifecycle timestamps. |
-| `created_by` | Optional admin/audit actor reference, subject to existing audit conventions. |
-| `is_active` or equivalent | Optional reversible pool eligibility control; decide in Phase 0 whether account status alone is sufficient. |
+| Column                     | Purpose                                                                                                     |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `user_id`                  | FK to `users.id`, cascading on account deletion.                                                            |
+| `participant_type`         | One of the existing participant types: `ELECTION_VOTER`, `COMPETITION_JUDGE`, or `POLLING_RESPONDENT`.      |
+| `created_at`, `updated_at` | Membership lifecycle timestamps.                                                                            |
+| `created_by`               | Optional admin/audit actor reference, subject to existing audit conventions.                                |
+| `is_active` or equivalent  | Optional reversible pool eligibility control; decide in Phase 0 whether account status alone is sufficient. |
 
 Use a primary key or unique constraint on `(user_id, participant_type)`. This permits one account to belong to multiple pools while preventing duplicate membership rows. Reuse the existing participant-type vocabulary where practical; do not introduce `STUDENT` as a type.
 
@@ -250,15 +250,15 @@ Each phase must be separately reviewable, deployable where possible, and have an
 
 ## 8. Main Risks and Mitigations
 
-| Risk | Mitigation |
-|---|---|
-| Existing account profile does not reveal intended pool membership | Generate a dry-run reconciliation report; preserve prior eligibility for existing student-pool accounts and send ambiguous records to review. |
-| Same email import overwrites shared details unexpectedly | Preview old/new values, define field ownership, require confirmation for conflicts, and audit changes. |
-| Role rename locks users out during mixed deployments | Expand first, accept old and new role values, convert rows only after compatible code is deployed, and retain URL/API aliases. |
-| Pool eligibility is confused with event enrollment | Keep separate tables/services and require explicit event enrollment for all event access. |
-| Removing pool membership breaks an existing event assignment | Do not cascade pool membership deletion to event enrollment; warn and require explicit event-level removal. |
-| Old single `profile_type` cannot represent newly valid combinations | Keep it as a deprecated compatibility field until cutover; never use it to reverse-map multi-type accounts after cutover. |
-| Duplicate school IDs block imports or cause incorrect merges | Email is canonical identity; validate school IDs under an approved uniqueness rule and route conflicts to review. |
+| Risk                                                                | Mitigation                                                                                                                                    |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Existing account profile does not reveal intended pool membership   | Generate a dry-run reconciliation report; preserve prior eligibility for existing student-pool accounts and send ambiguous records to review. |
+| Same email import overwrites shared details unexpectedly            | Preview old/new values, define field ownership, require confirmation for conflicts, and audit changes.                                        |
+| Role rename locks users out during mixed deployments                | Expand first, accept old and new role values, convert rows only after compatible code is deployed, and retain URL/API aliases.                |
+| Pool eligibility is confused with event enrollment                  | Keep separate tables/services and require explicit event enrollment for all event access.                                                     |
+| Removing pool membership breaks an existing event assignment        | Do not cascade pool membership deletion to event enrollment; warn and require explicit event-level removal.                                   |
+| Old single `profile_type` cannot represent newly valid combinations | Keep it as a deprecated compatibility field until cutover; never use it to reverse-map multi-type accounts after cutover.                     |
+| Duplicate school IDs block imports or cause incorrect merges        | Email is canonical identity; validate school IDs under an approved uniqueness rule and route conflicts to review.                             |
 
 ---
 

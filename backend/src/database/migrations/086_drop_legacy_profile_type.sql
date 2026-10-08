@@ -20,15 +20,19 @@ BEGIN
 END
 $$;
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_users_school_id_participant
-  ON users (lower(school_id))
-  WHERE role IN ('voter', 'participant') AND school_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_school_id_participant ON users (lower(school_id))
+WHERE
+    role IN ('voter', 'participant')
+    AND school_id IS NOT NULL;
 
 DROP INDEX IF EXISTS uq_users_school_id_student;
+
 DROP INDEX IF EXISTS idx_users_profile_type_program;
+
 DROP INDEX IF EXISTS idx_users_profile_type_year_section;
 
 ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_users_profile_type;
+
 ALTER TABLE users DROP COLUMN IF EXISTS profile_type;
 
 ANALYZE users;

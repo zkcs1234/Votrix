@@ -11,51 +11,58 @@
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS user_participant_types (
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  participant_type VARCHAR(32) NOT NULL
-    CHECK (participant_type IN (
-      'ELECTION_VOTER',
-      'COMPETITION_JUDGE',
-      'POLLING_RESPONDENT'
-    )),
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (user_id, participant_type)
+    user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    participant_type VARCHAR(32) NOT NULL CHECK (
+        participant_type IN (
+            'ELECTION_VOTER',
+            'COMPETITION_JUDGE',
+            'POLLING_RESPONDENT'
+        )
+    ),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by UUID REFERENCES users (id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, participant_type)
 );
 
-CREATE INDEX IF NOT EXISTS idx_user_participant_types_type_active
-  ON user_participant_types (participant_type, is_active, user_id);
+CREATE INDEX IF NOT EXISTS idx_user_participant_types_type_active ON user_participant_types (
+    participant_type,
+    is_active,
+    user_id
+);
 
-CREATE INDEX IF NOT EXISTS idx_user_participant_types_user
-  ON user_participant_types (user_id);
+CREATE INDEX IF NOT EXISTS idx_user_participant_types_user ON user_participant_types (user_id);
 
 DROP TRIGGER IF EXISTS trg_user_participant_types_updated_at ON user_participant_types;
+
 CREATE TRIGGER trg_user_participant_types_updated_at
   BEFORE UPDATE ON user_participant_types
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-INSERT INTO user_participant_types (user_id, participant_type)
+INSERT INTO
+    user_participant_types (user_id, participant_type)
 SELECT id, 'ELECTION_VOTER'
 FROM users
-WHERE role IN ('voter', 'participant')
-  AND profile_type = 'student'
-ON CONFLICT (user_id, participant_type) DO NOTHING;
+WHERE
+    role IN ('voter', 'participant')
+    AND profile_type = 'student' ON CONFLICT (user_id, participant_type) DO NOTHING;
 
-INSERT INTO user_participant_types (user_id, participant_type)
+INSERT INTO
+    user_participant_types (user_id, participant_type)
 SELECT id, 'POLLING_RESPONDENT'
 FROM users
-WHERE role IN ('voter', 'participant')
-  AND profile_type = 'student'
-ON CONFLICT (user_id, participant_type) DO NOTHING;
+WHERE
+    role IN ('voter', 'participant')
+    AND profile_type = 'student' ON CONFLICT (user_id, participant_type) DO NOTHING;
 
-INSERT INTO user_participant_types (user_id, participant_type)
+INSERT INTO
+    user_participant_types (user_id, participant_type)
 SELECT id, 'COMPETITION_JUDGE'
 FROM users
-WHERE role IN ('voter', 'participant')
-  AND profile_type = 'judge'
-ON CONFLICT (user_id, participant_type) DO NOTHING;
+WHERE
+    role IN ('voter', 'participant')
+    AND profile_type = 'judge' ON CONFLICT (user_id, participant_type) DO NOTHING;
 
 INSERT INTO user_participant_types (user_id, participant_type)
 SELECT DISTINCT ep.user_id, ep.participant_type::text

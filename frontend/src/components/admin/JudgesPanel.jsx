@@ -366,17 +366,17 @@ export default function JudgesPanel() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={downloadTemplate}>
-            <Download className="h-4 w-4" strokeWidth={1.5} /> Import template
+            <Download className="h-4 w-4" strokeWidth={1.5} /> Template
           </Button>
           <Button variant="secondary" onClick={handleExport} loading={exporting}>
             <Download className="h-4 w-4" strokeWidth={1.5} /> Export CSV
           </Button>
           <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-            <Upload className="h-4 w-4" strokeWidth={1.5} /> Review CSV import
+            <Upload className="h-4 w-4" strokeWidth={1.5} /> Import CSV
           </Button>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFile} />
           <Button onClick={() => setModal({ mode: 'add' })}>
-            <UserPlus className="h-4 w-4" strokeWidth={2} /> Add Competition Judge
+            <UserPlus className="h-4 w-4" strokeWidth={2} /> Add participant
           </Button>
         </div>
       </div>
