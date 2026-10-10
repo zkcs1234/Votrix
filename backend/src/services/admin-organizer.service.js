@@ -300,12 +300,35 @@ export async function registerOrganizerImport(parsedData) {
         organizationType: row.organizationType,
         scope: row.scope,
       })
-      results.push({ email: row.email, success: true, emailSent: Boolean(email?.sent) })
+      results.push({
+        email: row.email,
+        success: true,
+        operation: 'created',
+        emailSent: Boolean(email?.sent),
+        emailStatus: email?.sent ? 'sent' : email?.skipped ? 'skipped' : 'failed',
+        emailReason: email?.sent ? null : email?.reason || email?.error || 'Email delivery failed',
+      })
       succeeded += 1
     } catch (err) {
       failed += 1
-      results.push({ email: row.email, success: false, error: err.message || 'Failed' })
+      results.push({
+        email: row.email,
+        success: false,
+        operation: 'failed',
+        emailSent: false,
+        emailStatus: 'not_sent',
+        error: err.message || 'Failed',
+      })
     }
   }
-  return { total: parsedData.length, succeeded, failed, results }
+  return {
+    total: parsedData.length,
+    succeeded,
+    failed,
+    emailSent: results.filter((result) => result.emailStatus === 'sent').length,
+    emailSkipped: results.filter((result) => result.emailStatus === 'skipped').length,
+    emailFailed: results.filter((result) => result.emailStatus === 'failed').length,
+    emailNotSent: results.filter((result) => result.emailStatus === 'not_sent').length,
+    results,
+  }
 }

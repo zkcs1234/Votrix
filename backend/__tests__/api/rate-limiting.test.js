@@ -14,7 +14,7 @@ describe('Rate Limiting Middleware', () => {
       const response = await request(app)
         .post('/api/voter/competition/events/test-event/score')
         .send({})
-      
+
       // Should receive 403 (CSRF required) rather than 404 (not found),
       // confirming the route exists with middleware applied including rate limiting
       expect(response.status).toBe(403)
@@ -26,11 +26,23 @@ describe('Rate Limiting Middleware', () => {
       const response = await request(app)
         .post('/api/voter/competition/events/test-event/session-score')
         .send({})
-      
+
       // Should receive 403 (CSRF required) rather than 404 (not found),
       // confirming the route exists with middleware applied including rate limiting
       expect(response.status).toBe(403)
       expect(response.body).toHaveProperty('success', false)
+    })
+  })
+
+  describe('Webhook traffic', () => {
+    test('should bypass CSRF and rate limits for Resend webhook callbacks', async () => {
+      const response = await request(app)
+        .post('/api/webhooks/resend')
+        .set('Content-Type', 'application/json')
+        .send({ type: 'email.sent', data: { id: 'msg_123' } })
+
+      expect(response.status).toBe(200)
+      expect(response.body).toMatchObject({ success: true, received: true })
     })
   })
 })

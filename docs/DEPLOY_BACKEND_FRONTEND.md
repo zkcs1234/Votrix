@@ -76,6 +76,17 @@ Open Render service → Environment → Environment Variables and add the values
 - `CLOUDINARY_API_SECRET`
 - `RESEND_API_KEY`
 - `EMAIL_FROM` = e.g. `VOTRIX <noreply@yourdomain.com>`
+- `RESEND_WEBHOOK_SECRET` (for webhook verification / delivery tracking)
+- `RESEND_DAILY_LIMIT` = conservative app-level cap, e.g. `50`
+- `RESEND_MONTHLY_LIMIT` = conservative app-level cap, e.g. `1000`
+- `RESEND_BULK_BATCH_LIMIT` = safe bulk-send batch ceiling, e.g. `25`
+- `EMAIL_DEDUPE_WINDOW_MS` = e.g. `300000`
+- `EMAIL_PROVIDER_MODE` = `resend`
+
+Before using email quotas or the admin Email Delivery page, apply
+`backend/src/database/migrations/033_email_delivery_audit.sql` to the Supabase
+project used by the backend. The admin route is available at
+`/api/admin/email-delivery-logs`; it requires an authenticated admin session.
 
 Optional / tuning variables:
 

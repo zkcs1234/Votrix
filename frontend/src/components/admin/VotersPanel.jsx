@@ -14,6 +14,8 @@ import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 import { downloadBlob, downloadCsv } from '@/utils/csvDownload'
 import AccountStatusConfirmModal from '@/components/admin/AccountStatusConfirmModal'
+import { getEmailOutcomeMessage } from '@/utils/emailOutcome'
+import CsvImportResults from '@/components/admin/CsvImportResults'
 
 const STATUS_TONE = { active: 'success', suspended: 'danger', archived: 'default' }
 
@@ -34,7 +36,7 @@ function VoterFormModal({ mode, initial, programs, sections, participantLabel, a
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const { success, error: toastError } = useToast()
+  const { success, warning, error: toastError } = useToast()
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
@@ -48,7 +50,8 @@ function VoterFormModal({ mode, initial, programs, sections, participantLabel, a
         success(`${participantLabel} updated`)
       } else {
         const { data } = await api.create(form)
-        success(data.email?.sent ? `${participantLabel} added — credentials emailed` : `${participantLabel} added to the pool`)
+        success(`${participantLabel} added to the pool`)
+        if (!data.email?.sent) warning(getEmailOutcomeMessage(data.email))
       }
       onSaved()
     } catch (err) {
@@ -128,7 +131,15 @@ function VoterFormModal({ mode, initial, programs, sections, participantLabel, a
 // ---- CSV preview modal -----------------------------------------------------
 function CsvPreviewModal({ preview, onClose, onRegister, registering, importName }) {
   return (
-    <Modal open onClose={onClose} title="Review & Register" size="lg">
+    <Modal open onClose={onClose} title={preview.importResult ? 'Import results' : 'Review & Register'} size="lg">
+      {preview.importResult ? (
+        <CsvImportResults
+          result={preview.importResult}
+          filename={`${importName}-import-results.csv`}
+          onDone={onClose}
+        />
+      ) : (
+        <>
       {preview.errors?.length > 0 && (
         <div className="mb-4 rounded-lg border border-v-danger/30 bg-v-danger/10 p-3">
           <p className="v-error-text mb-2 font-semibold">{preview.errors.length} row error(s) — these will be skipped</p>
@@ -182,6 +193,8 @@ function CsvPreviewModal({ preview, onClose, onRegister, registering, importName
           Register {preview.data?.length ?? 0}
         </Button>
       </div>
+        </>
+      )}
     </Modal>
   )
 }
@@ -296,7 +309,7 @@ export default function VotersPanel({ pool = 'election' }) {
     try {
       const { data } = await api.register(preview.data)
       success(`Registered ${data.succeeded} of ${data.total}${data.failed ? ` (${data.failed} failed)` : ''}`)
-      setPreview(null)
+      setPreview((current) => current ? { ...current, importResult: data } : current)
       await fetchVoters()
     } catch (err) {
       toastError(getErrorMessage(err, 'Registration failed'))

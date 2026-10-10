@@ -66,6 +66,7 @@ router.get('/settings/taxonomy', adminController.getParticipantTaxonomy)
 router.put('/settings/taxonomy', adminActionLimiter, adminController.updateParticipantTaxonomy)
 
 router.get('/audit-logs', adminController.getAuditLogs)
+router.get('/email-delivery-logs', adminController.getEmailDeliveryLogs)
 
 router.get('/health', adminController.getSystemHealth)
 

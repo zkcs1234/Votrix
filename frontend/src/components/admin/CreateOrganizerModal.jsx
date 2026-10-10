@@ -10,6 +10,7 @@ import { clearCsrfToken, setCsrfToken } from '@/utils/csrf'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
+import { getEmailOutcomeMessage } from '@/utils/emailOutcome'
 
 async function ensureCsrfToken() {
   clearCsrfToken()
@@ -72,7 +73,7 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess, organ
   const [taxonomyLoading, setTaxonomyLoading] = useState(false)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
-  const { success, error: toastError } = useToast()
+  const { success, warning, error: toastError } = useToast()
 
   const [form, setForm] = useState({
     email: '',
@@ -138,8 +139,9 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess, organ
         success('Organizer updated')
       } else {
         await ensureCsrfToken()
-        await adminService.createOrganizer({ ...payload, email: form.email, sendEmail: true })
-        success('Organizer created — credentials emailed')
+        const { data } = await adminService.createOrganizer({ ...payload, email: form.email, sendEmail: true })
+        success('Organizer created')
+        if (!data.email?.sent) warning(getEmailOutcomeMessage(data.email))
       }
       onSuccess?.()
       onClose()

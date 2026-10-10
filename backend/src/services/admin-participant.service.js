@@ -532,21 +532,53 @@ async function registerSchoolParticipantImport(parsedData, participantType) {
         if (!existing) throw new ApiError(409, 'account no longer exists')
         await updateStudentProfile(existing.id, row)
         await addParticipantTypeMembership(existing.id, participantType)
-        results.push({ email: row.email, success: true, isNewParticipant: false, emailSent: false })
+        results.push({
+          email: row.email,
+          success: true,
+          operation: 'updated',
+          isNewParticipant: false,
+          emailSent: false,
+          emailStatus: 'not_sent',
+          emailReason: 'Existing accounts are not sent a new credentials email.',
+        })
       } else {
         const tempPassword = generateTemporaryPassword()
         const user = await insertStudent(row, tempPassword, participantType)
         const email = await sendVoterAccountCreatedEmail({ email: user.email, temporaryPassword: tempPassword })
-        results.push({ email: row.email, success: true, isNewParticipant: true, emailSent: Boolean(email?.sent) })
+        results.push({
+          email: row.email,
+          success: true,
+          operation: 'created',
+          isNewParticipant: true,
+          emailSent: Boolean(email?.sent),
+          emailStatus: email?.sent ? 'sent' : email?.skipped ? 'skipped' : 'failed',
+          emailReason: email?.sent ? null : email?.reason || email?.error || 'Email delivery failed',
+        })
       }
       succeeded += 1
     } catch (err) {
       failed += 1
-      results.push({ email: row.email, success: false, error: err.message || 'Failed' })
+      results.push({
+        email: row.email,
+        success: false,
+        operation: 'failed',
+        emailSent: false,
+        emailStatus: 'not_sent',
+        error: err.message || 'Failed',
+      })
     }
   }
 
-  return { total: parsedData.length, succeeded, failed, results }
+  return {
+    total: parsedData.length,
+    succeeded,
+    failed,
+    emailSent: results.filter((result) => result.emailStatus === 'sent').length,
+    emailSkipped: results.filter((result) => result.emailStatus === 'skipped').length,
+    emailFailed: results.filter((result) => result.emailStatus === 'failed').length,
+    emailNotSent: results.filter((result) => result.emailStatus === 'not_sent').length,
+    results,
+  }
 }
 
 export async function registerVoterImport(parsedData) {
@@ -896,19 +928,51 @@ export async function registerJudgeImport(parsedData) {
         if (!existing) throw new ApiError(409, 'account no longer exists')
         await updateJudgeRow(existing.id, row)
         await addParticipantTypeMembership(existing.id, PARTICIPANT_TYPES.COMPETITION_JUDGE)
-        results.push({ email: row.email, success: true, isNewJudge: false, emailSent: false })
+        results.push({
+          email: row.email,
+          success: true,
+          operation: 'updated',
+          isNewJudge: false,
+          emailSent: false,
+          emailStatus: 'not_sent',
+          emailReason: 'Existing accounts are not sent a new credentials email.',
+        })
       } else {
         const tempPassword = generateTemporaryPassword()
         const user = await insertJudge(row, tempPassword)
         const email = await sendVoterAccountCreatedEmail({ email: user.email, temporaryPassword: tempPassword })
-        results.push({ email: row.email, success: true, isNewJudge: true, emailSent: Boolean(email?.sent) })
+        results.push({
+          email: row.email,
+          success: true,
+          operation: 'created',
+          isNewJudge: true,
+          emailSent: Boolean(email?.sent),
+          emailStatus: email?.sent ? 'sent' : email?.skipped ? 'skipped' : 'failed',
+          emailReason: email?.sent ? null : email?.reason || email?.error || 'Email delivery failed',
+        })
       }
       succeeded += 1
     } catch (err) {
       failed += 1
-      results.push({ email: row.email, success: false, error: err.message || 'Failed' })
+      results.push({
+        email: row.email,
+        success: false,
+        operation: 'failed',
+        emailSent: false,
+        emailStatus: 'not_sent',
+        error: err.message || 'Failed',
+      })
     }
   }
 
-  return { total: parsedData.length, succeeded, failed, results }
+  return {
+    total: parsedData.length,
+    succeeded,
+    failed,
+    emailSent: results.filter((result) => result.emailStatus === 'sent').length,
+    emailSkipped: results.filter((result) => result.emailStatus === 'skipped').length,
+    emailFailed: results.filter((result) => result.emailStatus === 'failed').length,
+    emailNotSent: results.filter((result) => result.emailStatus === 'not_sent').length,
+    results,
+  }
 }

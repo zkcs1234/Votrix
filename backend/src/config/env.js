@@ -85,5 +85,11 @@ export const env = {
       process.env.EMAIL_FROM ||
       process.env.RESEND_FROM_EMAIL ||
       'VOTRIX <onboarding@resend.dev>',
+    webhookSecret: process.env.RESEND_WEBHOOK_SECRET || '',
+    dailyLimit: process.env.RESEND_DAILY_LIMIT || '50',
+    monthlyLimit: process.env.RESEND_MONTHLY_LIMIT || '1000',
+    bulkBatchLimit: process.env.RESEND_BULK_BATCH_LIMIT || '25',
+    providerMode: process.env.EMAIL_PROVIDER_MODE || 'resend',
+    dedupeWindowMs: process.env.EMAIL_DEDUPE_WINDOW_MS || '300000',
   },
 }

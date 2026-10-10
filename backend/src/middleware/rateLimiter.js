@@ -79,9 +79,9 @@ export const globalLimiter = createLimiter({
       : parseEnvInt('RATE_LIMIT_GLOBAL_IP_MAX', 100),
   keyGenerator: createKey({ user: true, ip: true }),
   skip: (req) => {
-    // Never throttle health probes
+    // Never throttle health probes or trusted webhook traffic.
     const path = req.path || req.originalUrl
-    return path === '/api/health' || path === '/health'
+    return path === '/api/health' || path === '/health' || path.startsWith('/api/webhooks') || path.startsWith('/webhooks')
   },
   message: stdMessage('Too many requests. Please slow down.'),
 })

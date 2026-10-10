@@ -77,6 +77,7 @@ export function createApp() {
   )
 
   app.use(globalLimiter)
+  app.use('/api/webhooks', express.raw({ type: 'application/json', limit: '1mb' }))
   app.use(express.json({ limit: '1mb' }))
   app.use(express.urlencoded({ extended: true }))
   app.use(cookieParser())
