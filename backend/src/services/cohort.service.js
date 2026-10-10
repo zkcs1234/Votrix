@@ -8,6 +8,7 @@ import { sendVoterInvitationEmailRegistered } from './mailer.service.js'
 import { createNotificationsForUsers } from './notification.service.js'
 import { recordEventActivity } from '../foundation/activity.js'
 import { getOrganizerScope, filterCohortsForScope, areCohortValuesInScope } from './organizer-scope.service.js'
+import { getEmailQuotaSettings } from './emailGuard.js'
 
 // Phase 5 of VOTER_PROFILE_AND_ADMIN_REGISTRATION_PLAN.md.
 // Organizers no longer create voter/respondent accounts. Instead they invite
@@ -135,6 +136,12 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
   const enrolledSet = new Set((existing ?? []).map((r) => r.user_id))
 
   const toEnroll = matchingAccounts.filter((s) => !enrolledSet.has(s.id))
+  if (notify) {
+    const { bulkBatchLimit } = getEmailQuotaSettings()
+    if (toEnroll.length > bulkBatchLimit) {
+      throw new ApiError(400, `Cohort invite exceeds the email batch limit of ${bulkBatchLimit} recipients`)
+    }
+  }
 
   let enrolled = 0
   for (const student of toEnroll) {
