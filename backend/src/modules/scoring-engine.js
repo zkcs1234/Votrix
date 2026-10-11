@@ -122,11 +122,18 @@ function highest(scores) {
 
 function lowestRemoved(scores, dropLowest, dropHighest) {
   if (!scores.length) return 0
+  const dLow = Math.max(0, Number(dropLowest) || 0)
+  const dHigh = Math.max(0, Number(dropHighest) || 0)
+
+  // If total configured drops meet or exceed available scores,
+  // do not drop asymmetrically — fall back to plain average across available scores
+  if (scores.length <= dLow + dHigh) {
+    return average(scores)
+  }
+
   const sorted = [...scores].sort((a, b) => a - b)
-  const start = Math.max(0, Math.min(dropLowest, sorted.length - 1))
-  const end = sorted.length - Math.max(0, Math.min(dropHighest, sorted.length - start - 1))
-  const slice = sorted.slice(start, end)
-  if (!slice.length) return 0
+  const slice = sorted.slice(dLow, sorted.length - dHigh)
+  if (!slice.length) return average(scores)
   return slice.reduce((a, b) => a + b, 0) / slice.length
 }
 
@@ -356,27 +363,32 @@ export function computeRankings({
   const sorted = [...byContestant.values()]
       .map((row) => {
         const { categoryTotals, ...publicRow } = row
+        const avgPlacement = row.judgeCount ? row.placementTotal / row.judgeCount : 999999
         return {
-        ...publicRow,
-        finalScore: row.judgeCount ? -row.placementTotal : 0,
-        averagePlacement: row.judgeCount ? row.placementTotal / row.judgeCount : 0,
-        averageRawScore: row.judgeCount ? row.rawScoreTotal / row.judgeCount : 0,
-        perCategory: [...row.categoryTotals.values()].map((category) => ({
-          categoryId: category.categoryId,
-          categoryName: category.categoryName,
-          value: category.count ? category.total / category.count : 0,
-        })),
+          ...publicRow,
+          finalScore: row.judgeCount ? round2(-avgPlacement, dp) : 0,
+          averagePlacement: row.judgeCount ? round2(avgPlacement, dp) : 0,
+          averageRawScore: row.judgeCount ? round2(row.rawScoreTotal / row.judgeCount, dp) : 0,
+          perCategory: [...row.categoryTotals.values()].map((category) => ({
+            categoryId: category.categoryId,
+            categoryName: category.categoryName,
+            value: category.count ? round2(category.total / category.count, dp) : 0,
+          })),
         }
       })
-      .sort((left, right) =>
-        right.finalScore - left.finalScore ||
-        left.averagePlacement - right.averagePlacement ||
-        right.averageRawScore - left.averageRawScore,
-      )
+      .sort((left, right) => {
+        if (left.judgeCount === 0 && right.judgeCount > 0) return 1
+        if (right.judgeCount === 0 && left.judgeCount > 0) return -1
+        const placementDiff = left.averagePlacement - right.averagePlacement
+        if (Math.abs(placementDiff) > 1e-9) return placementDiff
+        const rawDiff = right.averageRawScore - left.averageRawScore
+        if (Math.abs(rawDiff) > 1e-9) return rawDiff
+        return 0
+      })
 
       sorted.forEach((row, index) => {
         const previous = sorted[index - 1]
-        const samePlacement = previous && row.placementTotal === previous.placementTotal
+        const samePlacement = previous && row.averagePlacement === previous.averagePlacement
         const sameRawScore = previous && row.averageRawScore === previous.averageRawScore
         row.rank = samePlacement && sameRawScore ? previous.rank : index + 1
       })

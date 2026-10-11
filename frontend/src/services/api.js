@@ -161,12 +161,16 @@ api.interceptors.response.use(
         }
 
         return api(original)
-      } catch {
-        useAuthStore.getState().clearSession()
+      } catch (refreshError) {
+        // Only evict session if the refresh endpoint explicitly rejected with 401 (token revoked/invalid).
+        // Transient network drops or 5xx server issues should not clear user state or drop in-progress forms.
+        if (refreshError?.response?.status === 401) {
+          useAuthStore.getState().clearSession()
+        }
       }
     }
 
-    if (status === 401 && !original?.url?.includes('/auth/')) {
+    if (status === 401 && !original?.url?.includes('/auth/') && original?._retry) {
       useAuthStore.getState().clearSession()
     }
 

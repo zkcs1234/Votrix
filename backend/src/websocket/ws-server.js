@@ -163,11 +163,74 @@ async function setupRooms(ws) {
   }
 }
 
-function handleSubscribe(ws, msg) {
-  // Allow client to explicitly subscribe to a specific event room
-  // e.g. { type: 'subscribe', room: 'event:abc-123:organizer' }
-  const room = String(msg.room || '')
-  if (room.startsWith('event:') || room === `user:${ws._user.id}`) {
+async function handleSubscribe(ws, msg) {
+  const room = String(msg.room || '').trim()
+  if (!room || !ws._user) return
+
+  // User's private notifications room
+  if (room === `user:${ws._user.id}`) {
     joinRoom(ws, room)
+    return
   }
+
+  // Role-wide broadcasts (only own role or admin)
+  if (room === `role:${ws._user.role}` || ws._user.role === 'admin') {
+    joinRoom(ws, room)
+    return
+  }
+
+  // Event rooms: event:<eventId> or event:<eventId>:<channel>
+  const match = room.match(/^event:([a-f0-9-]+)(?::([a-z0-9_-]+))?$/i)
+  if (!match) return
+
+  const [, eventId, channel] = match
+  const db = getClient()
+
+  // Organizer private channel: only event organizer or admin
+  if (channel === 'organizer') {
+    if (ws._user.role === 'admin') {
+      joinRoom(ws, room)
+      return
+    }
+    if (ws._user.role !== 'organizer') return
+
+    try {
+      const { data: event } = await db
+        .from('events')
+        .select('id, organization_id, organizations!inner(organizer_id)')
+        .eq('id', eventId)
+        .maybeSingle()
+      if (event?.organizations?.organizer_id === ws._user.id) {
+        joinRoom(ws, room)
+      }
+    } catch (err) {
+      console.warn('[ws-server] Failed to verify organizer channel subscription:', err.message)
+    }
+    return
+  }
+
+  // Voter/Participant channel: organizers, admin, or enrolled participants
+  if (channel === 'voters') {
+    if (ws._user.role === 'admin' || ws._user.role === 'organizer') {
+      joinRoom(ws, room)
+      return
+    }
+    try {
+      const { data: enrollment } = await db
+        .from('event_participants')
+        .select('id')
+        .eq('event_id', eventId)
+        .eq('user_id', ws._user.id)
+        .maybeSingle()
+      if (enrollment) {
+        joinRoom(ws, room)
+      }
+    } catch (err) {
+      console.warn('[ws-server] Failed to verify voter channel subscription:', err.message)
+    }
+    return
+  }
+
+  // Public/general event room (event:<eventId>)
+  joinRoom(ws, room)
 }

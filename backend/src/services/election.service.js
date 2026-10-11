@@ -1050,10 +1050,12 @@ export async function submitBallot(eventId, voterId, payload) {
     if (!event.voting_enabled) {
       throw new ApiError(403, 'Voting is not open for this event')
     }
-    if (event.start_date && new Date(event.start_date) > new Date()) {
+    const now = Date.now()
+    const SKEW_TOLERANCE_MS = 30_000
+    if (event.start_date && new Date(event.start_date).getTime() > now + SKEW_TOLERANCE_MS) {
       throw new ApiError(403, 'Voting has not started yet for this event')
     }
-    if (event.end_date && new Date(event.end_date) < new Date()) {
+    if (event.end_date && new Date(event.end_date).getTime() < now - SKEW_TOLERANCE_MS) {
       throw new ApiError(403, 'Voting has ended for this event')
     }
     throw new ApiError(403, 'Voting is not open for this event')
@@ -1128,11 +1130,53 @@ export async function submitBallot(eventId, voterId, payload) {
 
   if (castErr) {
     if (castErr.code === '23505') {
+      const { data: existingSub } = await getClient()
+        .from(DB_TABLES.ELECTION_BALLOT_SUBMISSIONS)
+        .select('id')
+        .eq('event_id', eventId)
+        .eq('participant_id', enrollment.id)
+        .eq('ballot_section_id', ballot.ballotSectionId)
+        .maybeSingle()
+      if (existingSub) {
+        const { data: currentPart } = await getClient()
+          .from(DB_TABLES.EVENT_PARTICIPANTS)
+          .select('has_voted')
+          .eq('id', enrollment.id)
+          .single()
+        return {
+          success: true,
+          alreadySubmitted: true,
+          message: 'This ballot section was already submitted successfully',
+          ballotSectionId: ballot.ballotSectionId,
+          eventComplete: Boolean(currentPart?.has_voted),
+        }
+      }
       throw new ApiError(409, 'You have already submitted this ballot section')
     }
     throw new ApiError(500, castErr.message)
   }
   if (committed === false) {
+    const { data: existingSub } = await getClient()
+      .from(DB_TABLES.ELECTION_BALLOT_SUBMISSIONS)
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('participant_id', enrollment.id)
+      .eq('ballot_section_id', ballot.ballotSectionId)
+      .maybeSingle()
+    if (existingSub) {
+      const { data: currentPart } = await getClient()
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
+        .select('has_voted')
+        .eq('id', enrollment.id)
+        .single()
+      return {
+        success: true,
+        alreadySubmitted: true,
+        message: 'This ballot section was already submitted successfully',
+        ballotSectionId: ballot.ballotSectionId,
+        eventComplete: Boolean(currentPart?.has_voted),
+      }
+    }
     throw new ApiError(409, 'This ballot section is already submitted or is not the next section')
   }
 
@@ -1392,20 +1436,70 @@ async function fetchElectionResultsData(eventId) {
   const positionSummaries = positions.map((position) => {
     const inPosition = candidateResults.filter((c) => c.positionId === position.id)
     const totalPositionVotes = inPosition.reduce((s, c) => s + c.votes, 0)
+    const winnersCount = position.numberOfWinners || 1
+
+    const sortedCandidates = inPosition.slice().sort((a, b) => b.votes - a.votes)
+
+    let currentRank = 1
+    const rankedCandidates = sortedCandidates.map((c, idx) => {
+      if (idx > 0 && c.votes < sortedCandidates[idx - 1].votes) {
+        currentRank = idx + 1
+      }
+      return {
+        ...c,
+        rank: currentRank,
+        votePercentage:
+          totalPositionVotes > 0
+            ? Math.round((c.votes / totalPositionVotes) * 10000) / 100
+            : 0,
+      }
+    })
+
+    const cutoffVote = sortedCandidates[winnersCount - 1]?.votes
+    const nextVote = sortedCandidates[winnersCount]?.votes
+    const hasCutoffTie =
+      sortedCandidates.length > winnersCount &&
+      cutoffVote !== undefined &&
+      nextVote !== undefined &&
+      cutoffVote === nextVote &&
+      cutoffVote > 0
+
+    const candidatesWithWinnerStatus = rankedCandidates.map((c, idx) => {
+      const isWithinWinnersWindow = idx < winnersCount
+      const isTiedAtCutoff = hasCutoffTie && c.votes === cutoffVote
+
+      let outcome = 'not_elected'
+      if (c.votes > 0) {
+        if (isTiedAtCutoff) {
+          outcome = 'tied'
+        } else if (isWithinWinnersWindow) {
+          outcome = 'winner'
+        }
+      }
+
+      return {
+        ...c,
+        isWinner: outcome === 'winner',
+        isTied: isTiedAtCutoff,
+        outcome,
+      }
+    })
+
     return {
       positionId: position.id,
       positionName: position.name,
       ballotSectionId: position.ballotSectionId,
+      numberOfWinners: winnersCount,
       totalVotes: totalPositionVotes,
-      candidates: inPosition
-        .map((c) => ({
-          ...c,
-          votePercentage:
-            totalPositionVotes > 0
-              ? Math.round((c.votes / totalPositionVotes) * 10000) / 100
-              : 0,
-        }))
-        .sort((a, b) => b.votes - a.votes),
+      hasTie: hasCutoffTie,
+      tiedCandidates: hasCutoffTie
+        ? candidatesWithWinnerStatus.filter((c) => c.isTied).map((c) => ({
+            candidateId: c.candidateId,
+            candidateName: c.candidateName,
+            votes: c.votes,
+          }))
+        : [],
+      candidates: candidatesWithWinnerStatus,
     }
   })
 
@@ -1424,7 +1518,7 @@ async function fetchElectionResultsData(eventId) {
 
   const { data: sectionSubmissionRows, error: sectionSubmissionError } = await getClient()
     .from(DB_TABLES.ELECTION_BALLOT_SUBMISSIONS)
-    .select('ballot_section_id')
+    .select('ballot_section_id, participant_id')
     .eq('event_id', eventId)
   if (sectionSubmissionError) throw new ApiError(500, sectionSubmissionError.message)
 
@@ -1435,6 +1529,10 @@ async function fetchElectionResultsData(eventId) {
       (submissionsBySection.get(submission.ballot_section_id) ?? 0) + 1,
     )
   }
+
+  const distinctParticipants = new Set((sectionSubmissionRows ?? []).map((r) => r.participant_id))
+  const partialVotedCount = Math.max(0, distinctParticipants.size - voted)
+
   const sectionSummaries = (sectionRows ?? []).map((section) => {
     const sectionPositions = positionSummaries.filter(
       (position) => position.ballotSectionId === section.id,
@@ -1453,7 +1551,12 @@ async function fetchElectionResultsData(eventId) {
   return {
     totalVoters: total,
     votedCount: voted,
+    fullTurnoutCount: voted,
+    partialVotedCount,
+    totalParticipatingVoters: distinctParticipants.size,
     turnoutPercentage,
+    partialTurnoutPercentage: computeTurnoutRate(partialVotedCount, total),
+    overallParticipationPercentage: computeTurnoutRate(distinctParticipants.size, total),
     participationByProgram: participationBy('program'),
     participationByYearSection: participationBy('year_section'),
     liveTotalVotes,

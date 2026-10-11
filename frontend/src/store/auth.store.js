@@ -33,11 +33,13 @@ export const useAuthStore = create((set, get) => ({
     set({ user: user ?? null })
   },
 
-  clearSession() {
+  clearSession({ clearDrafts = false } = {}) {
     // Token cleared via cookie - only clear local user data
     removeItem(STORAGE_KEYS.USER)
     clearCsrfToken()
-    clearVotrixDrafts()
+    if (clearDrafts) {
+      clearVotrixDrafts()
+    }
     set({ user: null, isAuthenticated: false, isBootstrapping: false })
   },
 
