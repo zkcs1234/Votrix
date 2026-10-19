@@ -142,7 +142,7 @@ export default function CohortInviteManager({ eventId, service, participantLabel
 
       {!rosterLocked && (
         <Card>
-          <div className="space-y-4 p-5">
+          <div className="space-y-5 p-5 sm:p-6">
             <div>
               <h2 className="v-section-title">Invite a cohort</h2>
               <p className="v-caption mt-1">
@@ -151,7 +151,7 @@ export default function CohortInviteManager({ eventId, service, participantLabel
               </p>
             </div>
 
-            <div className="inline-flex rounded-lg border border-v-border p-0.5">
+            <div className="inline-flex flex-wrap gap-1 rounded-xl border border-v-border bg-v-surface-elevated p-1">
               {[
                 { id: 'program', label: 'By Program' },
                 { id: 'year_section', label: 'By Year & Section' },
@@ -160,8 +160,8 @@ export default function CohortInviteManager({ eventId, service, participantLabel
                   key={opt.id}
                   type="button"
                   onClick={() => switchType(opt.id)}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                    cohortType === opt.id ? 'bg-v-primary text-white' : 'text-v-text-muted hover:text-v-text'
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                    cohortType === opt.id ? 'bg-v-primary text-white shadow-sm' : 'text-v-text-muted hover:bg-v-surface hover:text-v-text'
                   }`}
                 >
                   {opt.label}
@@ -182,8 +182,8 @@ export default function CohortInviteManager({ eventId, service, participantLabel
                   return (
                     <label
                       key={c.value}
-                      className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 text-sm transition ${
-                        checked ? 'border-v-primary bg-v-primary/5' : 'border-v-border hover:bg-v-surface-elevated'
+                      className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm transition ${
+                        checked ? 'border-v-primary/40 bg-v-primary-soft' : 'border-v-border bg-v-surface hover:border-v-primary/40 hover:bg-v-surface-elevated'
                       }`}
                     >
                       <input type="checkbox" checked={checked} onChange={() => toggle(c.value)} className="h-4 w-4" />
@@ -221,28 +221,28 @@ export default function CohortInviteManager({ eventId, service, participantLabel
                 <h3 className="v-section-title-sm">Bulk invite status</h3>
                 <p className="v-caption mt-1">Summary for the most recent cohort email dispatch.</p>
               </div>
-              <span className="rounded-full bg-v-primary/10 px-2.5 py-1 text-xs font-semibold text-v-primary">
+              <span className="rounded-full bg-v-primary-soft px-2.5 py-1 text-xs font-semibold text-v-primary">
                 {inviteSummary.sent ?? 0} sent
               </span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <div className="rounded-lg border border-v-border bg-v-surface p-3">
+              <div className="rounded-xl border border-v-border bg-v-surface-elevated p-3">
                 <div className="v-caption">Sent</div>
                 <div className="mt-1 text-xl font-semibold text-v-text">{inviteSummary.sent ?? 0}</div>
               </div>
-              <div className="rounded-lg border border-v-border bg-v-surface p-3">
+              <div className="rounded-xl border border-v-border bg-v-surface-elevated p-3">
                 <div className="v-caption">Skipped</div>
                 <div className="mt-1 text-xl font-semibold text-v-text">{inviteSummary.skipped ?? 0}</div>
               </div>
-              <div className="rounded-lg border border-v-border bg-v-surface p-3">
+              <div className="rounded-xl border border-v-border bg-v-surface-elevated p-3">
                 <div className="v-caption">Duplicates</div>
                 <div className="mt-1 text-xl font-semibold text-v-text">{inviteSummary.duplicate ?? 0}</div>
               </div>
-              <div className="rounded-lg border border-v-border bg-v-surface p-3">
+              <div className="rounded-xl border border-v-border bg-v-surface-elevated p-3">
                 <div className="v-caption">Quota blocked</div>
                 <div className="mt-1 text-xl font-semibold text-v-text">{inviteSummary.quotaBlocked ?? 0}</div>
               </div>
-              <div className="rounded-lg border border-v-border bg-v-surface p-3">
+              <div className="rounded-xl border border-v-border bg-v-surface-elevated p-3">
                 <div className="v-caption">Failed</div>
                 <div className="mt-1 text-xl font-semibold text-v-text">{inviteSummary.failed ?? 0}</div>
               </div>

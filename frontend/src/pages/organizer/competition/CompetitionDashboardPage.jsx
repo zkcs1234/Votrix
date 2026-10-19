@@ -6,6 +6,7 @@ import StatCard from '@/components/ui/StatCard'
 import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
 import EventStatsTable from '@/components/organizer/EventStatsTable'
+import ParticipationSnapshot from '@/components/organizer/ParticipationSnapshot'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
@@ -34,7 +35,7 @@ export default function CompetitionDashboardPage() {
   // Show skeleton after 300ms
   if (isLoading || showLoader) {
     return (
-      <div className="space-y-6">
+      <div className="v-dashboard space-y-6">
         <div className="h-8 w-72 animate-pulse rounded-lg bg-v-surface-elevated" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -46,7 +47,7 @@ export default function CompetitionDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="v-dashboard space-y-6">
       <PageHeader
         title="Competition Scoring dashboard"
         description={nativeSetupEnabled ? 'Choose an event to configure its independent competitions, judges, and scoring.' : 'Manage contestants, criteria, and judge scoring.'}
@@ -71,6 +72,13 @@ export default function CompetitionDashboardPage() {
         <StatCard label="Total judges" value={data?.stats?.totalJudges ?? 0} hint="Across all events" icon={Star} />
         <StatCard label="Scores submitted" value={data?.stats?.scoresSubmitted ?? 0} icon={CheckSquare} />
       </div>
+
+      <ParticipationSnapshot
+        events={data?.eventBreakdown ?? []}
+        module="competition"
+        title="Judge completion by event"
+        description="Highest judge submission completion rates across your events."
+      />
 
       <EventStatsTable
         title="Judge completion by event"

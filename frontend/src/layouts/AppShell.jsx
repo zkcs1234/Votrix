@@ -74,7 +74,7 @@ function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
       isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5 w-full'
     } ${
       active
-        ? 'bg-white/10 font-medium text-v-sidebar-active'
+        ? 'bg-white/10 font-medium text-v-sidebar-active before:absolute before:left-0 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:rounded-r before:bg-v-primary'
         : 'text-v-sidebar-text hover:bg-white/5 hover:text-white'
     }`
 
@@ -98,9 +98,9 @@ function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
                 key={child.label}
                 to={href}
                 onClick={onNavigate}
-                className={`flex min-h-8 items-center gap-2 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                className={`relative flex min-h-8 items-center gap-2 rounded-md px-3 py-1.5 text-xs transition-colors ${
                   active
-                    ? 'bg-white/10 font-medium text-v-sidebar-active'
+                    ? 'bg-white/10 font-medium text-v-sidebar-active before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-r before:bg-v-primary'
                     : 'text-v-sidebar-text hover:bg-white/5 hover:text-white'
                 }`}
                 aria-current={active ? 'page' : undefined}
@@ -490,11 +490,15 @@ export default function AppShell({
   )
 
   return (
-    <div className="flex min-h-screen bg-v-bg" style={{ '--sidebar-width': showSidebar ? (isCollapsed ? '4.5rem' : '16rem') : '0px' }}>
+    <div
+      data-module={moduleLabel?.toLowerCase().replace(/\s+/g, '-')}
+      className="flex min-h-screen bg-v-bg"
+      style={{ '--sidebar-width': showSidebar ? (isCollapsed ? '4.5rem' : '14rem') : '0px' }}
+    >
       {showSidebar && (
         <aside
-          className={`hidden shrink-0 bg-v-sidebar lg:block sticky top-0 self-start h-screen min-h-screen overflow-y-auto transition-[width,padding] duration-200 ease-in-out ${
-            isCollapsed ? 'w-18 px-3 py-6' : 'w-64 p-6'
+          className={`sticky top-0 hidden h-screen min-h-screen shrink-0 self-start overflow-y-auto border-r border-white/5 bg-v-sidebar transition-[width,padding] duration-200 ease-in-out lg:block ${
+            isCollapsed ? 'w-18 px-3 py-6' : 'w-56 p-5'
           }`}
         >
           {sidebar(true)}
@@ -510,18 +514,18 @@ export default function AppShell({
             aria-label="Close menu"
             onClick={closeMobile}
           />
-          <aside className="relative flex h-full w-[min(100%,280px)] flex-col bg-v-sidebar p-6 shadow-xl animate-in slide-in-from-left duration-200 ease-out">
+          <aside className="relative flex h-full w-[min(100%,280px)] flex-col border-r border-white/5 bg-v-sidebar p-6 shadow-xl animate-in slide-in-from-left duration-200 ease-out">
             {sidebar(false)}
           </aside>
         </div>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow sm:px-6 sm:py-4">
+        <header className="sticky top-0 z-40 flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-v-border bg-v-surface/95 px-4 py-3 shadow-v-shadow backdrop-blur-md sm:px-6 sm:py-3">
           {showSidebar && (
             <button
               type="button"
-              className="flex-shrink-0 rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated lg:hidden"
+              className="flex-shrink-0 rounded-lg border border-v-border p-2 text-v-text-muted transition hover:border-v-primary/40 hover:bg-v-primary-soft/50 hover:text-v-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Open menu"
               aria-expanded={mobileOpen}
@@ -652,7 +656,7 @@ export default function AppShell({
           </div>
         </header>
 
-        <main className="v-page-enter flex-1 p-4 md:p-8">{children ?? <Outlet />}</main>
+        <main className="v-page-enter flex-1 p-4 md:px-7 md:py-6 xl:px-8">{children ?? <Outlet />}</main>
         <div id="stage-footer-portal" className="shrink-0 empty:hidden sticky bottom-0 z-40" />
       </div>
     </div>

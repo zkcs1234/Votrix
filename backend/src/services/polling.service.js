@@ -77,6 +77,21 @@ function mapPollEvent(row) {
   }
 }
 
+function assertPollExpirationWithinSchedule(pollExpiresAt, startDate, endDate) {
+  if (!pollExpiresAt) return
+
+  const expiration = new Date(pollExpiresAt)
+  if (Number.isNaN(expiration.getTime())) {
+    throw new ApiError(400, 'Invalid poll expiration date')
+  }
+
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || expiration < start || expiration > end) {
+    throw new ApiError(400, 'Poll expiration must be between the start and end dates')
+  }
+}
+
 function mapQuestion(row, options = [], typeDef = null) {
   const out = {
     id: row.id,
@@ -584,6 +599,7 @@ export async function listPollEvents(organizerId, { limit = 200, offset = 0 } = 
 }
 
 export async function createPollEvent(organizerId, payload) {
+  assertPollExpirationWithinSchedule(payload.pollExpiresAt, payload.startDate, payload.endDate)
   const org = await getOrCreatePollingOrganization(organizerId)
 
   const { data, error } = await getClient()
@@ -601,6 +617,7 @@ export async function createPollEvent(organizerId, payload) {
       polling_enabled: false,
       poll_anonymous: Boolean(payload.pollAnonymous),
       poll_allow_multiple_submissions: Boolean(payload.pollAllowMultipleSubmissions),
+      poll_expires_at: payload.pollExpiresAt ?? null,
     })
     .select('*')
     .single()
@@ -626,6 +643,11 @@ export async function updatePollEvent(eventId, organizerId, payload) {
   const event = await assertPollingEvent(eventId, organizerId)
   assertSetupEditable(event)
   assertEventUpdateAllowed(event, payload)
+  assertPollExpirationWithinSchedule(
+    payload.pollExpiresAt !== undefined ? payload.pollExpiresAt : event.poll_expires_at,
+    payload.startDate ?? event.start_date,
+    payload.endDate ?? event.end_date,
+  )
 
   // Capture old image_asset_id before updating so we can clean it up if replaced
   const oldAssetId = event.image_asset_id ?? null
@@ -639,6 +661,7 @@ export async function updatePollEvent(eventId, organizerId, payload) {
   if (payload.pollAllowMultipleSubmissions !== undefined) {
     updates.poll_allow_multiple_submissions = payload.pollAllowMultipleSubmissions
   }
+  if (payload.pollExpiresAt !== undefined) updates.poll_expires_at = payload.pollExpiresAt
   if (payload.banner !== undefined) updates.banner = payload.banner
   if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
 

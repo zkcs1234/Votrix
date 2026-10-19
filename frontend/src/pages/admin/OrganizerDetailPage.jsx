@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
+import PageHeader from '@/components/ui/PageHeader'
 
 const ACTION_TONES = {
   CREATE: 'success', INSERT: 'success',
@@ -179,16 +180,16 @@ export default function OrganizerDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="secondary" size="sm" onClick={() => navigate('/admin/organizers')}>
-          <ArrowLeft className="h-4 w-4" strokeWidth={2} />
-          Back
-        </Button>
-        <div>
-          <h1 className="v-page-title">Organizer Activity</h1>
-          <p className="v-caption font-mono text-xs">{id}</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Organizer Activity"
+        description={`Activity history for organizer ${id}.`}
+        actions={
+          <Button variant="secondary" size="sm" onClick={() => navigate('/admin/organizers')}>
+            <ArrowLeft className="h-4 w-4" strokeWidth={2} />
+            Back
+          </Button>
+        }
+      />
 
       <Card>
         <div className="space-y-4">

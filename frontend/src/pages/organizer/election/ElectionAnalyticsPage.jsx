@@ -109,6 +109,7 @@ export default function ElectionAnalyticsPage() {
 
   return (
     <AnalyticsLayout
+      moduleLabel="election"
       title="Election analytics"
       description="Live turnout, candidate rankings, and position results."
       fullReportTo={`/organizer/election/events/${eventId}/report`}

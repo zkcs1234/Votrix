@@ -29,14 +29,20 @@ function renderForm() {
     <ElectionEventFormPage /><Location />
   </MemoryRouter>)
 }
-function chooseDateTime(fieldName, day, hour, minute, period) {
-  const date = new Date(day)
-  date.setHours(hour % 12 + (period === 'PM' ? 12 : 0), minute, 0, 0)
-  const pad = value => String(value).padStart(2, '0')
-  const value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+function chooseDateTime(fieldName, date, hour, minute) {
   const input = screen.getByLabelText(new RegExp(`^${fieldName}`))
-  expect(input).toHaveAttribute('type', 'datetime-local')
-  fireEvent.change(input, { target: { value } })
+  fireEvent.click(input)
+  const now = new Date()
+  const monthDelta = (date.getFullYear() - now.getFullYear()) * 12 + date.getMonth() - now.getMonth()
+  for (let index = 0; index < Math.abs(monthDelta); index += 1) {
+    fireEvent.click(screen.getByRole('button', { name: monthDelta > 0 ? 'Next month' : 'Previous month' }))
+  }
+  fireEvent.click(screen.getByRole('button', { name: date.toDateString() }))
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  fireEvent.click(screen.getByRole('button', { name: `Hour ${hour % 12 || 12}` }))
+  fireEvent.click(screen.getByRole('button', { name: `Minute ${minute}` }))
+  fireEvent.click(screen.getByRole('button', { name: hour >= 12 ? 'PM' : 'AM' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Done' }))
 }
 
 beforeEach(() => {
@@ -50,8 +56,8 @@ it('accepts native date inputs and submits the ISO payload only on Create & cont
   const now = new Date()
   const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
   fireEvent.change(screen.getByRole('textbox', { name: /^Title/ }), { target: { value: 'Picker acceptance election' } })
-  chooseDateTime('Start Date and Time', day, 12, 0, 'AM')
-  chooseDateTime('End Date and Time', day, 12, 0, 'PM')
+  chooseDateTime('Start Date and Time', day, 0, 0)
+  chooseDateTime('End Date and Time', day, 12, 0)
   expect(mocks.publishDraft).not.toHaveBeenCalled()
   expect(mocks.saveDraftAsync).not.toHaveBeenCalled()
   expect(screen.getByTestId('location')).toHaveTextContent('/organizer/election/events/new')
@@ -71,8 +77,8 @@ it('retains the existing same-day end-before-start validation', async () => {
   const now = new Date()
   const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
   fireEvent.change(screen.getByRole('textbox', { name: /^Title/ }), { target: { value: 'Validation election' } })
-  chooseDateTime('Start Date and Time', day, 3, 20, 'PM')
-  chooseDateTime('End Date and Time', day, 12, 0, 'AM')
+  chooseDateTime('Start Date and Time', day, 15, 20)
+  chooseDateTime('End Date and Time', day, 0, 0)
   fireEvent.click(screen.getByRole('button', { name: 'Next: Branding' }))
   expect(await screen.findByText('End date must be on or after start date')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Create & continue' })).not.toBeInTheDocument()

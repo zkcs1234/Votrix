@@ -11,6 +11,7 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import StatCard from '@/components/ui/StatCard'
 import SearchInput from '@/components/ui/SearchInput'
+import PageHeader from '@/components/ui/PageHeader'
 
 // ─── Action colour coding ────────────────────────────────────────────────────
 
@@ -450,15 +451,11 @@ export default function AuditLogsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="v-page-title">Audit Logs</h1>
-          <p className="v-caption">
-            Security and compliance trail for all administrative actions.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
+      <PageHeader
+        title="Audit Logs"
+        description="Security and compliance trail for all administrative actions."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="secondary"
@@ -477,11 +474,12 @@ export default function AuditLogsPage() {
             <Download className="h-4 w-4" strokeWidth={1.5} />
             Export full
           </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Summary stat cards */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total logs" value={summary.total.toLocaleString()} />
         <StatCard label="Admin actions" value={summary.adminAct.toLocaleString()} />
         <StatCard label="Organizer actions" value={summary.orgAct.toLocaleString()} />

@@ -130,11 +130,7 @@ const BarChartView = memo(function BarChartView({
             {normalized.map((entry, index) => (
               <Cell
                 key={`bar-cell-${index}`}
-                fill={
-                  hoveredIndex === index
-                    ? '#a5b4fc' // lighten on hover (indigo-300)
-                    : entry._fill
-                }
+                fill={entry._fill}
                 opacity={hoveredIndex !== null && hoveredIndex !== index ? 0.65 : 1}
               />
             ))}

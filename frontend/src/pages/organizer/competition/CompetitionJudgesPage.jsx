@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import FormAlert from '@/components/ui/FormAlert'
+import PageHeader from '@/components/ui/PageHeader'
 import JudgeAssignmentPanel from '@/components/organizer/competition/JudgeAssignmentPanel'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
@@ -22,7 +23,13 @@ function judgeName(j) {
   return j.displayName || [j.firstName, j.lastName].filter(Boolean).join(' ') || j.email
 }
 
-export default function CompetitionJudgesPage() { return <NativeSetupBoundary Legacy={LegacyCompetitionJudgesPage}/> }
+export default function CompetitionJudgesPage() {
+  return (
+    <div data-module="competition-scoring" className="mx-auto max-w-5xl">
+      <NativeSetupBoundary Legacy={LegacyCompetitionJudgesPage} />
+    </div>
+  )
+}
 function LegacyCompetitionJudgesPage() {
   const { eventId } = useParams()
   const [judges, setJudges] = useState([])
@@ -144,12 +151,10 @@ function LegacyCompetitionJudgesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="v-page-title">Judges</h1>
-        <p className="v-caption">
-          Enroll existing judge accounts, then scope their assignments. Invitations are notifications; round submission progress is shown in Live Control.
-        </p>
-      </div>
+      <PageHeader
+        title="Judges"
+        description="Enroll existing judge accounts, then scope their assignments. Invitations are notifications; round submission progress is shown in Live Control."
+      />
 
       {!loading && foundation && rosterLocked && !loadError && (
         <FormAlert variant="warning">
@@ -162,7 +167,7 @@ function LegacyCompetitionJudgesPage() {
 
       {!rosterLocked && (
         <Card>
-          <div className="space-y-4 p-5">
+          <div className="space-y-5 p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <Search className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
               <input
@@ -186,12 +191,12 @@ function LegacyCompetitionJudgesPage() {
                   return (
                     <label
                       key={j.id}
-                      className={`flex items-center gap-2 rounded-lg border p-2.5 text-sm transition ${
+                      className={`flex items-center gap-3 rounded-xl border p-3 text-sm transition ${
                         j.enrolled
                           ? 'border-v-border bg-v-surface-elevated opacity-60'
                           : checked
-                            ? 'cursor-pointer border-v-primary bg-v-primary/5'
-                            : 'cursor-pointer border-v-border hover:bg-v-surface-elevated'
+                            ? 'cursor-pointer border-v-primary/40 bg-v-primary-soft'
+                            : 'cursor-pointer border-v-border bg-v-surface hover:border-v-primary/40 hover:bg-v-surface-elevated'
                       }`}
                     >
                       <input

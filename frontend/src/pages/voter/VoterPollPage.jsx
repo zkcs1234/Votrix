@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ArrowLeft, CheckCircle2, Clock3 } from 'lucide-react'
 import { pollingService } from '@/services/polling.service'
 import { validatePollAnswers } from '@/utils/pollValidation'
 import { getDraftStorageKey } from '@/utils/draftStorage'
@@ -122,21 +123,25 @@ export default function VoterPollPage() {
 
   if (done) {
     return (
-      <div className="mx-auto max-w-lg rounded-2xl border border-v-success/30 bg-v-success-bg p-8 text-center">
-        <p className="text-lg font-semibold text-v-success">Response submitted</p>
-        <p className="mt-2 text-sm text-v-text-subtle">
+      <div data-module="polling" className="v-card-md mx-auto max-w-lg border-v-success/30 bg-v-success-bg text-center">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-v-surface text-v-success">
+          <CheckCircle2 className="h-6 w-6" strokeWidth={1.8} aria-hidden />
+        </span>
+        <p className="mt-4 text-lg font-semibold text-v-success">Response submitted</p>
+        <p className="mt-2 text-sm leading-relaxed text-v-text-muted">
           Thank you for completing {poll?.event?.title}.
         </p>
         {poll?.event?.pollAllowMultipleSubmissions && poll?.pollOpen && (
           <button
             type="button"
             onClick={handleAnother}
-            className="mt-4 text-v-text-muted text-sm hover:text-v-text"
+            className="mt-4 rounded-lg px-3 py-2 text-sm font-medium text-v-primary hover:bg-v-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary"
           >
             Submit another response
           </button>
         )}
-        <Link to="/participant" className="mt-6 block text-v-text-muted hover:text-v-text">
+        <Link to="/participant" className="v-btn-tertiary mt-5 inline-flex items-center justify-center gap-2">
+          <ArrowLeft className="h-4 w-4" aria-hidden />
           Back to dashboard
         </Link>
       </div>
@@ -145,10 +150,13 @@ export default function VoterPollPage() {
 
   if (!poll?.pollOpen) {
     return (
-      <div className="mx-auto max-w-lg v-card p-8 text-center">
-        <p className="text-v-text">This poll is closed or has expired.</p>
+      <div data-module="polling" className="v-card-md mx-auto max-w-lg text-center">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-v-primary-soft text-v-primary">
+          <Clock3 className="h-6 w-6" strokeWidth={1.8} aria-hidden />
+        </span>
+        <p className="mt-4 text-lg font-semibold text-v-text">This poll is closed or has expired.</p>
         {poll?.event?.startDate && poll?.event?.endDate && (
-          <p className="mt-2 text-sm text-v-text-subtle">
+          <p className="mt-2 text-sm leading-relaxed text-v-text-muted">
             This poll was open from{' '}
             {new Date(poll.event.startDate).toLocaleString(undefined, {
               dateStyle: 'medium',
@@ -163,7 +171,8 @@ export default function VoterPollPage() {
           </p>
         )}
 
-        <Link to="/participant" className="mt-4 inline-block text-v-text-muted">
+        <Link to="/participant" className="v-btn-tertiary mt-5 inline-flex items-center justify-center gap-2">
+          <ArrowLeft className="h-4 w-4" aria-hidden />
           Back to dashboard
         </Link>
       </div>
@@ -172,9 +181,13 @@ export default function VoterPollPage() {
 
   if (!poll?.canSubmit) {
     return (
-      <div className="mx-auto max-w-lg v-card p-8 text-center">
-        <p className="text-v-text">You have already responded to this poll.</p>
-        <Link to="/participant" className="mt-4 inline-block text-v-text-muted">
+      <div data-module="polling" className="v-card-md mx-auto max-w-lg text-center">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-v-primary-soft text-v-primary">
+          <CheckCircle2 className="h-6 w-6" strokeWidth={1.8} aria-hidden />
+        </span>
+        <p className="mt-4 text-lg font-semibold text-v-text">You have already responded to this poll.</p>
+        <Link to="/participant" className="v-btn-tertiary mt-5 inline-flex items-center justify-center gap-2">
+          <ArrowLeft className="h-4 w-4" aria-hidden />
           Back to dashboard
         </Link>
       </div>
@@ -192,11 +205,11 @@ export default function VoterPollPage() {
       visible on mobile.
     */
     <FullscreenVotingShell>
-    <form onSubmit={handleSubmit} className="fixed inset-0 z-50 flex flex-col h-[100dvh] bg-v-surface">
+    <form onSubmit={handleSubmit} data-module="polling" className="fixed inset-0 z-50 flex h-[100dvh] flex-col bg-v-bg">
       {/* ===== FIXED TOP: Floating progress card (does not scroll) ===== */}
       <div className="shrink-0">
         <div className="mx-auto max-w-2xl px-4 pt-3 pb-1 md:px-8">
-          <div className="v-card-sm p-3 shadow-v-shadow-md">
+          <div className="v-card-sm border-t-4 border-t-v-primary p-3 shadow-v-shadow-md">
             <div className="flex items-center justify-between gap-2 text-sm">
               <span className="text-v-text-muted">
                 {answeredCount} of {questions.length} answered

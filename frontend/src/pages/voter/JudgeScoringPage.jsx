@@ -16,7 +16,13 @@ import JudgeScoringHeader from '@/components/voter/competition/JudgeScoringHeade
 import { useAuth } from '@/hooks/useAuth'
 import { CompetitionWorkspaceBoundary } from '@/components/voter/competition/NativeCompetitionWorkspace'
 
-export default function JudgeScoringPage() { return <CompetitionWorkspaceBoundary Legacy={LegacyJudgeScoringPage}/> }
+export default function JudgeScoringPage() {
+  return (
+    <div data-module="competition-scoring">
+      <CompetitionWorkspaceBoundary Legacy={LegacyJudgeScoringPage} />
+    </div>
+  )
+}
 function LegacyJudgeScoringPage() {
   const { eventId } = useParams()
   const { user } = useAuth()

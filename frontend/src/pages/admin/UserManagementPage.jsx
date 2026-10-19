@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import OrganizerManagementPage from './OrganizerManagementPage'
 import VotersPanel from '@/components/admin/VotersPanel'
 import JudgesPanel from '@/components/admin/JudgesPanel'
+import PageHeader from '@/components/ui/PageHeader'
 
 // Participant type pools remain separate views over shared user accounts.
 const TABS = [
@@ -47,7 +48,15 @@ export default function UserManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div role="tablist" aria-label="User management" className="flex gap-1 border-b border-v-border">
+      {tab === 'participants' && (
+        <div data-module={participantType === 'competition-judge' ? 'competition-scoring' : participantType === 'polling-respondent' ? 'polling' : 'election'}>
+          <PageHeader
+            title="User management"
+            description="Manage organizer accounts and participant pools."
+          />
+        </div>
+      )}
+      <div role="tablist" aria-label="User management" className="inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-v-border bg-v-surface p-1">
         {TABS.map((t) => {
           const active = tab === t.id
           return (
@@ -57,10 +66,10 @@ export default function UserManagementPage() {
               type="button"
               aria-selected={active}
               onClick={() => selectTab(t.id)}
-              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${
+              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition ${
                 active
-                  ? 'border-v-primary text-v-text'
-                  : 'border-transparent text-v-text-muted hover:text-v-text'
+                  ? 'bg-v-primary text-white shadow-sm'
+                  : 'text-v-text-muted hover:bg-v-surface-elevated hover:text-v-text'
               }`}
             >
               {t.label}
@@ -71,30 +80,34 @@ export default function UserManagementPage() {
 
       {tab === 'organizers' && <OrganizerManagementPage />}
       {tab === 'participants' && (
-        <div className="space-y-5">
+        <div data-module={participantType === 'competition-judge' ? 'competition-scoring' : participantType === 'polling-respondent' ? 'polling' : 'election'} className="space-y-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="v-section-title">Participant type</h2>
               <p className="v-caption mt-1">These are types within the Participant role. One account may have more than one type.</p>
             </div>
-            <div role="tablist" aria-label="Participant type" className="inline-flex flex-wrap gap-1 rounded-lg border border-v-border p-1">
+            <div role="tablist" aria-label="Participant type" className="grid w-full grid-cols-1 gap-1 rounded-xl border border-v-border bg-v-surface p-1 sm:w-auto sm:grid-cols-3">
               {participantTypes.map((type) => {
                 const active = participantType === type.id
+                const moduleName = type.id === 'competition-judge'
+                  ? 'competition-scoring'
+                  : type.id === 'polling-respondent' ? 'polling' : 'election'
                 return (
-                  <button
-                    key={type.id}
-                    role="tab"
-                    type="button"
-                    aria-selected={active}
-                    onClick={() => selectParticipantType(type.id)}
-                    className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-                      active
-                        ? 'bg-v-primary text-white'
-                        : 'text-v-text-muted hover:bg-v-surface-elevated hover:text-v-text'
-                    }`}
-                  >
-                    {type.label}
-                  </button>
+                  <span key={type.id} data-module={moduleName}>
+                    <button
+                      role="tab"
+                      type="button"
+                      aria-selected={active}
+                      onClick={() => selectParticipantType(type.id)}
+                      className={`w-full rounded-lg px-3 py-2 text-sm font-medium transition ${
+                        active
+                          ? 'bg-v-primary text-white shadow-sm'
+                          : 'text-v-text-muted hover:bg-v-surface-elevated hover:text-v-text'
+                      }`}
+                    >
+                      {type.label}
+                    </button>
+                  </span>
                 )
               })}
             </div>

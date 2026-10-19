@@ -25,6 +25,12 @@ const ROLE_ICONS = {
   POLLING_RESPONDENT: BarChart2,
 }
 
+const ROLE_MODULES = {
+  ELECTION_VOTER: 'election',
+  COMPETITION_JUDGE: 'competition-scoring',
+  POLLING_RESPONDENT: 'polling',
+}
+
 function RoleSummaryCard({ participantType, count, icon: Icon, label }) {
   if (!count || count === 0) return null
   const roleBadgeLabel =
@@ -35,9 +41,9 @@ function RoleSummaryCard({ participantType, count, icon: Icon, label }) {
         : 'Respondent'
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-v-border bg-v-surface p-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-v-surface-elevated">
-        <Icon className="h-5 w-5 text-v-text" strokeWidth={1.5} />
+    <div data-module={ROLE_MODULES[participantType]} className="flex items-center gap-3 rounded-xl border border-v-border bg-v-surface p-4">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-v-primary-soft">
+        <Icon className="h-5 w-5 text-v-primary" strokeWidth={1.5} />
       </div>
       <div>
         <p className="text-sm font-medium text-v-text">{label}</p>
@@ -123,12 +129,12 @@ export default function VoterDashboardPage() {
 
   if (loading || showLoader) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="v-dashboard mx-auto max-w-6xl space-y-6">
         <div className="v-card-md">
           <div className="h-8 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
           <div className="mt-2 h-4 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <SkeletonStatCard />
           <SkeletonStatCard />
           <SkeletonStatCard />
@@ -168,7 +174,7 @@ export default function VoterDashboardPage() {
       : 'Elections, competition judging, and polls'
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="v-dashboard mx-auto max-w-6xl space-y-6">
       <div className="v-card-md">
         <h2 className="v-page-title">Your events</h2>
         <p className="v-caption mt-2">

@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest'
 import {
   validateCustomType,
   validateCustomTypeUpdate,
+  validatePollEvent,
   validatePollAnswers,
 } from '../../src/validators/polling.validator.js'
 
@@ -60,6 +61,37 @@ describe('polling.validator — validateCustomTypeUpdate', () => {
 
   test('rejects an empty label when present', () => {
     expect(() => validateCustomTypeUpdate({ label: '   ' })).toThrow(/label cannot be empty/)
+  })
+})
+
+describe('polling.validator — validatePollEvent expiration', () => {
+  const base = {
+    title: 'Campus poll',
+    startDate: '2026-10-20T09:00:00.000Z',
+    endDate: '2026-10-22T17:00:00.000Z',
+  }
+
+  test('preserves a valid poll expiration in the normalized event payload', () => {
+    expect(validatePollEvent({ ...base, pollExpiresAt: '2026-10-21T12:00:00.000Z' }, true)).toMatchObject({
+      pollExpiresAt: '2026-10-21T12:00:00.000Z',
+    })
+  })
+
+  test('rejects expiration outside provided event dates', () => {
+    expect(() => validatePollEvent({ ...base, pollExpiresAt: '2026-10-20T08:59:00.000Z' }, true))
+      .toThrow(/Poll expiration must be between the start and end dates/)
+    expect(() => validatePollEvent({ ...base, pollExpiresAt: '2026-10-22T17:01:00.000Z' }, true))
+      .toThrow(/Poll expiration must be between the start and end dates/)
+  })
+
+  test('allows clearing an existing expiration', () => {
+    expect(validatePollEvent({ pollExpiresAt: null })).toEqual({ pollExpiresAt: null })
+    expect(validatePollEvent({ pollExpiresAt: '' })).toEqual({ pollExpiresAt: null })
+  })
+
+  test('rejects malformed expiration values', () => {
+    expect(() => validatePollEvent({ pollExpiresAt: 'not-a-date' })).toThrow(/Invalid poll expiration date/)
+    expect(() => validatePollEvent({ pollExpiresAt: 123 })).toThrow(/Invalid poll expiration date/)
   })
 })
 

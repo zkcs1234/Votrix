@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { pageantService } from '@/services/pageant.service'
 import { pageantEventSchemaStep1, isoToLocalInput, localInputToIso } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import DateTimeInput from '@/components/ui/DateTimeInput'
+import CalendarCard from '@/components/ui/CalendarCard'
 import Card from '@/components/ui/Card'
 import { getNextStage, stagePath } from '@/utils/eventStages'
 import SaveStatus from '@/components/ui/SaveStatus'
@@ -362,13 +362,22 @@ useEffect(() => {
   if (loadFailed) return <div role="alert" className="v-card p-5 space-y-3"><p className="v-error-text">{error}</p><Button variant="secondary" onClick={() => setLoadAttempt(value => value + 1)}>Retry loading event</Button></div>
 
   return (
-    <div className="space-y-6">
+    <div data-module="competition-scoring" className="mx-auto max-w-5xl space-y-6">
       <>
-          <EventStepper module="competition" currentKey={step} eventId={isNew ? 'new' : eventId} completedKeys={step === 'type' ? ['details', 'branding'] : step === 'branding' ? ['details'] : []} navigationDisabled={saving} onLocalStageSelect={setStep} />
+          <div className="v-card-sm overflow-hidden p-3 sm:p-4">
+            <EventStepper
+              module="competition"
+              currentKey={step}
+              eventId={isNew ? 'new' : eventId}
+              completedKeys={step === 'type' ? ['details', 'branding'] : step === 'branding' ? ['details'] : []}
+              navigationDisabled={saving}
+              onLocalStageSelect={setStep}
+            />
+          </div>
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="competition" frozen={Boolean(officialRulesId)} />}
 
-          <div className="w-full">
+          <div className="v-card-md">
             <header>
               <h2 className="v-page-title mb-2">
                 {isNew ? 'Create Competition Scoring Event' : readOnly ? 'View Competition Scoring Event' : 'Edit Competition Scoring Event'}
@@ -424,17 +433,23 @@ useEffect(() => {
                   control={control}
                   name="startDate"
                   render={({ field }) => (
-                    <DateTimeInput
+                    <CalendarCard
                       id="startDate"
                       hasError={Boolean(errors.startDate)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       name={field.name}
+                      max={formValues.endDate || undefined}
+                      required
+                      disabled={saving || readOnly}
+                      twoStep
+                      confirmDate
+                      ariaDescribedBy={errors.startDate ? 'startDate-error' : undefined}
                     />
                   )}
                 />
-                {errors.startDate && <p className="v-error-text">{errors.startDate.message}</p>}
+                {errors.startDate && <p id="startDate-error" className="v-error-text">{errors.startDate.message}</p>}
               </div>
 
               <div className="v-form-field">
@@ -445,17 +460,23 @@ useEffect(() => {
                   control={control}
                   name="endDate"
                   render={({ field }) => (
-                    <DateTimeInput
+                    <CalendarCard
                       id="endDate"
                       hasError={Boolean(errors.endDate)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       name={field.name}
+                      min={formValues.startDate || undefined}
+                      required
+                      disabled={saving || readOnly}
+                      twoStep
+                      confirmDate
+                      ariaDescribedBy={errors.endDate ? 'endDate-error' : undefined}
                     />
                   )}
                 />
-                {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
+                {errors.endDate && <p id="endDate-error" className="v-error-text">{errors.endDate.message}</p>}
               </div>
             </div>
           </form>

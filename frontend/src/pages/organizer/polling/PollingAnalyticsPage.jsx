@@ -97,6 +97,7 @@ export default function PollingAnalyticsPage() {
 
   return (
     <AnalyticsLayout
+      moduleLabel="polling"
       title="Poll analytics"
       description="Respondents, response rate, question statistics, and rating distributions."
       fullReportTo={`/organizer/polling/events/${eventId}/report`}

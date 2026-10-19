@@ -8,6 +8,7 @@ import {
 
 export default function DashboardLayout({
   title = 'Dashboard',
+  moduleLabel: moduleLabelOverride,
   showSidebar = true,
   showBackButton = false,
   backButtonPath = '/participant',
@@ -88,7 +89,7 @@ export default function DashboardLayout({
   return (
     <AppShell
       title={title}
-      moduleLabel={role}
+      moduleLabel={moduleLabelOverride ?? role}
       homeLink={home}
       navItems={navItems}
       showSidebar={showSidebar}

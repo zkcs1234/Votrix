@@ -7,6 +7,7 @@ import PageHeader from '@/components/ui/PageHeader'
 import StatCard from '@/components/ui/StatCard'
 import Button from '@/components/ui/Button'
 import EventStatsTable from '@/components/organizer/EventStatsTable'
+import ParticipationSnapshot from '@/components/organizer/ParticipationSnapshot'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 // Reference page for the React Query adoption (Phase B1). The service layer is
@@ -31,7 +32,7 @@ export default function ElectionDashboardPage() {
   if (isLoading) return <PageLoader label="Loading dashboard…" />
 
   return (
-    <div className="space-y-8">
+    <div className="v-dashboard space-y-8">
       <PageHeader
         title="Election dashboard"
         description="Manage events, ballots, and voter turnout."
@@ -58,6 +59,13 @@ export default function ElectionDashboardPage() {
         <StatCard label="Registered voters" value={data?.stats?.registeredVoters ?? 0} hint="Across all events" icon={Users} />
         <StatCard label="Votes recorded" value={data?.stats?.votesCast ?? 0} icon={CheckSquare} />
       </div>
+
+      <ParticipationSnapshot
+        events={data?.eventBreakdown ?? []}
+        module="election"
+        title="Participation by event"
+        description="Highest voter turnout rates across your elections."
+      />
 
       <EventStatsTable
         title="Election Events"

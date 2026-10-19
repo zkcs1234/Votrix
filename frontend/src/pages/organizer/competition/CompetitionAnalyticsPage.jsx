@@ -49,6 +49,7 @@ function LegacyCompetitionAnalyticsPage() {
   if (!hasAny) {
     return (
       <AnalyticsLayout
+        moduleLabel="competition-scoring"
         title="Competition analytics"
         description="Contestants, judges, scoring progress, and published tabulation rankings."
         fullReportTo={`/organizer/competition/events/${eventId}/report`}
@@ -70,6 +71,7 @@ function LegacyCompetitionAnalyticsPage() {
 
   return (
     <AnalyticsLayout
+      moduleLabel="competition-scoring"
       title="Competition analytics"
       description={`Contestants, judges, scoring progress, and ${data.isOfficial ? 'published' : 'live preview'} rankings.`}
       fullReportTo={`/organizer/competition/events/${eventId}/report`}

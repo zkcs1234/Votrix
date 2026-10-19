@@ -116,7 +116,7 @@ function SortableQuestionCard({ question, idx, types, onEdit, onDuplicate, onDel
     <li
       ref={setNodeRef}
       style={style}
-      className="rounded-2xl border border-v-border bg-v-surface p-5"
+      className="v-card-md p-5"
     >
       <div className="flex justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -403,14 +403,16 @@ const handleTypeChange = (typeKey) => {
   }
 
   return (
+    <div data-module="polling" className="mx-auto max-w-7xl">
     <ManagementWorkspace
       title="Poll builder"
+      subtitle="Create, configure, and reorder the questions respondents will answer."
       formPanel={
         setupLocked ? (
           <ReadOnlyEventBanner status={status} noun="poll" />
         ) : (
-        <form key={formKey} onSubmit={handleSubmit} className="v-card p-6 space-y-4 mb-4">
-        <h3 className="text-sm font-medium text-v-text-muted">
+        <form key={formKey} onSubmit={handleSubmit} className="v-card-md mb-4 space-y-4">
+        <h3 className="v-section-title">
           {editingId ? 'Edit question' : 'Add question'}
         </h3>
 
@@ -564,7 +566,7 @@ onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageU
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-v-primary px-5 py-2 text-white hover:bg-v-primary-hover disabled:opacity-60"
+            className="v-btn-primary disabled:opacity-60"
           >
             {editingId ? 'Update' : 'Add question'}
           </button>
@@ -595,7 +597,9 @@ onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageU
               />
             ))}
             {!questions.length && (
-              <p className="text-sm text-v-text-subtle">No questions yet. Add your first question above.</p>
+              <li className="v-card-md text-sm text-v-text-muted">
+                No questions yet. Add your first question above.
+              </li>
             )}
           </ul>
         </SortableContext>
@@ -603,6 +607,6 @@ onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageU
         </div>
       }
     />
+    </div>
   )
 }
-

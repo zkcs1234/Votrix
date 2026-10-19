@@ -51,13 +51,15 @@ export default function ResetPasswordPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <KeyRound className="h-5 w-5 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
-        <h2 className="text-xl font-semibold text-v-text">Set a new password</h2>
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-v-primary-soft text-v-primary">
+          <KeyRound className="h-5 w-5" strokeWidth={1.5} aria-hidden />
+        </span>
+        <h2 className="text-xl font-semibold tracking-tight text-v-text">Set a new password</h2>
       </div>
-      <p className="mt-2 text-sm text-v-text-subtle">Choose a strong password for your account.</p>
+      <p className="mt-2 text-sm leading-relaxed text-v-text-muted">Choose a strong password for your account.</p>
 
-      <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form className="mt-6 space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
         <AuthFormField label="New password" id="newPassword" error={errors.newPassword?.message}>
           <PasswordInput
             id="newPassword"

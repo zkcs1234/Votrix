@@ -44,7 +44,7 @@ const ChartTooltip = memo(function ChartTooltip({
               {/* Color dot */}
               <span
                 className="inline-block h-2 w-2 rounded-full flex-shrink-0"
-                style={{ backgroundColor: entry.color ?? entry.fill ?? '#818cf8' }}
+                style={{ backgroundColor: entry.color ?? entry.fill ?? '#4f46e5' }}
               />
               {entry.name && (
                 <span className="text-v-text-muted">{entry.name}:</span>

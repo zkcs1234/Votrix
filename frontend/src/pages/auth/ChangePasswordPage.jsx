@@ -91,17 +91,19 @@ export default function ChangePasswordPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <Lock className="h-5 w-5 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
-        <h2 className="text-xl font-semibold text-v-text">Change your password</h2>
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-v-primary-soft text-v-primary">
+          <Lock className="h-5 w-5" strokeWidth={1.5} aria-hidden />
+        </span>
+        <h2 className="text-xl font-semibold tracking-tight text-v-text">Change your password</h2>
       </div>
-      <p className="mt-2 text-sm text-v-text-subtle">
+      <p className="mt-2 text-sm leading-relaxed text-v-text-muted">
         {canSkip
           ? 'Set a personal password to secure your account, or continue with your temporary password.'
           : `You must set a new password before accessing your ${role} dashboard.`}
       </p>
 
-      <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form className="mt-6 space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
         <AuthFormField
           label="Current password"
           id="currentPassword"

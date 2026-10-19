@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Settings, Save, ShieldAlert } from 'lucide-react'
+import { Save, ShieldAlert } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
 import Badge from '@/components/ui/Badge'
+import PageHeader from '@/components/ui/PageHeader'
 import ParticipantTaxonomyPanel from '@/components/admin/ParticipantTaxonomyPanel'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -184,18 +185,13 @@ export default function SystemSettingsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <div className="flex items-center gap-2">
-          <Settings className="h-5 w-5 text-v-text-subtle" strokeWidth={1.5} />
-          <h1 className="v-page-title">System settings</h1>
-        </div>
-        <p className="v-caption">
-          Configure platform-wide behavior without changing the database schema.
-        </p>
-      </div>
+      <PageHeader
+        title="System settings"
+        description="Configure platform-wide behavior without changing the database schema."
+      />
 
-      <Card>
-        <form onSubmit={handleSave} className="space-y-6 p-6">
+      <Card padding="sm">
+        <form onSubmit={handleSave} className="space-y-6 p-1 sm:p-2">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="warning">
               <ShieldAlert className="mr-1 h-3 w-3" strokeWidth={2} aria-hidden />
@@ -208,9 +204,9 @@ export default function SystemSettingsPage() {
 
           <div className="space-y-5">
             {settings.map((setting) => (
-              <section key={setting.key} className="rounded-2xl border border-v-border p-4">
-                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                  <div>
+              <section key={setting.key} className="rounded-2xl border border-v-border bg-v-surface p-4 sm:p-5">
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
                     <h2 className="v-section-title">{setting.label}</h2>
                     <p className="v-caption mt-1">{setting.description}</p>
                   </div>

@@ -71,7 +71,7 @@ export default function AdminDashboardPage() {
   // Show skeleton after 300ms
   if (loading || showLoader) {
     return (
-      <div className="space-y-6">
+      <div className="v-dashboard space-y-6">
         <div className="v-card-md">
           <div className="h-8 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
           <div className="mt-2 h-4 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
@@ -127,7 +127,7 @@ export default function AdminDashboardPage() {
   const participantGrowth = analytics?.charts?.participantGrowth ?? analytics?.charts?.voterGrowth ?? []
 
   return (
-    <div className="space-y-6">
+    <div className="v-dashboard space-y-6">
       <PageHeader
         title="Admin dashboard"
         description={`Signed in as ${user?.username ?? 'admin'}`}
@@ -268,7 +268,7 @@ export default function AdminDashboardPage() {
             <div className="mt-3">
               <AreaChartView
                 data={monthlyEvents.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
-                areas={[{ dataKey: 'value', name: 'Events', color: '#818cf8' }]}
+                areas={[{ dataKey: 'value', name: 'Events', color: '#4f46e5' }]}
                 height={220}
                 showLegend={false}
               />
@@ -283,7 +283,7 @@ export default function AdminDashboardPage() {
             <div className="mt-3">
               <AreaChartView
                 data={participantGrowth.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
-                areas={[{ dataKey: 'value', name: 'Participants', color: '#34d399' }]}
+                areas={[{ dataKey: 'value', name: 'Participants', color: '#047857' }]}
                 height={220}
                 showLegend={false}
               />

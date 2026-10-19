@@ -103,6 +103,7 @@ export default function PollingReportPage() {
 
   return (
     <ReportDocument
+      moduleLabel="polling"
       title={report.event.title}
       subtitle="Poll report — response charts"
       generatedAt={report.generatedAt}

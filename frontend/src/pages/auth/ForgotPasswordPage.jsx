@@ -40,15 +40,17 @@ export default function ForgotPasswordPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <Mail className="h-5 w-5 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
-        <h2 className="text-xl font-semibold text-v-text">Forgot password</h2>
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-v-primary-soft text-v-primary">
+          <Mail className="h-5 w-5" strokeWidth={1.5} aria-hidden />
+        </span>
+        <h2 className="text-xl font-semibold tracking-tight text-v-text">Forgot password</h2>
       </div>
-      <p className="mt-2 text-sm text-v-text-subtle">
+      <p className="mt-2 text-sm leading-relaxed text-v-text-muted">
         Enter your email and we will send a reset link if an account exists.
       </p>
 
-      <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form className="mt-6 space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
         <AuthFormField label="Email" id="email" error={errors.email?.message}>
           <div className="relative">
             <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v-text-subtle" strokeWidth={1.5} aria-hidden />

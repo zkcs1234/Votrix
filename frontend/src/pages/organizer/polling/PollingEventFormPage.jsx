@@ -10,7 +10,7 @@ import {
   localInputToIso,
 } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import DateTimeInput from '@/components/ui/DateTimeInput'
+import CalendarCard from '@/components/ui/CalendarCard'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { getNextStage, stagePath } from '@/utils/eventStages'
@@ -77,6 +77,7 @@ const { eventId } = useParams()
       description: '',
       startDate: '',
       endDate: '',
+      pollExpiresAt: null,
       pollAnonymous: false,
       pollAllowMultipleSubmissions: false,
     },
@@ -105,6 +106,7 @@ const { eventId } = useParams()
     description: data.description,
     startDate: data.startDate,
     endDate: data.endDate,
+    pollExpiresAt: data.pollExpiresAt,
     pollAnonymous: data.pollAnonymous,
     pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
     banner: currentBanner,
@@ -112,6 +114,7 @@ const { eventId } = useParams()
       ...data,
       startDate: data.startDate,
       endDate: data.endDate,
+      pollExpiresAt: data.pollExpiresAt,
       pollAnonymous: data.pollAnonymous,
       pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
     },
@@ -137,6 +140,7 @@ useEffect(() => {
       description: '',
       startDate: '',
       endDate: '',
+      pollExpiresAt: null,
       pollAnonymous: false,
       pollAllowMultipleSubmissions: false,
     })
@@ -157,6 +161,7 @@ useEffect(() => {
       description: payload.description ?? '',
       startDate: payload.startDate ?? '',
       endDate: payload.endDate ?? '',
+      pollExpiresAt: payload.pollExpiresAt ?? null,
       pollAnonymous: payload.pollAnonymous ?? false,
       pollAllowMultipleSubmissions: payload.pollAllowMultipleSubmissions ?? false,
     })
@@ -193,6 +198,7 @@ useEffect(() => {
           description: e.description || '',
           startDate: isoToLocalInput(e.startDate),
           endDate: isoToLocalInput(e.endDate),
+          pollExpiresAt: isoToLocalInput(e.pollExpiresAt),
           pollAnonymous: e.pollAnonymous || false,
           pollAllowMultipleSubmissions: e.pollAllowMultipleSubmissions || false,
         })
@@ -269,6 +275,7 @@ useEffect(() => {
     try {
       const data = getValues()
       const isValid = await trigger([
+        'pollExpiresAt',
         'pollAnonymous',
         'pollAllowMultipleSubmissions',
       ])
@@ -318,6 +325,7 @@ useEffect(() => {
       description: data.description,
       startDate: localInputToIso(data.startDate),
       endDate: localInputToIso(data.endDate),
+      pollExpiresAt: localInputToIso(data.pollExpiresAt),
       pollAnonymous: data.pollAnonymous || false,
       pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions || false,
     }
@@ -371,20 +379,32 @@ useEffect(() => {
   if (loading) return <p className="v-caption">Loading...</p>
 
   return (
-    <div className="space-y-6">
+    <div data-module="polling" className="mx-auto max-w-5xl space-y-6">
       <>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-v-text-subtle" aria-label="Event steps">
+          <div className="v-card-sm flex flex-wrap items-center gap-2 p-3" aria-label="Event steps">
             {["details","branding","settings"].map((key, index) => (
-              <span key={key} aria-current={step === key ? 'step' : undefined} className={step === key ? 'font-medium text-v-primary' : ''}>
-                {index > 0 && <span aria-hidden="true"> → </span>}
-                Step {index + 1}: {key[0].toUpperCase() + key.slice(1)}
+              <span
+                key={key}
+                aria-current={step === key ? 'step' : undefined}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
+                  step === key
+                    ? 'border-v-primary/30 bg-v-primary-soft font-semibold text-v-primary'
+                    : 'border-v-border bg-v-surface text-v-text-muted'
+                }`}
+              >
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                  step === key ? 'bg-v-primary text-white' : 'bg-v-surface-elevated text-v-text-subtle'
+                }`}>
+                  {index + 1}
+                </span>
+                {key[0].toUpperCase() + key.slice(1)}
               </span>
             ))}
           </div>
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="poll" />}
 
-          <div className="w-full">
+          <div className="v-card-md">
             <header>
               <h2 className="v-page-title mb-2">
                 {isNew ? 'Create poll' : 'Poll settings'}
@@ -437,17 +457,23 @@ useEffect(() => {
                   control={control}
                   name="startDate"
                   render={({ field }) => (
-                    <DateTimeInput
+                    <CalendarCard
                       id="startDate"
                       hasError={Boolean(errors.startDate)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       name={field.name}
+                      max={formValues.endDate || undefined}
+                      required
+                      disabled={saving || readOnly}
+                      twoStep
+                      confirmDate
+                      ariaDescribedBy={errors.startDate ? 'startDate-error' : undefined}
                     />
                   )}
                 />
-                {errors.startDate && <p className="v-error-text">{errors.startDate.message}</p>}
+                {errors.startDate && <p id="startDate-error" className="v-error-text">{errors.startDate.message}</p>}
               </div>
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="endDate">
@@ -457,19 +483,26 @@ useEffect(() => {
                   control={control}
                   name="endDate"
                   render={({ field }) => (
-                    <DateTimeInput
+                    <CalendarCard
                       id="endDate"
                       hasError={Boolean(errors.endDate)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       name={field.name}
+                      min={formValues.startDate || undefined}
+                      required
+                      disabled={saving || readOnly}
+                      twoStep
+                      confirmDate
+                      ariaDescribedBy={errors.endDate ? 'endDate-error' : undefined}
                     />
                   )}
                 />
-                {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
+                {errors.endDate && <p id="endDate-error" className="v-error-text">{errors.endDate.message}</p>}
               </div>
             </div>
+            {error && <p className="v-error-text">{error}</p>}
           </form>
         )}
 
@@ -510,6 +543,34 @@ useEffect(() => {
                 <span>Allow multiple submissions</span>
               </label>
               <p className="v-caption -mt-2 pl-7">Allow respondents to submit more than once</p>
+            </div>
+
+            <div className="v-form-field">
+              <label className={LABEL_CLASS} htmlFor="pollExpiresAt">
+                Poll expiration date and time (optional)
+              </label>
+              <Controller
+                control={control}
+                name="pollExpiresAt"
+                render={({ field }) => (
+                  <CalendarCard
+                    id="pollExpiresAt"
+                    hasError={Boolean(errors.pollExpiresAt)}
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    min={formValues.startDate || undefined}
+                    max={formValues.endDate || undefined}
+                    disabled={saving || readOnly}
+                    twoStep
+                    confirmDate
+                    ariaDescribedBy={errors.pollExpiresAt ? 'pollExpiresAt-error' : undefined}
+                  />
+                )}
+              />
+              {errors.pollExpiresAt && <p id="pollExpiresAt-error" className="v-error-text">{errors.pollExpiresAt.message}</p>}
+              <p className="v-caption">If set, the poll closes at this time, within its scheduled start and end window. Clear to use only the event end date.</p>
             </div>
 
             {error && <p className="v-error-text">{error}</p>}

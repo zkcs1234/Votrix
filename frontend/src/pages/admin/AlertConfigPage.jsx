@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import PageHeader from '@/components/ui/PageHeader'
 import { useToast } from '@/hooks/useToast'
 
 const ALERT_LABELS = {
@@ -55,18 +56,18 @@ export default function AlertConfigPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="v-page-title">Alert Configuration</h1>
-        <p className="v-caption">Configure which system events trigger admin alerts.</p>
-      </div>
+      <PageHeader
+        title="Alert Configuration"
+        description="Configure which system events trigger admin alerts."
+      />
 
       <Card>
         <div className="divide-y divide-v-border">
           {config && Object.entries(ALERT_LABELS).map(([key, meta]) => {
             const alertCfg = config[key] ?? { enabled: false }
             return (
-              <div key={key} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
-                <div className="flex-1">
+              <div key={key} className="flex flex-col gap-4 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1">
                   <p className="font-medium text-v-text">{meta.label}</p>
                   <p className="mt-1 text-sm text-v-text-muted">{meta.description}</p>
                   {meta.hasThreshold && alertCfg.enabled && (

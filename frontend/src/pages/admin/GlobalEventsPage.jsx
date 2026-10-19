@@ -8,6 +8,7 @@ import SearchInput from '@/components/ui/SearchInput'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import StatCard from '@/components/ui/StatCard'
+import PageHeader from '@/components/ui/PageHeader'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { INPUT_CLASS } from '@/utils/uiClasses'
@@ -23,6 +24,13 @@ function eventTypeLabel(eventType) {
   if (eventType === 'election') return 'Election'
   if (eventType === 'polling') return 'Polling'
   return eventType?.replace(/_/g, ' ') || 'Unknown'
+}
+
+function eventModule(eventType) {
+  if (eventType === 'election') return 'election'
+  if (eventType === 'competition_scoring' || eventType === 'pageant') return 'competition-scoring'
+  if (eventType === 'polling') return 'polling'
+  return undefined
 }
 
 export default function GlobalEventsPage() {
@@ -177,20 +185,18 @@ export default function GlobalEventsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="v-page-title">Global events</h1>
-          <p className="v-caption">
-            Monitor all elections, competitions, and polls across the platform.
-          </p>
-        </div>
-        <Button size="sm" variant="secondary" onClick={handleExport} loading={exporting}>
-          <Download className="h-4 w-4" strokeWidth={1.5} />
-          Export CSV
-        </Button>
-      </div>
+      <PageHeader
+        title="Global events"
+        description="Monitor all elections, competitions, and polls across the platform."
+        actions={
+          <Button size="sm" variant="secondary" onClick={handleExport} loading={exporting}>
+            <Download className="h-4 w-4" strokeWidth={1.5} />
+            Export CSV
+          </Button>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total events" value={stats.total} icon={CalendarDays} />
         <StatCard label="Active" value={stats.active} icon={Zap} />
         <StatCard label="Scheduled" value={stats.scheduled} icon={Clock} />
@@ -198,7 +204,7 @@ export default function GlobalEventsPage() {
         <StatCard label="Archived" value={stats.archived} icon={Archive} />
       </div>
 
-      <Card>
+      <Card padding="sm">
         {error ? (
           <div className="p-8 text-center text-v-danger">{error}</div>
         ) : (
@@ -255,8 +261,8 @@ export default function GlobalEventsPage() {
                 No events match your current filters.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="v-table">
+              <div className="overflow-x-auto rounded-xl border border-v-border">
+                <table className="v-table min-w-[900px]">
                   <thead>
                     <tr>
                       <th>Title</th>
@@ -272,14 +278,16 @@ export default function GlobalEventsPage() {
                       <tr key={event.id} className="hover:bg-v-surface-elevated/50">
                         <td className="font-medium text-v-text">{event.title}</td>
                         <td className="capitalize">
-                          <Badge>
-                            <span className="inline-flex items-center gap-1.5">
+                          <span data-module={eventModule(event.event_type)}>
+                            <Badge className="border-v-primary/20 bg-v-primary-soft text-v-primary">
+                              <span className="inline-flex items-center gap-1.5">
                               {event.event_type === 'election' && <Vote className="h-3 w-3" strokeWidth={2} />}
                               {(event.event_type === 'competition_scoring' || event.event_type === 'pageant') && <Trophy className="h-3 w-3" strokeWidth={2} />}
                               {event.event_type === 'polling' && <BarChart2 className="h-3 w-3" strokeWidth={2} />}
                               {eventTypeLabel(event.event_type)}
-                            </span>
-                          </Badge>
+                              </span>
+                            </Badge>
+                          </span>
                         </td>
                         <td>{event.organizations?.organization_name || 'N/A'}</td>
                         <td className="capitalize">

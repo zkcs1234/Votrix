@@ -8,6 +8,7 @@ import Badge from '@/components/ui/Badge'
 import FormAlert from '@/components/ui/FormAlert'
 import SearchInput from '@/components/ui/SearchInput'
 import StatCard from '@/components/ui/StatCard'
+import PageHeader from '@/components/ui/PageHeader'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
@@ -366,14 +367,11 @@ export default function JudgesPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="v-page-title">Competition Judges</h1>
-          <p className="v-caption">
-            Register competition judges. Organizers pick them from this pool when setting up a competition.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <PageHeader
+        title="Competition Judges"
+        description="Register competition judges. Organizers pick them from this pool when setting up a competition."
+        actions={
+          <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={downloadTemplate}>
             <Download className="h-4 w-4" strokeWidth={1.5} /> Template
           </Button>
@@ -387,16 +385,17 @@ export default function JudgesPanel() {
           <Button onClick={() => setModal({ mode: 'add' })}>
             <UserPlus className="h-4 w-4" strokeWidth={2} /> Add participant
           </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard label="Competition Judges (this view)" value={total} icon={Trophy} />
         <StatCard label="Active" value={summary.active} icon={UserCheck} />
         <StatCard label="Suspended" value={summary.suspended} icon={ShieldOff} />
       </div>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div className="grid gap-3 sm:grid-cols-2 lg:flex lg:items-center">
         <SearchInput
           placeholder="Search name or email"
           value={search}
@@ -426,7 +425,7 @@ export default function JudgesPanel() {
           </div>
         ) : (
           <div className="v-table-wrap">
-            <table className="v-table">
+            <table className="v-table min-w-[760px]">
               <thead>
                 <tr>
                   <th>Name</th><th>Email</th><th>Expertise</th><th>Status</th><th className="text-right">Actions</th>

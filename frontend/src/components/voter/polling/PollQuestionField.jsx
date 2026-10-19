@@ -7,13 +7,13 @@ export default function PollQuestionField({ question, index, value, onChange, di
   const input = def?.ui?.input ?? 'unknown'
 
   return (
-    <fieldset className="v-card p-6 border-0">
+    <fieldset className="v-card space-y-1 border border-v-border p-5 shadow-v-shadow-sm sm:p-6">
       <legend className="sr-only">
         Question {index + 1}: {q.question}
         {q.required ? ' (required)' : ''}
       </legend>
       <div className="flex flex-wrap justify-between gap-2">
-        <p className="font-medium text-v-text">
+        <p className="font-semibold leading-6 text-v-text">
           {index + 1}. {q.question}
           {q.required && <span className="text-v-danger"> *</span>}
         </p>
@@ -118,9 +118,9 @@ function RadioInput({ options, value, onChange, disabled, required, questionLabe
           key={o.id}
           className={`mt-3 flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${
             value === o.id
-              ? 'border-v-text-muted bg-v-surface-elevated'
-              : 'border-v-border-strong hover:border-v-border-strong'
-          }`}
+              ? 'border-v-primary bg-v-primary-soft'
+              : 'border-v-border-strong bg-v-surface hover:border-v-primary/60'
+          } transition-colors`}
         >
           <input
             type="radio"
@@ -152,9 +152,9 @@ function CheckboxInput({ options, value, onChange, disabled, questionLabel }) {
           key={o.id}
           className={`mt-3 flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${
             value.includes(o.id)
-              ? 'border-v-text-muted bg-v-surface-elevated'
-              : 'border-v-border-strong hover:border-v-border-strong'
-          }`}
+              ? 'border-v-primary bg-v-primary-soft'
+              : 'border-v-border-strong bg-v-surface hover:border-v-primary/60'
+          } transition-colors`}
         >
           <input
             type="checkbox"
@@ -292,4 +292,3 @@ function RankingInput({ options, value, onChange, disabled, questionLabel }) {
     </ol>
   )
 }
-

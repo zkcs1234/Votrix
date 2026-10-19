@@ -96,6 +96,7 @@ function LegacyCompetitionReportPage() {
 
   return (
     <ReportDocument
+      moduleLabel="competition-scoring"
       title={report.event.title}
       subtitle="Competition Scoring report — rankings & judge turnout"
       generatedAt={report.generatedAt}

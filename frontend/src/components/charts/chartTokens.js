@@ -29,18 +29,17 @@ export const CHART_COLORS = [
  * (e.g. Cell fill — CSS vars don't resolve inside SVG fill attributes
  * in some browsers). These must stay in sync with index.css tokens.
  *
- * Light  ↔  Dark values — we pick the dark variant as a safe default
- * since Recharts renders on a dark-ish surface.
+ * Concrete light-theme values with enough contrast on white chart surfaces.
  */
 export const CHART_COLORS_HEX = {
-  primary:  '#818cf8', // --v-primary (dark)
-  success:  '#34d399', // --v-success  (dark)
-  warning:  '#fbbf24', // --v-warning  (dark)
-  danger:   '#f87171', // --v-danger   (dark)
-  violet:   '#8b5cf6',
-  pink:     '#ec4899',
-  cyan:     '#06b6d4',
-  lime:     '#84cc16',
+  primary:  '#4f46e5',
+  success:  '#047857',
+  warning:  '#92400e',
+  danger:   '#b91c1c',
+  violet:   '#6d28d9',
+  pink:     '#be185d',
+  cyan:     '#0e7490',
+  lime:     '#4d7c0f',
 }
 
 /**

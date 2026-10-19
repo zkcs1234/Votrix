@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { electionService } from '@/services/election.service'
 import { electionEventSchemaStep1, isoToLocalInput, localInputToIso } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import DateTimeInput from '@/components/ui/DateTimeInput'
+import CalendarCard from '@/components/ui/CalendarCard'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { getNextStage, stagePath } from '@/utils/eventStages'
@@ -346,20 +346,32 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
   if (loading) return <p className="v-caption">Loading...</p>
 
   return (
-    <div className="space-y-6">
+    <div data-module="election" className="mx-auto max-w-5xl space-y-6">
       <>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-v-text-subtle" aria-label="Event steps">
+          <div className="v-card-sm flex flex-wrap items-center gap-2 p-3" aria-label="Event steps">
             {["details","branding"].map((key, index) => (
-              <span key={key} aria-current={step === key ? 'step' : undefined} className={step === key ? 'font-medium text-v-primary' : ''}>
-                {index > 0 && <span aria-hidden="true"> → </span>}
-                Step {index + 1}: {key[0].toUpperCase() + key.slice(1)}
+              <span
+                key={key}
+                aria-current={step === key ? 'step' : undefined}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
+                  step === key
+                    ? 'border-v-primary/30 bg-v-primary-soft font-semibold text-v-primary'
+                    : 'border-v-border bg-v-surface text-v-text-muted'
+                }`}
+              >
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                  step === key ? 'bg-v-primary text-white' : 'bg-v-surface-elevated text-v-text-subtle'
+                }`}>
+                  {index + 1}
+                </span>
+                {key[0].toUpperCase() + key.slice(1)}
               </span>
             ))}
           </div>
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="election" />}
 
-          <div className="w-full">
+          <div className="v-card-md">
             <header>
               <h2 className="v-page-title mb-2">{isNew ? 'Create election event' : readOnly ? 'View election event' : 'Edit election event'}</h2>
               <p className="v-helper-text">
@@ -411,17 +423,23 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                   control={control}
                   name="startDate"
                   render={({ field }) => (
-                    <DateTimeInput
+                    <CalendarCard
                       id="startDate"
                       hasError={Boolean(errors.startDate)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       name={field.name}
+                      max={formValues.endDate || undefined}
+                      required
+                      disabled={saving || readOnly}
+                      twoStep
+                      confirmDate
+                      ariaDescribedBy={errors.startDate ? 'startDate-error' : undefined}
                     />
                   )}
                 />
-                {errors.startDate && <p className="v-error-text">{errors.startDate.message}</p>}
+                {errors.startDate && <p id="startDate-error" className="v-error-text">{errors.startDate.message}</p>}
               </div>
 
               <div className="v-form-field">
@@ -432,18 +450,23 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                   control={control}
                   name="endDate"
                   render={({ field }) => (
-                    <DateTimeInput
+                    <CalendarCard
                       id="endDate"
-                      showShortcuts={false}
                       hasError={Boolean(errors.endDate)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       name={field.name}
+                      min={formValues.startDate || undefined}
+                      required
+                      disabled={saving || readOnly}
+                      twoStep
+                      confirmDate
+                      ariaDescribedBy={errors.endDate ? 'endDate-error' : undefined}
                     />
                   )}
                 />
-                {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
+                {errors.endDate && <p id="endDate-error" className="v-error-text">{errors.endDate.message}</p>}
               </div>
             </div>
 

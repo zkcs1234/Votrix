@@ -113,6 +113,7 @@ export default function ElectionReportPage() {
 
   return (
     <ReportDocument
+      moduleLabel="election"
       title={report.event.title}
       subtitle="Election report — turnout & vote summary"
       generatedAt={report.generatedAt}

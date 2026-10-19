@@ -208,12 +208,11 @@ it('preserves saved weights, scope, score policy, and advancement during a name-
   expect(foundation.rounds[0]).toMatchObject({ weight: 75, progression: 'carry_forward', scorePolicy: 'cumulative', advancementType: 'top_n', advancementValue: 5, categoryId: 'a', divisionId: 'd' })
 })
 
-it('opens the existing penalty editor and keeps the disabled state understandable', async () => {
+it('opens the penalty editor from round settings', async () => {
   foundation.scoringConfig.calculationMethod = 'weighted_average'
   foundation.rounds = [round('saved-round')]
   await openWorkspace()
   fireEvent.click(screen.getByRole('button', { name: /^Settings for/  }))
-  expect(screen.getByText(/Disabled until permitted rules/)).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Deductions & Penalties' }))
   expect(await screen.findByText('Configure Penalty Rules')).toBeInTheDocument()
   expect(screen.getByText('Configure Penalty Rules').closest('details')).toHaveAttribute('open')

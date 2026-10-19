@@ -111,7 +111,7 @@ export default function OrganizerDashboardPage() {
   // Show skeleton after 300ms
   if (loading || showLoader) {
     return (
-      <div className="space-y-6">
+      <div className="v-dashboard space-y-6">
         <div className="v-card-md">
           <div className="h-8 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
           <div className="mt-2 h-4 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
@@ -156,7 +156,7 @@ export default function OrganizerDashboardPage() {
   const participation = analytics?.charts?.eventParticipation ?? []
 
   return (
-    <div className="space-y-6">
+    <div className="v-dashboard space-y-6">
       {/* Live competition session banner */}
       {activeSessions.length > 0 && (
         <div className="rounded-xl border border-v-primary/40 bg-v-primary-soft p-4 shadow-v-shadow">
@@ -251,7 +251,7 @@ export default function OrganizerDashboardPage() {
 
       <div className="grid gap-5 md:grid-cols-3">
         {/* Election Module Card */}
-        <div className="v-module-card">
+        <div className="v-module-card" data-module="election">
           <div className="v-module-card__illustration bg-vote-gradient">
             <img
               src={ElectionSVG}
@@ -275,7 +275,7 @@ export default function OrganizerDashboardPage() {
         </div>
 
         {/* Competition Scoring Module Card */}
-        <div className="v-module-card">
+        <div className="v-module-card" data-module="competition-scoring">
           <div className="v-module-card__illustration bg-comp-gradient">
             <img
               src={CompetitionSVG}
@@ -299,7 +299,7 @@ export default function OrganizerDashboardPage() {
         </div>
 
         {/* Polling Module Card */}
-        <div className="v-module-card">
+        <div className="v-module-card" data-module="polling">
           <div className="v-module-card__illustration bg-poll-gradient">
             <img
               src={PollingSVG}
@@ -363,7 +363,7 @@ export default function OrganizerDashboardPage() {
             <div className="mt-3">
               <AreaChartView
                 data={monthlyEvents.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
-                areas={[{ dataKey: 'value', name: 'Events', color: '#818cf8' }]}
+                areas={[{ dataKey: 'value', name: 'Events', color: '#4f46e5' }]}
                 height={180}
                 showLegend={false}
               />

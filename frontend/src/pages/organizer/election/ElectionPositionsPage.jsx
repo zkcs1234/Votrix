@@ -243,8 +243,10 @@ export default function ElectionPositionsPage() {
   }
 
   return (
+    <div data-module="election" className="mx-auto max-w-7xl">
     <ManagementWorkspace
       title="Position Builder"
+      subtitle="Organize ballot groups, add positions, and control who is eligible for each position."
       formPanel={
         <div className="space-y-4">
           <div className="v-card space-y-3 p-4">
@@ -524,5 +526,6 @@ export default function ElectionPositionsPage() {
       </ul>
       }
     />
+    </div>
   )
 }

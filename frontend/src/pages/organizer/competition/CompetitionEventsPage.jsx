@@ -5,6 +5,7 @@ import { pageantService } from '@/services/pageant.service'
 import { isReadOnlyEventStatus, isSetupLocked } from '@/utils/constants'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
 import useCompetitionSync from '@/hooks/useCompetitionSync'
 import useLatestRequest from '@/hooks/useLatestRequest'
 import { getErrorMessage } from '@/utils/getErrorMessage'
@@ -184,16 +185,16 @@ export default function CompetitionEventsPage() {
         />
       )}
 
-      <div className="flex justify-between">
-        <h2 className="text-xl font-semibold text-v-text">Competition Scoring events</h2>
-        <Link
-          to="/organizer/competition/events/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2} />
-New event
-        </Link>
-      </div>
+      <PageHeader
+        title="Competition Scoring events"
+        description="Manage competitions, preview judging criteria, and monitor live events."
+        actions={
+          <Link to="/organizer/competition/events/new" className="v-btn-primary">
+            <Plus className="h-4 w-4" strokeWidth={2} />
+            New event
+          </Link>
+        }
+      />
 
       {hasDraft && (
         <DraftBanner
@@ -204,17 +205,22 @@ New event
         />
       )}
       {error && <div role="alert" className="v-card p-4 space-y-2"><p className="v-error-text">{error}</p><Button variant="secondary" onClick={load}>Retry loading competitions</Button></div>}
-      {!error && events.length === 0 && <p className="v-caption">No competitions yet. Create an event to begin setup.</p>}
+      {!error && events.length === 0 && (
+        <div className="v-card-md">
+          <p className="font-semibold text-v-text">No competitions yet.</p>
+          <p className="mt-1 text-sm text-v-text-muted">Create an event to begin setup.</p>
+        </div>
+      )}
 
       {events.map((event) => (
-        <div
+        <article
           key={event.id}
-          className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-border bg-v-surface p-5"
+          className="v-card-md flex min-w-0 flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center"
         >
-          <div>
+          <div className="min-w-0">
             <Link
               to={`/organizer/competition/events/${event.id}/${event.status === 'draft' ? 'workspace' : isReadOnlyEventStatus(event.status) ? 'rankings' : 'live'}`}
-              className="text-lg font-medium text-v-text hover:text-v-text"
+              className="break-words text-lg font-semibold text-v-text hover:text-v-primary"
             >
               {event.title}
             </Link>
@@ -222,11 +228,11 @@ New event
               {event.status === 'draft' ? 'Setup — not published' : event.status}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
             <button
               type="button"
               onClick={() => setPreviewEventId(event.id)}
-              className="inline-flex items-center gap-1 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated"
+              className="v-btn-secondary"
             >
               <Eye className="h-3.5 w-3.5" strokeWidth={2} />
               Preview
@@ -234,21 +240,21 @@ New event
             {event.status === 'draft' ? (
               <Link
                 to={`/organizer/competition/events/${event.id}/workspace`}
-                className="rounded-lg border border-v-primary bg-v-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-v-primary-hover"
+                className="v-btn-primary"
               >
                 Continue setup
               </Link>
             ) : isReadOnlyEventStatus(event.status) ? null : (
               <Link
                 to={`/organizer/competition/events/${event.id}/live`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-800 bg-emerald-950/30 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-950/50"
+                className="v-btn-secondary text-v-success"
               >
                 Live Control
               </Link>
             )}
             <Link
               to={`/organizer/competition/events/${event.id}/edit`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
+              className="v-btn-secondary"
             >
               {isSetupLocked(event.status) ? (
                 <>
@@ -263,7 +269,7 @@ New event
               )}
             </Link>
           </div>
-        </div>
+        </article>
       ))}
     </div>
   )

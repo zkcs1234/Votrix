@@ -18,11 +18,11 @@ export default function LoginForm({
   showForgot = false,
 }) {
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full">
       <h2 className="v-page-title">{title}</h2>
       <p className="v-caption mt-2 leading-relaxed">{description}</p>
 
-      <Card padding="md" className="mt-6">
+      <Card padding="md" className="mt-6 border-v-border/80 bg-v-surface shadow-sm">
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
           <AuthFormField label="Email" id="email" error={errors.email?.message}>
             <div className="relative">

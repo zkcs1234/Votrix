@@ -5,6 +5,7 @@ import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
+import PageHeader from '@/components/ui/PageHeader'
 
 const SERVICE_ICONS = {
   database: Database,
@@ -46,16 +47,16 @@ export default function HealthDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="v-page-title">System Health</h1>
-          <p className="v-caption">Live status of platform services.</p>
-        </div>
-        <Button size="sm" variant="secondary" onClick={fetchHealth} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={2} />
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        title="System Health"
+        description="Live status of platform services."
+        actions={
+          <Button size="sm" variant="secondary" onClick={fetchHealth} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={2} />
+            Refresh
+          </Button>
+        }
+      />
 
       {error && (
         <FormAlert variant="error">{error}</FormAlert>
@@ -72,7 +73,7 @@ export default function HealthDashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {loading && !health
           ? Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-28 animate-pulse rounded-xl bg-v-surface-elevated" />

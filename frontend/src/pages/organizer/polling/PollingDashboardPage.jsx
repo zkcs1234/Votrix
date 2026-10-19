@@ -6,6 +6,7 @@ import StatCard from '@/components/ui/StatCard'
 import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
 import EventStatsTable from '@/components/organizer/EventStatsTable'
+import ParticipationSnapshot from '@/components/organizer/ParticipationSnapshot'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
@@ -31,7 +32,7 @@ export default function PollingDashboardPage() {
   // Show skeleton after 300ms
   if (isLoading || showLoader) {
     return (
-      <div className="space-y-6">
+      <div className="v-dashboard space-y-6">
         <div className="h-8 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -43,7 +44,7 @@ export default function PollingDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="v-dashboard space-y-6">
       <PageHeader
         title="Polling dashboard"
         description="Manage surveys, configure polls, and track responses."
@@ -63,6 +64,13 @@ export default function PollingDashboardPage() {
         <StatCard label="Active polls" value={data?.stats?.activePolls ?? 0} icon={Zap} />
         <StatCard label="Responses submitted" value={data?.stats?.responsesSubmitted ?? 0} icon={Send} />
       </div>
+
+      <ParticipationSnapshot
+        events={data?.eventBreakdown ?? []}
+        module="polling"
+        title="Participation by poll"
+        description="Highest respondent participation rates across your polls."
+      />
 
       <EventStatsTable
         title="Participation by poll"
