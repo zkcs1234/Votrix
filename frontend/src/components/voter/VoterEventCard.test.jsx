@@ -18,7 +18,10 @@ test('renders one native event card with direct links for each category and roun
  }
  render(<MemoryRouter><VoterEventCard event={event}/></MemoryRouter>)
  expect(screen.getByRole('heading',{name:event.title})).toBeInTheDocument()
+ expect(screen.getByRole('status')).toHaveTextContent('Waiting to open')
+ expect(screen.getByRole('status').querySelector('svg')).toHaveAttribute('aria-hidden','true')
  const nav=screen.getByRole('navigation',{name:`Categories for ${event.title}`})
- expect(within(nav).getByRole('link',{name:/Hip-Hop \(Final\).*Waiting to open/})).toHaveAttribute('href','/participant/competition/events/event-1/score?competitionId=hip-hop&roundId=final')
- expect(within(nav).getByRole('link',{name:/Street Dance \(Final\).*Waiting to open/})).toHaveAttribute('href','/participant/competition/events/event-1/score?competitionId=street-dance&roundId=final-2')
+ expect(within(nav).getByRole('link',{name:'Hip-Hop (Final)'})).toHaveAttribute('href','/participant/competition/events/event-1/score?competitionId=hip-hop&roundId=final')
+ expect(within(nav).getByRole('link',{name:'Street Dance (Final)'})).toHaveAttribute('href','/participant/competition/events/event-1/score?competitionId=street-dance&roundId=final-2')
+ expect(within(nav).queryByText('Waiting to open')).not.toBeInTheDocument()
 })

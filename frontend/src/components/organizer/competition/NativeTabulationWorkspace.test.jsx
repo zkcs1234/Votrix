@@ -1,6 +1,6 @@
 import {act,fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import {beforeEach,expect,test,vi} from 'vitest'
-import {MemoryRouter, Routes, Route, useParams} from 'react-router-dom'
+import {MemoryRouter, Routes, Route, useParams, useLocation} from 'react-router-dom'
 const f=vi.hoisted(()=>({snapshot:vi.fn(),calculate:vi.fn(),transition:vi.fn(),appoint:vi.fn(),qualification:vi.fn(),deduction:vi.fn(),export:vi.fn(),owned:vi.fn(),downloadCsv:vi.fn(),downloadExcel:vi.fn(),downloadPdf:vi.fn(),downloadBlob:vi.fn(),listeners:new Map()}))
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'owner'}})}))
 vi.mock('@/services/competition-native-tabulation.service',()=>({nativeTabulationService:{snapshot:f.snapshot,calculate:f.calculate,transition:f.transition,appoint:f.appoint,qualification:f.qualification,deduction:f.deduction}}))
@@ -115,6 +115,22 @@ test('matrix has one row per contestant and offers exports without repeating per
  expect(screen.queryByRole('table',{name:/original judge scores by configured criterion/})).not.toBeInTheDocument()
  exportEntry('Dancer a')
  expect(f.downloadCsv).toHaveBeenCalledWith('competition-entry-1.csv',expect.arrayContaining([expect.objectContaining({'Record type':'Original scores','Technique (100%) \u00b7 Skill [0\u201310]':'8','Calculated judge total':80})]))
+})
+test('Pageant division winners are not reported as an event-wide tie and exports identify the division',async()=>{
+ const scope={mode:'division',divisions:[{id:'men',name:'MEN'},{id:'women',name:'WOMEN'}],entries:[{entryId:'entry-a',divisionId:'men'},{entryId:'woman-a',divisionId:'women'}]}
+ states.a.divisionRanking=scope;states.a.calculation.output_snapshot.divisionRanking=scope
+ Object.assign(states.a.entries[0],{divisionId:'men',divisionName:'MEN'})
+ Object.assign(states.a.calculation.output_snapshot.results[0],{divisionId:'men',divisionName:'MEN'})
+ states.a.entries.push({id:'woman-a',name:'Woman winner',contestantNumber:1,divisionId:'women',divisionName:'WOMEN'})
+ states.a.session.entry_ids.push('woman-a')
+ states.a.calculation.output_snapshot.results.push({contestantId:'woman-a',divisionId:'women',divisionName:'WOMEN',rank:1,baseScore:80,finalScore:80})
+ await renderReady()
+ exportEntry('Dancer a')
+ expect(f.downloadCsv).toHaveBeenCalledWith('competition-entry-men-1.csv',expect.arrayContaining([expect.objectContaining({Division:'MEN'})]))
+ openStage('Ranking & Tie Rules')
+ expect(screen.getByRole('heading',{name:'Division rankings and tie rules'})).toBeInTheDocument()
+ expect(screen.queryByRole('heading',{name:'Tied placements'})).not.toBeInTheDocument()
+ expect(screen.getAllByRole('table')).toHaveLength(2)
 })
 
 test('deduction controls and calculation prerequisites are absent when no selected-round rule is configured',async()=>{
@@ -237,16 +253,93 @@ test('qualification review preserves automatic cutoff selection and confirmation
  states.a.roundId='pre';states.a.calculation.finalized=true;states.a.rules.configuration_snapshot.rounds=[{id:'pre',displayOrder:0,advancementType:'top_n',advancementValue:1},{id:'special',displayOrder:1,purpose:'special'},{id:'final',displayOrder:2}]
  f.qualification.mockResolvedValue({data:{automatic:['entry-a','entry-b'],policy:'top_n',fromRound:'pre',toRound:'final',standings:[{contestantId:'entry-a',rank:1},{contestantId:'entry-b',rank:1}]}})
  states.a.calculation.output_snapshot.results.push({contestantId:'entry-b',rank:1,baseScore:80,finalScore:80})
- states.a.entries.push({id:'entry-b',name:'Dancer b',contestantNumber:2})
+ states.a.entries.push({id:'entry-b',name:'Dancer b',contestantNumber:2});states.a.session.entry_ids.push('entry-b')
  render(<MemoryRouter><Workspace eventId="event" choices={rounds}/></MemoryRouter>);await screen.findByRole('tab',{name:'Next Round: available'});openStage('Next Round');fireEvent.click(screen.getByRole('button',{name:'Review Advancement'}));await screen.findByRole('button',{name:'Confirm reviewed qualifiers'});expect(screen.getAllByRole('checkbox')).toHaveLength(2);expect(screen.getAllByRole('checkbox').every((checkbox)=>checkbox.checked&&checkbox.disabled)).toBe(true);fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Explicit tied cutoff roster review'}});fireEvent.click(screen.getByRole('button',{name:'Confirm reviewed qualifiers'}));await waitFor(()=>expect(f.qualification).toHaveBeenCalledWith('event','a',expect.objectContaining({roundId:'pre',sourceDigest:'digest',calculationId:'calc-a',qualifierIds:['entry-a','entry-b'],acknowledged:true}),true));expect(f.calculate).not.toHaveBeenCalled()
 })
 test('manual advancement uses the existing reasoned qualifier decision for tied standings',async()=>{
  const rounds=[{...choices[0],roundId:'pre',roundName:'Preliminary'},{...choices[0],roundId:'final',roundName:'Final'}]
  states.a.roundId='pre';states.a.calculation.finalized=true;states.a.rules.configuration_snapshot.rounds=[{id:'pre',displayOrder:0,advancementType:'manual'},{id:'final',displayOrder:1}]
  states.a.calculation.output_snapshot.results.push({contestantId:'entry-b',rank:1,baseScore:80,finalScore:80})
- states.a.entries.push({id:'entry-b',name:'Dancer b',contestantNumber:2})
+ states.a.entries.push({id:'entry-b',name:'Dancer b',contestantNumber:2});states.a.session.entry_ids.push('entry-b')
  f.qualification.mockResolvedValue({data:{automatic:[],policy:'manual',fromRound:'pre',toRound:'final',standings:[{contestantId:'entry-a',rank:1},{contestantId:'entry-b',rank:1}]}})
  render(<MemoryRouter><Workspace eventId="event" choices={rounds}/></MemoryRouter>);await screen.findByRole('tab',{name:'Next Round: available'});openStage('Next Round');expect(screen.getByText(/Manual advancement is configured/)).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Review Advancement'}));await screen.findByRole('button',{name:'Confirm reviewed qualifiers'});expect(screen.getAllByRole('checkbox').every((checkbox)=>!checkbox.disabled)).toBe(true)
+})
+function advancementFixture(finalized=true){
+ const rounds=[{...choices[0],roundId:'pre',roundName:'Preliminary'},{...choices[0],roundId:'final',roundName:'Final'}]
+ states.a.roundId='pre';states.a.calculation.finalized=finalized;states.a.calculation.verified=finalized
+ states.a.rules.configuration_snapshot.structure='multiple'
+ states.a.rules.configuration_snapshot.rounds=[{id:'pre',name:'Preliminary',displayOrder:0,progression:'weighted',weight:30,advancementType:'top_n',advancementValue:1},{id:'final',name:'Final',displayOrder:1,progression:'weighted',weight:70}]
+ states.a.rules.configuration_snapshot.criteria[0].roundId='pre'
+ states.a.advancement={fromRoundId:'pre',toRoundId:'final',nextRoundName:'Final',qualificationCurrent:false,qualifiedEntryIds:[]}
+ return rounds
+}
+test('advancement route is visible before finalization and explains pending requirements and score weights',async()=>{
+ const rounds=advancementFixture(false)
+ function Routed(){const {section}=useParams();return <Workspace eventId="event" choices={rounds} initialSection={section}/>}
+ render(<MemoryRouter initialEntries={['/organizer/competition/events/event/tabulation/advancement']}><Routes><Route path="/organizer/competition/events/:eventId/tabulation/:section" element={<Routed/>}/></Routes></MemoryRouter>)
+ expect(await screen.findByRole('heading',{name:'Prepare next-round advancement'})).toBeInTheDocument()
+ expect(screen.getByRole('button',{name:'Review Advancement'})).toBeDisabled()
+ expect(screen.getByRole('button',{name:'Open Final in Live Control'})).toBeDisabled()
+ expect(screen.getByText('Final score contributions: Preliminary 30% + Final 70%.')).toBeInTheDocument()
+ expect(screen.getByText('Next-round qualifiers confirmed: Pending')).toBeInTheDocument()
+ expect(screen.getByText(/John Reyes must verify this calculation from their reviewer account/)).toBeInTheDocument()
+ fireEvent.click(screen.getByRole('button',{name:'Open Finalization'}))
+ expect(await screen.findByRole('heading',{name:'Independent review'})).toBeInTheDocument()
+ expect(screen.queryByRole('button',{name:'Verify calculation'})).not.toBeInTheDocument()
+ expect(f.qualification).not.toHaveBeenCalled()
+})
+
+test('advancement directs a verified round to finalization and enables review after the recorded decision',async()=>{
+ const rounds=advancementFixture(false)
+ states.a.calculation.verified=true
+ f.transition.mockImplementation(async()=>{states.a.calculation.finalized=true;return {data:{}}})
+ function Routed(){const {section}=useParams();return <Workspace eventId="event" choices={rounds} initialSection={section}/>}
+ render(<MemoryRouter initialEntries={['/organizer/competition/events/event/tabulation/advancement']}><Routes><Route path="/organizer/competition/events/:eventId/tabulation/:section" element={<Routed/>}/></Routes></MemoryRouter>)
+ fireEvent.click(await screen.findByRole('button',{name:'Finalize this round'}))
+ const finalize=await screen.findByRole('button',{name:'Finalize official calculation'})
+ expect(finalize).toBeDisabled()
+ fireEvent.change(screen.getByRole('textbox',{name:'Review reason'}),{target:{value:'Reviewed and approved Preliminary'}})
+ fireEvent.click(finalize)
+ await waitFor(()=>expect(f.transition).toHaveBeenCalledWith('event','a',expect.objectContaining({action:'finalize',reason:'Reviewed and approved Preliminary',roundId:'pre'})))
+ await waitFor(()=>expect(screen.queryByRole('button',{name:'Finalize official calculation'})).not.toBeInTheDocument())
+ fireEvent.click(screen.getByRole('tab',{name:/^Next Round:/}))
+ expect(await screen.findByRole('button',{name:'Review Advancement'})).toBeEnabled()
+ expect(screen.getByRole('button',{name:'Open Final in Live Control'})).toBeDisabled()
+ expect(f.qualification).not.toHaveBeenCalled()
+})
+test('confirming the proposed qualifiers persists readiness and hands off to the correct Live Control round',async()=>{
+ const rounds=advancementFixture()
+ const proposal={automatic:['entry-a'],policy:'top_n',fromRound:'pre',toRound:'final',standings:[{contestantId:'entry-a',rank:1}]}
+ f.qualification.mockImplementation(async(e,c,body,confirm)=>{if(confirm){states.a.advancement={...states.a.advancement,qualificationCurrent:true,qualifiedEntryIds:['entry-a']};return {data:{qualificationId:'q'}}}return {data:proposal}})
+ f.snapshot.mockImplementation(async(e,c,r)=>({data:r==='final'?{eventId:'event',competitionId:'a',roundId:'final',viewerId:'owner',qualificationCurrent:true}:{...structuredClone(states.a),roundId:r}}))
+ function Routed(){const {section}=useParams();return <Workspace eventId="event" choices={rounds} initialSection={section}/>}
+ function Live(){const location=useLocation();return <h1>Live Control {location.search}</h1>}
+ render(<MemoryRouter initialEntries={['/organizer/competition/events/event/tabulation/overview']}><Routes><Route path="/organizer/competition/events/:eventId/tabulation/:section" element={<Routed/>}/><Route path="/organizer/competition/events/:eventId/live" element={<Live/>}/></Routes></MemoryRouter>)
+ fireEvent.click(await screen.findByRole('button',{name:'Advancement to Final'}))
+ await screen.findByRole('heading',{name:'Preliminary tabulation complete'})
+ expect(screen.getByRole('button',{name:'Open Final in Live Control'})).toBeDisabled()
+ fireEvent.click(screen.getByRole('button',{name:'Review Advancement'}))
+ await screen.findByRole('button',{name:'Confirm reviewed qualifiers'})
+ fireEvent.change(screen.getByRole('textbox',{name:'Review reason'}),{target:{value:'Reviewed Top 1 qualifier'}})
+ fireEvent.click(screen.getByRole('button',{name:'Confirm reviewed qualifiers'}))
+ await screen.findByText('1 qualifier confirmed for Final.')
+ fireEvent.click(screen.getByRole('button',{name:'Open Final in Live Control'}))
+ expect(await screen.findByRole('heading',{name:/Live Control.*competitionId=a.*roundId=final/})).toBeInTheDocument()
+ expect(f.calculate).not.toHaveBeenCalled()
+})
+
+test.each([
+ ['stale qualification',{qualificationCurrent:false},'The confirmed qualifier roster changed.'],
+ ['foreign actor',{viewerId:'someone-else'},'Next-round source context mismatch'],
+])('next-round handoff rejects %s returned by the authoritative refresh',async(label,change,error)=>{
+ const rounds=advancementFixture()
+ states.a.advancement={...states.a.advancement,qualificationCurrent:true,qualifiedEntryIds:['entry-a']}
+ f.snapshot.mockImplementation(async(e,c,r)=>({data:r==='final'?{eventId:e,competitionId:c,roundId:r,viewerId:'owner',qualificationCurrent:true,...change}:{...structuredClone(states.a),roundId:r}}))
+ function Routed(){const {section}=useParams();return <Workspace eventId="event" choices={rounds} initialSection={section}/>}
+ render(<MemoryRouter initialEntries={['/organizer/competition/events/event/tabulation/advancement']}><Routes><Route path="/organizer/competition/events/:eventId/tabulation/:section" element={<Routed/>}/><Route path="/organizer/competition/events/:eventId/live" element={<h1>Final Live Control</h1>}/></Routes></MemoryRouter>)
+ fireEvent.click(await screen.findByRole('button',{name:'Open Final in Live Control'}))
+ expect(await screen.findByText(new RegExp(error))).toBeInTheDocument()
+ expect(screen.queryByRole('heading',{name:'Final Live Control'})).not.toBeInTheDocument()
 })
 test('a published single-round category can proceed to the next category still needing tabulation',async()=>{
  states.a.calculation.finalized=true

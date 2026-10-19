@@ -14,8 +14,9 @@ export function validateNativeConfiguration(raw) {
   if (!['single', 'multiple'].includes(raw.structure) || !Array.isArray(raw.rounds) || !Array.isArray(raw.criteria)) fail('Choose a single phase or multiple rounds')
   if (raw.structure === 'single' && raw.rounds.length || raw.structure === 'multiple' && raw.rounds.length < 1) fail('A single phase has no rounds; round-based setup requires at least one named round')
   const config = raw.scoringConfig
-  keys(config, ['calculationMethod', 'criterionBasis', 'tiePolicy', 'decimalPlaces', 'dropHighest', 'dropLowest', 'manualBasis', 'deductionRules', 'deductionMode', 'numericCarryBasis', 'inputDecimalPlaces', 'defaultMinScore', 'defaultMaxScore', 'singleRoundName'])
+  keys(config, ['calculationMethod', 'criterionBasis', 'minorWeightBasis', 'tiePolicy', 'decimalPlaces', 'dropHighest', 'dropLowest', 'manualBasis', 'deductionRules', 'deductionMode', 'numericCarryBasis', 'inputDecimalPlaces', 'defaultMinScore', 'defaultMaxScore', 'singleRoundName'])
   if (config.criterionBasis !== undefined && !['percentage', 'points'].includes(config.criterionBasis)) fail('Choose Percentage or Points criterion scoring basis')
+  if (config.minorWeightBasis !== undefined && config.minorWeightBasis !== 'overall') fail('Choose overall-round minor criterion weights')
   if (config.singleRoundName !== undefined && !name(config.singleRoundName)) fail('Name the single round')
   if (config.defaultMinScore !== undefined || config.defaultMaxScore !== undefined) {
     if (!Number.isFinite(config.defaultMinScore) || !Number.isFinite(config.defaultMaxScore) || config.defaultMaxScore <= 0 || config.defaultMinScore >= config.defaultMaxScore) fail('Configure valid default score bounds')
@@ -60,7 +61,8 @@ export function validateNativeConfiguration(raw) {
     })
     if (!pointsBasis && targets.some(m => m !== c && m.percentage !== undefined)) {
       if (targets.some(m => !Number.isFinite(m.percentage) || m.percentage <= 0 || m.percentage > 100)) fail('Give every weighted minor criterion a positive percentage')
-      if (Math.abs(targets.reduce((total,m) => total + m.percentage,0) - 100) > 0.001) fail('Minor criterion weights must total 100% within their major criterion')
+      const expectedTotal = config.minorWeightBasis === 'overall' ? c.percentage : 100
+      if (Math.abs(targets.reduce((total,m) => total + m.percentage,0) - expectedTotal) > 0.001) fail(`Minor criterion weights must total ${expectedTotal}%${config.minorWeightBasis === 'overall' ? ' to match their major criterion' : ' within their major criterion'}`)
     }
   })
   const duplicateNames = rows => new Set(rows.map(r => r.name.trim().toLowerCase())).size !== rows.length

@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "fixtureOnly": true,
+  "databaseTouched": false,
+  "layouts": [
+    {
+      "width": 1440,
+      "pageWidth": 1425,
+      "barWidth": 204,
+      "overflow": "auto",
+      "tableWidth": 1368
+    },
+    {
+      "width": 390,
+      "pageWidth": 375,
+      "barWidth": 204,
+      "overflow": "auto",
+      "tableWidth": 318
+    },
+    {
+      "width": 320,
+      "pageWidth": 305,
+      "barWidth": 204,
+      "overflow": "auto",
+      "tableWidth": 248
+    }
+  ],
+  "headersPreserved": true
+}

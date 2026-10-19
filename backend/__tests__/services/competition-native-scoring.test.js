@@ -1,6 +1,6 @@
 import {afterEach,beforeEach,expect,test,vi} from 'vitest'
-const f=vi.hoisted(()=>({rpc:vi.fn(),emit:vi.fn(),autoCalculate:vi.fn()}))
-vi.mock('../../src/foundation/db.js',()=>({db:()=>({rpc:f.rpc})}))
+const f=vi.hoisted(()=>({rpc:vi.fn(),from:vi.fn(),emit:vi.fn(),autoCalculate:vi.fn()}))
+vi.mock('../../src/foundation/db.js',()=>({db:()=>({rpc:f.rpc,from:f.from})}))
 vi.mock('../../src/websocket/ws-emitter.js',()=>({emitToUser:f.emit}))
 vi.mock('../../src/services/competition-native-tabulation.service.js',()=>({automaticallyCalculateNative:f.autoCalculate}))
 import {scoringChoices,activeSessionsForOrganizer,liveView,liveControl,scoreWrite,scoringError} from '../../src/services/competition-native-scoring.service.js'
@@ -27,6 +27,22 @@ test('view requires exact judge, competition and NULL round and coerces closed a
  expect((await liveView(event,child,judge)).criteria[0].open).toBe(false)
  f.rpc.mockResolvedValue({data:{context:{eventId:event,competitionId:child,roundId:id(12)},viewerJudgeId:judge}})
  await expect(liveView(event,child,judge)).rejects.toMatchObject({statusCode:503})
+})
+test('authorized scoring roster receives original per-division numbers without changing entry IDs or access',async()=>{
+ const query=vi.fn((column,ids)=>Promise.resolve({data:ids.includes(id(21))?[{id:id(21),contestant_number:1,division_id:id(31)},{id:id(22),contestant_number:1,division_id:id(32)}]:[{id:id(31),name:'MEN',row_color:'#2563eb'},{id:id(32),name:'WOMEN',row_color:'#db2777'}]}))
+ const eventScope=vi.fn(()=>({in:query}))
+ f.from.mockImplementation(()=>({select:()=>({eq:eventScope})}))
+ f.rpc.mockResolvedValue({data:{context:{eventId:event,competitionId:child,roundId:null},viewerJudgeId:judge,contestants:[{id:id(11),masterId:id(21),contestantNumber:1,open:true},{id:id(12),masterId:id(22),contestantNumber:2,open:false}]}})
+ const view=await liveView(event,child,judge)
+ expect(view.contestants).toMatchObject([{id:id(11),contestantNumber:1,registrationNumber:1,divisionName:'MEN',open:true},{id:id(12),contestantNumber:2,registrationNumber:1,divisionName:'WOMEN',open:false}])
+ expect(eventScope).toHaveBeenCalledWith('event_id',event)
+ expect(query).toHaveBeenCalledWith('id',[id(21),id(22)])
+ expect(view.allowedDivisions).toHaveLength(2)
+})
+test('foreign scoring snapshots cannot trigger registration metadata queries',async()=>{
+ f.rpc.mockResolvedValue({data:{context:{eventId:id(99),competitionId:child,roundId:null},viewerJudgeId:judge,contestants:[{masterId:id(21)}]}})
+ await expect(liveView(event,child,judge)).rejects.toMatchObject({statusCode:503})
+ expect(f.from).not.toHaveBeenCalled()
 })
 test('score writes bind server actor, pass expected child/session/row revisions and notify only after commit',async()=>{
  const result=await scoreWrite(event,child,judge,null,'lock',body)

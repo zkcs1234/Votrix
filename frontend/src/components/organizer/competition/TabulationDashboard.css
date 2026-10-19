@@ -2,6 +2,13 @@
 .v-tabulation { --tab-grid-line: color-mix(in srgb, var(--v-border) 80%, var(--v-primary) 20%); --tab-grid-head: color-mix(in srgb, var(--v-primary) 24%, #08243c); font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif); }
 .v-tabulation .v-tabulation-page-header { display: grid; grid-template-columns: minmax(15rem, 1fr) minmax(28rem, 1.6fr); align-items: center; gap: .65rem; }
 .v-tabulation-page-header > * { margin: 0; min-width: 0; }
+.v-tab-round-progress { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; border: 1px solid var(--v-border); border-radius: .4rem; padding: .5rem .7rem; background: var(--v-surface); font-size: .75rem; }
+.v-tab-round-progress strong { margin-right: .6rem; }
+.v-tab-round-progress span { color: var(--v-text-muted); }
+.v-tab-round-checks { display: grid; gap: .4rem; font-size: .8rem; }
+.v-tab-round-checks li { display: flex; gap: .5rem; align-items: center; }
+.v-tab-round-checks [data-ready=true] { color: var(--v-success); }
+.v-tab-round-checks [data-ready=false] { color: var(--v-text-muted); }
 .v-tabulation .v-tabulation-header { gap: .6rem; }
 .v-tabulation .v-tabulation-title { flex-basis: 12rem; gap: .6rem; }
 .v-tabulation .v-tabulation-title-icon { width: 2.25rem; height: 2.25rem; }

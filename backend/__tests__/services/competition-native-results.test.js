@@ -22,6 +22,13 @@ test('public deduction settings expose responsibility flags without judge reason
  expect(JSON.stringify(data)).not.toContain('secret')
  expect(data.results).not.toHaveProperty('judgeDeductions')
 })
+test('public Pageant division metadata retains separate standings without exposing the private frozen roster',async()=>{
+ f.rpc.mockResolvedValue({data:{results:{eventId:e,competitionId:c,roundId:null,divisionRanking:{mode:'division',divisions:[{id:'men',name:'MEN',private:'secret'}],entries:[{entryId:'secret'}]},standings:[{participationId:id(7),divisionId:'men',divisionName:'MEN',rank:1,score:3,tied:false}]}}})
+ const data=await publicResults(e,c)
+ expect(data.results.divisionRanking).toEqual({mode:'division',divisions:[{id:'men',name:'MEN'}]})
+ expect(data.results.standings[0]).toMatchObject({divisionId:'men',divisionName:'MEN',rank:1,tied:false})
+ expect(JSON.stringify(data)).not.toContain('secret')
+})
 test('incomplete current results mask both current and historical finalized score payloads',async()=>{f.rpc.mockResolvedValue({data:{eventId:e,competitionId:c,roundId:null,viewerId:actor,complete:false,official:{secret:80},calculation:{secret:99},history:[{version:1,results:{secret:80}}]}});const data=await ownedResults(e,c,actor);expect(data.official).toBe(null);expect(data.calculation).toBe(null);expect(data.history[0].results).toBe(null)})
 test('publication binds server actor, explicit selected calculation, request ID and CAS; emits only after commit',async()=>{
  const body={action:'publish',roundId:null,requestId:id(6),calculationId:calc,sourceDigest:digest,expectedPublicationVersion:0,reason:'Explicit reviewed version',acknowledged:true}

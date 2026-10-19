@@ -1,3 +1,4 @@
+import { judgeDivisionOptions } from '@/utils/judgeContestantDivisions'
 import {DEDUCTION_LABELS, validJudgeDeductionRecords} from '../../../../../shared/competition-deductions.js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Filter, Lock, Search, Settings2, Shield, Trophy, Users } from 'lucide-react'
@@ -69,6 +70,10 @@ export default function NativeCompetitionWorkspace({eventId,eventName,event=null
  const [snapshot,setView]=useState(null),[ownerSnapshots,setOwnerSnapshots]=useState({}),[ownerTabulations,setOwnerTabulations]=useState({}),[scores,setScores]=useState({}),[error,setError]=useState(null),[notice,setNotice]=useState(null),[busy,setBusy]=useState(false),[pending,setPending]=useState(0),[submittingKey,setSubmittingKey]=useState(null),[accessBusyKeys,setAccessBusyKeys]=useState(()=>new Set())
  const accessQueue=useRef(Promise.resolve())
  const view=snapshot?.context?.eventId===eventId&&snapshot.context.competitionId===choice.competitionId&&snapshot.context.roundId===choice.roundId&&(owner||snapshot.viewerJudgeId===judgeId)?snapshot:null
+ const [divisionFilter,setDivisionFilter]=useState('all')
+ const divisionOptions=judgeDivisionOptions(view)
+ const activeDivision=divisionOptions.some(division=>division.id===divisionFilter)?divisionFilter:'all'
+ useEffect(()=>{setDivisionFilter('all')},[identity])
  const [deductionDrafts,setDeductionDrafts]=useState({})
  const deductionDraftsRef=useRef({})
  const eventClosed=!!view?.eventStatus&&!['draft','scheduled','active'].includes(view.eventStatus)
@@ -309,6 +314,7 @@ export default function NativeCompetitionWorkspace({eventId,eventName,event=null
   <div className="v-native-judge-session-bar">
    <label>Round <select aria-label="Round" value={selected} onChange={e=>setSelected(e.target.value)}>{choices.filter(c=>c.competitionId===choice.competitionId).map(c=><option key={chooseKey(c)} value={chooseKey(c)}>{c.roundName}</option>)}</select></label>
    <span className="v-native-live-indicator" data-live={view?.session?.status==='active'} role="status">{view?.session?.status==='active'?(connected?'Scoring session is live':'Reconnecting to live session'):view?.session?.status==='paused'?'Scoring is paused':view?.submission?'Round submitted · waiting for organizer':owner?'Session not started':'Waiting for organizer to open scoring'}</span>
+   {!owner&&divisionOptions.length>0&&<nav className="v-native-division-filter" aria-label="Contestant division filter"><div role="group" aria-label="Show contestants by division"><button type="button" aria-pressed={activeDivision==='all'} onClick={()=>setDivisionFilter('all')}>Event Wide</button>{divisionOptions.map(division=><button key={division.id} type="button" data-division-tone={division.tone} aria-pressed={activeDivision===division.id} onClick={()=>setDivisionFilter(division.id)}>{division.label}</button>)}</div></nav>}
    {!owner&&<span className="v-native-connection-state">{connected?'Connected':'Reconnecting'}</span>}
   </div>
   {error&&<p role="alert">{error}</p>}
@@ -332,7 +338,7 @@ export default function NativeCompetitionWorkspace({eventId,eventName,event=null
    {view.session&&<fieldset><legend>Audited reopen or correction</legend><label>Reason <input value={reason} onChange={e=>setReason(e.target.value)}/></label><label>Judge <select value={correctionJudge} onChange={e=>setCorrectionJudge(e.target.value)}><option value="">Reopen session only</option>{view.progress?.map(j=><option key={j.judgeId} value={j.judgeId}>{j.judgeName??j.judgeId}</option>)}</select></label><p>This preserves submitted history and pauses scoring. Selecting a judge unlocks that judge’s sources for correction.</p><Button disabled={busy||reason.trim().length<5} onClick={()=>control('reopen',{reason,judgeId:correctionJudge||null,acknowledged:true})}>Confirm audited reopen</Button></fieldset>}
   </fieldset>}
   {view&&!owner&&<>
-   <CompetitionScoringForm key={`${identity}:${view.context.sessionId}`} sheet={view} scores={scores} deductionDrafts={deductionDrafts} onDeductionChange={changeDeductions} onScoreChange={change} onSubmitCriterion={lock} submittingKey={submittingKey} sessionState={{contestantOrder:view.session?.entry_ids??[]}} simplified/>
+   <CompetitionScoringForm key={`${identity}:${view.context.sessionId}`} sheet={view} divisionFilter={activeDivision} scores={scores} deductionDrafts={deductionDrafts} onDeductionChange={changeDeductions} onScoreChange={change} onSubmitCriterion={lock} submittingKey={submittingKey} sessionState={{contestantOrder:view.session?.entry_ids??[]}} simplified/>
    <footer className="v-native-submit-footer">
     <div className="v-native-submit-status" role="status">
      <strong>{pending?`Saving ${pending} draft${pending===1?'':'s'}`:view.submission?'Round submitted':'Drafts saved'}</strong>

@@ -17,6 +17,18 @@ describe('competition creation integrity',()=>{
   rules.criteria[0].minorCriteria.forEach(m=>delete m.percentage)
   expect(calculateOfficial(rules,submitted).results[0].finalScore).toBe(75)
  })
+ it('treats overall-round minor percentages as direct shares that sum to the major weight',()=>{
+  const cfg=configuration()
+  cfg.criteria[0].percentage=30
+  cfg.criteria[0].minorCriteria=[{id:id(2),name:'Projection',minScore:1,maxScore:10,percentage:10},{id:id(3),name:'Engagement',minScore:1,maxScore:10,percentage:10},{id:id(4),name:'Technique',minScore:1,maxScore:10,percentage:10}]
+  cfg.scoringConfig.minorWeightBasis='overall'
+  expect(validateNativeConfiguration(cfg)).toEqual(cfg)
+  const rules={id:'rules',event:{id:'event'},rounds:[],contestants:[{id:'entry',name:'Entry',contestantNumber:1}],judges:[{judgeId:'judge',role:'judge',isActive:true}],criteria:cfg.criteria,scoringConfig:cfg.scoringConfig}
+  const submitted=[{judge_id:'judge',round_id:null,status:'submitted',rules_version:'rules',sources:[{contestantId:'entry',scores:{[id(2)]:10,[id(3)]:8,[id(4)]:5}}]}]
+  expect(calculateOfficial(rules,submitted).results[0].finalScore).toBe(23)
+  cfg.criteria[0].minorCriteria[2].percentage=5
+  expect(()=>validateNativeConfiguration(cfg)).toThrow('total 30%')
+ })
  it('review catches a missing final-round judge instead of accepting a preliminary-only panel',()=>{
   const branch={competition:{},configuration:{...configuration(),structure:'multiple',rounds:[{id:'pre',name:'Preliminary'},{id:'final',name:'Final'}]},criteriaReadiness:{allReady:true},entries:[{id:'entry'}],assignments:[{participant_id:'enrollment',round_id:'pre'}],judges:[{id:'enrollment',isActive:true,accountStatus:'active',role:'judge'}]}
   expect(competitionSetupIssues(branch)).toEqual([{step:'judges',message:'Assign an active judge to Final.'}])

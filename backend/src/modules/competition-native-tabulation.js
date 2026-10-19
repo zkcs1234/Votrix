@@ -14,7 +14,10 @@ export function nativeCalculationInputs(snapshot) {
  const frozen=snapshot.rules,cfg=frozen.configuration_snapshot
  const scopes=snapshot.scopes??[{session:snapshot.session,submissions:snapshot.submissions}]
  const rounds=cfg.rounds.map((r,i)=>({...r,purpose:i===cfg.rounds.length-1?'final':'preliminary',contestantIds:scopes.find(s=>s.session?.round_id===r.id)?.session.entry_ids??[],criteriaIds:cfg.criteria.filter(k=>k.roundId===r.id).map(k=>k.id),progression:r.progression??'back_to_zero'}))
- const contestants=frozen.participation_snapshot.map(e=>({id:e.id,masterId:e.contestant_id,name:snapshot.entries?.find(x=>x.id===e.id)?.name??e.id,contestantNumber:e.entry_number}))
+ const divisionRanking=snapshot.divisionRanking
+ const divisionEntries=new Map((divisionRanking?.entries??[]).map(e=>[e.entryId,e]))
+ if(divisionRanking?.mode==='division'&&frozen.participation_snapshot.some(e=>!divisionEntries.get(e.id)?.divisionId))throw new Error('Every Pageant entry requires its authorized division')
+ const contestants=frozen.participation_snapshot.map(e=>({id:e.id,masterId:e.contestant_id,name:snapshot.entries?.find(x=>x.id===e.id)?.name??e.id,contestantNumber:divisionEntries.get(e.id)?.contestantNumber??e.entry_number,...(divisionEntries.has(e.id)?{divisionId:divisionEntries.get(e.id).divisionId,divisionName:divisionEntries.get(e.id).divisionName}:{})}))
  const judges=[...new Set(frozen.assignment_snapshot.map(a=>a.judgeId))].map(judgeId=>({judgeId,isActive:true,role:frozen.assignment_snapshot.find(a=>a.judgeId===judgeId).judgeRole,assignments:frozen.assignment_snapshot.filter(a=>a.judgeId===judgeId).map(a=>a.round_id==null?{scope:'event',scopeId:snapshot.eventId}:{scope:'round',scopeId:a.round_id})}))
  if(judges.some(j=>!j.assignments.length))throw new Error('Explicit frozen judge assignments are required')
  const submissions=scopes.flatMap(scope=>scope.submissions.map(s=>({...s,status:'submitted',round_id:scope.session.round_id,sources:scope.session.entry_ids.map(entryId=>({contestantId:entryId,scores:Object.assign({},...s.sources.filter(row=>row.entry_id===entryId).map(row=>row.scores))}))})))
@@ -25,7 +28,7 @@ export function nativeCalculationInputs(snapshot) {
  const deductions=configuredRules.length
   ? (snapshot.allDeductions??snapshot.deductions??[]).filter(d=>d.status==='approve'&&configuredRuleIds.has(d.rule_key)&&applicableDeductionRules(cfg,snapshot.roundId,'organizer').some(rule=>rule.id===d.rule_key)).map(d=>({id:d.id,contestant_id:d.entry_id,round_id:d.rule_snapshot.roundId??cfg.criteria.find(k=>k.id===d.rule_snapshot.criteriaId)?.roundId??null,criteria_id:d.rule_snapshot.criteriaId??null,decision_status:'approved',rule_id:d.rule_key,description:d.rule_snapshot.description,reason:d.reason,amount:d.rule_snapshot.amount,units:d.rule_snapshot.units,...(d.rule_snapshot.appliedBy?{appliedBy:d.rule_snapshot.appliedBy}:{})}))
   : []
- const rules={id:frozen.id,event:{id:snapshot.eventId},contestants,judges,rounds,criteria:cfg.criteria.map(k=>({...k,isActive:true,minorCriteria:k.minorCriteria??[]})),categories:[],scoringConfig:{...cfg.scoringConfig,calculationMethod:cfg.rounds.find(r=>r.id===snapshot.roundId)?.calculationMethod??cfg.scoringConfig.calculationMethod,decimalPlaces:cfg.scoringConfig.decimalPlaces??2,finalRoundId:rounds.at(-1)?.id??null}}
+ const rules={id:frozen.id,event:{id:snapshot.eventId},contestants,judges,rounds,criteria:cfg.criteria.map(k=>({...k,isActive:true,minorCriteria:k.minorCriteria??[]})),categories:[],scoringConfig:{...cfg.scoringConfig,...(divisionRanking?.mode==='division'?{perDivision:true}:{}),calculationMethod:cfg.rounds.find(r=>r.id===snapshot.roundId)?.calculationMethod??cfg.scoringConfig.calculationMethod,decimalPlaces:cfg.scoringConfig.decimalPlaces??2,finalRoundId:rounds.at(-1)?.id??null}}
  return {rules,submissions,deductions,judgeDeductions:submittedJudgeDeductions(cfg,scopes),roundId:rounds.at(-1)?.id===snapshot.roundId?null:snapshot.roundId}
 }
 export function calculateNativeSnapshot(snapshot,{manualResults,reason}={}) {
@@ -34,7 +37,7 @@ export function calculateNativeSnapshot(snapshot,{manualResults,reason}={}) {
   const entries=snapshot.session.entry_ids
   if(typeof reason!=='string'||reason.trim().length<5||!Array.isArray(manualResults)||manualResults.length!==entries.length||new Set(manualResults.map(r=>r.contestantId)).size!==entries.length||manualResults.some(r=>!entries.includes(r.contestantId)||!Number.isSafeInteger(r.rank)||r.rank<1))throw new Error('Explicit complete manual placements and a reason are required')
   const results=manualResults.map(r=>({...input.rules.contestants.find(e=>e.id===r.contestantId),contestantId:r.contestantId,rank:r.rank,manual:true,baseScore:null,deductionTotal:null,finalScore:null,judgeTotals:[]})).sort((a,b)=>a.rank-b.rank)
-  return {input,output:{results,worksheets:[],roundResults:[],missing:[],ready:true,manualBasis:input.rules.scoringConfig.manualBasis,reason}}
+  return {input,output:{results,worksheets:[],roundResults:[],missing:[],ready:true,manualBasis:input.rules.scoringConfig.manualBasis,reason,...(snapshot.divisionRanking?{divisionRanking:snapshot.divisionRanking}:{})}}
  }
  const cfg=input.rules.scoringConfig, final=input.rules.rounds.at(-1)
  let output
@@ -52,17 +55,22 @@ export function calculateNativeSnapshot(snapshot,{manualResults,reason}={}) {
   for(const worksheet of combined)worksheet.carryNumericTotal=subtractPoints(worksheet.carryNumericTotal,worksheet.finalJudgePointDeductionTotal)
   const results=numeric.results.map(row=>{
    const own=combined.filter(w=>w.entryId===row.contestantId)
-   const rawJudgeRanks=Object.fromEntries(own.map(w=>[w.judgeId,1+combined.filter(peer=>peer.judgeId===w.judgeId&&peer.carryNumericTotal>w.carryNumericTotal).length]))
+   const rawJudgeRanks=Object.fromEntries(own.map(w=>[w.judgeId,1+combined.filter(peer=>peer.judgeId===w.judgeId&&peer.carryNumericTotal>w.carryNumericTotal&&(!cfg.perDivision||input.rules.contestants.find(e=>e.id===peer.entryId)?.divisionId===row.divisionId)).length]))
    const judgeRanks=Object.fromEntries(own.map(w=>[w.judgeId,combineOfficialContributions([{score:rawJudgeRanks[w.judgeId],weight:100},...input.judgeDeductions.filter(d=>d.judge_id===w.judgeId&&d.contestant_id===row.contestantId&&d.round_id===final.id&&d.units==='placements').map(d=>({score:d.amount,weight:100}))],dp)]))
    const placements=combineOfficialContributions(Object.values(judgeRanks).map(score=>({score,weight:100})),dp)
    const placementPenalty=officialDeductionTotal(input.deductions,row.contestantId,final.id,'placements',dp)+officialDeductionTotal(input.deductions,row.contestantId,null,'placements',dp)
    const adjustedPlacements=combineOfficialContributions([{score:placements,weight:100},{score:placementPenalty,weight:100}],dp)
    return {...row,rawJudgeRanks,judgeRanks,numericCarryScore:own.some(w=>w.finalJudgePointDeductionTotal)?officialMean(own.map(w=>w.carryNumericTotal),dp):row.finalScore,pointDeductionTotal:row.deductionTotal,baseScore:placements,finalScore:adjustedPlacements,rankingScore:adjustedPlacements,weightedScore:row.finalScore,deductionTotal:placementPenalty,judgeTotals:own.map(w=>w.carryNumericTotal)}
   }).sort((a,b)=>a.finalScore-b.finalScore)
-  results.forEach((row,i)=>{row.rank=i&&row.finalScore===results[i-1].finalScore?results[i-1].rank:i+1})
+  for(const group of cfg.perDivision?[...new Set(results.map(r=>r.divisionId))].map(id=>results.filter(r=>r.divisionId===id)):[results])group.forEach((row,i)=>{row.rank=i&&row.finalScore===group[i-1].finalScore?group[i-1].rank:i+1})
   output={...numeric,results,worksheets:numeric.worksheets.map(w=>combined.find(c=>c.entryId===w.entryId&&c.judgeId===w.judgeId&&c.roundId===w.roundId)??w),numericCarryBasis:cfg.numericCarryBasis}
  } else output=calculateOfficial(input.rules,input.submissions,{roundId:input.roundId,deductions:input.deductions,judgeDeductions:input.judgeDeductions})
  if(!output.ready||output.missing.length)throw new Error('The authoritative engine found incomplete current sources')
+ if(snapshot.divisionRanking){
+  output.divisionRanking=snapshot.divisionRanking
+  const entries=new Map(input.rules.contestants.map(e=>[e.id,e]))
+  for(const row of [...output.results,...output.roundResults])Object.assign(row,{divisionName:entries.get(row.contestantId)?.divisionName})
+ }
  const dp=cfg.decimalPlaces??2
  output.entryCriteriaAverages=output.worksheets.reduce((entries,worksheet)=>{
   for(const criterion of worksheet.criteria??[]){
@@ -87,6 +95,7 @@ export function nativeQualifierProposal(snapshot,calculation) {
  const next=round?getNextRound(cfg.rounds,round):null
  if(!next)throw new Error('This phase has no outgoing qualification')
  const output=calculation.output_snapshot
- const standings=output.results.map(r=>({contestantId:r.contestantId,rank:r.rank,score:r.finalScore,roundScore:output.roundResults?.find(s=>s.roundId===round.id&&s.contestantId===r.contestantId)?.finalScore??r.finalScore})).sort((a,b)=>a.rank-b.rank)
- return {fromRound:round.id,toRound:next.id,policy:round.advancementType??'none',automatic:[...selectQualifiers(standings,round.advancementType,round.advancementValue)],standings}
+ const standings=output.results.map(r=>({contestantId:r.contestantId,divisionId:r.divisionId,divisionName:r.divisionName,rank:r.rank,score:r.finalScore,roundScore:output.roundResults?.find(s=>s.roundId===round.id&&s.contestantId===r.contestantId)?.finalScore??r.finalScore})).sort((a,b)=>a.rank-b.rank)
+ const groups=output.divisionRanking?.mode==='division'?[...new Set(standings.map(s=>s.divisionId))].map(id=>standings.filter(s=>s.divisionId===id)):[standings]
+ return {fromRound:round.id,toRound:next.id,policy:round.advancementType??'none',automatic:groups.flatMap(group=>[...selectQualifiers(group,round.advancementType,round.advancementValue)]),standings}
 }

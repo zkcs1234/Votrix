@@ -1,5 +1,11 @@
 # Competition Minor-Criteria Plan
 
+This document describes the original equal-weight minor-criteria behavior in
+the legacy competition workflow. The native Round Scoring editor now also
+supports direct overall-round minor weights; see
+[`rounds-scoring-step5-implementation.md`](./rounds-scoring-step5-implementation.md)
+for its current formula and legacy-configuration compatibility.
+
 Adds a **minor-criteria** level beneath `competition_criteria`. Judges score the
 minor criteria (not the criteria directly), and the score type (1-100, 1-10, …)
 moves down to each minor criterion.

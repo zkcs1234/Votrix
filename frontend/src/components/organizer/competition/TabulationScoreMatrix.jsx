@@ -19,7 +19,20 @@ export function entryReviewStatus(view, entryId) {
 
 // Only saved official traces are displayed. Missing values stay blank and no
 // local preview is substituted for a current backend calculation.
-export default function TabulationScoreMatrix({ view, roundId, criteria, method, search, onSearch, selectedEntryId, onSelectEntry, onOriginals, onBreakdown, onExportEntry, onExport, reviewer, busy }) {
+export default function TabulationScoreMatrix(props) {
+  const scope=props.view.divisionRanking
+  if(scope?.mode!=='division') return <ScoreMatrix {...props}/>
+  return <div className="space-y-3" aria-label="Separate division calculations">{!props.reviewer&&<div className="v-tab-inline-actions"><button type="button" className="v-tab-small-button" disabled={!props.view.complete||props.busy} onClick={props.onExport}>Export all divisions</button></div>}{scope.divisions.map(division=>{
+    const ids=new Set(scope.entries.filter(entry=>entry.divisionId===division.id).map(entry=>entry.entryId))
+    const allowed=(props.view.session?.entry_ids??[]).filter(id=>ids.has(id))
+    if(!allowed.length)return null
+    const label=/^(men|male)$/i.test(division.name)?'Men':/^(women|female)$/i.test(division.name)?'Women':division.name
+    const view={...props.view,entries:(props.view.entries??[]).filter(entry=>ids.has(entry.id)),session:{...props.view.session,entry_ids:allowed},calculation:props.view.calculation?.output_snapshot?.divisionRanking?.mode==='division'?props.view.calculation:null}
+    return <ScoreMatrix key={division.id} {...props} view={view} hideExport title={`${label} calculations`} matrixId={`score-matrix-${division.id}`} caption={`${label} contestant tabulation matrix`}/>
+  })}</div>
+}
+
+function ScoreMatrix({ view, roundId, criteria, method, search, onSearch, selectedEntryId, onSelectEntry, onOriginals, onBreakdown, onExportEntry, onExport, reviewer, busy, hideExport=false, title='Contestant scores', matrixId='score-matrix-heading', caption='Contestant tabulation matrix' }) {
   const [status, setStatus] = useState('all')
   const [sort, setSort] = useState('rank')
   const [compact, setCompact] = useState(true)
@@ -49,10 +62,10 @@ export default function TabulationScoreMatrix({ view, roundId, criteria, method,
   const aggregateLabel = manual ? 'Placement' : ranked ? 'Rank sum' : method === 'sum' ? 'Panel sum' : method === 'highest_score' ? 'Highest total' : 'Aggregate'
   const columns = 3 + (manual ? 0 : judges.length + criteria.length + 1 + (organizerPenalties ? 1 : 0)) + 3
 
-  return <section className="v-tab-matrix" aria-labelledby="score-matrix-heading">
-    <div className="v-tab-panel-title"><h2 id="score-matrix-heading">Contestant scores</h2><div className="v-tab-inline-actions">
+  return <section className="v-tab-matrix" aria-labelledby={matrixId}>
+    <div className="v-tab-panel-title"><h2 id={matrixId}>{title}</h2><div className="v-tab-inline-actions">
       <button type="button" className="v-tab-small-button" aria-pressed={compact} onClick={() => setCompact(!compact)}>Compact rows</button>
-      {!reviewer && <button type="button" className="v-tab-small-button" disabled={!view.complete || busy} onClick={onExport}>Export All</button>}
+      {!reviewer && !hideExport && <button type="button" className="v-tab-small-button" disabled={!view.complete || busy} onClick={onExport}>Export All</button>}
     </div></div>
     <div className="v-tab-matrix-toolbar">
       <label className="v-tab-search"><span className="sr-only">Search entries</span><input type="search" className="v-input" aria-label="Search entries" placeholder="Search contestant name or number…" value={search} onChange={event => onSearch(event.target.value)} /></label>
@@ -63,7 +76,7 @@ export default function TabulationScoreMatrix({ view, roundId, criteria, method,
     {!view.complete ? <p className="v-tab-empty">Scores are withheld until every required current judge sheet is complete. Missing scores are never treated as zero.</p> : <>
       <div className="v-tab-grid-scroll" tabIndex={0} role="region" aria-label="Contestant score matrix, scroll for additional columns">
         <table className="v-tab-grid" data-compact={compact} style={{ '--tab-matrix-width': `${Math.max(720, 500 + (judges.length + criteria.length) * 40)}px` }}>
-          <caption className="sr-only">Contestant tabulation matrix</caption>
+          <caption className="sr-only">{caption}</caption>
           <thead><tr>
             <th scope="col" rowSpan={2} className="v-tab-rank">Rank</th><th scope="col" rowSpan={2} className="v-tab-no">No.</th><th scope="col" rowSpan={2} className="v-tab-name">Contestant name</th>
             {!manual && judges.length > 0 && <th scope="colgroup" colSpan={judges.length}>Judge totals{ranked ? ' / placements' : ''}</th>}

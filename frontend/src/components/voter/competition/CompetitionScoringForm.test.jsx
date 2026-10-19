@@ -71,6 +71,31 @@ test('unknown custom divisions keep their identity rather than inferring gender 
  expect(screen.getByRole('table').querySelector('tbody tr')).toHaveAttribute('data-division-tone','neutral')
 })
 
+test('Pageant keeps paired registration numbers and division highlights while filters preserve scoring identities',()=>{
+ const contestants=[
+  {id:'m2',name:'Man two',contestantNumber:4,registrationNumber:2,divisionId:'men',divisionName:'MEN',open:true},
+  {id:'w1',name:'Woman one',contestantNumber:2,registrationNumber:1,divisionId:'women',divisionName:'WOMEN',open:true},
+  {id:'m1',name:'Man one',contestantNumber:1,registrationNumber:1,divisionId:'men',divisionName:'MEN',open:true},
+  {id:'w2',name:'Woman two',contestantNumber:3,registrationNumber:2,divisionId:'women',divisionName:'WOMEN',open:true},
+ ]
+ const changed=vi.fn(),props={sheet:{...sheet,contestants},scores:{'m1:m':8},onScoreChange:changed,simplified:true}
+ const view=render(<CompetitionScoringForm {...props}/>),table=screen.getByRole('table')
+ const ids=()=>[...table.querySelectorAll('tbody tr')].map(row=>row.dataset.contestantId)
+ expect(ids()).toEqual(['m1','w1','m2','w2'])
+ expect([...table.querySelectorAll('.v-judge-number > span')].map(span=>span.textContent)).toEqual(['#1','#1','#2','#2'])
+ expect(table.querySelectorAll('.v-judge-division-label')).toHaveLength(4)
+ const headers=table.querySelector('thead').innerHTML
+ view.rerender(<CompetitionScoringForm {...props} divisionFilter="men"/>)
+ expect(ids()).toEqual(['m1','m2'])
+ fireEvent.change(screen.getByRole('spinbutton',{name:'Man one: Quality, Skill score'}),{target:{value:'9'}})
+ expect(changed).toHaveBeenCalledWith('m1','m','9')
+ view.rerender(<CompetitionScoringForm {...props} divisionFilter="women"/>)
+ expect(ids()).toEqual(['w1','w2'])
+ expect(table.querySelector('thead').innerHTML).toBe(headers)
+ view.rerender(<CompetitionScoringForm {...props}/>)
+ expect(screen.getByRole('spinbutton',{name:'Man one: Quality, Skill score'})).toHaveValue(8)
+})
+
 test('configured deduction names and amounts replace the generic minor header',()=>{
  const rule={id:'late',description:'Time Limit Violation',amount:2,units:'points',criteriaId:null,appliedBy:'judge',anchorCriterionId:'c'}
  const configured={...sheet,deductionSettings:{mode:'judge',rules:[rule]}}

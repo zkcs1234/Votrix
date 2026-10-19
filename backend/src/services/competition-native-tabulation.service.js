@@ -67,6 +67,16 @@ export async function automaticallyCalculateNative(eventId,competitionId,roundId
   return {status:'needs_review',message:'Automatic calculation needs administrator review. The saved source data is unchanged.'}
  }
 }
+export async function tabulationWorkspaceSnapshot(eventId,competitionId,actor,roundId=null){
+ const state=await tabulationSnapshot(eventId,competitionId,actor,roundId)
+ // Migration 130 gives combined Pageant calculations a new source fingerprint.
+ // Reconcile through the same audited/idempotent automatic-calculation path.
+ if(state.divisionRanking?.mode==='division'&&state.complete&&state.calculationStale&&!state.calculation&&state.rules?.configuration_snapshot?.scoringConfig?.calculationMethod!=='manual'&&['active','closed'].includes(state.session?.status)&&state.deductionsResolved){
+  await automaticallyCalculateNative(eventId,competitionId,roundId)
+  return tabulationSnapshot(eventId,competitionId,actor,roundId)
+ }
+ return state
+}
 async function notify(eventId,competitionId,actor,roundId){
  try{const data=await rpc('competition_child_official_notice',{p_event:eventId,p_competition:competitionId,p_actor:actor,p_round:roundId});for(const user of data.userIds??[])emitToUser(user,'competition:native-invalidated',{eventId,competitionId,roundId,affectedRoundIds:data.roundIds})}catch{/* Authoritative reconciliation covers a missed notification after commit. */}
 }

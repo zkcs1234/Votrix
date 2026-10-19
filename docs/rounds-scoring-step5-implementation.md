@@ -31,7 +31,7 @@ The progress indicator reflects validation rather than record counts. Back/Next 
 
 ## Scoring and compatibility
 
-The existing normalization is preserved: `rating / maximum × 100`. The minimum is an input bound, not a score offset. Equal minors average those normalized ratings. Weighted minors multiply them by their minor percentages. Each major then contributes its percentage to the judge total.
+The existing normalization is preserved: `rating / maximum × 100`. The minimum is an input bound, not a score offset. Equal minors average those normalized ratings, then the major percentage is applied. In the current overall-round weighting model, each minor percentage is a direct share of the round and the minor percentages under a major must sum to that major's percentage. For example, a 30% major can contain three 10% minors; each minor then contributes directly to the judge total. Legacy frozen rules retain their previous relative-minor weighting interpretation, and editable legacy configurations are converted to equivalent direct percentages before saving.
 
 The official engine retains exact rational arithmetic, configured final rounding, average/sum/highest/removal methods, ranking, manual results and existing carry/qualification semantics. Rank percentage carry uses an explicit numeric judge-average basis, never weighted ordinal ranks. Numeric point deductions apply after aggregation; rank point deductions affect numeric totals before ranking, while placement penalties apply after ranking.
 

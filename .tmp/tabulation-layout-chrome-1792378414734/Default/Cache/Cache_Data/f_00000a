@@ -1,0 +1,758 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/voter/competition/CompetitionScoringForm.jsx");const useEffect = __vite__cjsImport1_react["useEffect"]; const useState = __vite__cjsImport1_react["useState"];const _jsxDEV = __vite__cjsImport9_react_jsxDevRuntime["jsxDEV"];import { judgeContestantNumber, judgeDivision } from "/src/utils/judgeContestantDivisions.js";
+import __vite__cjsImport1_react from "/node_modules/.vite/deps/react.js?v=192a8052";
+import { CheckCircle, Clock, Lock } from "/node_modules/.vite/deps/lucide-react.js?v=192a8052";
+import Button from "/src/components/ui/Button.jsx";
+import ScoreInputBase from "/src/components/ui/ScoreInput.jsx";
+import "/src/components/voter/competition/CompetitionScoringForm.css?t=1792378411082";
+import { validScore } from "/@fs/C:/Github/Votrix/shared/competition-score-input.js";
+import { validJudgeDeductionRecords } from "/@fs/C:/Github/Votrix/shared/competition-deductions.js";
+import JudgeDeductionControls from "/src/components/voter/competition/JudgeDeductionControls.jsx";
+var _jsxFileName = "C:/Github/Votrix/frontend/src/components/voter/competition/CompetitionScoringForm.jsx";
+import __vite__cjsImport9_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=192a8052";
+var _s = $RefreshSig$();
+// Round-driven scoresheet. The whole round's field is on stage, so the judge
+// scores every contestant from one table and commits each with "Submit & lock".
+//
+// Judges score MINOR criteria. Each criterion contributes one or more minor
+// columns; each minor carries its own score type/bounds. A criterion with no
+// minors (not-yet-migrated) falls back to a single column scored directly against
+// the criterion, using the sheet's event scale.
+export default function CompetitionScoringForm({ sheet, scores, onScoreChange, deductionDrafts = {}, onDeductionChange, submittingKey = null, onSubmitCriterion, sessionState = null, simplified = false, preview = false, divisionFilter = "all" }) {
+	_s();
+	const { contestants, criteria } = sheet;
+	const [typing, setTyping] = useState(false);
+	const [displayOrder, setDisplayOrder] = useState(sessionState?.contestantOrder ?? []);
+	useEffect(() => {
+		if (!typing) setDisplayOrder(sessionState?.contestantOrder ?? []);
+	}, [typing, sessionState?.contestantOrder]);
+	const scaleBounds = sheet.scoreBounds ?? null;
+	const pointsBasis = sheet.criterionBasis === "points";
+	const critColumns = (criteria ?? []).map((crit) => {
+		const minors = pointsBasis ? [{
+			id: crit.id,
+			name: crit.name,
+			minScore: crit.minScore,
+			maxScore: crit.maxScore,
+			decimalPlaces: crit.decimalPlaces
+		}] : crit.minors && crit.minors.length ? crit.minors : [{
+			id: crit.id,
+			name: crit.name,
+			minScore: crit.minScore,
+			maxScore: crit.maxScore,
+			decimalPlaces: crit.decimalPlaces
+		}];
+		// #4 show-but-lock: a criterion the organizer hasn't opened renders disabled.
+		return {
+			crit,
+			minors,
+			open: crit.open !== false
+		};
+	});
+	const judgeDeductionRules = sheet.deductionSettings?.mode === "judge" ? (sheet.deductionSettings.rules ?? []).filter((rule) => rule.appliedBy === "judge") : [];
+	const deductionRuleGroups = critColumns.map(({ crit, open }) => ({
+		crit,
+		open,
+		rules: judgeDeductionRules.filter((rule) => rule.anchorCriterionId === crit.id)
+	})).filter(({ rules }) => rules.length > 0);
+	const showDeductionColumn = deductionRuleGroups.length > 0;
+	const deductionHeaderRules = deductionRuleGroups.flatMap(({ rules }) => rules);
+	const statusBeforeCriteria = !simplified && showDeductionColumn;
+	const deductionsForContestant = (cont) => deductionRuleGroups.flatMap(({ crit, rules }) => (deductionDrafts[`${cont.id}:${crit.id}`] ?? []).flatMap((record) => {
+		const rule = rules.find((item) => item.id === record.ruleId);
+		return rule ? [{
+			crit,
+			record,
+			rule
+		}] : [];
+	}));
+	const boundsFor = (minor) => ({
+		min: minor.minScore ?? scaleBounds?.min ?? 1,
+		max: minor.maxScore ?? scaleBounds?.max ?? 100
+	});
+	const allCritIds = critColumns.map(({ crit }) => crit.id);
+	// #6 per-criterion locking. Each criterion is committed on its own; a cell is
+	// one of: LOCKED (already submitted), OPEN (scorable now), or WAITING (organizer
+	// hasn't opened it / contestant not open). "Submit open criteria" commits only
+	// the open, not-yet-locked criteria; the row is fully "Locked" once every
+	// criterion is in.
+	const lockedSetOf = (cont) => new Set(cont.lockedCriteria ?? []);
+	const isCritLocked = (cont, critId) => lockedSetOf(cont).has(critId);
+	const fullyLocked = (cont) => Boolean(cont.hasSubmitted) || allCritIds.length > 0 && allCritIds.every((id) => lockedSetOf(cont).has(id));
+	// A criterion is "complete" (lockable) once every one of its minors has a
+	// filled, in-range score for this contestant.
+	const critMinorsComplete = (cont, minors) => minors.length > 0 && minors.every((m) => {
+		const raw = scores[`${cont.id}:${m.id}`];
+		if (raw === undefined || raw === "" || raw === null) return false;
+		const num = Number(raw);
+		const b = boundsFor(m);
+		return validScore(num, {
+			minScore: b.min,
+			maxScore: b.max,
+			decimalPlaces: m.decimalPlaces
+		});
+	});
+	const RowStatus = ({ cont }) => {
+		const total = allCritIds.length;
+		const lockedCount = lockedSetOf(cont).size;
+		if (fullyLocked(cont)) return /* @__PURE__ */ _jsxDEV("span", {
+			className: "v-judge-status-badge",
+			"data-complete": "true",
+			children: [/* @__PURE__ */ _jsxDEV(CheckCircle, { "aria-hidden": true }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 103,
+				columnNumber: 95
+			}, this), "Completed"]
+		}, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 103,
+			columnNumber: 35
+		}, this);
+		if (cont.open === false || lockedCount === 0) return /* @__PURE__ */ _jsxDEV("span", {
+			className: "v-judge-status-badge",
+			children: [/* @__PURE__ */ _jsxDEV(Clock, { "aria-hidden": true }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 104,
+				columnNumber: 97
+			}, this), "Waiting"]
+		}, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 104,
+			columnNumber: 58
+		}, this);
+		return /* @__PURE__ */ _jsxDEV("span", {
+			className: "v-judge-status-badge",
+			children: [
+				lockedCount,
+				"/",
+				total,
+				" locked"
+			]
+		}, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 105,
+			columnNumber: 12
+		}, this);
+	};
+	// Order contestants by the session's contestant order when available, else by
+	// number. No "active" emphasis — the whole field is equal (round-driven).
+	const baseOrdered = (() => {
+		if (displayOrder.length) {
+			const orderMap = new Map(displayOrder.map((id, index) => [id, index]));
+			return [...contestants].sort((a, b) => (orderMap.get(a.id) ?? Infinity) - (orderMap.get(b.id) ?? Infinity));
+		}
+		return [...contestants].sort((a, b) => a.contestantNumber - b.contestantNumber);
+	})();
+	// Preserve the published order without inserting division section rows.
+	const hasRegisteredDivisions = contestants.some((cont) => cont.registrationNumber != null && judgeDivision(cont, sheet).id);
+	const orderedContestants = (hasRegisteredDivisions ? [...baseOrdered].sort((a, b) => Number(judgeContestantNumber(a)) - Number(judgeContestantNumber(b)) || judgeDivision(a, sheet).order - judgeDivision(b, sheet).order) : baseOrdered).filter((cont) => divisionFilter === "all" || judgeDivision(cont, sheet).id === divisionFilter);
+	// Per-criterion Lock control (#6). Each criterion commits on its own the moment
+	// the judge finishes it, so scores can't be revisited (fairness). States:
+	//   • Locked   — already committed (green chip).
+	//   • Waiting  — contestant/criterion not open yet (nothing shown; input greyed).
+	//   • Lockable — open + every minor filled in range → solid Lock button.
+	//   • Incomplete — open but not all minors filled → disabled Lock button.
+	const CritLock = ({ cont, crit, minors, critOpen, targetName }) => {
+		if (isCritLocked(cont, crit.id)) {
+			return /* @__PURE__ */ _jsxDEV(Button, {
+				size: "sm",
+				variant: "secondary",
+				disabled: true,
+				className: "v-judge-lock-button is-locked",
+				"aria-label": `${cont.name}: ${crit.name}, ${targetName} locked`,
+				children: [/* @__PURE__ */ _jsxDEV(CheckCircle, {
+					className: "h-3.5 w-3.5",
+					strokeWidth: 2,
+					"aria-hidden": true
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 141,
+					columnNumber: 11
+				}, this), /* @__PURE__ */ _jsxDEV("span", { children: "Locked" }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 142,
+					columnNumber: 11
+				}, this)]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 134,
+				columnNumber: 9
+			}, this);
+		}
+		if (cont.open === false || !critOpen) return null;
+		const busy = submittingKey === `${cont.id}:${crit.id}`;
+		const rules = judgeDeductionRules;
+		const entryWideRules = rules.filter((rule) => !rule.criteriaId);
+		const entryWideRecords = Object.entries(deductionDrafts).filter(([key]) => key.startsWith(`${cont.id}:`)).flatMap(([, records]) => records.filter((record) => entryWideRules.some((rule) => rule.id === record.ruleId)));
+		const complete = critMinorsComplete(cont, minors) && validJudgeDeductionRecords(deductionDrafts[`${cont.id}:${crit.id}`] ?? [], rules) && validJudgeDeductionRecords(entryWideRecords, entryWideRules);
+		return /* @__PURE__ */ _jsxDEV(Button, {
+			size: "sm",
+			variant: complete ? "primary" : "secondary",
+			onClick: () => onSubmitCriterion?.(cont.id, crit.id),
+			disabled: busy || !complete,
+			loading: busy,
+			className: "v-judge-lock-button",
+			"aria-label": `${cont.name}: ${crit.name}, ${targetName} ${busy ? "Locking" : "Lock"}`,
+			title: complete ? `Lock ${targetName}; this locks all scores for ${crit.name}` : `Complete every score for ${crit.name} before locking`,
+			children: [/* @__PURE__ */ _jsxDEV(Lock, {
+				className: "h-3.5 w-3.5",
+				strokeWidth: 2,
+				"aria-hidden": true
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 163,
+				columnNumber: 9
+			}, this), /* @__PURE__ */ _jsxDEV("span", { children: busy ? "Locking…" : "Lock" }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 164,
+				columnNumber: 9
+			}, this)]
+		}, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 153,
+			columnNumber: 7
+		}, this);
+	};
+	// Existing lock/completion state, presented as a compact read-only badge.
+	return /* @__PURE__ */ _jsxDEV("section", {
+		className: `v-judge-sheet${preview ? " v-judge-sheet-preview" : ""}`,
+		onFocusCapture: () => setTyping(true),
+		onBlurCapture: (e) => {
+			if (!e.currentTarget.contains(e.relatedTarget)) setTyping(false);
+		},
+		children: [/* @__PURE__ */ _jsxDEV("div", {
+			className: "v-judge-sheet-scroll",
+			role: "region",
+			"aria-label": "Judge scoresheet — scroll to view contestants, criteria, and deductions",
+			tabIndex: 0,
+			children: /* @__PURE__ */ _jsxDEV("table", { children: [
+				/* @__PURE__ */ _jsxDEV("caption", {
+					className: "sr-only",
+					children: "Contestants, configured scoring criteria, and deductions. Lock each complete major criterion, then submit the completed round."
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 174,
+					columnNumber: 11
+				}, this),
+				preview && /* @__PURE__ */ _jsxDEV("colgroup", { children: [
+					/* @__PURE__ */ _jsxDEV("col", { className: "v-judge-contestant-col" }, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 176,
+						columnNumber: 13
+					}, this),
+					statusBeforeCriteria && /* @__PURE__ */ _jsxDEV("col", { className: "v-judge-status-col" }, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 177,
+						columnNumber: 38
+					}, this),
+					critColumns.flatMap(({ minors }) => minors.map((m) => /* @__PURE__ */ _jsxDEV("col", {}, m.id, false, {
+						fileName: _jsxFileName,
+						lineNumber: 178,
+						columnNumber: 66
+					}, this))),
+					!simplified && !showDeductionColumn && /* @__PURE__ */ _jsxDEV("col", { className: "v-judge-status-col" }, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 179,
+						columnNumber: 53
+					}, this),
+					showDeductionColumn && /* @__PURE__ */ _jsxDEV("col", { className: "v-judge-deduction-col" }, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 180,
+						columnNumber: 37
+					}, this)
+				] }, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 175,
+					columnNumber: 23
+				}, this),
+				/* @__PURE__ */ _jsxDEV("thead", { children: [/* @__PURE__ */ _jsxDEV("tr", { children: [
+					/* @__PURE__ */ _jsxDEV("th", {
+						className: "v-judge-contestant",
+						scope: "col",
+						rowSpan: 2,
+						children: "Contestant"
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 184,
+						columnNumber: 15
+					}, this),
+					statusBeforeCriteria && /* @__PURE__ */ _jsxDEV("th", {
+						className: "v-judge-status",
+						scope: "col",
+						rowSpan: 2,
+						children: "Status"
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 185,
+						columnNumber: 40
+					}, this),
+					critColumns.map(({ crit, minors, open }) => /* @__PURE__ */ _jsxDEV("th", {
+						colSpan: minors.length,
+						scope: "colgroup",
+						className: "v-judge-major",
+						children: [
+							/* @__PURE__ */ _jsxDEV("span", {
+								className: "v-judge-major-name",
+								children: crit.name
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 187,
+								columnNumber: 17
+							}, this),
+							/* @__PURE__ */ _jsxDEV("span", {
+								className: "v-judge-major-weight",
+								children: pointsBasis ? `${crit.maxScore} pts` : `${crit.percentage}%`
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 188,
+								columnNumber: 17
+							}, this),
+							!simplified && !open && /* @__PURE__ */ _jsxDEV("span", {
+								className: "v-judge-closed-label",
+								children: "Not open yet"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 189,
+								columnNumber: 42
+							}, this)
+						]
+					}, crit.id, true, {
+						fileName: _jsxFileName,
+						lineNumber: 186,
+						columnNumber: 60
+					}, this)),
+					!simplified && !showDeductionColumn && /* @__PURE__ */ _jsxDEV("th", {
+						className: "v-judge-status",
+						scope: "col",
+						rowSpan: 2,
+						children: "Status"
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 191,
+						columnNumber: 55
+					}, this),
+					showDeductionColumn && /* @__PURE__ */ _jsxDEV("th", {
+						scope: "colgroup",
+						className: "v-judge-major v-judge-deduction-major",
+						children: "DEDUCTION"
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 192,
+						columnNumber: 39
+					}, this)
+				] }, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 183,
+					columnNumber: 13
+				}, this), /* @__PURE__ */ _jsxDEV("tr", { children: [critColumns.flatMap(({ minors }) => minors.map((m) => {
+					const bounds = boundsFor(m);
+					const major = critColumns.find((column) => column.minors.includes(m))?.crit;
+					const label = simplified ? pointsBasis || m.id === major?.id ? "Score" : m.name : pointsBasis ? major?.name : m.name;
+					return /* @__PURE__ */ _jsxDEV("th", {
+						scope: "col",
+						className: "v-judge-minor",
+						children: [
+							label,
+							!pointsBasis && m.id !== major?.id && m.percentage !== undefined && /* @__PURE__ */ _jsxDEV("span", {
+								className: "v-judge-range",
+								children: [m.percentage, "% of major criterion"]
+							}, void 0, true, {
+								fileName: _jsxFileName,
+								lineNumber: 198,
+								columnNumber: 145
+							}, this),
+							/* @__PURE__ */ _jsxDEV("span", {
+								className: "v-judge-range",
+								children: [
+									bounds.min,
+									"–",
+									bounds.max
+								]
+							}, void 0, true, {
+								fileName: _jsxFileName,
+								lineNumber: 198,
+								columnNumber: 219
+							}, this)
+						]
+					}, m.id, true, {
+						fileName: _jsxFileName,
+						lineNumber: 198,
+						columnNumber: 22
+					}, this);
+				})), showDeductionColumn && /* @__PURE__ */ _jsxDEV("th", {
+					scope: "col",
+					className: "v-judge-minor v-judge-deduction-minor",
+					children: /* @__PURE__ */ _jsxDEV("span", {
+						className: "v-judge-deduction-header-list",
+						children: deductionHeaderRules.map((rule) => /* @__PURE__ */ _jsxDEV("span", {
+							className: "v-judge-deduction-header-item",
+							children: [/* @__PURE__ */ _jsxDEV("strong", { children: rule.description }, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 204,
+								columnNumber: 23
+							}, this), /* @__PURE__ */ _jsxDEV("span", {
+								className: "v-judge-range",
+								children: [
+									"/ ",
+									rule.units === "placements" ? "+" : "-",
+									rule.amount,
+									" ",
+									rule.units === "points" ? "Points" : "Placements"
+								]
+							}, void 0, true, {
+								fileName: _jsxFileName,
+								lineNumber: 205,
+								columnNumber: 23
+							}, this)]
+						}, rule.id, true, {
+							fileName: _jsxFileName,
+							lineNumber: 203,
+							columnNumber: 21
+						}, this))
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 201,
+						columnNumber: 17
+					}, this)
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 200,
+					columnNumber: 39
+				}, this)] }, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 194,
+					columnNumber: 13
+				}, this)] }, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 182,
+					columnNumber: 11
+				}, this),
+				/* @__PURE__ */ _jsxDEV("tbody", { children: [orderedContestants.length === 0 && /* @__PURE__ */ _jsxDEV("tr", { children: /* @__PURE__ */ _jsxDEV("td", {
+					colSpan: 1 + critColumns.reduce((count, column) => count + column.minors.length, 0) + (!simplified ? 1 : 0) + (showDeductionColumn ? 1 : 0),
+					className: "v-judge-empty",
+					children: "No contestants in this division for the selected round."
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 214,
+					columnNumber: 58
+				}, this) }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 214,
+					columnNumber: 54
+				}, this), orderedContestants.map((cont) => {
+					const closed = cont.open === false || !!sheet.submission;
+					const presentation = contestantPresentation(cont, sheet);
+					const entryDeductions = deductionsForContestant(cont);
+					return /* @__PURE__ */ _jsxDEV("tr", {
+						"data-contestant-id": cont.id,
+						"data-division-tone": presentation.tone,
+						style: presentation.style,
+						children: [
+							/* @__PURE__ */ _jsxDEV("td", {
+								className: "v-judge-contestant",
+								children: /* @__PURE__ */ _jsxDEV("div", {
+									className: "v-judge-identity",
+									children: [
+										/* @__PURE__ */ _jsxDEV("span", {
+											className: "v-judge-number",
+											title: presentation.divisionName || undefined,
+											children: [/* @__PURE__ */ _jsxDEV("span", { children: ["#", judgeContestantNumber(cont)] }, void 0, true, {
+												fileName: _jsxFileName,
+												lineNumber: 222,
+												columnNumber: 21
+											}, this), presentation.indicator && /* @__PURE__ */ _jsxDEV("small", { children: presentation.indicator }, void 0, false, {
+												fileName: _jsxFileName,
+												lineNumber: 222,
+												columnNumber: 91
+											}, this)]
+										}, void 0, true, {
+											fileName: _jsxFileName,
+											lineNumber: 221,
+											columnNumber: 19
+										}, this),
+										cont.photo && /* @__PURE__ */ _jsxDEV("img", {
+											className: "v-judge-photo",
+											src: cont.photo,
+											alt: ""
+										}, void 0, false, {
+											fileName: _jsxFileName,
+											lineNumber: 224,
+											columnNumber: 34
+										}, this),
+										/* @__PURE__ */ _jsxDEV("span", {
+											className: "v-judge-name",
+											children: [cont.name, presentation.divisionName && /* @__PURE__ */ _jsxDEV("small", {
+												className: "v-judge-division-label",
+												children: presentation.divisionName
+											}, void 0, false, {
+												fileName: _jsxFileName,
+												lineNumber: 225,
+												columnNumber: 91
+											}, this)]
+										}, void 0, true, {
+											fileName: _jsxFileName,
+											lineNumber: 225,
+											columnNumber: 19
+										}, this)
+									]
+								}, void 0, true, {
+									fileName: _jsxFileName,
+									lineNumber: 220,
+									columnNumber: 17
+								}, this)
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 219,
+								columnNumber: 15
+							}, this),
+							statusBeforeCriteria && /* @__PURE__ */ _jsxDEV("td", {
+								className: "v-judge-status",
+								children: /* @__PURE__ */ _jsxDEV(RowStatus, { cont }, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 228,
+									columnNumber: 71
+								}, this)
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 228,
+								columnNumber: 40
+							}, this),
+							critColumns.flatMap(({ crit, minors, open: critOpen }) => {
+								const critLocked = isCritLocked(cont, crit.id) || cont.intersections?.[`${cont.id}:${crit.id}`] === "deny";
+								const busy = submittingKey === `${cont.id}:${crit.id}`;
+								return minors.map((m) => /* @__PURE__ */ _jsxDEV("td", {
+									className: "v-judge-score-cell",
+									title: !simplified && !critOpen ? "Not open yet" : undefined,
+									children: /* @__PURE__ */ _jsxDEV("div", {
+										className: "v-judge-score-stack",
+										children: [/* @__PURE__ */ _jsxDEV("label", { children: [/* @__PURE__ */ _jsxDEV("span", {
+											className: "sr-only",
+											children: [
+												cont.name,
+												": ",
+												crit.name,
+												", ",
+												m.name,
+												" score"
+											]
+										}, void 0, true, {
+											fileName: _jsxFileName,
+											lineNumber: 234,
+											columnNumber: 28
+										}, this), /* @__PURE__ */ _jsxDEV(ScoreInputComponent, {
+											contestantId: cont.id,
+											target: m,
+											bounds: boundsFor(m),
+											scores,
+											onScoreChange,
+											disabled: critLocked || closed || !critOpen || busy
+										}, void 0, false, {
+											fileName: _jsxFileName,
+											lineNumber: 235,
+											columnNumber: 23
+										}, this)] }, void 0, true, {
+											fileName: _jsxFileName,
+											lineNumber: 234,
+											columnNumber: 21
+										}, this), /* @__PURE__ */ _jsxDEV(CritLock, {
+											cont,
+											crit,
+											minors,
+											critOpen,
+											targetName: m.name
+										}, void 0, false, {
+											fileName: _jsxFileName,
+											lineNumber: 237,
+											columnNumber: 21
+										}, this)]
+									}, void 0, true, {
+										fileName: _jsxFileName,
+										lineNumber: 233,
+										columnNumber: 19
+									}, this)
+								}, m.id, false, {
+									fileName: _jsxFileName,
+									lineNumber: 232,
+									columnNumber: 40
+								}, this));
+							}),
+							!simplified && !showDeductionColumn && /* @__PURE__ */ _jsxDEV("td", {
+								className: "v-judge-status",
+								children: /* @__PURE__ */ _jsxDEV(RowStatus, { cont }, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 241,
+									columnNumber: 86
+								}, this)
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 241,
+								columnNumber: 55
+							}, this),
+							showDeductionColumn && /* @__PURE__ */ _jsxDEV("td", {
+								className: "v-judge-deduction-cell",
+								children: onDeductionChange ? /* @__PURE__ */ _jsxDEV("div", {
+									className: "v-judge-deduction-controls",
+									children: deductionRuleGroups.map(({ crit, rules, open }) => {
+										const deductionRecords = deductionDrafts[`${cont.id}:${crit.id}`] ?? [];
+										const critLocked = isCritLocked(cont, crit.id) || cont.intersections?.[`${cont.id}:${crit.id}`] === "deny";
+										const busy = submittingKey === `${cont.id}:${crit.id}`;
+										return /* @__PURE__ */ _jsxDEV(JudgeDeductionControls, {
+											rules,
+											records: deductionRecords,
+											disabled: critLocked || closed || !open || busy,
+											entryLocked: !!cont.lockedCriteria?.length,
+											onChange: (records) => onDeductionChange(cont.id, crit.id, records)
+										}, crit.id, false, {
+											fileName: _jsxFileName,
+											lineNumber: 252,
+											columnNumber: 25
+										}, this);
+									})
+								}, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 244,
+									columnNumber: 19
+								}, this) : entryDeductions.length ? /* @__PURE__ */ _jsxDEV("ul", {
+									className: "v-judge-deduction-readonly",
+									children: entryDeductions.map(({ crit, record, rule }) => /* @__PURE__ */ _jsxDEV("li", { children: [/* @__PURE__ */ _jsxDEV("strong", { children: rule.description }, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 267,
+										columnNumber: 25
+									}, this), /* @__PURE__ */ _jsxDEV("span", { children: [
+										rule.units === "placements" ? "+" : "-",
+										rule.amount,
+										" ",
+										rule.units
+									] }, void 0, true, {
+										fileName: _jsxFileName,
+										lineNumber: 268,
+										columnNumber: 25
+									}, this)] }, `${crit.id}:${record.id}`, true, {
+										fileName: _jsxFileName,
+										lineNumber: 266,
+										columnNumber: 23
+									}, this))
+								}, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 264,
+									columnNumber: 19
+								}, this) : /* @__PURE__ */ _jsxDEV("span", {
+									className: "v-helper-text",
+									children: "No deductions"
+								}, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 272,
+									columnNumber: 21
+								}, this)
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 242,
+								columnNumber: 39
+							}, this)
+						]
+					}, cont.id, true, {
+						fileName: _jsxFileName,
+						lineNumber: 218,
+						columnNumber: 20
+					}, this);
+				})] }, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 214,
+					columnNumber: 11
+				}, this)
+			] }, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 173,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 172,
+			columnNumber: 7
+		}, this), /* @__PURE__ */ _jsxDEV("p", {
+			className: "v-judge-sheet-help",
+			children: simplified ? "Score each criterion, then lock it when complete. Lock Submission becomes available after every required criterion is locked." : "Scroll to view all criteria. Contestant identities and criteria headers stay visible. Lock commits one major criterion; Lock Submission sends the completed round."
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 278,
+			columnNumber: 7
+		}, this)]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 171,
+		columnNumber: 5
+	}, this);
+}
+_s(CompetitionScoringForm, "R3YdCOXXMwKbp7C2Y/Jidc7uNkY=");
+_c = CompetitionScoringForm;
+// Presentation only: actual division/gender labels determine M/F. Unknown
+// divisions keep their own initials/color; names and photos never infer gender.
+function contestantPresentation(contestant, sheet) {
+	const division = judgeDivision(contestant, sheet);
+	const divisionName = division.label || division.name;
+	const { tone } = division;
+	const accent = tone === "female" ? "#db2777" : tone === "male" ? "#2563eb" : division.color;
+	const indicator = tone === "female" ? "F" : tone === "male" ? "M" : divisionName.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+	return {
+		tone,
+		indicator,
+		divisionName,
+		style: accent ? {
+			"--judge-accent": accent,
+			"--judge-row-bg": `color-mix(in srgb, ${accent} 6%, var(--v-surface))`
+		} : undefined
+	};
+}
+// `target` is the thing being scored — a minor criterion (normal path) or, for a
+// not-yet-migrated criterion, the criterion itself. It carries id + bounds, and
+// scores are keyed `${contestantId}:${target.id}`.
+function ScoreInputComponent({ contestantId, target, bounds, scores, onScoreChange, disabled, size = "sm" }) {
+	const key = `${contestantId}:${target.id}`;
+	const currentValue = scores[key] ?? "";
+	const min = bounds?.min ?? target.minScore ?? 1;
+	const max = bounds?.max ?? target.maxScore ?? 100;
+	return /* @__PURE__ */ _jsxDEV(ScoreInputBase, {
+		min,
+		max,
+		step: target.decimalPlaces == null ? "any" : 10 ** -target.decimalPlaces,
+		decimalPlaces: target.decimalPlaces,
+		value: currentValue,
+		onChange: (val) => onScoreChange(contestantId, target.id, val),
+		disabled,
+		size,
+		className: "v-judge-score-input"
+	}, void 0, false, {
+		fileName: _jsxFileName,
+		lineNumber: 304,
+		columnNumber: 5
+	}, this);
+}
+_c2 = ScoreInputComponent;
+// Re-export the inner component for backwards compatibility
+export { ScoreInputComponent as ScoreInput };
+var _c, _c2;
+$RefreshReg$(_c, "CompetitionScoringForm");
+$RefreshReg$(_c2, "ScoreInputComponent");
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+import * as __vite_react_currentExports from "/src/components/voter/competition/CompetitionScoringForm.jsx?t=1792378411082";
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+
+  const currentExports = __vite_react_currentExports;
+  queueMicrotask(() => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Github/Votrix/frontend/src/components/voter/competition/CompetitionScoringForm.jsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Github/Votrix/frontend/src/components/voter/competition/CompetitionScoringForm.jsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+function $RefreshReg$(type, id) { return RefreshRuntime.register(type, "C:/Github/Votrix/frontend/src/components/voter/competition/CompetitionScoringForm.jsx" + ' ' + id); }
+function $RefreshSig$() { return RefreshRuntime.createSignatureFunctionForTransform(); }
+
+//# sourceMappingURL=data:application/json;base64,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QUFZLFNBQVMsU0FBUyxZQUFZLFNBQVM7Q0FDdEYsTUFBTSxZQUFZLFNBQVMsV0FBVyxNQUFNLFNBQVMsU0FBUyxNQUFNLGFBQWEsTUFBTSxLQUFLLEVBQUUsT0FBTyxPQUFPLEVBQUUsTUFBTSxHQUFHLENBQUMsRUFBRSxLQUFJLFNBQVEsS0FBSyxFQUFFLEVBQUUsS0FBSyxFQUFFLEVBQUUsWUFBWTtDQUNwSyxPQUFPO0VBQUU7RUFBTTtFQUFXO0VBQWMsT0FBTyxTQUFTO0dBQUUsa0JBQWtCO0dBQVEsa0JBQWtCLHNCQUFzQixPQUFPO0VBQXdCLElBQUk7Q0FBVTtBQUMzSzs7OztBQUtBLFNBQVMsb0JBQW9CLEVBQUUsY0FBYyxRQUFRLFFBQVEsUUFBUSxlQUFlLFVBQVUsT0FBTyxRQUFRO0NBQzNHLE1BQU0sTUFBTSxHQUFHLGFBQWEsR0FBRyxPQUFPO0NBQ3RDLE1BQU0sZUFBZSxPQUFPLFFBQVE7Q0FDcEMsTUFBTSxNQUFNLFFBQVEsT0FBTyxPQUFPLFlBQVk7Q0FDOUMsTUFBTSxNQUFNLFFBQVEsT0FBTyxPQUFPLFlBQVk7Q0FFOUMsT0FDRSx3QkFBQyxnQkFBRDtFQUNPO0VBQ0E7RUFDTCxNQUFNLE9BQU8saUJBQWlCLE9BQU8sUUFBUSxNQUFNLENBQUMsT0FBTztFQUMzRCxlQUFlLE9BQU87RUFDdEIsT0FBTztFQUNQLFdBQVcsUUFBUSxjQUFjLGNBQWMsT0FBTyxJQUFJLEdBQUc7RUFDbkQ7RUFDSjtFQUNOLFdBQVU7Q0FDWDs7Ozs7QUFFTDs7O0FBR0EsU0FBUyx1QkFBdUIiLCJuYW1lcyI6W10sInNvdXJjZXMiOlsiQ29tcGV0aXRpb25TY29yaW5nRm9ybS5qc3giXSwidmVyc2lvbiI6Mywic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsganVkZ2VDb250ZXN0YW50TnVtYmVyLCBqdWRnZURpdmlzaW9uIH0gZnJvbSAnQC91dGlscy9qdWRnZUNvbnRlc3RhbnREaXZpc2lvbnMnXHJcbmltcG9ydCB7IHVzZUVmZmVjdCwgdXNlU3RhdGUgfSBmcm9tICdyZWFjdCdcclxuaW1wb3J0IHsgQ2hlY2tDaXJjbGUsIENsb2NrLCBMb2NrIH0gZnJvbSAnbHVjaWRlLXJlYWN0J1xyXG5pbXBvcnQgQnV0dG9uIGZyb20gJ0AvY29tcG9uZW50cy91aS9CdXR0b24nXHJcbmltcG9ydCBTY29yZUlucHV0QmFzZSBmcm9tICdAL2NvbXBvbmVudHMvdWkvU2NvcmVJbnB1dCdcclxuaW1wb3J0ICcuL0NvbXBldGl0aW9uU2NvcmluZ0Zvcm0uY3NzJ1xyXG5pbXBvcnQge3ZhbGlkU2NvcmV9IGZyb20gJy4uLy4uLy4uLy4uLy4uL3NoYXJlZC9jb21wZXRpdGlvbi1zY29yZS1pbnB1dC5qcydcclxuaW1wb3J0IHsgdmFsaWRKdWRnZURlZHVjdGlvblJlY29yZHMgfSBmcm9tICcuLi8uLi8uLi8uLi8uLi9zaGFyZWQvY29tcGV0aXRpb24tZGVkdWN0aW9ucy5qcydcclxuaW1wb3J0IEp1ZGdlRGVkdWN0aW9uQ29udHJvbHMgZnJvbSAnLi9KdWRnZURlZHVjdGlvbkNvbnRyb2xzJ1xyXG5cclxuLy8gUm91bmQtZHJpdmVuIHNjb3Jlc2hlZXQuIFRoZSB3aG9sZSByb3VuZCdzIGZpZWxkIGlzIG9uIHN0YWdlLCBzbyB0aGUganVkZ2VcclxuLy8gc2NvcmVzIGV2ZXJ5IGNvbnRlc3RhbnQgZnJvbSBvbmUgdGFibGUgYW5kIGNvbW1pdHMgZWFjaCB3aXRoIFwiU3VibWl0ICYgbG9ja1wiLlxyXG4vL1xyXG4vLyBKdWRnZXMgc2NvcmUgTUlOT1IgY3JpdGVyaWEuIEVhY2ggY3JpdGVyaW9uIGNvbnRyaWJ1dGVzIG9uZSBvciBtb3JlIG1pbm9yXHJcbi8vIGNvbHVtbnM7IGVhY2ggbWlub3IgY2FycmllcyBpdHMgb3duIHNjb3JlIHR5cGUvYm91bmRzLiBBIGNyaXRlcmlvbiB3aXRoIG5vXHJcbi8vIG1pbm9ycyAobm90LXlldC1taWdyYXRlZCkgZmFsbHMgYmFjayB0byBhIHNpbmdsZSBjb2x1bW4gc2NvcmVkIGRpcmVjdGx5IGFnYWluc3RcclxuLy8gdGhlIGNyaXRlcmlvbiwgdXNpbmcgdGhlIHNoZWV0J3MgZXZlbnQgc2NhbGUuXHJcbmV4cG9ydCBkZWZhdWx0IGZ1bmN0aW9uIENvbXBldGl0aW9uU2NvcmluZ0Zvcm0oe1xyXG4gIHNoZWV0LFxyXG4gIHNjb3JlcyxcclxuICBvblNjb3JlQ2hhbmdlLFxyXG4gIGRlZHVjdGlvbkRyYWZ0cyA9IHt9LFxyXG4gIG9uRGVkdWN0aW9uQ2hhbmdlLFxyXG4gIHN1Ym1pdHRpbmdLZXkgPSBudWxsLFxyXG4gIG9uU3VibWl0Q3JpdGVyaW9uLFxyXG4gIHNlc3Npb25TdGF0ZSA9IG51bGwsXHJcbiAgc2ltcGxpZmllZCA9IGZhbHNlLFxyXG4gIHByZXZpZXcgPSBmYWxzZSxcclxuICBkaXZpc2lvbkZpbHRlciA9ICdhbGwnLFxyXG59KSB7XHJcbiAgY29uc3QgeyBjb250ZXN0YW50cywgY3JpdGVyaWEgfSA9IHNoZWV0XHJcbiAgY29uc3QgW3R5cGluZyxzZXRUeXBpbmddPXVzZVN0YXRlKGZhbHNlKVxyXG4gIGNvbnN0IFtkaXNwbGF5T3JkZXIsc2V0RGlzcGxheU9yZGVyXT11c2VTdGF0ZShzZXNzaW9uU3RhdGU/LmNvbnRlc3RhbnRPcmRlcj8/W10pXHJcbiAgdXNlRWZmZWN0KCgpPT57aWYoIXR5cGluZylzZXREaXNwbGF5T3JkZXIoc2Vzc2lvblN0YXRlPy5jb250ZXN0YW50T3JkZXI/P1tdKX0sW3R5cGluZyxzZXNzaW9uU3RhdGU/LmNvbnRlc3RhbnRPcmRlcl0pXHJcbiAgY29uc3Qgc2NhbGVCb3VuZHMgPSBzaGVldC5zY29yZUJvdW5kcyA/PyBudWxsXHJcbiAgY29uc3QgcG9pbnRzQmFzaXMgPSBzaGVldC5jcml0ZXJpb25CYXNpcyA9PT0gJ3BvaW50cydcclxuXHJcbiAgY29uc3QgY3JpdENvbHVtbnMgPSAoY3JpdGVyaWEgPz8gW10pLm1hcCgoY3JpdCkgPT4ge1xyXG4gICAgY29uc3QgbWlub3JzID1cclxuICAgICAgcG9pbnRzQmFzaXNcclxuICAgICAgICA/IFt7IGlkOiBjcml0LmlkLCBuYW1lOiBjcml0Lm5hbWUsIG1pblNjb3JlOiBjcml0Lm1pblNjb3JlLCBtYXhTY29yZTogY3JpdC5tYXhTY29yZSwgZGVjaW1hbFBsYWNlczogY3JpdC5kZWNpbWFsUGxhY2VzIH1dXHJcbiAgICAgICAgOiBjcml0Lm1pbm9ycyAmJiBjcml0Lm1pbm9ycy5sZW5ndGhcclxuICAgICAgICA/IGNyaXQubWlub3JzXHJcbiAgICAgICAgOiBbeyBpZDogY3JpdC5pZCwgbmFtZTogY3JpdC5uYW1lLCBtaW5TY29yZTogY3JpdC5taW5TY29yZSwgbWF4U2NvcmU6IGNyaXQubWF4U2NvcmUsIGRlY2ltYWxQbGFjZXM6Y3JpdC5kZWNpbWFsUGxhY2VzIH1dXHJcbiAgICAvLyAjNCBzaG93LWJ1dC1sb2NrOiBhIGNyaXRlcmlvbiB0aGUgb3JnYW5pemVyIGhhc24ndCBvcGVuZWQgcmVuZGVycyBkaXNhYmxlZC5cclxuICAgIHJldHVybiB7IGNyaXQsIG1pbm9ycywgb3BlbjogY3JpdC5vcGVuICE9PSBmYWxzZSB9XHJcbiAgfSlcclxuICBjb25zdCBqdWRnZURlZHVjdGlvblJ1bGVzID1cclxuICAgIHNoZWV0LmRlZHVjdGlvblNldHRpbmdzPy5tb2RlID09PSAnanVkZ2UnXHJcbiAgICAgID8gKHNoZWV0LmRlZHVjdGlvblNldHRpbmdzLnJ1bGVzID8/IFtdKS5maWx0ZXIoKHJ1bGUpID0+IHJ1bGUuYXBwbGllZEJ5ID09PSAnanVkZ2UnKVxyXG4gICAgICA6IFtdXHJcbiAgY29uc3QgZGVkdWN0aW9uUnVsZUdyb3VwcyA9IGNyaXRDb2x1bW5zXHJcbiAgICAubWFwKCh7IGNyaXQsIG9wZW4gfSkgPT4gKHtcclxuICAgICAgY3JpdCxcclxuICAgICAgb3BlbixcclxuICAgICAgcnVsZXM6IGp1ZGdlRGVkdWN0aW9uUnVsZXMuZmlsdGVyKFxyXG4gICAgICAgIChydWxlKSA9PiBydWxlLmFuY2hvckNyaXRlcmlvbklkID09PSBjcml0LmlkLFxyXG4gICAgICApLFxyXG4gICAgfSkpXHJcbiAgICAuZmlsdGVyKCh7IHJ1bGVzIH0pID0+IHJ1bGVzLmxlbmd0aCA+IDApXHJcbiAgY29uc3Qgc2hvd0RlZHVjdGlvbkNvbHVtbiA9IGRlZHVjdGlvblJ1bGVHcm91cHMubGVuZ3RoID4gMFxyXG4gIGNvbnN0IGRlZHVjdGlvbkhlYWRlclJ1bGVzID0gZGVkdWN0aW9uUnVsZUdyb3Vwcy5mbGF0TWFwKCh7IHJ1bGVzIH0pID0+IHJ1bGVzKVxyXG4gIGNvbnN0IHN0YXR1c0JlZm9yZUNyaXRlcmlhID0gIXNpbXBsaWZpZWQgJiYgc2hvd0RlZHVjdGlvbkNvbHVtblxyXG4gIGNvbnN0IGRlZHVjdGlvbnNGb3JDb250ZXN0YW50ID0gKGNvbnQpID0+XHJcbiAgICBkZWR1Y3Rpb25SdWxlR3JvdXBzLmZsYXRNYXAoKHsgY3JpdCwgcnVsZXMgfSkgPT5cclxuICAgICAgKGRlZHVjdGlvbkRyYWZ0c1tgJHtjb250LmlkfToke2NyaXQuaWR9YF0gPz8gW10pLmZsYXRNYXAoKHJlY29yZCkgPT4ge1xyXG4gICAgICAgIGNvbnN0IHJ1bGUgPSBydWxlcy5maW5kKChpdGVtKSA9PiBpdGVtLmlkID09PSByZWNvcmQucnVsZUlkKVxyXG4gICAgICAgIHJldHVybiBydWxlID8gW3sgY3JpdCwgcmVjb3JkLCBydWxlIH1dIDogW11cclxuICAgICAgfSksXHJcbiAgICApXHJcbiAgY29uc3QgYm91bmRzRm9yID0gKG1pbm9yKSA9PiAoe1xyXG4gICAgbWluOiBtaW5vci5taW5TY29yZSA/PyBzY2FsZUJvdW5kcz8ubWluID8/IDEsXHJcbiAgICBtYXg6IG1pbm9yLm1heFNjb3JlID8/IHNjYWxlQm91bmRzPy5tYXggPz8gMTAwLFxyXG4gIH0pXHJcbiAgY29uc3QgYWxsQ3JpdElkcyA9IGNyaXRDb2x1bW5zLm1hcCgoeyBjcml0IH0pID0+IGNyaXQuaWQpXHJcblxyXG4gIC8vICM2IHBlci1jcml0ZXJpb24gbG9ja2luZy4gRWFjaCBjcml0ZXJpb24gaXMgY29tbWl0dGVkIG9uIGl0cyBvd247IGEgY2VsbCBpc1xyXG4gIC8vIG9uZSBvZjogTE9DS0VEIChhbHJlYWR5IHN1Ym1pdHRlZCksIE9QRU4gKHNjb3JhYmxlIG5vdyksIG9yIFdBSVRJTkcgKG9yZ2FuaXplclxyXG4gIC8vIGhhc24ndCBvcGVuZWQgaXQgLyBjb250ZXN0YW50IG5vdCBvcGVuKS4gXCJTdWJtaXQgb3BlbiBjcml0ZXJpYVwiIGNvbW1pdHMgb25seVxyXG4gIC8vIHRoZSBvcGVuLCBub3QteWV0LWxvY2tlZCBjcml0ZXJpYTsgdGhlIHJvdyBpcyBmdWxseSBcIkxvY2tlZFwiIG9uY2UgZXZlcnlcclxuICAvLyBjcml0ZXJpb24gaXMgaW4uXHJcbiAgY29uc3QgbG9ja2VkU2V0T2YgPSAoY29udCkgPT4gbmV3IFNldChjb250LmxvY2tlZENyaXRlcmlhID8/IFtdKVxyXG4gIGNvbnN0IGlzQ3JpdExvY2tlZCA9IChjb250LCBjcml0SWQpID0+IGxvY2tlZFNldE9mKGNvbnQpLmhhcyhjcml0SWQpXHJcbiAgY29uc3QgZnVsbHlMb2NrZWQgPSAoY29udCkgPT5cclxuICAgIEJvb2xlYW4oY29udC5oYXNTdWJtaXR0ZWQpIHx8XHJcbiAgICAoYWxsQ3JpdElkcy5sZW5ndGggPiAwICYmIGFsbENyaXRJZHMuZXZlcnkoKGlkKSA9PiBsb2NrZWRTZXRPZihjb250KS5oYXMoaWQpKSlcclxuXHJcbiAgLy8gQSBjcml0ZXJpb24gaXMgXCJjb21wbGV0ZVwiIChsb2NrYWJsZSkgb25jZSBldmVyeSBvbmUgb2YgaXRzIG1pbm9ycyBoYXMgYVxyXG4gIC8vIGZpbGxlZCwgaW4tcmFuZ2Ugc2NvcmUgZm9yIHRoaXMgY29udGVzdGFudC5cclxuICBjb25zdCBjcml0TWlub3JzQ29tcGxldGUgPSAoY29udCwgbWlub3JzKSA9PlxyXG4gICAgbWlub3JzLmxlbmd0aCA+IDAgJiZcclxuICAgIG1pbm9ycy5ldmVyeSgobSkgPT4ge1xyXG4gICAgICBjb25zdCByYXcgPSBzY29yZXNbYCR7Y29udC5pZH06JHttLmlkfWBdXHJcbiAgICAgIGlmIChyYXcgPT09IHVuZGVmaW5lZCB8fCByYXcgPT09ICcnIHx8IHJhdyA9PT0gbnVsbCkgcmV0dXJuIGZhbHNlXHJcbiAgICAgIGNvbnN0IG51bSA9IE51bWJlcihyYXcpXHJcbiAgICAgIGNvbnN0IGIgPSBib3VuZHNGb3IobSlcclxuICAgICAgcmV0dXJuIHZhbGlkU2NvcmUobnVtLHttaW5TY29yZTpiLm1pbixtYXhTY29yZTpiLm1heCxkZWNpbWFsUGxhY2VzOm0uZGVjaW1hbFBsYWNlc30pXHJcbiAgICB9KVxyXG5cclxuICBjb25zdCBSb3dTdGF0dXMgPSAoeyBjb250IH0pID0+IHtcclxuICAgIGNvbnN0IHRvdGFsID0gYWxsQ3JpdElkcy5sZW5ndGhcclxuICAgIGNvbnN0IGxvY2tlZENvdW50ID0gbG9ja2VkU2V0T2YoY29udCkuc2l6ZVxyXG4gICAgaWYgKGZ1bGx5TG9ja2VkKGNvbnQpKSByZXR1cm4gPHNwYW4gY2xhc3NOYW1lPVwidi1qdWRnZS1zdGF0dXMtYmFkZ2VcIiBkYXRhLWNvbXBsZXRlPVwidHJ1ZVwiPjxDaGVja0NpcmNsZSBhcmlhLWhpZGRlbiAvPkNvbXBsZXRlZDwvc3Bhbj5cclxuICAgIGlmIChjb250Lm9wZW4gPT09IGZhbHNlIHx8IGxvY2tlZENvdW50ID09PSAwKSByZXR1cm4gPHNwYW4gY2xhc3NOYW1lPVwidi1qdWRnZS1zdGF0dXMtYmFkZ2VcIj48Q2xvY2sgYXJpYS1oaWRkZW4gLz5XYWl0aW5nPC9zcGFuPlxyXG4gICAgcmV0dXJuIDxzcGFuIGNsYXNzTmFtZT1cInYtanVkZ2Utc3RhdHVzLWJhZGdlXCI+e2xvY2tlZENvdW50fS97dG90YWx9IGxvY2tlZDwvc3Bhbj5cclxuICB9XHJcblxyXG4gIC8vIE9yZGVyIGNvbnRlc3RhbnRzIGJ5IHRoZSBzZXNzaW9uJ3MgY29udGVzdGFudCBvcmRlciB3aGVuIGF2YWlsYWJsZSwgZWxzZSBieVxyXG4gIC8vIG51bWJlci4gTm8gXCJhY3RpdmVcIiBlbXBoYXNpcyDigJQgdGhlIHdob2xlIGZpZWxkIGlzIGVxdWFsIChyb3VuZC1kcml2ZW4pLlxyXG4gIGNvbnN0IGJhc2VPcmRlcmVkID0gKCgpID0+IHtcclxuICAgIGlmIChkaXNwbGF5T3JkZXIubGVuZ3RoKSB7XHJcbiAgICAgIGNvbnN0IG9yZGVyTWFwID0gbmV3IE1hcChkaXNwbGF5T3JkZXIubWFwKChpZCwgaW5kZXgpID0+IFtpZCwgaW5kZXhdKSlcclxuICAgICAgcmV0dXJuIFsuLi5jb250ZXN0YW50c10uc29ydChcclxuICAgICAgICAoYSwgYikgPT4gKG9yZGVyTWFwLmdldChhLmlkKSA/PyBJbmZpbml0eSkgLSAob3JkZXJNYXAuZ2V0KGIuaWQpID8/IEluZmluaXR5KSxcclxuICAgICAgKVxyXG4gICAgfVxyXG4gICAgcmV0dXJuIFsuLi5jb250ZXN0YW50c10uc29ydCgoYSwgYikgPT4gYS5jb250ZXN0YW50TnVtYmVyIC0gYi5jb250ZXN0YW50TnVtYmVyKVxyXG4gIH0pKClcclxuXHJcbiAgLy8gUHJlc2VydmUgdGhlIHB1Ymxpc2hlZCBvcmRlciB3aXRob3V0IGluc2VydGluZyBkaXZpc2lvbiBzZWN0aW9uIHJvd3MuXHJcbiAgY29uc3QgaGFzUmVnaXN0ZXJlZERpdmlzaW9ucyA9IGNvbnRlc3RhbnRzLnNvbWUoY29udCA9PiBjb250LnJlZ2lzdHJhdGlvbk51bWJlciAhPSBudWxsICYmIGp1ZGdlRGl2aXNpb24oY29udCwgc2hlZXQpLmlkKVxyXG4gIGNvbnN0IG9yZGVyZWRDb250ZXN0YW50cyA9IChoYXNSZWdpc3RlcmVkRGl2aXNpb25zID8gWy4uLmJhc2VPcmRlcmVkXS5zb3J0KChhLGIpID0+IE51bWJlcihqdWRnZUNvbnRlc3RhbnROdW1iZXIoYSkpLU51bWJlcihqdWRnZUNvbnRlc3RhbnROdW1iZXIoYikpIHx8IGp1ZGdlRGl2aXNpb24oYSxzaGVldCkub3JkZXItanVkZ2VEaXZpc2lvbihiLHNoZWV0KS5vcmRlcikgOiBiYXNlT3JkZXJlZClcclxuICAgIC5maWx0ZXIoY29udCA9PiBkaXZpc2lvbkZpbHRlciA9PT0gJ2FsbCcgfHwganVkZ2VEaXZpc2lvbihjb250LCBzaGVldCkuaWQgPT09IGRpdmlzaW9uRmlsdGVyKVxyXG5cclxuICAvLyBQZXItY3JpdGVyaW9uIExvY2sgY29udHJvbCAoIzYpLiBFYWNoIGNyaXRlcmlvbiBjb21taXRzIG9uIGl0cyBvd24gdGhlIG1vbWVudFxyXG4gIC8vIHRoZSBqdWRnZSBmaW5pc2hlcyBpdCwgc28gc2NvcmVzIGNhbid0IGJlIHJldmlzaXRlZCAoZmFpcm5lc3MpLiBTdGF0ZXM6XHJcbiAgLy8gICDigKIgTG9ja2VkICAg4oCUIGFscmVhZHkgY29tbWl0dGVkIChncmVlbiBjaGlwKS5cclxuICAvLyAgIOKAoiBXYWl0aW5nICDigJQgY29udGVzdGFudC9jcml0ZXJpb24gbm90IG9wZW4geWV0IChub3RoaW5nIHNob3duOyBpbnB1dCBncmV5ZWQpLlxyXG4gIC8vICAg4oCiIExvY2thYmxlIOKAlCBvcGVuICsgZXZlcnkgbWlub3IgZmlsbGVkIGluIHJhbmdlIOKGkiBzb2xpZCBMb2NrIGJ1dHRvbi5cclxuICAvLyAgIOKAoiBJbmNvbXBsZXRlIOKAlCBvcGVuIGJ1dCBub3QgYWxsIG1pbm9ycyBmaWxsZWQg4oaSIGRpc2FibGVkIExvY2sgYnV0dG9uLlxyXG4gIGNvbnN0IENyaXRMb2NrID0gKHsgY29udCwgY3JpdCwgbWlub3JzLCBjcml0T3BlbiwgdGFyZ2V0TmFtZSB9KSA9PiB7XHJcbiAgICBpZiAoaXNDcml0TG9ja2VkKGNvbnQsIGNyaXQuaWQpKSB7XHJcbiAgICAgIHJldHVybiAoXHJcbiAgICAgICAgPEJ1dHRvblxyXG4gICAgICAgICAgc2l6ZT1cInNtXCJcclxuICAgICAgICAgIHZhcmlhbnQ9XCJzZWNvbmRhcnlcIlxyXG4gICAgICAgICAgZGlzYWJsZWRcclxuICAgICAgICAgIGNsYXNzTmFtZT1cInYtanVkZ2UtbG9jay1idXR0b24gaXMtbG9ja2VkXCJcclxuICAgICAgICAgIGFyaWEtbGFiZWw9e2Ake2NvbnQubmFtZX06ICR7Y3JpdC5uYW1lfSwgJHt0YXJnZXROYW1lfSBsb2NrZWRgfVxyXG4gICAgICAgID5cclxuICAgICAgICAgIDxDaGVja0NpcmNsZSBjbGFzc05hbWU9XCJoLTMuNSB3LTMuNVwiIHN0cm9rZVdpZHRoPXsyfSBhcmlhLWhpZGRlbiAvPlxyXG4gICAgICAgICAgPHNwYW4+TG9ja2VkPC9zcGFuPlxyXG4gICAgICAgIDwvQnV0dG9uPlxyXG4gICAgICApXHJcbiAgICB9XHJcbiAgICBpZiAoY29udC5vcGVuID09PSBmYWxzZSB8fCAhY3JpdE9wZW4pIHJldHVybiBudWxsXHJcbiAgICBjb25zdCBidXN5ID0gc3VibWl0dGluZ0tleSA9PT0gYCR7Y29udC5pZH06JHtjcml0LmlkfWBcclxuICAgIGNvbnN0IHJ1bGVzID0ganVkZ2VEZWR1Y3Rpb25SdWxlc1xyXG4gICAgY29uc3QgZW50cnlXaWRlUnVsZXMgPSBydWxlcy5maWx0ZXIocnVsZSA9PiAhcnVsZS5jcml0ZXJpYUlkKVxyXG4gICAgY29uc3QgZW50cnlXaWRlUmVjb3JkcyA9IE9iamVjdC5lbnRyaWVzKGRlZHVjdGlvbkRyYWZ0cykuZmlsdGVyKChba2V5XSkgPT4ga2V5LnN0YXJ0c1dpdGgoYCR7Y29udC5pZH06YCkpLmZsYXRNYXAoKFsscmVjb3Jkc10pID0+IHJlY29yZHMuZmlsdGVyKHJlY29yZCA9PiBlbnRyeVdpZGVSdWxlcy5zb21lKHJ1bGUgPT4gcnVsZS5pZCA9PT0gcmVjb3JkLnJ1bGVJZCkpKVxyXG4gICAgY29uc3QgY29tcGxldGUgPSBjcml0TWlub3JzQ29tcGxldGUoY29udCwgbWlub3JzKSAmJiB2YWxpZEp1ZGdlRGVkdWN0aW9uUmVjb3JkcyhkZWR1Y3Rpb25EcmFmdHNbYCR7Y29udC5pZH06JHtjcml0LmlkfWBdID8/IFtdLCBydWxlcykgJiYgdmFsaWRKdWRnZURlZHVjdGlvblJlY29yZHMoZW50cnlXaWRlUmVjb3JkcywgZW50cnlXaWRlUnVsZXMpXHJcbiAgICByZXR1cm4gKFxyXG4gICAgICA8QnV0dG9uXHJcbiAgICAgICAgc2l6ZT1cInNtXCJcclxuICAgICAgICB2YXJpYW50PXtjb21wbGV0ZSA/ICdwcmltYXJ5JyA6ICdzZWNvbmRhcnknfVxyXG4gICAgICAgIG9uQ2xpY2s9eygpID0+IG9uU3VibWl0Q3JpdGVyaW9uPy4oY29udC5pZCwgY3JpdC5pZCl9XHJcbiAgICAgICAgZGlzYWJsZWQ9e2J1c3kgfHwgIWNvbXBsZXRlfVxyXG4gICAgICAgIGxvYWRpbmc9e2J1c3l9XHJcbiAgICAgICAgY2xhc3NOYW1lPVwidi1qdWRnZS1sb2NrLWJ1dHRvblwiXHJcbiAgICAgICAgYXJpYS1sYWJlbD17YCR7Y29udC5uYW1lfTogJHtjcml0Lm5hbWV9LCAke3RhcmdldE5hbWV9ICR7YnVzeSA/ICdMb2NraW5nJyA6ICdMb2NrJ31gfVxyXG4gICAgICAgIHRpdGxlPXtjb21wbGV0ZSA/IGBMb2NrICR7dGFyZ2V0TmFtZX07IHRoaXMgbG9ja3MgYWxsIHNjb3JlcyBmb3IgJHtjcml0Lm5hbWV9YCA6IGBDb21wbGV0ZSBldmVyeSBzY29yZSBmb3IgJHtjcml0Lm5hbWV9IGJlZm9yZSBsb2NraW5nYH1cclxuICAgICAgPlxyXG4gICAgICAgIDxMb2NrIGNsYXNzTmFtZT1cImgtMy41IHctMy41XCIgc3Ryb2tlV2lkdGg9ezJ9IGFyaWEtaGlkZGVuIC8+XHJcbiAgICAgICAgPHNwYW4+e2J1c3kgPyAnTG9ja2luZ+KApicgOiAnTG9jayd9PC9zcGFuPlxyXG4gICAgICA8L0J1dHRvbj5cclxuICAgIClcclxuICB9XHJcblxyXG4gIC8vIEV4aXN0aW5nIGxvY2svY29tcGxldGlvbiBzdGF0ZSwgcHJlc2VudGVkIGFzIGEgY29tcGFjdCByZWFkLW9ubHkgYmFkZ2UuXHJcbiAgcmV0dXJuIChcclxuICAgIDxzZWN0aW9uIGNsYXNzTmFtZT17YHYtanVkZ2Utc2hlZXQke3ByZXZpZXcgPyAnIHYtanVkZ2Utc2hlZXQtcHJldmlldycgOiAnJ31gfSBvbkZvY3VzQ2FwdHVyZT17KCkgPT4gc2V0VHlwaW5nKHRydWUpfSBvbkJsdXJDYXB0dXJlPXtlID0+IHsgaWYgKCFlLmN1cnJlbnRUYXJnZXQuY29udGFpbnMoZS5yZWxhdGVkVGFyZ2V0KSkgc2V0VHlwaW5nKGZhbHNlKSB9fT5cclxuICAgICAgPGRpdiBjbGFzc05hbWU9XCJ2LWp1ZGdlLXNoZWV0LXNjcm9sbFwiIHJvbGU9XCJyZWdpb25cIiBhcmlhLWxhYmVsPVwiSnVkZ2Ugc2NvcmVzaGVldCDigJQgc2Nyb2xsIHRvIHZpZXcgY29udGVzdGFudHMsIGNyaXRlcmlhLCBhbmQgZGVkdWN0aW9uc1wiIHRhYkluZGV4PXswfT5cclxuICAgICAgICA8dGFibGU+XHJcbiAgICAgICAgICA8Y2FwdGlvbiBjbGFzc05hbWU9XCJzci1vbmx5XCI+Q29udGVzdGFudHMsIGNvbmZpZ3VyZWQgc2NvcmluZyBjcml0ZXJpYSwgYW5kIGRlZHVjdGlvbnMuIExvY2sgZWFjaCBjb21wbGV0ZSBtYWpvciBjcml0ZXJpb24sIHRoZW4gc3VibWl0IHRoZSBjb21wbGV0ZWQgcm91bmQuPC9jYXB0aW9uPlxyXG4gICAgICAgICAge3ByZXZpZXcgJiYgPGNvbGdyb3VwPlxyXG4gICAgICAgICAgICA8Y29sIGNsYXNzTmFtZT1cInYtanVkZ2UtY29udGVzdGFudC1jb2xcIiAvPlxyXG4gICAgICAgICAgICB7c3RhdHVzQmVmb3JlQ3JpdGVyaWEgJiYgPGNvbCBjbGFzc05hbWU9XCJ2LWp1ZGdlLXN0YXR1cy1jb2xcIiAvPn1cclxuICAgICAgICAgICAge2NyaXRDb2x1bW5zLmZsYXRNYXAoKHsgbWlub3JzIH0pID0+IG1pbm9ycy5tYXAobSA9PiA8Y29sIGtleT17bS5pZH0gLz4pKX1cclxuICAgICAgICAgICAgeyFzaW1wbGlmaWVkICYmICFzaG93RGVkdWN0aW9uQ29sdW1uICYmIDxjb2wgY2xhc3NOYW1lPVwidi1qdWRnZS1zdGF0dXMtY29sXCIgLz59XHJcbiAgICAgICAgICAgIHtzaG93RGVkdWN0aW9uQ29sdW1uICYmIDxjb2wgY2xhc3NOYW1lPVwidi1qdWRnZS1kZWR1Y3Rpb24tY29sXCIgLz59XHJcbiAgICAgICAgICA8L2NvbGdyb3VwPn1cclxuICAgICAgICAgIDx0aGVhZD5cclxuICAgICAgICAgICAgPHRyPlxyXG4gICAgICAgICAgICAgIDx0aCBjbGFzc05hbWU9XCJ2LWp1ZGdlLWNvbnRlc3RhbnRcIiBzY29wZT1cImNvbFwiIHJvd1NwYW49ezJ9PkNvbnRlc3RhbnQ8L3RoPlxyXG4gICAgICAgICAgICAgIHtzdGF0dXNCZWZvcmVDcml0ZXJpYSAmJiA8dGggY2xhc3NOYW1lPVwidi1qdWRnZS1zdGF0dXNcIiBzY29wZT1cImNvbFwiIHJvd1NwYW49ezJ9PlN0YXR1czwvdGg+fVxyXG4gICAgICAgICAgICAgIHtjcml0Q29sdW1ucy5tYXAoKHsgY3JpdCwgbWlub3JzLCBvcGVuIH0pID0+IDx0aCBrZXk9e2NyaXQuaWR9IGNvbFNwYW49e21pbm9ycy5sZW5ndGh9IHNjb3BlPVwiY29sZ3JvdXBcIiBjbGFzc05hbWU9XCJ2LWp1ZGdlLW1ham9yXCI+XHJcbiAgICAgICAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJ2LWp1ZGdlLW1ham9yLW5hbWVcIj57Y3JpdC5uYW1lfTwvc3Bhbj5cclxuICAgICAgICAgICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInYtanVkZ2UtbWFqb3Itd2VpZ2h0XCI+e3BvaW50c0Jhc2lzID8gYCR7Y3JpdC5tYXhTY29yZX0gcHRzYCA6IGAke2NyaXQucGVyY2VudGFnZX0lYH08L3NwYW4+XHJcbiAgICAgICAgICAgICAgICB7IXNpbXBsaWZpZWQgJiYgIW9wZW4gJiYgPHNwYW4gY2xhc3NOYW1lPVwidi1qdWRnZS1jbG9zZWQtbGFiZWxcIj5Ob3Qgb3BlbiB5ZXQ8L3NwYW4+fVxyXG4gICAgICAgICAgICAgIDwvdGg+KX1cclxuICAgICAgICAgICAgICB7IXNpbXBsaWZpZWQgJiYgIXNob3dEZWR1Y3Rpb25Db2x1bW4gJiYgPHRoIGNsYXNzTmFtZT1cInYtanVkZ2Utc3RhdHVzXCIgc2NvcGU9XCJjb2xcIiByb3dTcGFuPXsyfT5TdGF0dXM8L3RoPn1cclxuICAgICAgICAgICAgICB7c2hvd0RlZHVjdGlvbkNvbHVtbiAmJiA8dGggc2NvcGU9XCJjb2xncm91cFwiIGNsYXNzTmFtZT1cInYtanVkZ2UtbWFqb3Igdi1qdWRnZS1kZWR1Y3Rpb24tbWFqb3JcIj5ERURVQ1RJT048L3RoPn1cclxuICAgICAgICAgICAgPC90cj5cclxuICAgICAgICAgICAgPHRyPntjcml0Q29sdW1ucy5mbGF0TWFwKCh7IG1pbm9ycyB9KSA9PiBtaW5vcnMubWFwKG0gPT4ge1xyXG4gICAgICAgICAgICAgIGNvbnN0IGJvdW5kcyA9IGJvdW5kc0ZvcihtKVxyXG4gICAgICAgICAgICAgIGNvbnN0IG1ham9yPWNyaXRDb2x1bW5zLmZpbmQoY29sdW1uPT5jb2x1bW4ubWlub3JzLmluY2x1ZGVzKG0pKT8uY3JpdFxyXG4gICAgICAgICAgICAgIGNvbnN0IGxhYmVsPXNpbXBsaWZpZWQ/KHBvaW50c0Jhc2lzfHxtLmlkPT09bWFqb3I/LmlkPydTY29yZSc6bS5uYW1lKTpwb2ludHNCYXNpcz9tYWpvcj8ubmFtZTptLm5hbWVcclxuICAgICAgICAgICAgICByZXR1cm4gPHRoIGtleT17bS5pZH0gc2NvcGU9XCJjb2xcIiBjbGFzc05hbWU9XCJ2LWp1ZGdlLW1pbm9yXCI+e2xhYmVsfXshcG9pbnRzQmFzaXMmJm0uaWQhPT1tYWpvcj8uaWQmJm0ucGVyY2VudGFnZSAhPT0gdW5kZWZpbmVkICYmIDxzcGFuIGNsYXNzTmFtZT1cInYtanVkZ2UtcmFuZ2VcIj57bS5wZXJjZW50YWdlfSUgb2YgbWFqb3IgY3JpdGVyaW9uPC9zcGFuPn08c3BhbiBjbGFzc05hbWU9XCJ2LWp1ZGdlLXJhbmdlXCI+e2JvdW5kcy5taW594oCTe2JvdW5kcy5tYXh9PC9zcGFuPjwvdGg+XHJcbiAgICAgICAgICAgIH0pKX1cclxuICAgICAgICAgICAgICB7c2hvd0RlZHVjdGlvbkNvbHVtbiAmJiA8dGggc2NvcGU9XCJjb2xcIiBjbGFzc05hbWU9XCJ2LWp1ZGdlLW1pbm9yIHYtanVkZ2UtZGVkdWN0aW9uLW1pbm9yXCI+XHJcbiAgICAgICAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJ2LWp1ZGdlLWRlZHVjdGlvbi1oZWFkZXItbGlzdFwiPlxyXG4gICAgICAgICAgICAgICAgICB7ZGVkdWN0aW9uSGVhZGVyUnVsZXMubWFwKChydWxlKSA9PiAoXHJcbiAgICAgICAgICAgICAgICAgICAgPHNwYW4ga2V5PXtydWxlLmlkfSBjbGFzc05hbWU9XCJ2LWp1ZGdlLWRlZHVjdGlvbi1oZWFkZXItaXRlbVwiPlxyXG4gICAgICAgICAgICAgICAgICAgICAgPHN0cm9uZz57cnVsZS5kZXNjcmlwdGlvbn08L3N0cm9uZz5cclxuICAgICAgICAgICAgICAgICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInYtanVkZ2UtcmFuZ2VcIj5cclxuICAgICAgICAgICAgICAgICAgICAgICAgLyB7cnVsZS51bml0cyA9PT0gJ3BsYWNlbWVudHMnID8gJysnIDogJy0nfXtydWxlLmFtb3VudH0ge3J1bGUudW5pdHMgPT09ICdwb2ludHMnID8gJ1BvaW50cycgOiAnUGxhY2VtZW50cyd9XHJcbiAgICAgICAgICAgICAgICAgICAgICA8L3NwYW4+XHJcbiAgICAgICAgICAgICAgICAgICAgPC9zcGFuPlxyXG4gICAgICAgICAgICAgICAgICApKX1cclxuICAgICAgICAgICAgICAgIDwvc3Bhbj5cclxuICAgICAgICAgICAgICA8L3RoPn1cclxuICAgICAgICAgICAgPC90cj5cclxuICAgICAgICAgIDwvdGhlYWQ+XHJcbiAgICAgICAgICA8dGJvZHk+e29yZGVyZWRDb250ZXN0YW50cy5sZW5ndGggPT09IDAgJiYgPHRyPjx0ZCBjb2xTcGFuPXsxICsgY3JpdENvbHVtbnMucmVkdWNlKChjb3VudCwgY29sdW1uKSA9PiBjb3VudCArIGNvbHVtbi5taW5vcnMubGVuZ3RoLCAwKSArICghc2ltcGxpZmllZCA/IDEgOiAwKSArIChzaG93RGVkdWN0aW9uQ29sdW1uID8gMSA6IDApfSBjbGFzc05hbWU9XCJ2LWp1ZGdlLWVtcHR5XCI+Tm8gY29udGVzdGFudHMgaW4gdGhpcyBkaXZpc2lvbiBmb3IgdGhlIHNlbGVjdGVkIHJvdW5kLjwvdGQ+PC90cj59e29yZGVyZWRDb250ZXN0YW50cy5tYXAoY29udCA9PiB7XHJcbiAgICAgICAgICAgIGNvbnN0IGNsb3NlZCA9IGNvbnQub3BlbiA9PT0gZmFsc2UgfHwgISFzaGVldC5zdWJtaXNzaW9uXHJcbiAgICAgICAgICAgIGNvbnN0IHByZXNlbnRhdGlvbiA9IGNvbnRlc3RhbnRQcmVzZW50YXRpb24oY29udCwgc2hlZXQpXHJcbiAgICAgICAgICAgIGNvbnN0IGVudHJ5RGVkdWN0aW9ucyA9IGRlZHVjdGlvbnNGb3JDb250ZXN0YW50KGNvbnQpXHJcbiAgICAgICAgICAgIHJldHVybiA8dHIga2V5PXtjb250LmlkfSBkYXRhLWNvbnRlc3RhbnQtaWQ9e2NvbnQuaWR9IGRhdGEtZGl2aXNpb24tdG9uZT17cHJlc2VudGF0aW9uLnRvbmV9IHN0eWxlPXtwcmVzZW50YXRpb24uc3R5bGV9PlxyXG4gICAgICAgICAgICAgIDx0ZCBjbGFzc05hbWU9XCJ2LWp1ZGdlLWNvbnRlc3RhbnRcIj5cclxuICAgICAgICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPVwidi1qdWRnZS1pZGVudGl0eVwiPlxyXG4gICAgICAgICAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJ2LWp1ZGdlLW51bWJlclwiIHRpdGxlPXtwcmVzZW50YXRpb24uZGl2aXNpb25OYW1lIHx8IHVuZGVmaW5lZH0+XHJcbiAgICAgICAgICAgICAgICAgICAgPHNwYW4+I3tqdWRnZUNvbnRlc3RhbnROdW1iZXIoY29udCl9PC9zcGFuPntwcmVzZW50YXRpb24uaW5kaWNhdG9yICYmIDxzbWFsbD57cHJlc2VudGF0aW9uLmluZGljYXRvcn08L3NtYWxsPn1cclxuICAgICAgICAgICAgICAgICAgPC9zcGFuPlxyXG4gICAgICAgICAgICAgICAgICB7Y29udC5waG90byAmJiA8aW1nIGNsYXNzTmFtZT1cInYtanVkZ2UtcGhvdG9cIiBzcmM9e2NvbnQucGhvdG99IGFsdD1cIlwiIC8+fVxyXG4gICAgICAgICAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJ2LWp1ZGdlLW5hbWVcIj57Y29udC5uYW1lfXtwcmVzZW50YXRpb24uZGl2aXNpb25OYW1lICYmIDxzbWFsbCBjbGFzc05hbWU9XCJ2LWp1ZGdlLWRpdmlzaW9uLWxhYmVsXCI+e3ByZXNlbnRhdGlvbi5kaXZpc2lvbk5hbWV9PC9zbWFsbD59PC9zcGFuPlxyXG4gICAgICAgICAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgICAgICAgPC90ZD5cclxuICAgICAgICAgICAgICB7c3RhdHVzQmVmb3JlQ3JpdGVyaWEgJiYgPHRkIGNsYXNzTmFtZT1cInYtanVkZ2Utc3RhdHVzXCI+PFJvd1N0YXR1cyBjb250PXtjb250fS8+PC90ZD59XHJcbiAgICAgICAgICAgICAge2NyaXRDb2x1bW5zLmZsYXRNYXAoKHsgY3JpdCwgbWlub3JzLCBvcGVuOiBjcml0T3BlbiB9KSA9PiB7XHJcbiAgICAgICAgICAgICAgICBjb25zdCBjcml0TG9ja2VkID0gaXNDcml0TG9ja2VkKGNvbnQsIGNyaXQuaWQpIHx8IGNvbnQuaW50ZXJzZWN0aW9ucz8uW2Ake2NvbnQuaWR9OiR7Y3JpdC5pZH1gXSA9PT0gJ2RlbnknXHJcbiAgICAgICAgICAgICAgICBjb25zdCBidXN5ID0gc3VibWl0dGluZ0tleSA9PT0gYCR7Y29udC5pZH06JHtjcml0LmlkfWBcclxuICAgICAgICAgICAgICAgIHJldHVybiBtaW5vcnMubWFwKG0gPT4gPHRkIGtleT17bS5pZH0gY2xhc3NOYW1lPVwidi1qdWRnZS1zY29yZS1jZWxsXCIgdGl0bGU9eyFzaW1wbGlmaWVkJiYhY3JpdE9wZW4/J05vdCBvcGVuIHlldCc6dW5kZWZpbmVkfT5cclxuICAgICAgICAgICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJ2LWp1ZGdlLXNjb3JlLXN0YWNrXCI+XHJcbiAgICAgICAgICAgICAgICAgICAgPGxhYmVsPjxzcGFuIGNsYXNzTmFtZT1cInNyLW9ubHlcIj57Y29udC5uYW1lfToge2NyaXQubmFtZX0sIHttLm5hbWV9IHNjb3JlPC9zcGFuPlxyXG4gICAgICAgICAgICAgICAgICAgICAgPFNjb3JlSW5wdXRDb21wb25lbnQgY29udGVzdGFudElkPXtjb250LmlkfSB0YXJnZXQ9e219IGJvdW5kcz17Ym91bmRzRm9yKG0pfSBzY29yZXM9e3Njb3Jlc30gb25TY29yZUNoYW5nZT17b25TY29yZUNoYW5nZX0gZGlzYWJsZWQ9e2NyaXRMb2NrZWQgfHwgY2xvc2VkIHx8ICFjcml0T3BlbiB8fCBidXN5fSAvPlxyXG4gICAgICAgICAgICAgICAgICAgIDwvbGFiZWw+XHJcbiAgICAgICAgICAgICAgICAgICAgPENyaXRMb2NrIGNvbnQ9e2NvbnR9IGNyaXQ9e2NyaXR9IG1pbm9ycz17bWlub3JzfSBjcml0T3Blbj17Y3JpdE9wZW59IHRhcmdldE5hbWU9e20ubmFtZX0gLz5cclxuICAgICAgICAgICAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgICAgICAgICA8L3RkPilcclxuICAgICAgICAgICAgICB9KX1cclxuICAgICAgICAgICAgICB7IXNpbXBsaWZpZWQgJiYgIXNob3dEZWR1Y3Rpb25Db2x1bW4gJiYgPHRkIGNsYXNzTmFtZT1cInYtanVkZ2Utc3RhdHVzXCI+PFJvd1N0YXR1cyBjb250PXtjb250fS8+PC90ZD59XHJcbiAgICAgICAgICAgICAge3Nob3dEZWR1Y3Rpb25Db2x1bW4gJiYgPHRkIGNsYXNzTmFtZT1cInYtanVkZ2UtZGVkdWN0aW9uLWNlbGxcIj5cclxuICAgICAgICAgICAgICAgIHtvbkRlZHVjdGlvbkNoYW5nZSA/IChcclxuICAgICAgICAgICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJ2LWp1ZGdlLWRlZHVjdGlvbi1jb250cm9sc1wiPlxyXG4gICAgICAgICAgICAgICAgICAgIHtkZWR1Y3Rpb25SdWxlR3JvdXBzLm1hcCgoeyBjcml0LCBydWxlcywgb3BlbiB9KSA9PiB7XHJcbiAgICAgICAgICAgICAgICAgICAgICBjb25zdCBkZWR1Y3Rpb25SZWNvcmRzID0gZGVkdWN0aW9uRHJhZnRzW2Ake2NvbnQuaWR9OiR7Y3JpdC5pZH1gXSA/PyBbXVxyXG4gICAgICAgICAgICAgICAgICAgICAgY29uc3QgY3JpdExvY2tlZCA9XHJcbiAgICAgICAgICAgICAgICAgICAgICAgIGlzQ3JpdExvY2tlZChjb250LCBjcml0LmlkKSB8fFxyXG4gICAgICAgICAgICAgICAgICAgICAgICBjb250LmludGVyc2VjdGlvbnM/LltgJHtjb250LmlkfToke2NyaXQuaWR9YF0gPT09ICdkZW55J1xyXG4gICAgICAgICAgICAgICAgICAgICAgY29uc3QgYnVzeSA9IHN1Ym1pdHRpbmdLZXkgPT09IGAke2NvbnQuaWR9OiR7Y3JpdC5pZH1gXHJcbiAgICAgICAgICAgICAgICAgICAgICByZXR1cm4gKFxyXG4gICAgICAgICAgICAgICAgICAgICAgICA8SnVkZ2VEZWR1Y3Rpb25Db250cm9sc1xyXG4gICAgICAgICAgICAgICAgICAgICAgICAgIGtleT17Y3JpdC5pZH1cclxuICAgICAgICAgICAgICAgICAgICAgICAgICBydWxlcz17cnVsZXN9XHJcbiAgICAgICAgICAgICAgICAgICAgICAgICAgcmVjb3Jkcz17ZGVkdWN0aW9uUmVjb3Jkc31cclxuICAgICAgICAgICAgICAgICAgICAgICAgICBkaXNhYmxlZD17Y3JpdExvY2tlZCB8fCBjbG9zZWQgfHwgIW9wZW4gfHwgYnVzeX1cclxuICAgICAgICAgICAgICAgICAgICAgICAgICBlbnRyeUxvY2tlZD17ISFjb250LmxvY2tlZENyaXRlcmlhPy5sZW5ndGh9XHJcbiAgICAgICAgICAgICAgICAgICAgICAgICAgb25DaGFuZ2U9eyhyZWNvcmRzKSA9PiBvbkRlZHVjdGlvbkNoYW5nZShjb250LmlkLCBjcml0LmlkLCByZWNvcmRzKX1cclxuICAgICAgICAgICAgICAgICAgICAgICAgLz5cclxuICAgICAgICAgICAgICAgICAgICAgIClcclxuICAgICAgICAgICAgICAgICAgICB9KX1cclxuICAgICAgICAgICAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgICAgICAgICApIDogZW50cnlEZWR1Y3Rpb25zLmxlbmd0aCA/IChcclxuICAgICAgICAgICAgICAgICAgPHVsIGNsYXNzTmFtZT1cInYtanVkZ2UtZGVkdWN0aW9uLXJlYWRvbmx5XCI+XHJcbiAgICAgICAgICAgICAgICAgICAge2VudHJ5RGVkdWN0aW9ucy5tYXAoKHsgY3JpdCwgcmVjb3JkLCBydWxlIH0pID0+IChcclxuICAgICAgICAgICAgICAgICAgICAgIDxsaSBrZXk9e2Ake2NyaXQuaWR9OiR7cmVjb3JkLmlkfWB9PlxyXG4gICAgICAgICAgICAgICAgICAgICAgICA8c3Ryb25nPntydWxlLmRlc2NyaXB0aW9ufTwvc3Ryb25nPlxyXG4gICAgICAgICAgICAgICAgICAgICAgICA8c3Bhbj57cnVsZS51bml0cyA9PT0gJ3BsYWNlbWVudHMnID8gJysnIDogJy0nfXtydWxlLmFtb3VudH0ge3J1bGUudW5pdHN9PC9zcGFuPlxyXG4gICAgICAgICAgICAgICAgICAgICAgPC9saT5cclxuICAgICAgICAgICAgICAgICAgICApKX1cclxuICAgICAgICAgICAgICAgICAgPC91bD5cclxuICAgICAgICAgICAgICAgICkgOiA8c3BhbiBjbGFzc05hbWU9XCJ2LWhlbHBlci10ZXh0XCI+Tm8gZGVkdWN0aW9uczwvc3Bhbj59XHJcbiAgICAgICAgICAgICAgPC90ZD59XHJcbiAgICAgICAgICAgIDwvdHI+XHJcbiAgICAgICAgICB9KX08L3Rib2R5PlxyXG4gICAgICAgIDwvdGFibGU+XHJcbiAgICAgIDwvZGl2PlxyXG4gICAgICA8cCBjbGFzc05hbWU9XCJ2LWp1ZGdlLXNoZWV0LWhlbHBcIj57c2ltcGxpZmllZD8nU2NvcmUgZWFjaCBjcml0ZXJpb24sIHRoZW4gbG9jayBpdCB3aGVuIGNvbXBsZXRlLiBMb2NrIFN1Ym1pc3Npb24gYmVjb21lcyBhdmFpbGFibGUgYWZ0ZXIgZXZlcnkgcmVxdWlyZWQgY3JpdGVyaW9uIGlzIGxvY2tlZC4nOidTY3JvbGwgdG8gdmlldyBhbGwgY3JpdGVyaWEuIENvbnRlc3RhbnQgaWRlbnRpdGllcyBhbmQgY3JpdGVyaWEgaGVhZGVycyBzdGF5IHZpc2libGUuIExvY2sgY29tbWl0cyBvbmUgbWFqb3IgY3JpdGVyaW9uOyBMb2NrIFN1Ym1pc3Npb24gc2VuZHMgdGhlIGNvbXBsZXRlZCByb3VuZC4nfTwvcD5cclxuICAgIDwvc2VjdGlvbj5cclxuICApXHJcbn1cclxuXHJcbi8vIFByZXNlbnRhdGlvbiBvbmx5OiBhY3R1YWwgZGl2aXNpb24vZ2VuZGVyIGxhYmVscyBkZXRlcm1pbmUgTS9GLiBVbmtub3duXHJcbi8vIGRpdmlzaW9ucyBrZWVwIHRoZWlyIG93biBpbml0aWFscy9jb2xvcjsgbmFtZXMgYW5kIHBob3RvcyBuZXZlciBpbmZlciBnZW5kZXIuXHJcbmZ1bmN0aW9uIGNvbnRlc3RhbnRQcmVzZW50YXRpb24oY29udGVzdGFudCwgc2hlZXQpIHtcclxuICBjb25zdCBkaXZpc2lvbiA9IGp1ZGdlRGl2aXNpb24oY29udGVzdGFudCwgc2hlZXQpXHJcbiAgY29uc3QgZGl2aXNpb25OYW1lID0gZGl2aXNpb24ubGFiZWwgfHwgZGl2aXNpb24ubmFtZVxyXG4gIGNvbnN0IHsgdG9uZSB9ID0gZGl2aXNpb25cclxuICBjb25zdCBhY2NlbnQgPSB0b25lID09PSAnZmVtYWxlJyA/ICcjZGIyNzc3JyA6IHRvbmUgPT09ICdtYWxlJyA/ICcjMjU2M2ViJyA6IGRpdmlzaW9uLmNvbG9yXHJcbiAgY29uc3QgaW5kaWNhdG9yID0gdG9uZSA9PT0gJ2ZlbWFsZScgPyAnRicgOiB0b25lID09PSAnbWFsZScgPyAnTScgOiBkaXZpc2lvbk5hbWUuc3BsaXQoL1xccysvKS5maWx0ZXIoQm9vbGVhbikuc2xpY2UoMCwgMikubWFwKHdvcmQgPT4gd29yZFswXSkuam9pbignJykudG9VcHBlckNhc2UoKVxyXG4gIHJldHVybiB7IHRvbmUsIGluZGljYXRvciwgZGl2aXNpb25OYW1lLCBzdHlsZTogYWNjZW50ID8geyAnLS1qdWRnZS1hY2NlbnQnOiBhY2NlbnQsICctLWp1ZGdlLXJvdy1iZyc6IGBjb2xvci1taXgoaW4gc3JnYiwgJHthY2NlbnR9IDYlLCB2YXIoLS12LXN1cmZhY2UpKWAgfSA6IHVuZGVmaW5lZCB9XHJcbn1cclxuXHJcbi8vIGB0YXJnZXRgIGlzIHRoZSB0aGluZyBiZWluZyBzY29yZWQg4oCUIGEgbWlub3IgY3JpdGVyaW9uIChub3JtYWwgcGF0aCkgb3IsIGZvciBhXHJcbi8vIG5vdC15ZXQtbWlncmF0ZWQgY3JpdGVyaW9uLCB0aGUgY3JpdGVyaW9uIGl0c2VsZi4gSXQgY2FycmllcyBpZCArIGJvdW5kcywgYW5kXHJcbi8vIHNjb3JlcyBhcmUga2V5ZWQgYCR7Y29udGVzdGFudElkfToke3RhcmdldC5pZH1gLlxyXG5mdW5jdGlvbiBTY29yZUlucHV0Q29tcG9uZW50KHsgY29udGVzdGFudElkLCB0YXJnZXQsIGJvdW5kcywgc2NvcmVzLCBvblNjb3JlQ2hhbmdlLCBkaXNhYmxlZCwgc2l6ZSA9ICdzbScgfSkge1xyXG4gIGNvbnN0IGtleSA9IGAke2NvbnRlc3RhbnRJZH06JHt0YXJnZXQuaWR9YFxyXG4gIGNvbnN0IGN1cnJlbnRWYWx1ZSA9IHNjb3Jlc1trZXldID8/ICcnXHJcbiAgY29uc3QgbWluID0gYm91bmRzPy5taW4gPz8gdGFyZ2V0Lm1pblNjb3JlID8/IDFcclxuICBjb25zdCBtYXggPSBib3VuZHM/Lm1heCA/PyB0YXJnZXQubWF4U2NvcmUgPz8gMTAwXHJcblxyXG4gIHJldHVybiAoXHJcbiAgICA8U2NvcmVJbnB1dEJhc2VcclxuICAgICAgbWluPXttaW59XHJcbiAgICAgIG1heD17bWF4fVxyXG4gICAgICBzdGVwPXt0YXJnZXQuZGVjaW1hbFBsYWNlcyA9PSBudWxsID8gJ2FueScgOiAxMCAqKiAtdGFyZ2V0LmRlY2ltYWxQbGFjZXN9XHJcbiAgICAgIGRlY2ltYWxQbGFjZXM9e3RhcmdldC5kZWNpbWFsUGxhY2VzfVxyXG4gICAgICB2YWx1ZT17Y3VycmVudFZhbHVlfVxyXG4gICAgICBvbkNoYW5nZT17KHZhbCkgPT4gb25TY29yZUNoYW5nZShjb250ZXN0YW50SWQsIHRhcmdldC5pZCwgdmFsKX1cclxuICAgICAgZGlzYWJsZWQ9e2Rpc2FibGVkfVxyXG4gICAgICBzaXplPXtzaXplfVxyXG4gICAgICBjbGFzc05hbWU9XCJ2LWp1ZGdlLXNjb3JlLWlucHV0XCJcclxuICAgIC8+XHJcbiAgKVxyXG59XHJcblxyXG4vLyBSZS1leHBvcnQgdGhlIGlubmVyIGNvbXBvbmVudCBmb3IgYmFja3dhcmRzIGNvbXBhdGliaWxpdHlcclxuZXhwb3J0IHsgU2NvcmVJbnB1dENvbXBvbmVudCBhcyBTY29yZUlucHV0IH1cclxuIl19

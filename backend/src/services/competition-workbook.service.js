@@ -5,7 +5,7 @@ import { db } from '../foundation/db.js'
 import { recordAudit } from '../foundation/audit.js'
 import { scopeAllows } from '../../../shared/competition-calculation.js'
 
-export const WORKBOOK_VERSION='VOTRIX-competition-1'
+export const WORKBOOK_VERSION='VOTRIX-competition-2'
 const sheet=(workbook,name,rows)=>XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet(rows),name)
 const rowColor = (rules, divisionId) => {
  const division=rules.divisions.find(d=>d.id===divisionId),name=division?.name?.toLowerCase()
@@ -74,16 +74,23 @@ export function buildWorkbook(state,calculation=null) {
  const status=calculation?.status==='published'&&calculation.rules_version===state.rules.id&&calculation.source_digest===state.sourceDigest?'PUBLISHED':state.ready?'READY FOR VERIFICATION':'PROVISIONAL'
  sheet(book,'Competition Info',[['Template',WORKBOOK_VERSION],['Competition ID',rule.event.id],['Round ID',calculation?.round_id??'overall'],['Configuration ID',rule.id],['Calculation ID',calculation?.id??'provisional'],['Status',status],['Title',rule.event.title],['Precision',dp],['Rounding','Half up; each weighted judge total, then aggregation/final total']])
  sheet(book,'Official Scoring Rules',[['Method',rule.scoringConfig.calculationMethod],['Version',rule.version],['Rule JSON',JSON.stringify(rule)]])
- const raw=[['Event ID','Session ID','Round ID','Judge ID','Entry ID','Major ID','Minor ID','Raw score','Minimum','Maximum','Normalized','Major percent','Weighted contribution']]
+ const raw=[['Event ID','Session ID','Round ID','Judge ID','Entry ID','Major ID','Minor ID','Raw score','Minimum','Maximum','Normalized','Major weight (%)','Minor weight (%)','Weighted contribution (percentage points)']]
  const judgeRows=[['Round ID','Judge ID','Entry ID','Submission ID','Status','Judge total']]
  for(const w of state.worksheets){
    const refs=[]
-   for(const c of w.criteria)for(const m of c.minors){raw.push([rule.event.id,state.session?.id,w.roundId,w.judgeId,w.entryId,c.criteriaId,m.id,m.raw,m.minScore,m.maxScore,Number(m.raw)/m.maxScore*100,c.percentage,(Number(m.raw)/m.maxScore*100)*c.percentage/100/c.minors.length]);refs.push(`'Raw Scores'!M${raw.length}`)}
+   for(const c of w.criteria)for(const m of c.minors){raw.push([rule.event.id,state.session?.id,w.roundId,w.judgeId,w.entryId,c.criteriaId,m.id,m.raw,m.minScore,m.maxScore,Number(m.raw)/m.maxScore*100,c.percentage,m.percentage??'','']);refs.push(`'Raw Scores'!N${raw.length}`)}
    judgeRows.push([w.roundId,w.judgeId,w.entryId,w.submissionId,w.complete?'Submitted':'Missing / Incomplete',w.total])
    judgeRows[judgeRows.length-1].formula=w.complete?`ROUND(SUM(${refs.join(',')}),${dp})`:null
  }
  sheet(book,'Raw Scores',raw)
- for(let n=2;n<=raw.length;n++){book.Sheets['Raw Scores'][`K${n}`].f=`H${n}/J${n}*100`;const count=state.worksheets.find(w=>w.entryId===raw[n-1][4]&&w.judgeId===raw[n-1][3]&&w.roundId===raw[n-1][2])?.criteria.find(c=>c.criteriaId===raw[n-1][5])?.minors.length??1;book.Sheets['Raw Scores'][`M${n}`].f=`K${n}*L${n}/100/${count}`}
+ for(let n=2;n<=raw.length;n++){
+  book.Sheets['Raw Scores'][`K${n}`].f=`H${n}/J${n}*100`
+  const worksheet=state.worksheets.find(w=>w.entryId===raw[n-1][4]&&w.judgeId===raw[n-1][3]&&w.roundId===raw[n-1][2])
+  const criterion=worksheet?.criteria.find(c=>c.criteriaId===raw[n-1][5]),count=criterion?.minors.length??1
+  const directWeights=rule.scoringConfig.minorWeightBasis==='overall'
+  const weightedMinors=criterion?.minors.some(minor=>minor.percentage!==undefined)
+  book.Sheets['Raw Scores'][`N${n}`].f=directWeights&&weightedMinors?`K${n}*M${n}/100`:weightedMinors?`K${n}*L${n}*M${n}/10000`:`K${n}*L${n}/100/${count}`
+ }
  sheet(book,'Judge Worksheets',judgeRows)
  for(let n=2;n<=judgeRows.length;n++)if(judgeRows[n-1].formula)book.Sheets['Judge Worksheets'][`F${n}`].f=judgeRows[n-1].formula
  sheet(book,'Computation Breakdown',[['Round','Entry','Judge','Major','Minor inputs','Percent','Average','Contribution'],...state.worksheets.flatMap(w=>w.criteria.map(c=>[w.roundId,w.entryId,w.judgeId,c.criteriaId,JSON.stringify(c.minors),c.percentage,c.average,c.contribution]))])

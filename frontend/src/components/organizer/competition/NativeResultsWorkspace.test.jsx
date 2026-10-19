@@ -10,6 +10,15 @@ const snapshot=c=>({eventId:'event',competitionId:c,roundId:null,viewerId:'owner
 let states
 beforeEach(()=>{vi.clearAllMocks();f.listeners.clear();states={a:snapshot('a'),b:snapshot('b')};f.owned.mockImplementation(async(e,c)=>({data:structuredClone(states[c])}));f.publish.mockResolvedValue({data:{}})})
 const ready=async(analytics=false)=>{render(<Workspace eventId="event" choices={choices} analytics={analytics}/>);await screen.findByText(/Current judge completion/)}
+test('official Pageant results show one standings table per division',async()=>{
+ states.a.official.divisionRanking={mode:'division',divisions:[{id:'men',name:'MEN'},{id:'women',name:'WOMEN'}]}
+ states.a.official.standings[0].divisionId='men'
+ states.a.official.standings.push({participationId:'woman',divisionId:'women',entryNumber:1,name:'Woman winner',rank:1,score:3})
+ await ready()
+ expect(screen.getAllByRole('table')).toHaveLength(2)
+ expect(screen.getByRole('heading',{name:'MEN'})).toBeInTheDocument()
+ expect(screen.getByRole('heading',{name:'WOMEN'})).toBeInTheDocument()
+})
 const emit=payload=>{for(const cb of f.listeners.get('competition:native-invalidated')??[])cb(payload)}
 test('explicit No Deductions removes deduction columns from current official results',async()=>{
  states.a.official.deductionSettings={organizer:false,judge:false}
