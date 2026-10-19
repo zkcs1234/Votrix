@@ -1,0 +1,8 @@
+{
+  "singleProcessRoomDelivery": "PASSED",
+  "crossProcessDeliveryRequirement": "FAILED",
+  "sharedTransportInfrastructure": "BLOCKED",
+  "remoteProcessReceivedParentHint": false,
+  "confidentialScoresSent": false,
+  "conclusion": "Process-local registry does not reach a user room in another API process. Reconciliation is not shared delivery."
+}

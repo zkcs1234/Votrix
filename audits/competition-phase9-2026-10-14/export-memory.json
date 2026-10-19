@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "bytes": [
+    2192564,
+    2192564
+  ],
+  "milliseconds": 205.4526,
+  "before": {
+    "rss": 73936896,
+    "heapTotal": 18886656,
+    "heapUsed": 10216736,
+    "external": 4607824,
+    "arrayBuffers": 2583470
+  },
+  "after": {
+    "rss": 107081728,
+    "heapTotal": 54734848,
+    "heapUsed": 24075928,
+    "external": 4649793,
+    "arrayBuffers": 2583470
+  },
+  "rawTargets": 3000,
+  "processPeakWorkingSetBytes": 107282432,
+  "platform": "win32",
+  "outputsRetained": 2,
+  "includesRuntimeInputAndModules": true,
+  "simultaneousHttpExports": false,
+  "productionPeakVerified": false
+}

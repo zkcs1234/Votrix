@@ -1,0 +1,499 @@
+{
+  "phase": 10,
+  "capturedAt": "2026-10-14T03:49:50.084Z",
+  "sourceOnly": true,
+  "providerRequests": false,
+  "secretsRecorded": false,
+  "userConfirmed": {
+    "previousVercelRenderDeployment": true,
+    "gitConnectedPlatforms": true,
+    "collaboratorNotNecessarilyHostingOwner": true,
+    "localAppSharesHostedProductionSensitiveSupabase": true
+  },
+  "git": {
+    "branch": "main",
+    "head": "5fc5dbaf4329896088d8389ed49fa574e25ed73c",
+    "remotes": [
+      {
+        "name": "origin",
+        "host": "github.com",
+        "urlWithheld": true
+      }
+    ],
+    "commitsOrPushesPerformed": false,
+    "remoteBranchProtection": "BLOCKED — no authenticated provider access"
+  },
+  "environment": {
+    "backendKeys": [
+      "CLIENT_URL",
+      "CLOUDINARY_API_KEY",
+      "CLOUDINARY_API_SECRET",
+      "CLOUDINARY_CLOUD_NAME",
+      "CSRF_SECRET",
+      "EMAIL_FROM",
+      "JWT_ACCESS_SECRET",
+      "JWT_COOKIE_NAME",
+      "JWT_EXPIRES_IN",
+      "JWT_REFRESH_SECRET",
+      "LOCK_PARTICIPANTS_ON_ACTIVE",
+      "NODE_ENV",
+      "PORT",
+      "RESEND_API_KEY",
+      "SMTP_HOST",
+      "SMTP_PASSWORD",
+      "SMTP_PORT",
+      "SMTP_USER",
+      "SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "SUPABASE_URL"
+    ],
+    "frontendKeys": [
+      "VITE_API_URL",
+      "VITE_LOCK_PARTICIPANTS_ON_ACTIVE"
+    ],
+    "trackedEnvironmentFiles": [
+      {
+        "file": "backend/.env",
+        "tracked": false
+      },
+      {
+        "file": "frontend/.env",
+        "tracked": false
+      }
+    ],
+    "backendSupabase": {
+      "classification": "HOSTED_PRODUCTION_SENSITIVE",
+      "writableAllowed": false
+    },
+    "serviceCredentialPresent": true,
+    "directSqlKeysPresent": [],
+    "frontendApi": {
+      "configured": true,
+      "origin": "http://localhost:5000",
+      "liveVerified": false
+    },
+    "backendFrontendOrigin": {
+      "configured": false,
+      "origin": "UNIDENTIFIED",
+      "liveVerified": false
+    },
+    "relayConfigured": false,
+    "relaySecretPresent": false,
+    "envFilesModified": false
+  },
+  "hosting": {
+    "render": {
+      "blueprint": "render.yaml",
+      "root": "backend",
+      "build": "npm install",
+      "start": "npm start",
+      "health": "/api/health",
+      "autoDeployExplicitInBlueprint": false,
+      "actualServiceStatus": "UNVERIFIED",
+      "providerSettings": "BLOCKED"
+    },
+    "vercel": {
+      "configuration": "frontend/vercel.json",
+      "framework": "vite",
+      "build": "npm run build",
+      "output": "dist",
+      "projectLinkPresent": false,
+      "actualServiceStatus": "UNVERIFIED",
+      "providerSettings": "BLOCKED"
+    }
+  },
+  "workflows": [
+    {
+      "file": ".github/workflows/backend-ci.yml",
+      "sha256": "3aeb9068ee64c9b61613305cb2f33fa28f9a88ddbe03fa7125e249d8723c6a76",
+      "mainPush": true,
+      "mainPullRequest": true,
+      "deploymentCommandsPresent": false,
+      "usesSecretsExpression": false
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "sha256": "fcb283b52498e2770d574bac20a0cbc209c0868a27c2f61d77b9fdd6af372274",
+      "mainPush": true,
+      "mainPullRequest": true,
+      "deploymentCommandsPresent": false,
+      "usesSecretsExpression": false
+    },
+    {
+      "file": ".github/workflows/frontend-ci.yml",
+      "sha256": "8797d1d9103a8ca35ffffb0378b9bbb8c49123f1477d161c5f2a5d3cde121509",
+      "mainPush": true,
+      "mainPullRequest": true,
+      "deploymentCommandsPresent": false,
+      "usesSecretsExpression": false
+    }
+  ],
+  "scriptRiskInventory": [
+    {
+      "file": "backend/scripts/check-round-progression.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/competition-hint-broker.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/competition-phase10-baseline.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/competition-phase10-discovery.mjs",
+      "loadsDotenv": true,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/competition-phase7-preservation.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/competition-phase8-preservation.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/competition-phase9-baseline.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/competition-phase9-inventory.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/competition-preflight.mjs",
+      "loadsDotenv": true,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/phase8-local-db.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/phase8-postgrest-fixture.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/phase9-local-db.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/phase9-postgrest-fixture.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/production-target-safety.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-child.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-native-results.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-native-scoring.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-native-tabulation.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-native.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-participation.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase7-browser.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase7-integrations.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/test-competition-phase7-performance.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase7-populated-restore.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase7-recovery.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase7-transport.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/test-competition-phase8-browser-extended.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": true,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase8-browser.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": true,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase8-capacity.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase8-database.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/test-competition-phase8-integrations.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/test-competition-phase8-restore.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase8-transport.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-browser-carry.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": true,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-browser-extended.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": true,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-browser-large-roster.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": true,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-browser-methods.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": true,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-browser-suite.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-browser.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": true,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-capacity.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-database.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-export-memory.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-integrations.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-recovery.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-restore.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-competition-phase9-transport.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": false
+    },
+    {
+      "file": "backend/scripts/test-competition-repairs.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": true,
+      "explicitLoopbackPort": true
+    },
+    {
+      "file": "backend/scripts/test-production-target-safety.mjs",
+      "loadsDotenv": false,
+      "loadsApplication": false,
+      "localDataDirectoryCheck": false,
+      "explicitLoopbackPort": true
+    }
+  ],
+  "confirmedWritePaths": [
+    {
+      "file": "backend/src/server.js",
+      "trigger": "startEventScheduleSync() immediately",
+      "writeImplementation": "backend/src/services/event-schedule-sync.service.js"
+    },
+    {
+      "file": "backend/src/server.js",
+      "trigger": "startArchivalScheduler() after 60 seconds",
+      "writeImplementation": "backend/src/services/archival.service.js"
+    },
+    {
+      "file": "backend/src/config/database.js",
+      "trigger": "service-role SDK used by mutating organizer/auth/admin operations",
+      "readOnlyEnforcement": false
+    },
+    {
+      "file": "backend/__tests__/integration/competition-scoring.integration.test.js",
+      "trigger": "RUN_DB_INTEGRATION=1 reads actual environment",
+      "targetIdentityGuard": false
+    }
+  ],
+  "verdict": {
+    "localSharedDatabaseSeparation": "FAILED",
+    "backendStartupApproved": false,
+    "rawTestsApproved": false,
+    "hostingAccountDiscovery": "BLOCKED",
+    "catalogBackupAccess": "BLOCKED",
+    "release": "NO-GO"
+  }
+}

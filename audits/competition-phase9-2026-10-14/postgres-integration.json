@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "database": "votrix_hardening_1791937090503",
+  "template": "votrix_publication_1791898451572",
+  "installationAndRerunPreserved": true,
+  "originalTables": 46,
+  "scenarios": [
+    "Draft removal: master/sibling preservation and stale CAS rejection",
+    "Frozen/scored membership removal denied",
+    "Permission-scoped waiting/open/paused/submitted/closed states",
+    "Correction clears current completion while preserving historical submissions",
+    "Unauthorized actor and anon/authenticated RPC denial"
+  ],
+  "productionTouched": false
+}

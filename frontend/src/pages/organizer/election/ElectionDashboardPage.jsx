@@ -15,6 +15,8 @@ import { useSocketEvent } from '@/hooks/useSocketEvent'
 // invalidate the cache instead of hand-rolling a reload.
 export const ELECTION_DASHBOARD_KEY = ['election', 'dashboard']
 
+const electionPath = (event) => `/organizer/election/events/${event.id}/positions`
+
 export default function ElectionDashboardPage() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({
@@ -54,17 +56,28 @@ export default function ElectionDashboardPage() {
           icon={Vote}
         />
         <StatCard label="Registered voters" value={data?.stats?.registeredVoters ?? 0} hint="Across all events" icon={Users} />
-        <StatCard label="Votes cast" value={data?.stats?.votesCast ?? 0} icon={CheckSquare} />
+        <StatCard label="Votes recorded" value={data?.stats?.votesCast ?? 0} icon={CheckSquare} />
       </div>
 
       <EventStatsTable
-        title="Turnout by event"
+        title="Election Events"
         events={data?.eventBreakdown ?? []}
-        linkFor={(e) => `/organizer/election/events/${e.id}/positions`}
+        linkFor={electionPath}
         registeredLabel="Registered"
         participatedLabel="Voted"
         rateLabel="Turnout"
-        emptyMessage="No events available. Create your first event to begin."
+        emptyContent={
+          <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+            <div>
+              <p className="v-body-text">No election events yet.</p>
+              <p className="v-caption mt-1">Create an election event to get started.</p>
+            </div>
+            <Link to="/organizer/election/events/new" className="v-btn-primary">
+              <Plus className="h-4 w-4" strokeWidth={2} />
+              Create event
+            </Link>
+          </div>
+        }
       />
     </div>
   )

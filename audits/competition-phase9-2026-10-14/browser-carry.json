@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "database": "votrix_hardening_1791937285525",
+  "scenarios": [
+    "Actual Preliminary/Final browser controls calculate back_to_zero with unchanged engine and confirmed roster",
+    "Actual Preliminary/Final browser controls calculate carry_forward with unchanged engine and confirmed roster",
+    "Actual Preliminary/Final browser controls calculate weighted with unchanged engine and confirmed roster"
+  ],
+  "requestCount": 538,
+  "setup": "Reviewed SQL RPC fixture configuration; live/scoring/qualification/tabulation/review/finalization use actual browser UI",
+  "hosted": false,
+  "syntheticJwtIssuance": true,
+  "localPostgrestAdapter": true
+}

@@ -26,7 +26,6 @@ function sendAuthResponse(res, { accessToken, refreshToken, user }, { remember =
 
   res.json({
     success: true,
-    // accessToken now ONLY in HTTP-only cookie - not exposed to JavaScript
     csrfToken,
     user,
   })
@@ -200,6 +199,7 @@ export const changePassword = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: 'Password updated successfully',
+    accessToken: tokens.accessToken,
     csrfToken,
     user: tokens.user,
   })
@@ -237,6 +237,7 @@ export const skipPasswordChange = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: 'You can continue with your current password',
+    accessToken: tokens.accessToken,
     csrfToken,
     user: tokens.user,
   })

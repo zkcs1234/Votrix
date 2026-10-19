@@ -41,6 +41,7 @@ function getDesiredState(event, now, liveEventIds, completedEventIds) {
   }
 
   if (COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)) {
+    if (event.official_rules_id) return null
     // Competition status is driven ENTIRELY by the LIVE SESSION, not the
     // calendar: the organizer opens/closes scoring from Live Control
     // (startSession/completeSession). This is the source of truth everywhere
@@ -166,7 +167,7 @@ export async function syncEventSchedules() {
   try {
     const { data, error } = await db()
       .from(DB_TABLES.EVENTS)
-      .select('id, event_type, status, start_date, end_date, voting_enabled, scoring_enabled, polling_enabled, poll_expires_at')
+      .select('*')
       .in('event_type', [EVENT_TYPES.ELECTION, EVENT_TYPES.POLLING, ...Array.from(COMPETITION_SCORING_EVENT_TYPES)])
       .in('status', ['draft', 'scheduled', 'active'])
 
@@ -190,7 +191,7 @@ export async function syncEventSchedules() {
     const events = [...(data ?? [])]
     const knownIds = new Set(events.map((e) => e.id))
     const columns =
-      'id, event_type, status, start_date, end_date, voting_enabled, scoring_enabled, polling_enabled, poll_expires_at'
+      '*'
 
     const missingLiveIds = [...liveEventIds].filter((id) => !knownIds.has(id))
     if (missingLiveIds.length) {

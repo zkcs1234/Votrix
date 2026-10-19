@@ -1,0 +1,7 @@
+{
+  "database": "votrix_publication_1791901422233",
+  "template": "votrix_tabulation_1791894228454",
+  "host": "127.0.0.1",
+  "port": 55439,
+  "disposable": true
+}

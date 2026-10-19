@@ -1,0 +1,98 @@
+{
+  "checkedAt": "2026-10-14T04:06:53.543Z",
+  "executed": true,
+  "directCatalogVerified": false,
+  "schemaStatus": 200,
+  "tables": [
+    {
+      "name": "competitions",
+      "restExposed": false
+    },
+    {
+      "name": "competition_entries",
+      "restExposed": false
+    },
+    {
+      "name": "competition_legacy_contexts",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_configurations",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_rounds",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_criteria",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_minors",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_judge_assignments",
+      "restExposed": false
+    }
+  ],
+  "rpcs": [
+    {
+      "name": "competition_create_child",
+      "restExposed": false
+    },
+    {
+      "name": "competition_native_foundation",
+      "restExposed": false
+    },
+    {
+      "name": "competition_save_native_configuration",
+      "restExposed": false
+    },
+    {
+      "name": "competition_freeze_native_rules",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_scoring_choices",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_live_view",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_score_write",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_tabulation_snapshot",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_official_calculate",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_confirm_qualification",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_owned_results",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_publication_action",
+      "restExposed": false
+    },
+    {
+      "name": "competition_child_judge_navigation",
+      "restExposed": false
+    }
+  ],
+  "childIdentityStatus": 404,
+  "childIdentityOperational": false,
+  "nativeBackendUsable": false,
+  "note": "GET-only REST exposure/zero-row capability check; not proof of SQL catalog or migration ledger. No event/score/account records requested."
+}

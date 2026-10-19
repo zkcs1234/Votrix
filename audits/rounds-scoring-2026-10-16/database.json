@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "checks": [
+    "Migration rerun preserves existing events, configurations, frozen rules, drafts, submissions, calculations and publications",
+    "Single named scope persists without artificial round identity",
+    "Independent competitions and existing atomic review remain valid",
+    "Valid weighted rounds, invalid contribution totals, and independent qualification without required weights",
+    "Duplicate minor names rejected",
+    "Frozen default precision and per-minor overrides reach the judge sheet",
+    "Excess input precision rejected in the database transaction",
+    "Draft, lock and submit preserve server semantics",
+    "Unauthorized score writes and edits to frozen scored rules rejected",
+    "Closing scoring closes judge inputs",
+    "All synthetic test changes roll back"
+  ],
+  "database": "votrix_dev_1791952165826",
+  "productionTouched": false
+}

@@ -1,4 +1,9 @@
 import { db as getClient } from '../foundation/index.js'
+import { collectRows } from '../foundation/collectRows.js'
+import { evaluateCriteriaReadiness } from '../../../shared/competition-criteria-readiness.js'
+import { scoringRuleReadiness } from '../../../shared/competition-rule-configuration.js'
+import {buildParticipationState} from '../../../shared/competition-participation-state.js'
+import { isDeepStrictEqual } from 'node:util'
 import { recordEventActivity } from '../foundation/activity.js'
 import { ApiError } from '../utils/ApiError.js'
 import {
@@ -28,6 +33,13 @@ async function assertCompetitionEvent(eventId, organizerId) {
     throw new ApiError(400, 'This event is not a competition scoring event')
   }
   return event
+}
+
+async function assertEventResource(table, resourceId, eventId, label) {
+  const { data, error } = await getClient().from(table).select('id').eq('id', resourceId).eq('event_id', eventId).maybeSingle()
+  if (error) throw new ApiError(500, error.message)
+  if (!data) throw new ApiError(403, `${label} does not belong to this event`)
+  return data
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +105,7 @@ function mapCategory(row) {
   if (!row) return null
   return {
     id: row.id,
+    userId: row.user_id,
     eventId: row.event_id,
     divisionId: row.division_id ?? null,
     name: row.name,
@@ -192,6 +205,7 @@ export async function createCategory(eventId, organizerId, payload) {
 
 export async function updateCategory(eventId, organizerId, categoryId, payload) {
   assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  await assertEventResource(DB_TABLES.COMPETITION_CATEGORIES, categoryId, eventId, 'Category')
 
   // Validate division if being updated
   if (payload.divisionId !== undefined && payload.divisionId !== null) {
@@ -234,6 +248,7 @@ export async function updateCategory(eventId, organizerId, categoryId, payload) 
 
 export async function deleteCategory(eventId, organizerId, categoryId) {
   assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  await assertEventResource(DB_TABLES.COMPETITION_CATEGORIES, categoryId, eventId, 'Category')
   const { error } = await getClient()
     .from(DB_TABLES.COMPETITION_CATEGORIES)
     .delete()
@@ -266,6 +281,9 @@ function mapRound(row) {
     isOpen: row.is_open,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
+    purpose: row.workflow?.purpose ?? 'regular',
+    progression: row.workflow?.progression ?? 'weighted',
+    nextRoundId: row.workflow?.nextRoundId ?? null,
     // Phase 6: advancement/elimination config + finalize state.
     advancementType: row.advancement_type ?? 'none',
     advancementValue: row.advancement_value ?? null,
@@ -279,18 +297,11 @@ function mapRound(row) {
 export async function listRounds(eventId, organizerId, filters = {}) {
   await assertCompetitionEvent(eventId, organizerId)
   
-  let query = getClient()
-    .from(DB_TABLES.COMPETITION_ROUNDS)
-    .select('*')
-    .eq('event_id', eventId)
-
-  if (filters.divisionId !== undefined) {
-    query = query.eq('division_id', filters.divisionId)
-  }
-
-  const { data, error } = await query
-    .order('display_order', { ascending: true })
-    .order('created_at', { ascending: true })
+  const { data, error } = await collectRows(() => {
+    let query = getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('*', { count: 'exact' }).eq('event_id', eventId)
+    if (filters.divisionId !== undefined) query = query.eq('division_id', filters.divisionId)
+    return query.order('display_order', { ascending: true }).order('created_at', { ascending: true }).order('id')
+  })
 
   if (error) throw new ApiError(500, error.message)
   return (data ?? []).map(mapRound)
@@ -298,14 +309,15 @@ export async function listRounds(eventId, organizerId, filters = {}) {
 
 export async function createRound(eventId, organizerId, payload) {
   assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  if (payload.nextRoundId) await assertEventResource(DB_TABLES.COMPETITION_ROUNDS, payload.nextRoundId, eventId, 'Next round')
 
   // §F #1: round weights across the event must not exceed 100%.
-  if (Number(payload.weight) > 0) {
+  if (Number(payload.weight) > 0 && (payload.progression ?? 'weighted') === 'weighted' && payload.purpose !== 'special') {
     const { data: rounds } = await getClient()
       .from(DB_TABLES.COMPETITION_ROUNDS)
-      .select('weight')
+      .select('weight,workflow,category_id')
       .eq('event_id', eventId)
-    const total = (rounds ?? []).reduce((s, r) => s + Number(r.weight ?? 0), 0)
+    const total = (rounds ?? []).filter(r => (r.workflow?.progression ?? 'weighted') === 'weighted' && r.workflow?.purpose !== 'special' && (r.category_id??null)===(payload.categoryId??null)).reduce((s, r) => s + Number(r.weight ?? 0), 0)
     assertWeightWithinBudget(total, payload.weight, 'Round weight')
   }
 
@@ -331,6 +343,10 @@ export async function createRound(eventId, organizerId, payload) {
     if (!div) throw new ApiError(400, 'Division does not belong to this event')
   }
 
+  const { data: ordering, error: orderError } = await getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('display_order').eq('event_id', eventId)
+  if (orderError) throw new ApiError(500, orderError.message)
+  const nextOrder = Math.max(-1, ...(ordering ?? []).map(r => Number(r.display_order))) + 1
+
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_ROUNDS)
     .insert({
@@ -339,11 +355,15 @@ export async function createRound(eventId, organizerId, payload) {
       division_id: payload.divisionId ?? null,
       name: payload.name,
       description: payload.description ?? null,
-      display_order: payload.displayOrder ?? 0,
+      display_order: nextOrder,
       weight: payload.weight ?? 0,
       is_open: payload.isOpen ?? false,
       starts_at: payload.startsAt ?? null,
       ends_at: payload.endsAt ?? null,
+      workflow: { purpose: payload.purpose ?? 'regular', progression: payload.progression ?? 'weighted', nextRoundId: payload.nextRoundId ?? null },
+      advancement_type: payload.advancementType ?? 'none',
+      advancement_value: payload.advancementValue ?? null,
+      score_policy: payload.scorePolicy ?? 'independent',
     })
     .select('*')
     .single()
@@ -360,6 +380,12 @@ export async function createRound(eventId, organizerId, payload) {
 
 export async function updateRound(eventId, organizerId, roundId, payload) {
   assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  await assertEventResource(DB_TABLES.COMPETITION_ROUNDS, roundId, eventId, 'Round')
+  if (payload.categoryId) await assertEventResource(DB_TABLES.COMPETITION_CATEGORIES, payload.categoryId, eventId, 'Category')
+  if (payload.nextRoundId) {
+    if (payload.nextRoundId === roundId) throw new ApiError(400, 'A round cannot advance to itself')
+    await assertEventResource(DB_TABLES.COMPETITION_ROUNDS, payload.nextRoundId, eventId, 'Next round')
+  }
   
   if (payload.divisionId !== undefined && payload.divisionId !== null) {
     const { data: div, error: divErr } = await getClient()
@@ -386,6 +412,11 @@ export async function updateRound(eventId, organizerId, roundId, payload) {
   if (payload.advancementType !== undefined) updates.advancement_type = payload.advancementType
   if (payload.advancementValue !== undefined) updates.advancement_value = payload.advancementValue
   if (payload.scorePolicy !== undefined) updates.score_policy = payload.scorePolicy
+  if (['purpose','progression','nextRoundId','judgingSettings'].some(k => payload[k] !== undefined)) {
+    const { data: current } = await getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('workflow').eq('id', roundId).eq('event_id', eventId).single()
+    updates.workflow = { ...(current?.workflow ?? {}) }
+    for (const key of ['purpose','progression','nextRoundId','judgingSettings']) if (payload[key] !== undefined) updates.workflow[key] = payload[key]
+  }
 
   const { data, error } = await getClient()
     .from(DB_TABLES.COMPETITION_ROUNDS)
@@ -408,6 +439,7 @@ export async function updateRound(eventId, organizerId, roundId, payload) {
 
 export async function deleteRound(eventId, organizerId, roundId) {
   assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  await assertEventResource(DB_TABLES.COMPETITION_ROUNDS, roundId, eventId, 'Round')
   const { error } = await getClient()
     .from(DB_TABLES.COMPETITION_ROUNDS)
     .delete()
@@ -427,11 +459,9 @@ export async function deleteRound(eventId, organizerId, roundId) {
 // Round ↔ Contestants / Criteria
 // ---------------------------------------------------------------------------
 export async function addContestantToRound(eventId, organizerId, roundId, contestantId) {
-  await assertCompetitionEvent(eventId, organizerId)
-  const { error } = await getClient()
-    .from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS)
-    .insert({ round_id: roundId, contestant_id: contestantId })
-  if (error && error.code !== '23505') throw new ApiError(500, error.message)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  const { error } = await getClient().rpc('competition_set_round_membership', { p_event:eventId, p_actor:organizerId, p_round:roundId, p_entry:contestantId, p_add:true })
+  if (error) throw new ApiError(['PGRST202','42P01'].includes(error.code) ? 503 : /FORBIDDEN/.test(error.message) ? 403 : 409, ['PGRST202','42P01'].includes(error.code) ? 'Apply competition migration 096 before assigning entries.' : error.message)
   recordEventActivity({
     eventId,
     action: 'competition.round.contestant.add',
@@ -443,13 +473,9 @@ export async function addContestantToRound(eventId, organizerId, roundId, contes
 }
 
 export async function removeContestantFromRound(eventId, organizerId, roundId, contestantId) {
-  await assertCompetitionEvent(eventId, organizerId)
-  const { error } = await getClient()
-    .from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS)
-    .delete()
-    .eq('round_id', roundId)
-    .eq('contestant_id', contestantId)
-  if (error) throw new ApiError(500, error.message)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  const { error } = await getClient().rpc('competition_set_round_membership', { p_event:eventId, p_actor:organizerId, p_round:roundId, p_entry:contestantId, p_add:false })
+  if (error) throw new ApiError(['PGRST202','42P01'].includes(error.code) ? 503 : /FORBIDDEN/.test(error.message) ? 403 : 409, ['PGRST202','42P01'].includes(error.code) ? 'Apply competition migration 096 before assigning entries.' : error.message)
   recordEventActivity({
     eventId,
     action: 'competition.round.contestant.remove',
@@ -461,22 +487,30 @@ export async function removeContestantFromRound(eventId, organizerId, roundId, c
 }
 
 export async function addCriteriaToRound(eventId, organizerId, roundId, criteriaId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  await Promise.all([
+    assertEventResource(DB_TABLES.COMPETITION_ROUNDS, roundId, eventId, 'Round'),
+    assertEventResource(DB_TABLES.CRITERIA, criteriaId, eventId, 'Criterion'),
+  ])
 
   // §F #1: a round's assigned criteria must total ≤ 100%. Sum the round's current
   // criteria plus the one being attached (skip if it's already attached).
-  const { data: existing } = await getClient()
+  const { data: existing, error: existingError } = await getClient()
     .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
     .select('criteria_id')
     .eq('round_id', roundId)
+  if (existingError) throw new ApiError(500, existingError.message)
   const existingIds = (existing ?? []).map((r) => r.criteria_id)
   if (!existingIds.includes(criteriaId)) {
     const idsToPrice = [...existingIds, criteriaId]
-    const { data: crits } = await getClient()
+    const { data: crits, error: criteriaError } = await getClient()
       .from(DB_TABLES.CRITERIA)
-      .select('id, percentage')
+      .select('id, percentage, is_active')
       .in('id', idsToPrice)
-    const pctById = new Map((crits ?? []).map((c) => [c.id, Number(c.percentage ?? 0)]))
+      .eq('event_id', eventId)
+    if (criteriaError) throw new ApiError(500, criteriaError.message)
+    if ((crits ?? []).length !== idsToPrice.length) throw new ApiError(409, 'Round criteria contain an invalid event relationship')
+    const pctById = new Map((crits ?? []).map((c) => [c.id, c.is_active===false?0:Number(c.percentage ?? 0)]))
     const currentTotal = existingIds.reduce((s, id) => s + (pctById.get(id) ?? 0), 0)
     assertWeightWithinBudget(currentTotal, pctById.get(criteriaId) ?? 0, "This round's criteria weight")
   }
@@ -496,7 +530,11 @@ export async function addCriteriaToRound(eventId, organizerId, roundId, criteria
 }
 
 export async function removeCriteriaFromRound(eventId, organizerId, roundId, criteriaId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  await Promise.all([
+    assertEventResource(DB_TABLES.COMPETITION_ROUNDS, roundId, eventId, 'Round'),
+    assertEventResource(DB_TABLES.CRITERIA, criteriaId, eventId, 'Criterion'),
+  ])
   const { error } = await getClient()
     .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
     .delete()
@@ -603,6 +641,7 @@ function mapJudge(row) {
     displayName: row.display_name,
     role: row.judge_role ?? row.role ?? JUDGE_ROLES.JUDGE,
     isActive: row.is_active,
+    accountStatus: row.users?.account_status ?? null,
     hasScored: scored,
     hasSubmitted: scored,
     // Professional profile fields (title/affiliation/expertise), when joined.
@@ -621,7 +660,7 @@ export async function listCompetitionJudges(eventId, organizerId) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id, event_id, user_id, first_name, last_name, metadata, has_scored, judge_role, display_name, is_active, created_at, updated_at, users!inner (id, email, first_name, last_name, profile_data)')
+    .select('id, event_id, user_id, first_name, last_name, metadata, has_scored, judge_role, display_name, is_active, created_at, updated_at, users!inner (id, email, first_name, last_name, profile_data, account_status)')
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
     .order('created_at', { ascending: false })
@@ -719,6 +758,8 @@ export async function getJudgePool(eventId, organizerId, { search } = {}) {
 // Enroll selected judges into the event as COMPETITION_JUDGE. Idempotent; only
 // real judge accounts are matched (D7 guard); optional Email B to newly added.
 export async function pickJudges(eventId, organizerId, { userIds, notify = false } = {}) {
+  const frozenEvent = await assertCompetitionEvent(eventId, organizerId)
+  if (frozenEvent.official_rules_id) throw new ApiError(409, 'Published judge requirements need an authorized rules amendment')
   assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
   if (!Array.isArray(userIds) || userIds.length === 0) {
     throw new ApiError(400, 'Select at least one judge')
@@ -732,6 +773,8 @@ export async function pickJudges(eventId, organizerId, { userIds, notify = false
     .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
     .in('user_id', userIds)
   if (error) throw new ApiError(500, error.message)
+  const authorizedPool = new Set((await getJudgePool(eventId, organizerId)).map(j => j.id))
+  if (userIds.some(id => !authorizedPool.has(id))) throw new ApiError(403, 'Judge is outside your authorized pool')
   const judges = (membershipRows ?? []).map((row) => row.users).filter(Boolean)
   if (!judges?.length) return { matched: 0, enrolled: 0, alreadyEnrolled: 0, notified: 0 }
 
@@ -811,6 +854,8 @@ export async function inviteCompetitionJudge(eventId, organizerId, payload) {
 }
 
 export async function updateCompetitionJudge(eventId, organizerId, judgeId, payload) {
+  const frozenEvent = await assertCompetitionEvent(eventId, organizerId)
+  if (frozenEvent.official_rules_id) throw new ApiError(409, 'Published judge requirements need an authorized rules amendment')
   await assertCompetitionEvent(eventId, organizerId)
   const updates = {}
   if (payload.role !== undefined) {
@@ -843,6 +888,8 @@ export async function updateCompetitionJudge(eventId, organizerId, judgeId, payl
 }
 
 export async function deleteCompetitionJudge(eventId, organizerId, judgeId) {
+  const frozenEvent = await assertCompetitionEvent(eventId, organizerId)
+  if (frozenEvent.official_rules_id) throw new ApiError(409, 'Published judge requirements need an authorized rules amendment')
   await assertCompetitionEvent(eventId, organizerId)
   const { error } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
@@ -900,6 +947,8 @@ export async function listJudgeAssignments(eventId, organizerId, judgeId) {
 }
 
 export async function createJudgeAssignment(eventId, organizerId, judgeId, payload) {
+  const frozenEvent = await assertCompetitionEvent(eventId, organizerId)
+  if (frozenEvent.official_rules_id) throw new ApiError(409, 'Published judge requirements need an authorized rules amendment')
   assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
 
   if (!isValidAssignmentScope(payload.scope)) {
@@ -952,6 +1001,8 @@ export async function createJudgeAssignment(eventId, organizerId, judgeId, paylo
 }
 
 export async function deleteJudgeAssignment(eventId, organizerId, judgeId, assignmentId) {
+  const frozenEvent = await assertCompetitionEvent(eventId, organizerId)
+  if (frozenEvent.official_rules_id) throw new ApiError(409, 'Published judge requirements need an authorized rules amendment')
   assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
   await assertJudgeParticipant(eventId, judgeId)
 
@@ -987,7 +1038,9 @@ export async function getScoringConfig(eventId, organizerId) {
 }
 
 export async function setScoringConfig(eventId, organizerId, partialConfig) {
-  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  const event = await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(event)
+  if (event.official_rules_id) throw new ApiError(409, 'Published scoring rules are frozen. Use the authorized amendment process.')
   const current = await getClient()
     .from(DB_TABLES.EVENTS)
     .select('scoring_config')
@@ -998,13 +1051,24 @@ export async function setScoringConfig(eventId, organizerId, partialConfig) {
     ...(current.data?.scoring_config ?? {}),
     ...partialConfig,
   })
+  const changed = Object.keys(partialConfig).some(key => key !== 'confirmed' && !isDeepStrictEqual(partialConfig[key], current.data?.scoring_config?.[key]))
+  if (changed && partialConfig.confirmed !== true) merged.confirmed = false
+  if (merged.calculationMethod === 'undecided') merged.confirmed = false
+  if (merged.confirmed === true) {
+    const foundation = await getCompetitionFoundation(eventId, organizerId)
+    const readiness = scoringRuleReadiness(foundation, merged, organizerId)
+    if (!readiness.canConfirm) throw new ApiError(400, readiness.issues.map(issue => issue.message).join(' '), { scoringRulesReadiness: readiness })
+  }
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
     .update({ scoring_config: merged })
     .eq('id', eventId)
+    .eq('status', 'draft')
+    .is('official_rules_id', null)
     .select('scoring_config')
-    .single()
+    .maybeSingle()
   if (error) throw new ApiError(500, error.message)
+  if (!data) throw new ApiError(409, 'Setup was published while saving. Reload the official scoring rules.')
   recordEventActivity({
     eventId,
     action: 'competition.scoring_config.update',
@@ -1022,27 +1086,30 @@ export async function getCompetitionFoundation(eventId, organizerId) {
     await Promise.all([
       getClient()
         .from(DB_TABLES.EVENTS)
-        .select('id, title, scoring_config, scoring_enabled, event_type, divisions_enabled, competition_type')
+        .select('id, title, status, official_rules_id, scoring_config, scoring_enabled, event_type, divisions_enabled, competition_type')
         .eq('id', eventId)
         .single(),
       listCategories(eventId, organizerId),
       listRounds(eventId, organizerId),
-      getClient()
+      collectRows(() => getClient()
         .from(DB_TABLES.CRITERIA)
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('event_id', eventId)
         .order('display_order', { ascending: true })
-        .order('created_at', { ascending: true }),
-      getClient()
+        .order('created_at', { ascending: true }).order('id')),
+      collectRows(() => getClient()
         .from(DB_TABLES.CONTESTANTS)
-        .select('*')
+        .select('*', { count:'exact' })
         .eq('event_id', eventId)
-        .order('contestant_number', { ascending: true }),
+        .order('contestant_number', { ascending: true }).order('id')),
       listCompetitionJudges(eventId, organizerId),
       Promise.all([
-        getClient().from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS).select('round_id, contestant_id'),
-        getClient().from(DB_TABLES.COMPETITION_ROUND_CRITERIA).select('round_id, criteria_id'),
-      ]).then(([rc, cr]) => ({ contestants: rc.data ?? [], criteria: cr.data ?? [] })),
+        collectRows(() => getClient().from(DB_TABLES.COMPETITION_ROUND_CONTESTANTS).select('round_id, contestant_id, competition_rounds!inner(event_id)', { count: 'exact' }).eq('competition_rounds.event_id', eventId).order('round_id').order('contestant_id')),
+        collectRows(() => getClient().from(DB_TABLES.COMPETITION_ROUND_CRITERIA).select('round_id, criteria_id, competition_rounds!inner(event_id)', { count: 'exact' }).eq('competition_rounds.event_id', eventId).order('round_id').order('criteria_id')),
+      ]).then(([rc, cr]) => {
+        if (rc.error || cr.error) throw new ApiError(500, (rc.error || cr.error).message)
+        return { contestants: rc.data ?? [], criteria: cr.data ?? [] }
+      }),
       listDivisions(eventId, true), // includeInactive = true to get all divisions
     ])
 
@@ -1065,31 +1132,34 @@ export async function getCompetitionFoundation(eventId, organizerId) {
 
   // Minor criteria (judges score these; each owns its score type). Nested under
   // their parent criterion below so the scoring engine and workspace get them.
-  const { data: minorRows, error: minorErr } = await getClient()
+  const { data: minorRows, error: minorErr } = await collectRows(() => getClient()
     .from(DB_TABLES.MINOR_CRITERIA)
-    .select('id, criteria_id, event_id, name, score_type, custom_min, custom_max, display_order, is_active')
+    .select('id, criteria_id, event_id, name, score_type, custom_min, custom_max, display_order, is_active', { count: 'exact' })
     .eq('event_id', eventId)
     .order('display_order', { ascending: true })
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: true }).order('id'))
   if (minorErr) throw new ApiError(500, minorErr.message)
   const minorsByCrit = new Map()
   for (const m of minorRows ?? []) {
     if (!minorsByCrit.has(m.criteria_id)) minorsByCrit.set(m.criteria_id, [])
     minorsByCrit.get(m.criteria_id).push({
       id: m.id,
+      eventId: m.event_id,
       criteriaId: m.criteria_id,
       name: m.name,
       scoreType: m.score_type,
       customMin: m.custom_min === null || m.custom_min === undefined ? null : Number(m.custom_min),
       customMax: m.custom_max === null || m.custom_max === undefined ? null : Number(m.custom_max),
       displayOrder: m.display_order ?? 0,
+      isActive: m.is_active !== false,
     })
   }
 
-  return {
+  const foundation = {
     event: eventRes.data,
     scoringConfig: mergeScoringConfig(eventRes.data.scoring_config),
     divisions,
+    minorCriteria: [...minorsByCrit.values()].flat(),
     categories: cats,
     rounds: rounds.map((r) => ({
       ...r,
@@ -1112,6 +1182,8 @@ export async function getCompetitionFoundation(eventId, organizerId) {
       ...c,
       contestantNumber: c.contestant_number,
       divisionId: c.division_id ?? null,
+      entryType: c.entry_type ?? null,
+      entryLabel: c.entry_label ?? null,
     })),
     judges,
     assignments: assignmentRows.map((a) => ({
@@ -1121,4 +1193,22 @@ export async function getCompetitionFoundation(eventId, organizerId) {
       scopeId: a.scope_id,
     })),
   }
+  foundation.advancementDecisions = []
+  foundation.eligibilityDecisions = []
+  if (foundation.event.official_rules_id) {
+    const decisions = await Promise.all(['competition_advancement_decisions','competition_eligibility_decisions'].map(table => collectRows(() => getClient().from(table).select('*', { count:'exact' }).eq('event_id',eventId).order('id'))))
+    for (const result of decisions) if (result.error) throw new ApiError(503, 'Could not load confirmed participation history. Reload before assigning entries.')
+    foundation.advancementDecisions = decisions[0].data ?? []
+    foundation.eligibilityDecisions = decisions[1].data ?? []
+  }
+  let participationContext={known:true}
+  if(foundation.event.official_rules_id){
+    const {data,error}=await getClient().rpc('competition_participation_context',{p_event:eventId,p_actor:organizerId})
+    if(error||!data)throw new ApiError(503,'Could not load round participation. Apply migration 099 after 097 and reload saved data.')
+    participationContext=data
+  }
+  foundation.participation=buildParticipationState(foundation,participationContext)
+  foundation.criteriaReadiness = evaluateCriteriaReadiness(foundation)
+  foundation.scoringRulesReadiness = scoringRuleReadiness(foundation, foundation.scoringConfig, organizerId)
+  return foundation
 }

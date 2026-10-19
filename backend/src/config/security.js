@@ -31,8 +31,8 @@ export function assertProductionSecurity() {
     throw new Error('Production requires CSRF_SECRET (min 32 characters).')
   }
 
-  if (!env.clientUrl.startsWith('https://')) {
-    throw new Error('Production requires FRONTEND_URL (or CLIENT_URL) to use https://')
+  if (env.clientOrigins.some(origin => !origin.startsWith('https://'))) {
+    throw new Error('Production requires all explicitly approved frontend origins to use https://')
   }
 
   if (env.cookie.sameSite !== 'none') {

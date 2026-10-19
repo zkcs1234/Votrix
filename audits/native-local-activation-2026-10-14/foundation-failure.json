@@ -1,0 +1,24 @@
+{
+  "database": "votrix_dev_1791952165826",
+  "failedMigration": "039_per_division_contestant_number.sql",
+  "message": "NOTICE:  constraint \"contestants_number_unique\" of relation \"competition_contestants\" does not exist, skipping\r\nERROR:  cannot drop index competition_contestants_number_unique because constraint competition_contestants_number_unique on table competition_contestants requires it\r\nHINT:  You can drop constraint competition_contestants_number_unique on table competition_contestants instead.\r\n",
+  "applied": [
+    "038_fix_competition_tables_event_id.sql",
+    "038_competition_divisions.sql"
+  ],
+  "overlays": [
+    {
+      "file": "011_rename_pageant_to_competition_scoring.sql",
+      "originalSha256": "7d55bce20d0c503c1f3cb3976f9778ccf63a46562a84fd6fd1f4b75d7d0eff7b",
+      "executedSha256": "e4647683d74753a92ad8006d65b170feda3bd1974dcd7f42fbb630ba24998b8a",
+      "reason": "Guarded trigger rename syntax and precommitted enum additions; fresh isolated database only"
+    },
+    {
+      "file": "030_event_information_form_schema.sql",
+      "originalSha256": "986fd5638073a6093af80345795f889da8f7028fa352866ce1e812dde21f6307",
+      "executedSha256": "b38d03acaa7199f236aeaa9a23502c3b09c205c5e2eb62d9f9cbdd679f3ca697",
+      "reason": "Remove trailing non-SQL tool markup after COMMIT; SQL definitions unchanged"
+    }
+  ],
+  "productionTouched": false
+}

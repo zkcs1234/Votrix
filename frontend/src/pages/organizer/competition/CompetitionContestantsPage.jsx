@@ -1,438 +1,158 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { NativeSetupBoundary } from '@/components/organizer/competition/NativeSetupWorkspace'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import FilterBar from '@/components/ui/FilterBar'
-import useEventStatus from '@/hooks/useEventStatus'
+import Button from '@/components/ui/Button'
+import CompetitionRoundParticipation from '@/components/organizer/competition/CompetitionRoundParticipation'
+import {stagePath} from '@/utils/eventStages'
+import useCompetitionSync from '@/hooks/useCompetitionSync'
 import useTableFilter from '@/hooks/useTableFilter'
+import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
+import { ENTRY_TYPES, orderedRounds, participationFor, entryParticipation, roundAcceptsEntry } from '../../../../../shared/competition-participation.js'
 
-import { INPUT_CLASS } from '@/utils/uiClasses'
-const inputClass = INPUT_CLASS
-
-export default function CompetitionContestantsPage() {
+const blank = { name:'', number:1, divisionId:'', entryType:'individual', entryLabel:'' }
+export default function CompetitionContestantsPage() { return <NativeSetupBoundary Legacy={LegacyCompetitionContestantsPage}/> }
+function LegacyCompetitionContestantsPage() {
   const { eventId } = useParams()
-  const { success, error: toastError } = useToast()
-  const { status, setupLocked } = useEventStatus(pageantService, eventId)
-  const [list, setList] = useState([])
-  const [foundation, setFoundation] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  const [name, setName] = useState('')
-  const [number, setNumber] = useState(1)
-  const [numberHint, setNumberHint] = useState('')
-  const [divisionId, setDivisionId] = useState('')
-  const [editingContestant, setEditingContestant] = useState(null)
-  const [photoFile, setPhotoFile] = useState(null)
-  // Round-aware assignment: pick a round, toggle which contestants are in it.
-  const [selectedRoundId, setSelectedRoundId] = useState(null)
-  const [roundBusy, setRoundBusy] = useState(null)
-
-  const load = useCallback(() => {
-    pageantService
-      .getFoundation(eventId)
-      .then(({ data }) => {
-        setFoundation(data.foundation)
-        setList(data.foundation.contestants ?? [])
-      })
-      .finally(() => setLoading(false))
-  }, [eventId])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  const divisionsEnabled = foundation?.event?.divisions_enabled
-  const divisions = foundation?.divisions ?? []
-  const rounds = foundation?.rounds ?? []
-  const hasRounds = rounds.length > 0
-
-  // Search by name/number, and (when enabled) facet by division with counts.
-  const contestantDivisionName = (c) => {
-    const id = c.divisionId ?? c.division_id
-    return id ? (divisions.find((d) => d.id === id)?.name ?? null) : null
-  }
-  const {
-    search,
-    setSearch,
-    activeFilters,
-    setFilter,
-    clearFilters,
-    filtered: visibleList,
-    facets,
-    resultCount,
-    totalCount,
-    hasActiveFilters,
-  } = useTableFilter({
-    rows: list,
-    searchKeys: ['name', (c) => c.contestantNumber ?? c.contestant_number],
-    facetFields: divisionsEnabled
-      ? [{ id: 'division', label: 'Division', accessor: contestantDivisionName }]
-      : [],
-  })
-
-  useEffect(() => {
-    const rs = foundation?.rounds ?? []
-    if (!rs.length) {
-      setSelectedRoundId(null)
-      return
-    }
-    setSelectedRoundId((cur) => (cur && rs.some((r) => r.id === cur) ? cur : rs[0].id))
-  }, [foundation])
-
-  const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? null
-  const roundContestantIds = new Set(selectedRound?.contestantIds ?? [])
-
-  const toggleInRound = async (contestantId) => {
-    if (!selectedRoundId) return
-    setRoundBusy(contestantId)
+  const { success, error:toastError } = useToast()
+  const [foundation,setFoundation] = useState(null), [loading,setLoading] = useState(true), [loadError,setLoadError] = useState('')
+  const [values,setValues] = useState(blank), [editing,setEditing] = useState(null), [photo,setPhoto] = useState(null)
+  const [busy,setBusy] = useState(false), [formError,setFormError] = useState(''), [selectedRoundId,setSelectedRoundId] = useState(null)
+  const [selection,setSelection] = useState([]), [numberHint,setNumberHint] = useState('')
+  const [formVersion,setFormVersion] = useState(0)
+  const [qualifiersOnly,setQualifiersOnly] = useState(false)
+  const recordsRef=useRef(null)
+  const request = useRef(0), numberRequest = useRef(0), mutation = useRef(false), formRef = useRef(null)
+  const load = useCallback(async (resetSelection = true) => {
+    const id = ++request.current
     try {
-      if (roundContestantIds.has(contestantId)) {
-        await pageantService.removeRoundContestant(eventId, selectedRoundId, contestantId)
-      } else {
-        await pageantService.addRoundContestant(eventId, selectedRoundId, contestantId)
-      }
-      await load()
-    } catch (err) {
-      toastError(getErrorMessage(err))
-    } finally {
-      setRoundBusy(null)
-    }
+      const { data } = await pageantService.getFoundation(eventId)
+      if (id === request.current) { setFoundation(data.foundation); setLoadError(''); if (resetSelection) setSelection([]) }
+      return data.foundation
+    } catch (failure) {
+      if (id === request.current) setLoadError(getErrorMessage(failure,'Could not load saved entries. Reload before making changes.'))
+      throw failure
+    } finally { if (id === request.current) setLoading(false) }
+  },[eventId])
+  useEffect(() => { const requests=request, numbers=numberRequest; load().catch(() => {}); return () => { requests.current++; numbers.current++ } },[load])
+  useCompetitionSync(eventId, () => load(false))
+  const list = foundation?.contestants ?? [], rounds = orderedRounds(foundation?.rounds), divisions = foundation?.divisions ?? []
+  const divisionsEnabled = Boolean(foundation?.event?.divisions_enabled)
+  const readOnly = !foundation || foundation.event?.status !== 'draft' || Boolean(foundation.event?.official_rules_id ?? foundation.event?.officialRulesId)
+  const blocked = readOnly || busy || Boolean(loadError)
+  const activeDivisions = divisions.filter(d => d.isActive !== false && d.is_active !== false)
+  const set = (key,value) => { setValues(current => ({...current,[key]:value})); setFormError('') }
+  useEffect(() => { setSelectedRoundId(current => rounds.some(r => r.id === current) ? current : rounds[0]?.id ?? null) },[foundation]) // eslint-disable-line react-hooks/exhaustive-deps
+  const participation = participationFor(foundation ?? {},selectedRoundId), selectedRound = participation.round
+  const assigned = new Set(participation.assignedIds)
+  const divisionName = entry => divisions.find(d => d.id === (entry.divisionId ?? entry.division_id))?.name ?? 'Unassigned'
+  const filters = useTableFilter({ rows:list, searchKeys:['name',e=>e.contestantNumber ?? e.contestant_number],
+    facetFields:divisionsEnabled ? [{id:'division',label:'Division',accessor:divisionName}] : [] })
+  const visible = filters.filtered.filter(entry=>!qualifiersOnly||participation.decision?.qualifiers.includes(entry.id))
+  const eligible = entry => roundAcceptsEntry(selectedRound ?? {},entry) && !entryParticipation(foundation,entry,selectedRoundId).nonCompeting
+  const selectable = visible.filter(entry => eligible(entry) || assigned.has(entry.id))
+  const selected = selectable.filter(e => selection.includes(e.id))
+  const refreshNumber = useCallback(async divisionId => {
+    const id = ++numberRequest.current
+    try { const { data } = await pageantService.getNextContestantNumber(eventId,divisionId || null)
+      if (id === numberRequest.current) { setValues(current => ({...current,number:data.nextContestantNumber})); setNumberHint('Next available number') }
+    } catch { if (id === numberRequest.current) setNumberHint('Enter an available number') }
+  },[eventId])
+  useEffect(() => { if (foundation && !editing && !readOnly) refreshNumber(divisionsEnabled ? values.divisionId : null) },[foundation,editing,readOnly,divisionsEnabled,values.divisionId,refreshNumber])
+  const reset = () => { setValues(blank); setEditing(null); setPhoto(null); setFormVersion(current=>current+1); setFormError(''); setNumberHint('') }
+  const mutate = async operation => {
+    if (blocked || mutation.current) return
+    mutation.current = true; setBusy(true)
+    try { await operation(); await load() }
+    catch (failure) { toastError(getErrorMessage(failure)); }
+    finally { mutation.current = false; setBusy(false) }
   }
-
-  // Bulk assign/remove for the selected round. Operates on the currently VISIBLE
-  // contestants, so a division filter scopes the bulk action (e.g. "add all
-  // Senior contestants to the Final"). Manual per-contestant toggles still work.
-  const bulkRound = async (mode) => {
-    if (!selectedRoundId) return
-    const targets =
-      mode === 'add'
-        ? visibleList.filter((c) => !roundContestantIds.has(c.id))
-        : visibleList.filter((c) => roundContestantIds.has(c.id))
+  const save = async event => {
+    event.preventDefault()
+    if (blocked || mutation.current) return
+    if (!values.name.trim()) { setFormError('Enter a name for this contestant or entry.'); return }
+    if (!Number.isInteger(Number(values.number)) || Number(values.number)<1) { setFormError('Enter a positive whole entry number.'); return }
+    const validDivision = activeDivisions.some(d => d.id === values.divisionId) || (editing && values.divisionId && values.divisionId === (editing.divisionId ?? editing.division_id))
+    if (divisionsEnabled && !validDivision) { setFormError('Select a configured division before saving.'); return }
+    const payload = { name:values.name.trim(),contestantNumber:Number(values.number),entryLabel:values.entryLabel.trim(),
+      ...(values.entryType === 'legacy' ? {} : {entryType:values.entryType}),
+      ...(divisionsEnabled ? {divisionId:values.divisionId} : editing ? {} : {divisionId:null}) }
+    await mutate(async () => {
+      const { data } = editing ? await pageantService.updateContestant(eventId,editing.id,payload) : await pageantService.createContestant(eventId,payload)
+      if (photo && data.contestant?.id) {
+        try { await pageantService.uploadContestantPhoto(eventId,data.contestant.id,photo) }
+        catch { toastError('Entry saved. Its photo could not be uploaded; edit the saved entry to try again.') }
+      }
+      reset(); success(editing ? 'Entry updated' : 'Entry registered. Round assignment is a separate step.')
+    })
+  }
+  const assignSelected = mode => {
+    if (participation.managed || !selectedRound) return
+    const targets = selected.filter(e => mode === 'add' ? eligible(e) && !assigned.has(e.id) : assigned.has(e.id))
     if (!targets.length) return
-    setRoundBusy('bulk')
-    try {
-      const results = await Promise.allSettled(
-        targets.map((c) =>
-          mode === 'add'
-            ? pageantService.addRoundContestant(eventId, selectedRoundId, c.id)
-            : pageantService.removeRoundContestant(eventId, selectedRoundId, c.id),
-        ),
-      )
-      await load()
-
-      const failed = results.filter((r) => r.status === 'rejected').length
-      const roundName = selectedRound?.name ?? 'the round'
-      if (failed) {
-        toastError(
-          `${targets.length - failed} of ${targets.length} updated — ${failed} couldn't be saved. Please try again.`,
-        )
-      } else if (mode === 'add') {
-        success(`Added ${targets.length} contestant${targets.length === 1 ? '' : 's'} to ${roundName}`)
-      } else {
-        success(`Removed ${targets.length} contestant${targets.length === 1 ? '' : 's'} from ${roundName}`)
-      }
-    } catch (err) {
-      toastError(getErrorMessage(err, 'Bulk update failed. Some contestants may not have been updated.'))
-    } finally {
-      setRoundBusy(null)
-    }
+    mutate(async () => {
+      let saved = 0
+      // Serial requests respect the shared event lock and stop on a failed write.
+      try { for (const entry of targets) { await (mode === 'add' ? pageantService.addRoundContestant : pageantService.removeRoundContestant)(eventId,selectedRound.id,entry.id); saved++ } }
+      catch (failure) { await load(); throw new Error(`${saved} of ${targets.length} updated. ${getErrorMessage(failure)}`, {cause:failure}) }
+      success(`${saved} ${saved === 1 ? 'entry' : 'entries'} ${mode === 'add' ? 'assigned to' : 'removed from'} ${selectedRound.name}`)
+    })
   }
-
-  const refreshNextNumber = useCallback(
-    async (divId) => {
-      try {
-        const { data } = await pageantService.getNextContestantNumber(eventId, divId || null)
-        setNumber(data.nextContestantNumber)
-        setNumberHint(
-          divId
-            ? `Next available in this division`
-            : `Next available number`,
-        )
-      } catch {
-        setNumber(1)
-        setNumberHint('')
-      }
-    },
-    [eventId],
-  )
-
-  useEffect(() => {
-    if (editingContestant) return
-    if (!foundation) return
-    refreshNextNumber(divisionId || null)
-  }, [foundation, divisionId, editingContestant, refreshNextNumber])
-
-  const handleCreate = async (e) => {
-    e.preventDefault()
-    const payload = {
-      name,
-      contestantNumber: Number(number),
-      divisionId: divisionId || null,
-    }
-    const wasEditing = Boolean(editingContestant)
-    try {
-      const { data } = wasEditing
-        ? await pageantService.updateContestant(eventId, editingContestant.id, payload)
-        : await pageantService.createContestant(eventId, payload)
-      if (photoFile && data.contestant?.id) {
-        await pageantService.uploadContestantPhoto(eventId, data.contestant.id, photoFile)
-      }
-      setName('')
-      setDivisionId('')
-      setPhotoFile(null)
-      setEditingContestant(null)
-      setLoading(true)
-      await load()
-      await refreshNextNumber(divisionId || null)
-      success(wasEditing ? `${payload.name} updated` : `${payload.name} added`)
-    } catch (err) {
-      toastError(getErrorMessage(err, `Couldn't ${wasEditing ? 'update' : 'add'} the contestant.`))
-    }
+  const edit = entry => {
+    if (blocked) return
+    numberRequest.current++; setEditing(entry); setPhoto(null); setFormError(''); setNumberHint('')
+    setValues({name:entry.name,number:entry.contestantNumber ?? entry.contestant_number,divisionId:entry.divisionId ?? entry.division_id ?? '',entryType:entry.entryType ?? entry.entry_type ?? 'legacy',entryLabel:entry.entryLabel ?? entry.entry_label ?? ''})
+    formRef.current?.scrollIntoView?.({behavior:'smooth',block:'start'}); formRef.current?.querySelector('select')?.focus({preventScroll:true})
   }
-
-  const startEditing = (contestant) => {
-    setEditingContestant(contestant)
-    setName(contestant.name)
-    setNumber(contestant.contestantNumber ?? contestant.contestant_number)
-    setDivisionId(contestant.divisionId ?? contestant.division_id ?? '')
-    setPhotoFile(null)
-    setNumberHint('')
-  }
-
-  const cancelEdit = () => {
-    setEditingContestant(null)
-    setName('')
-    setDivisionId('')
-    setPhotoFile(null)
-    setNumberHint('')
-    refreshNextNumber(divisionId || null)
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-20">
-        <LoadingSpinner />
-      </div>
-    )
-  }
-
-  return (
-    <ManagementWorkspace
-      title="Contestants"
-      formPanel={
-        setupLocked ? (
-          <ReadOnlyEventBanner status={status} noun="competition" />
-        ) : (
-        <>
-        {/* W1: divisions-before-contestants dependency, surfaced (not blocked). */}
-        {divisionsEnabled && divisions.length === 0 && (
-          <div className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/5 px-4 py-2.5 text-xs text-amber-300/90">
-            Divisions are enabled but none exist yet. Create your divisions in{' '}
-            <strong>Structure &amp; Scoring → Divisions</strong> first, so you can assign each contestant
-            to one as you add them.
-          </div>
-        )}
-        <form onSubmit={handleCreate} className="space-y-4 v-card p-6 mb-4">
-        <div className={`grid gap-4 ${divisionsEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-          <input className={inputClass} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-          <div className="space-y-1">
-            <input
-              type="number"
-              min={1}
-              className={inputClass}
-              value={number}
-              onChange={(e) => setNumber(e.target.value)}
-              disabled={Boolean(editingContestant)}
-              aria-label="Contestant number"
-            />
-            {!editingContestant && numberHint && (
-              <p className="text-xs text-v-text-subtle">{numberHint}</p>
-            )}
-          </div>
-          {divisionsEnabled && (
-            <select
-              className={inputClass}
-              value={divisionId}
-              onChange={(e) => setDivisionId(e.target.value)}
-            >
-              <option value="">— Event-wide —</option>
-              {divisions.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          )}
+  const remove = entry => { if (!blocked && window.confirm(`Delete entry "${entry.name}"? Historical scoring records cannot be deleted.`)) mutate(async () => { await pageantService.deleteContestant(eventId,entry.id); if(editing?.id===entry.id)reset(); success('Entry deleted') }) }
+  const selectEntry = (entry,checked) => setSelection(current => checked ? [...new Set([...current,entry.id])] : current.filter(id => id !== entry.id))
+  if (loading) return <div className="flex justify-center py-20"><LoadingSpinner /></div>
+  if (!foundation) return <div role="alert" className="v-card p-4 space-y-2"><p className="v-error-text">{loadError || 'Could not load saved entries.'}</p><p role="status" className="v-caption">Failed to load participation data</p><Button variant="secondary" onClick={() => { void load().catch(() => {}) }}>Reload saved entries</Button></div>
+  const nameLabel = values.entryType === 'individual' ? 'Contestant full name' : 'Entry or group name'
+  const ordinaryControls = rounds.length > 0 && !participation.managed && !readOnly
+  const entryTypeLabel = entry => ENTRY_TYPES.find(t => t.id === (entry.entryType ?? entry.entry_type))?.label ?? 'Existing entry'
+  const actions = entry => !readOnly && <div className="flex gap-3"><button type="button" disabled={blocked} className="text-v-primary disabled:opacity-50" onClick={()=>edit(entry)} aria-label={`Edit ${entry.name}`}>Edit</button><button type="button" disabled={blocked} className="text-v-danger disabled:opacity-50" onClick={()=>remove(entry)} aria-label={`Delete ${entry.name}`}>Delete</button></div>
+  const qualification = entry => { const state=entryParticipation(foundation,entry,selectedRoundId); return <><span>{state.status}</span>{state.source && state.assigned.some(r=>r.id===selectedRoundId) && <span className="mt-1 block text-xs text-v-text-subtle">Confirmed from {participation.sources.find(r=>r.id===state.source.round_id)?.name} · source {state.source.calculation_id?.slice(0,8)} · rules {state.source.rules_version?.slice(0,8)}</span>}</> }
+  const membershipNames = entry => entryParticipation(foundation,entry,selectedRoundId).assigned.map(r=>r.name).join(', ') || 'None'
+  return <div className="min-w-0 space-y-5">
+    <header><h2 className="text-xl font-semibold text-v-text">Contestants &amp; Entries</h2><p className="mt-1 text-sm text-v-text-subtle">Register participants, manage competition entries, and prepare round assignments.</p></header>
+    {loadError && <div role="alert" className="v-card p-4"><p className="v-error-text">{loadError}</p><Button variant="secondary" onClick={()=>load().catch(()=>{})}>Reload saved entries</Button></div>}
+    {readOnly && foundation && <ReadOnlyEventBanner status={foundation.event.status} noun="competition" frozen={Boolean(foundation.event?.official_rules_id ?? foundation.event?.officialRulesId)} />}
+    <div className={`grid min-w-0 items-start gap-5 ${!readOnly ? 'xl:grid-cols-[minmax(270px,0.7fr)_minmax(0,2fr)]' : ''}`}>
+      {!readOnly && <form ref={formRef} onSubmit={save} className="v-card min-w-0 scroll-mt-24 space-y-4 p-4 sm:p-5" noValidate aria-label="Entry registration">
+        <h3 className="font-semibold text-v-text">{editing ? 'Edit entry' : 'Register an entry'}</h3>
+        <fieldset disabled={blocked} className="min-w-0 space-y-4">
+          <div><label className={LABEL_CLASS} htmlFor="entry-type">Entry type</label><select id="entry-type" className={`${INPUT_CLASS} w-full`} value={values.entryType} onChange={e=>set('entryType',e.target.value)}>{editing && values.entryType==='legacy' && <option value="legacy">Existing type unchanged</option>}{ENTRY_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
+          <div><label className={LABEL_CLASS} htmlFor="entry-name">{nameLabel}</label><input id="entry-name" className={`${INPUT_CLASS} w-full`} placeholder={values.entryType==='individual'?'Enter full name':'Enter pair, team, or group name'} value={values.name} onChange={e=>set('name',e.target.value)} required /></div>
+          <div className={`grid gap-4 ${divisionsEnabled?'sm:grid-cols-2 xl:grid-cols-1':''}`}><div><label className={LABEL_CLASS} htmlFor="entry-number">Entry number</label><input id="entry-number" type="number" min="1" step="1" className={`${INPUT_CLASS} w-full`} value={values.number} onChange={e=>set('number',e.target.value)} disabled={Boolean(editing)} required />{numberHint && <p className="mt-1 text-xs text-v-text-subtle">{numberHint}</p>}</div>
+          {divisionsEnabled && <div><label className={LABEL_CLASS} htmlFor="entry-division">Division</label><select id="entry-division" required className={`${INPUT_CLASS} w-full`} value={values.divisionId} onChange={e=>set('divisionId',e.target.value)}><option value="">Select a division</option>{editing && values.divisionId && !activeDivisions.some(d=>d.id===values.divisionId) && <option value={values.divisionId}>{divisionName(editing)} — existing registration</option>}{activeDivisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select>{!activeDivisions.length && <p className="mt-2 text-xs text-v-text-subtle">Create a division in <Link className="text-v-primary underline" to={`${stagePath('competition','workspace',eventId)}?tab=divisions`}>Structure &amp; Scoring</Link> before registering entries.</p>}</div>}</div>
+          <div><label className={LABEL_CLASS} htmlFor="entry-label">Entry description <span className="font-normal text-v-text-subtle">(optional)</span></label><input id="entry-label" className={`${INPUT_CLASS} w-full`} value={values.entryLabel} onChange={e=>set('entryLabel',e.target.value)} placeholder="Short description" /></div>
+          <ImageUploadField key={editing?.id ?? `new-${formVersion}`} label="Entry photo" variant="photo" onFileSelect={setPhoto} />
+          <p className="text-xs leading-relaxed text-v-text-subtle">Registration creates an entry. Assign it to the initial round below; later qualification is confirmed separately.</p>
+          {formError && <p role="alert" className="v-error-text">{formError}</p>}
+          <div className="flex flex-wrap gap-2"><Button type="submit" loading={busy}>{editing?'Save entry':'Register entry'}</Button>{editing && <Button variant="secondary" onClick={reset}>Cancel edit</Button>}</div>
+        </fieldset>
+      </form>}
+      <section className="min-w-0 space-y-4" aria-label="Registered entries">
+        <CompetitionRoundParticipation eventId={eventId} foundation={foundation} rounds={rounds} selectedRoundId={selectedRoundId}
+          onSelect={id=>{setSelectedRoundId(id);setSelection([]);setQualifiersOnly(false)}} readOnly={readOnly} blocked={blocked} loadError={loadError}
+          selectedCount={selected.length} canAdd={selected.some(e=>eligible(e)&&!assigned.has(e.id))} canRemove={selected.some(e=>assigned.has(e.id))}
+          onAssign={()=>assignSelected('add')} onRemove={()=>assignSelected('remove')}
+          onViewQualified={()=>{setQualifiersOnly(true);recordsRef.current?.scrollIntoView?.({block:'start'});recordsRef.current?.focus({preventScroll:true})}} />
+        {qualifiersOnly&&<div className="flex flex-wrap items-center gap-3 text-xs"><span>Showing approved qualifiers for {selectedRound?.name}</span><button type="button" className="text-v-primary underline" onClick={()=>setQualifiersOnly(false)}>Show all entries</button></div>}
+        <FilterBar search={filters.search} onSearchChange={filters.setSearch} searchPlaceholder="Search name or entry number" facetFields={divisionsEnabled?[{id:'division',label:'Division'}]:[]} facets={filters.facets} activeFilters={filters.activeFilters} onFilterChange={filters.setFilter} onClear={filters.clearFilters} hasActiveFilters={filters.hasActiveFilters} resultCount={visible.length} totalCount={filters.totalCount} noun="entries" />
+        <div ref={recordsRef} tabIndex={-1} className="v-card min-w-0 scroll-mt-24 overflow-hidden focus:outline-none">
+          <div className="hidden overflow-x-auto lg:block"><table className="w-full text-left text-xs"><thead className="bg-v-surface-elevated text-v-text-muted"><tr>{ordinaryControls && <th className="p-3"><input type="checkbox" aria-label="Select all eligible shown entries" disabled={blocked || !selectable.length} checked={Boolean(selectable.length && selectable.every(e=>selection.includes(e.id)))} onChange={e=>setSelection(e.target.checked?selectable.map(e=>e.id):[])} /></th>}<th className="p-3">No.</th><th className="p-3">Name / entry type</th>{divisionsEnabled && <th className="p-3">Division</th>}<th className="p-3">Initial round</th><th className="p-3">Qualification status</th><th className="p-3">Assigned rounds</th>{!readOnly && <th className="p-3">Actions</th>}</tr></thead><tbody>{visible.map(entry=><tr key={entry.id} className="border-t border-v-border text-v-text">{ordinaryControls && <td className="p-3"><input type="checkbox" aria-label={`Select ${entry.name}`} disabled={blocked || (!eligible(entry) && !assigned.has(entry.id))} checked={selection.includes(entry.id)} onChange={e=>selectEntry(entry,e.target.checked)} /></td>}<td className="p-3 align-top">{entry.contestantNumber ?? entry.contestant_number}</td><td className="max-w-48 p-3 align-top"><div className="flex items-start gap-2">{entry.photo && <img src={entry.photo} alt="" className="h-8 w-8 shrink-0 rounded object-cover" />}<div className="min-w-0"><span className="block break-words font-medium">{entry.name}</span><span className="mt-1 block text-v-text-subtle">{entryTypeLabel(entry)}</span></div></div></td>{divisionsEnabled && <td className="p-3 align-top">{divisionName(entry)}</td>}<td className="p-3 align-top">{entryParticipation(foundation,entry,selectedRoundId).initial?.name ?? (rounds.length?'Awaiting assignment':'Event-wide')}</td><td className="max-w-56 p-3 align-top">{qualification(entry)}</td><td className="p-3 align-top">{membershipNames(entry)}</td>{!readOnly && <td className="p-3 align-top">{actions(entry)}</td>}</tr>)}</tbody></table></div>
+          <div className="divide-y divide-v-border lg:hidden">{visible.map(entry=><article key={entry.id} className="space-y-3 p-4"><div className="flex items-start gap-3">{ordinaryControls && <input type="checkbox" aria-label={`Select ${entry.name}`} disabled={blocked || (!eligible(entry) && !assigned.has(entry.id))} checked={selection.includes(entry.id)} onChange={e=>selectEntry(entry,e.target.checked)} />}<div className="min-w-0 flex-1"><p className="break-words text-sm font-medium text-v-text">#{entry.contestantNumber ?? entry.contestant_number} · {entry.name}</p><p className="mt-1 text-xs text-v-text-subtle">{entryTypeLabel(entry)}{divisionsEnabled?` · ${divisionName(entry)}`:''}</p></div></div><dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs"><dt className="text-v-text-subtle">Initial round</dt><dd>{entryParticipation(foundation,entry,selectedRoundId).initial?.name ?? (rounds.length?'Awaiting assignment':'Event-wide')}</dd><dt className="text-v-text-subtle">Qualification</dt><dd>{qualification(entry)}</dd><dt className="text-v-text-subtle">Assigned rounds</dt><dd>{membershipNames(entry)}</dd></dl>{actions(entry)}</article>)}</div>
+          {!visible.length && <p className="p-5 text-sm text-v-text-subtle">{filters.hasActiveFilters?'No entries match your search.':'No entries registered yet.'}</p>}
         </div>
-        <ImageUploadField label="Contestant photo" variant="photo" onFileSelect={setPhotoFile} />
-        <button type="submit" className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white">
-          {editingContestant ? 'Save contestant' : 'Add contestant'}
-        </button>
-        {editingContestant && (
-          <button
-            type="button"
-            className="ml-3 text-sm text-v-text-muted hover:text-v-text"
-            onClick={cancelEdit}
-          >
-            Cancel edit
-          </button>
-        )}
-      </form>
-        </>
-        )
-      }
-      recordsPanel={
-        <>
-        <div className="mb-4">
-          <FilterBar
-            search={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Search by name or number"
-            facetFields={divisionsEnabled ? [{ id: 'division', label: 'Division' }] : []}
-            facets={facets}
-            activeFilters={activeFilters}
-            onFilterChange={setFilter}
-            onClear={clearFilters}
-            hasActiveFilters={hasActiveFilters}
-            resultCount={resultCount}
-            totalCount={totalCount}
-            noun="contestants"
-          />
-        </div>
-        {/* Round-aware assignment: rounds are created in Structure & Scoring;
-            here you assign which contestants compete in the selected round. */}
-        {hasRounds && !setupLocked && (
-          <div className="mb-4 rounded-lg border border-v-border bg-v-surface px-4 py-3">
-            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-v-text-muted">
-              Assign contestants to round
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {rounds.map((r) => {
-                const count = (r.contestantIds ?? []).length
-                const active = r.id === selectedRoundId
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setSelectedRoundId(r.id)}
-                    className={`rounded-lg border px-3 py-1.5 text-sm transition ${
-                      active
-                        ? 'border-v-primary bg-v-primary/10 text-v-text'
-                        : 'border-v-border text-v-text-muted hover:text-v-text'
-                    }`}
-                  >
-                    {r.name}
-                    <span className="ml-1.5 text-[10px] text-v-text-subtle">{count}</span>
-                  </button>
-                )
-              })}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                disabled={roundBusy === 'bulk'}
-                onClick={() => bulkRound('add')}
-                className="rounded-lg border border-v-border px-2.5 py-1 text-xs font-medium text-v-text-muted hover:bg-v-primary/10 hover:text-v-primary disabled:opacity-50"
-              >
-                {roundBusy === 'bulk' ? 'Working…' : `Add all ${hasActiveFilters ? 'shown' : ''} to ${selectedRound?.name ?? 'round'}`}
-              </button>
-              <button
-                type="button"
-                disabled={roundBusy === 'bulk'}
-                onClick={() => bulkRound('remove')}
-                className="rounded-lg border border-v-border px-2.5 py-1 text-xs font-medium text-v-text-muted hover:bg-v-danger/10 hover:text-v-danger disabled:opacity-50"
-              >
-                Remove all from {selectedRound?.name ?? 'round'}
-              </button>
-              <span className="text-xs text-v-text-subtle">
-                or use the “In {selectedRound?.name ?? 'round'}” button per contestant.
-              </span>
-            </div>
-          </div>
-        )}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-8">
-          {visibleList.map((c) => {
-          // Both DB raw rows (snake_case) or mapped could be present depending on endpoints.
-          // getFoundation returns mapped rows for contestants.
-          const currentDivisionId = c.divisionId ?? c.division_id
-          const currentContestantNumber = c.contestantNumber ?? c.contestant_number
-          const divisionName = currentDivisionId ? divisions.find(d => d.id === currentDivisionId)?.name : null
-
-          return (
-            <div key={c.id} className="rounded-xl border border-v-border bg-v-surface p-4 flex flex-col">
-              {c.photo && <img src={c.photo} alt="" className="mb-3 h-40 w-full rounded-lg object-cover" />}
-              <div className="flex justify-between items-start gap-2">
-                <div>
-                  <p className="text-v-text-muted text-xs">#{currentContestantNumber}</p>
-                  <p className="font-medium text-v-text">{c.name}</p>
-                </div>
-                {divisionsEnabled && divisionName && (
-                  <span className="rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium text-v-primary uppercase tracking-wide">
-                    {divisionName}
-                  </span>
-                )}
-              </div>
-              {hasRounds && !setupLocked && (
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    disabled={roundBusy === c.id}
-                    onClick={() => toggleInRound(c.id)}
-                    className={`w-full rounded-lg px-2 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
-                      roundContestantIds.has(c.id)
-                        ? 'bg-v-success/10 text-v-success hover:bg-v-danger/10 hover:text-v-danger'
-                        : 'bg-v-surface-elevated text-v-text-muted hover:bg-v-primary/10 hover:text-v-primary'
-                    }`}
-                  >
-                    {roundBusy === c.id
-                      ? '...'
-                      : roundContestantIds.has(c.id)
-                        ? `✓ In ${selectedRound?.name ?? 'round'}`
-                        : `Add to ${selectedRound?.name ?? 'round'}`}
-                  </button>
-                </div>
-              )}
-              {!setupLocked && (
-              <div className="mt-auto flex gap-3 pt-3 text-sm">
-                <button type="button" className="text-v-primary" onClick={() => startEditing(c)}>Edit</button>
-                <button
-                  type="button"
-                  className="text-v-danger"
-                  onClick={async () => {
-                    if (confirm(`Delete contestant "${c.name}"? This can't be undone.`)) {
-                      try {
-                        await pageantService.deleteContestant(eventId, c.id)
-                        await load()
-                        if (!editingContestant) {
-                          await refreshNextNumber(divisionId || null)
-                        }
-                        success(`${c.name} deleted`)
-                      } catch (err) {
-                        toastError(getErrorMessage(err, "Couldn't delete the contestant."))
-                      }
-                    }
-                  }}
-                >
-                  Delete
-                </button>
-              </div>
-              )}
-            </div>
-          )
-        })}
-        {!visibleList.length && (
-          <p className="text-sm text-v-text-subtle">
-            {hasActiveFilters ? 'No contestants match your search.' : 'No contestants yet.'}
-          </p>
-        )}
-        </div>
-        </>
-      }
-    />
-  )
+      </section>
+    </div>
+  </div>
 }

@@ -25,6 +25,8 @@ const STATUS_TONE = {
  * @param {string} [props.participatedLabel]
  * @param {string} [props.rateLabel]
  * @param {string} [props.emptyMessage]
+ * @param {(e) => React.ReactNode} [props.renderAction] Optional Action column.
+ * @param {React.ReactNode} [props.emptyContent] Empty state instead of a table.
  */
 export default function EventStatsTable({
   events = [],
@@ -34,6 +36,8 @@ export default function EventStatsTable({
   participatedLabel = 'Participated',
   rateLabel = 'Rate',
   emptyMessage = 'No events yet.',
+  renderAction,
+  emptyContent,
 }) {
   const {
     search,
@@ -53,7 +57,7 @@ export default function EventStatsTable({
   })
 
   return (
-    <Card padding={false}>
+    <Card padding={false} className={renderAction ? 'min-w-0' : ''}>
       {events.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-v-border px-6 py-4">
           <h3 className="font-semibold text-v-text">{title}</h3>
@@ -82,48 +86,52 @@ export default function EventStatsTable({
         </div>
       )}
 
-      <div className="v-table-wrap">
-        <table className="v-table">
-          <thead>
-            <tr>
-              <th>Event</th>
-              <th>Status</th>
-              <th className="text-right">{registeredLabel}</th>
-              <th className="text-right">{participatedLabel}</th>
-              <th className="text-right">{rateLabel}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
+      {events.length === 0 && emptyContent ? emptyContent : (
+        <div className="v-table-wrap">
+          <table className="v-table">
+            <thead>
               <tr>
-                <td colSpan={5} className="text-center v-caption py-8">
-                  {hasActiveFilters ? 'No events match your search' : emptyMessage}
-                </td>
+                <th>Event</th>
+                <th>Status</th>
+                <th className="text-right">{registeredLabel}</th>
+                <th className="text-right">{participatedLabel}</th>
+                <th className="text-right">{rateLabel}</th>
+                {renderAction && <th>Action</th>}
               </tr>
-            ) : (
-              filtered.map((e) => (
-                <tr key={e.id} className={linkFor ? 'hover:bg-v-surface-elevated' : ''}>
-                  <td className="font-medium text-v-text">
-                    {linkFor ? (
-                      <Link to={linkFor(e)} className="hover:text-v-primary">
-                        {e.title}
-                      </Link>
-                    ) : (
-                      e.title
-                    )}
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={renderAction ? 6 : 5} className="text-center v-caption py-8">
+                    {hasActiveFilters ? 'No events match your search' : emptyMessage}
                   </td>
-                  <td>
-                    <Badge tone={STATUS_TONE[e.status] ?? 'default'}>{e.status}</Badge>
-                  </td>
-                  <td className="text-right tabular-nums text-v-text-muted">{e.registered}</td>
-                  <td className="text-right tabular-nums text-v-text-muted">{e.participated}</td>
-                  <td className="text-right tabular-nums font-medium text-v-text">{e.rate}%</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                filtered.map((e) => (
+                  <tr key={e.id} className={linkFor ? 'hover:bg-v-surface-elevated' : ''}>
+                    <td className="font-medium text-v-text">
+                      {linkFor ? (
+                        <Link to={linkFor(e)} className={`hover:text-v-primary ${renderAction ? 'block max-w-xs whitespace-normal break-words' : ''}`}>
+                          {e.title}
+                        </Link>
+                      ) : (
+                        e.title
+                      )}
+                    </td>
+                    <td>
+                      <Badge tone={STATUS_TONE[e.status] ?? 'default'}>{e.status}</Badge>
+                    </td>
+                    <td className="text-right tabular-nums text-v-text-muted">{e.registered}</td>
+                    <td className="text-right tabular-nums text-v-text-muted">{e.participated}</td>
+                    <td className="text-right tabular-nums font-medium text-v-text">{e.rate}%</td>
+                    {renderAction && <td>{renderAction(e)}</td>}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Card>
   )
 }

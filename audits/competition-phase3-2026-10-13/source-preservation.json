@@ -1,0 +1,13 @@
+{
+  "checked": 611,
+  "changedExistingFiles": [
+    "backend\\src\\database\\scripts\\competition-preflight-catalog.sql",
+    "backend\\src\\modules\\competition-legacy-preflight.js",
+    "backend\\src\\routes\\competition-child.routes.js",
+    "backend\\src\\routes\\pageant-judge.routes.js",
+    "backend\\scripts\\competition-preflight.mjs"
+  ],
+  "frontendUnchanged": true,
+  "electionPollingUnchanged": true,
+  "enginesAndJudgeTableUnchanged": true
+}

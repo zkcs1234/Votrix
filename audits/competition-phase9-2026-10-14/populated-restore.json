@@ -1,0 +1,259 @@
+{
+  "passed": true,
+  "source": "votrix_hardening_1791937090503",
+  "restored": "votrix_phase9_populated_restore_1791937351161",
+  "dumpMilliseconds": 1027.4435999999998,
+  "restoreMilliseconds": 2404.0419,
+  "allPublicTables": [
+    {
+      "name": "audit_logs",
+      "count": 138,
+      "fingerprint": "d45b108d9cbd6a1e4a624e4b6361e155"
+    },
+    {
+      "name": "competition_advancement_decisions",
+      "count": 7,
+      "fingerprint": "d54ba8726627c9048dec99a5a4660291"
+    },
+    {
+      "name": "competition_categories",
+      "count": 4,
+      "fingerprint": "e00ca6bc012ee97af5ea984f03534ebd"
+    },
+    {
+      "name": "competition_child_calculation_transitions",
+      "count": 70,
+      "fingerprint": "2de97285246c33d7dc3fc21a9abb9b71"
+    },
+    {
+      "name": "competition_child_calculations",
+      "count": 37,
+      "fingerprint": "f430a804b7ea7ae2af85810ddb9f875a"
+    },
+    {
+      "name": "competition_child_configurations",
+      "count": 32,
+      "fingerprint": "72b1521ae435c0c07314f063187f91bd"
+    },
+    {
+      "name": "competition_child_criteria",
+      "count": 43,
+      "fingerprint": "ac4b738580e3cd49f291ffcc71c08a66"
+    },
+    {
+      "name": "competition_child_deduction_decisions",
+      "count": 2,
+      "fingerprint": "554c1d0c736ed96b696e0ecf01df0685"
+    },
+    {
+      "name": "competition_child_deduction_reviews",
+      "count": 3,
+      "fingerprint": "b6c014a2e65a14428f478cde38ac5113"
+    },
+    {
+      "name": "competition_child_judge_assignments",
+      "count": 77,
+      "fingerprint": "7be7335618d8cfd1d9bcd687b356d183"
+    },
+    {
+      "name": "competition_child_minors",
+      "count": 43,
+      "fingerprint": "2a932c21f855350fe236dc6b2c2aa26b"
+    },
+    {
+      "name": "competition_child_publications",
+      "count": 5,
+      "fingerprint": "9b28dc2033f6ecb584b75e619b7d19f4"
+    },
+    {
+      "name": "competition_child_qualifications",
+      "count": 14,
+      "fingerprint": "7231365c27de36343704e0a5e9f97528"
+    },
+    {
+      "name": "competition_child_review_policies",
+      "count": 20,
+      "fingerprint": "44f990c47eb0970683c263852a104862"
+    },
+    {
+      "name": "competition_child_rounds",
+      "count": 21,
+      "fingerprint": "1903d3c49158dee5538c9d92e61cdd3a"
+    },
+    {
+      "name": "competition_child_rule_versions",
+      "count": 29,
+      "fingerprint": "ad1f36913519aab857388d8a6cedf994"
+    },
+    {
+      "name": "competition_child_score_drafts",
+      "count": 160,
+      "fingerprint": "d32ef6b84f1c0604a8ee32acfe9bae76"
+    },
+    {
+      "name": "competition_child_scoring_audit",
+      "count": 466,
+      "fingerprint": "29ffd56c192269219542b44884178da0"
+    },
+    {
+      "name": "competition_child_sessions",
+      "count": 34,
+      "fingerprint": "455cdecc9cf88a66c09378849f4c2190"
+    },
+    {
+      "name": "competition_child_submission_heads",
+      "count": 83,
+      "fingerprint": "9b54414f2e7083c2f3ccd4569b5f4330"
+    },
+    {
+      "name": "competition_child_submissions",
+      "count": 93,
+      "fingerprint": "50ae56c649016d02a0755a0e658f72d9"
+    },
+    {
+      "name": "competition_contestants",
+      "count": 102,
+      "fingerprint": "35643360a3dd52e6f88d0a836d51fa68"
+    },
+    {
+      "name": "competition_create_requests",
+      "count": 1,
+      "fingerprint": "bca345be0608382d3707fd9370fe32e8"
+    },
+    {
+      "name": "competition_criteria",
+      "count": 10,
+      "fingerprint": "735d751d28c3ec3d287ad09629c718b6"
+    },
+    {
+      "name": "competition_criterion_lock_history",
+      "count": 39,
+      "fingerprint": "3d5d344c83701c849a3710aff0f162fb"
+    },
+    {
+      "name": "competition_deductions",
+      "count": 1,
+      "fingerprint": "3ceba5002a763e275c57133567552e37"
+    },
+    {
+      "name": "competition_divisions",
+      "count": 13,
+      "fingerprint": "cb3412da1d40832c7419ab9202b6b782"
+    },
+    {
+      "name": "competition_eligibility_decisions",
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "competition_entries",
+      "count": 102,
+      "fingerprint": "14cda74bd8ddc91417a5157666c90cff"
+    },
+    {
+      "name": "competition_judge_assignments",
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "competition_judge_drafts",
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "competition_legacy_contexts",
+      "count": 14,
+      "fingerprint": "3edf9702b615726384a86e40e2e4cbf5"
+    },
+    {
+      "name": "competition_lineups",
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "competition_minor_criteria",
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "competition_result_calculations",
+      "count": 11,
+      "fingerprint": "56e511f87008833eb9a0606eafbd0eb8"
+    },
+    {
+      "name": "competition_round_contestants",
+      "count": 53,
+      "fingerprint": "d6ada74b13ec219c70d3f9234875c4d5"
+    },
+    {
+      "name": "competition_round_criteria",
+      "count": 18,
+      "fingerprint": "085a30ff09c399e26a437942344e57ca"
+    },
+    {
+      "name": "competition_round_submissions",
+      "count": 15,
+      "fingerprint": "5afdc0f082247fa6d9ee97534b4098a3"
+    },
+    {
+      "name": "competition_rounds",
+      "count": 22,
+      "fingerprint": "ee32bc338e85333bee9fc5283b157796"
+    },
+    {
+      "name": "competition_rule_amendments",
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "competition_rule_versions",
+      "count": 10,
+      "fingerprint": "09157ec3fe05aa74b762c04e45d178fa"
+    },
+    {
+      "name": "competition_scores",
+      "count": 38,
+      "fingerprint": "98d8cdc68bc23d6b15924382b3788bef"
+    },
+    {
+      "name": "competition_session_judge_scores",
+      "count": 38,
+      "fingerprint": "fc78bc048ea9bcfab35787fdbeeb40c4"
+    },
+    {
+      "name": "competition_sessions",
+      "count": 9,
+      "fingerprint": "40fbdee75f0061d36bf907aca74ea9c6"
+    },
+    {
+      "name": "competitions",
+      "count": 52,
+      "fingerprint": "f8cf68319ac3b4bea67dba148578eed9"
+    },
+    {
+      "name": "event_participants",
+      "count": 32,
+      "fingerprint": "64a4d0e78f80453820259af565ec5ee2"
+    },
+    {
+      "name": "events",
+      "count": 23,
+      "fingerprint": "dfae3a030193ac43a201c8a7ea268496"
+    },
+    {
+      "name": "organizations",
+      "count": 9,
+      "fingerprint": "82cf88045743d736145b4923b2b8a0b4"
+    },
+    {
+      "name": "users",
+      "count": 32,
+      "fingerprint": "474fadda0bef3b8599f3d6f8ab83bc59"
+    }
+  ],
+  "sourceUnchanged": true,
+  "definitionAndPrivilegeMatch": true,
+  "productionBackupValidated": false,
+  "externalAssetsIncluded": false,
+  "roleDefinitionsIncluded": false
+}

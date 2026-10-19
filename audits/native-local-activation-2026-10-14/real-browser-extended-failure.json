@@ -1,0 +1,448 @@
+{
+  "error": "Timeout document.body.innerText.includes('Participation — Multi-round real app') / Competition Scoring\n\nCompetition Scoring\n\nOR\nOrganizer\n1\nDetails\nNot started\n2\nBranding\nNot started\n3\nStructure & Scoring\nCurrent stage\n4\nContestants & Entries\nNot started\n5\nJudges\nNot started\n6\nReview & Freeze\nNot started\n7\nLive Control\nNot started\n8\nTabulation\nNot started\n9\nRankings\nNot started\n10\nAnalytics\nNot started\n11\nReport\nNot started\nCompetition setup\n\nCreate each competition, select its entrants, save rules and assign its judges before freezing. Each competition has independent scoring and results.\n\nCompetition identity or participation conflicts with saved records\n\nReload saved setup\nCompetition\nChoose a competition\nrank_based\nHip-Hop\nhighest_score\nmanual\nlowest_removal\nMulti-round real app\nsum\nNew competition name\nCreate competition\nEvent entrants and judge enrollment\n1. Participation — rank_based\n\nSave configuration changes before changing participation or assignments.\n\nAlpha\nParticipating\nBeta\nParticipating\n#1 — Alpha Remove draft participation #1\n#2 — Beta Remove draft participation #2\n2. Structure, criteria and scoring rules\n\nRules frozen. Continue to Live Control.\n\nStructure\nSingle phase\nMultiple rounds\nCalculation method\nAverage judge scores\nSum\nRank-based\nHighest score\nRemove extremes\nManual\nTie policy\nShared rank\nHighest criterion\nDecimal places\nSingle phase criteria — 100%\nCriterion 1 name\nCriterion 1 percentage\nCriterion 1 minimum\nCriterion 1 maximum\nAdd equally averaged minorRemove criterion\nAdd criterion to Single phase\nFrozen deduction rules\nSave competition configuration\n3. Explicit judge assignments\nEnrolled judge\nChoose an active scoring judge\nLocal Judge Two\nLocal Judge One\nAssignment scope\nEntire competition (explicit grant)\nAssign judge\nLocal Judge One — Entire competition Remove assignment\nLocal Judge Two — Entire competition Remove assignment\n4. Review and freeze\n\nCheck the selected entrants, round rosters, criteria totals and explicit panel. Freezing prevents ordinary setup edits; it does not start scoring or publish results.\n\n I reviewed this competition’s saved rules and assignments.Freeze competition rules\nLive Control\nTabulation and qualification\nOfficial results, publication and CSV\n0",
+  "scenarios": [],
+  "network": [
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/analytics",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/analytics",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/dashboard",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/dashboard",
+      "status": 200
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/election/events",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/polling/events",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/election/events",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/polling/events",
+      "status": 200
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/participant/overview",
+      "status": 200
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/participant/login-redirect",
+      "status": 200
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/participant/overview",
+      "status": 200
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/participant/login-redirect",
+      "status": 200
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/participant/overview",
+      "status": 200
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/participant/overview",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/notifications/unread-count",
+      "status": 429
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/notifications/unread-count",
+      "status": 429
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/participant/login-redirect",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/notifications/unread-count",
+      "status": 429
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/participant/competition/events/05c766b1-2307-467c-9fdf-dd8847fce1e0/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/participant/competition/events/05c766b1-2307-467c-9fdf-dd8847fce1e0/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/participant/competition/events/05c766b1-2307-467c-9fdf-dd8847fce1e0/competitions/reviewer-contexts",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/participant/competition/events/05c766b1-2307-467c-9fdf-dd8847fce1e0/competitions/reviewer-contexts",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/participant/competition/events/05c766b1-2307-467c-9fdf-dd8847fce1e0/competitions/b718b6a5-3a83-4255-b5ad-6506871040fd/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/participant/competition/events/05c766b1-2307-467c-9fdf-dd8847fce1e0/competitions/b718b6a5-3a83-4255-b5ad-6506871040fd/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/contestants",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/enrollments/pool",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/enrollments",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/24f842f9-1f19-4ee5-9ca6-18ebc426af07/foundation",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/24f842f9-1f19-4ee5-9ca6-18ebc426af07/entries",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/contestants",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/enrollments",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/enrollments/pool",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/24f842f9-1f19-4ee5-9ca6-18ebc426af07/foundation",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/24f842f9-1f19-4ee5-9ca6-18ebc426af07/entries",
+      "status": 200
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 204
+    },
+    {
+      "session": "64BE33A444DBCD6ABDC8E6BDF8EB3091",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 409
+    },
+    {
+      "session": "C0CE2C470482A332A5878C51B723DC31",
+      "path": "/api/participant/competition/dashboard",
+      "status": 200
+    },
+    {
+      "session": "915DC98F87E9D070215A748077ECA3A1",
+      "path": "/api/participant/competition/dashboard",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/participant/competition/events/05c766b1-2307-467c-9fdf-dd8847fce1e0/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/participant/competition/events/05c766b1-2307-467c-9fdf-dd8847fce1e0/competitions/reviewer-contexts",
+      "status": 200
+    },
+    {
+      "session": "D596BCA245EBD878F130C4E3FF4C2226",
+      "path": "/api/participant/competition/events/05c766b1-2307-467c-9fdf-dd8847fce1e0/competitions/b718b6a5-3a83-4255-b5ad-6506871040fd/tabulation/reviewer",
+      "status": 200
+    }
+  ],
+  "database": "votrix_dev_1791952165826",
+  "productionTouched": false
+}

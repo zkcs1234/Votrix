@@ -20,6 +20,10 @@ PostgreSQL schema for Supabase. All primary keys are **UUID** (`gen_random_uuid(
    migration. `040_down_reconcile_event_participants.sql` removes the indexes
    added by `040` and restores the migration `033` compatibility view, but
    intentionally retains repaired participant rows to prevent enrollment loss.
+7. Migration `129_native_competition_completion.sql` marks a native competition
+   event completed only after every native category's non-special rounds are
+   finalized, advancement rosters are confirmed, and terminal results are
+   published. Apply it after migrations through `128`.
 
 ## Entity relationship
 

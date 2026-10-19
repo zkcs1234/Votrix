@@ -184,7 +184,7 @@ export default function ElectionAnalyticsPage() {
           description={`${section.turnoutPercentage}% section turnout · ${section.totalVotes} selections`}
         >
           <p className="text-sm text-v-text-muted">
-            {section.positionSummaries.length} positions in this ballot section
+            {section.positionSummaries.length} positions in this election group · {section.eligibleVoters ?? 0} eligible voters
           </p>
         </AnalyticsSection>
       ))}

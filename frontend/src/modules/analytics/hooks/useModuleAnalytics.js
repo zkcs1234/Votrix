@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getAnalyticsProvider } from '../services/registry'
+import useLatestRequest from '@/hooks/useLatestRequest'
 
 export function useModuleAnalytics({
   moduleId,
@@ -28,9 +29,12 @@ export function useModuleAnalytics({
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [reportError, setReportError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
   const aliveRef = useRef(true)
-  const inflightRef = useRef(false)
+  const inflightRef = useRef(null)
+  const requestScope = `${moduleId}:${eventId}:${skipReport}`
+  const beginRead = useLatestRequest(requestScope)
 
   const load = useCallback(async () => {
     const provider = getAnalyticsProvider(moduleId)
@@ -39,13 +43,15 @@ export function useModuleAnalytics({
       setLoading(false)
       return
     }
-    if (inflightRef.current) return
-    inflightRef.current = true
+    if (inflightRef.current?.scope === requestScope) return
+    const token = Symbol('analytics request')
+    const isCurrent = beginRead()
+    inflightRef.current = { scope: requestScope, token }
     try {
       const tasks = [provider.fetchAnalytics(eventId)]
       if (!skipReport) tasks.push(provider.fetchReport(eventId))
       const results = await Promise.allSettled(tasks)
-      if (!aliveRef.current) return
+      if (!aliveRef.current || !isCurrent()) return
 
       const [analyticsRes, reportRes] = results
 
@@ -58,16 +64,21 @@ export function useModuleAnalytics({
 
       if (reportRes && reportRes.status === 'fulfilled') {
         setReport(reportRes.value)
+        setReportError(null)
       } else if (reportRes && reportRes.status === 'rejected') {
-        // Report failures are non-fatal for analytics views.
+        // Keep successful analytics and the last good report visible, but let
+        // report pages explain their own failure and offer a retry.
+        setReportError(reportRes.reason)
       }
 
       setLastUpdated(new Date())
+    } catch (failure) {
+      if (aliveRef.current && isCurrent()) { setError(failure); if (!skipReport) setReportError(failure) }
     } finally {
-      inflightRef.current = false
-      if (aliveRef.current) setLoading(false)
+      if (inflightRef.current?.token === token) inflightRef.current = null
+      if (aliveRef.current && isCurrent()) setLoading(false)
     }
-  }, [moduleId, eventId, skipReport])
+  }, [moduleId, eventId, skipReport, requestScope, beginRead])
 
   useEffect(() => {
     aliveRef.current = true
@@ -79,6 +90,8 @@ export function useModuleAnalytics({
       setLoading(true)
       setData(null)
       setReport(null)
+      setError(null)
+      setReportError(null)
       load()
     }
     const handle = setTimeout(start, 0)
@@ -98,6 +111,7 @@ export function useModuleAnalytics({
     report,
     loading,
     error,
+    reportError,
     lastUpdated,
     refresh: load,
   }

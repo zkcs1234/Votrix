@@ -1,0 +1,320 @@
+ M backend/__tests__/api/auth.api.test.js
+ M backend/__tests__/services/competition-session-preflight.test.js
+ M backend/__tests__/services/live-scores-store-disconnect.test.js
+ M backend/__tests__/services/round-criteria-fallback.characterization.test.js
+ M backend/__tests__/services/round-finalize.test.js
+ M backend/__tests__/services/stage-group.test.js
+ M backend/__tests__/validators/competition.validator.test.js
+ M backend/package.json
+ M backend/src/app.js
+ M backend/src/config/env.js
+ M backend/src/config/security.js
+ M backend/src/controllers/competition-session.controller.js
+ M backend/src/controllers/competition.controller.js
+ M backend/src/controllers/draft.controller.js
+ M backend/src/controllers/election-organizer.controller.js
+ M backend/src/controllers/pageant-organizer.controller.js
+ M backend/src/controllers/reports-organizer.controller.js
+ M backend/src/foundation/mapper.js
+ M backend/src/middleware/csrf.js
+ M backend/src/middleware/eventGuards.js
+ M backend/src/middleware/rateLimiter.js
+ M backend/src/routes/competition-organizer.routes.js
+ M backend/src/routes/election-organizer.routes.js
+ M backend/src/routes/index.js
+ M backend/src/routes/pageant-judge.routes.js
+ M backend/src/routes/pageant-organizer.routes.js
+ M backend/src/routes/reports-organizer.routes.js
+ M backend/src/server.js
+ M backend/src/services/competition-division.service.js
+ M backend/src/services/competition-session.service.js
+ M backend/src/services/competition-tabulation.service.js
+ M backend/src/services/competition.service.js
+ M backend/src/services/election.service.js
+ M backend/src/services/event-schedule-sync.service.js
+ M backend/src/services/pageant.service.js
+ M backend/src/services/participant.service.js
+ M backend/src/services/reports.service.js
+ M backend/src/services/voter.service.js
+ M backend/src/validators/competition.validator.js
+ M backend/src/validators/election.validator.js
+ M backend/src/websocket/ws-emitter.js
+ M backend/src/websocket/ws-rooms.js
+ M backend/src/websocket/ws-server.js
+ M frontend/src/app/Bootstrap.jsx
+ M frontend/src/components/organizer/DraftBanner.jsx
+ M frontend/src/components/organizer/EventStatsTable.jsx
+ M frontend/src/components/organizer/ReadOnlyEventBanner.jsx
+ M frontend/src/components/organizer/competition/CriteriaManager.jsx
+ M frontend/src/components/organizer/competition/JudgeAssignmentPanel.jsx
+ M frontend/src/components/ui/CalendarCard.jsx
+ M frontend/src/components/ui/EventStepper.jsx
+ M frontend/src/components/ui/Modal.jsx
+ M frontend/src/components/ui/ModuleStageLayout.jsx
+ M frontend/src/components/ui/StageFooter.jsx
+ M frontend/src/components/voter/competition/CompetitionScoringForm.jsx
+ M frontend/src/hooks/useSocketEvent.js
+ M frontend/src/index.css
+ M frontend/src/layouts/PageantLayout.jsx
+ M frontend/src/modules/analytics/hooks/useModuleAnalytics.js
+ M frontend/src/modules/competition/views/competitionMetrics.js
+ M frontend/src/pages/organizer/OrganizerDashboardPage.jsx
+ M frontend/src/pages/organizer/competition/CompetitionAnalyticsPage.jsx
+ M frontend/src/pages/organizer/competition/CompetitionContestantsPage.jsx
+ M frontend/src/pages/organizer/competition/CompetitionEventFormPage.jsx
+ M frontend/src/pages/organizer/competition/CompetitionEventsPage.jsx
+ M frontend/src/pages/organizer/competition/CompetitionJudgesPage.jsx
+ M frontend/src/pages/organizer/competition/CompetitionLiveControlPage.jsx
+ M frontend/src/pages/organizer/competition/CompetitionRankingsPage.jsx
+ M frontend/src/pages/organizer/competition/CompetitionReviewPage.jsx
+ M frontend/src/pages/organizer/competition/CompetitionTabulationPage.jsx
+ M frontend/src/pages/organizer/competition/CompetitionWorkspacePage.jsx
+ M frontend/src/pages/organizer/election/ElectionAnalyticsPage.jsx
+ M frontend/src/pages/organizer/election/ElectionCandidatesPage.jsx
+ M frontend/src/pages/organizer/election/ElectionDashboardPage.jsx
+ M frontend/src/pages/organizer/election/ElectionEventFormPage.jsx
+ M frontend/src/pages/organizer/election/ElectionEventsPage.jsx
+ M frontend/src/pages/organizer/election/ElectionPositionsPage.jsx
+ M frontend/src/pages/organizer/election/ElectionVotersPage.jsx
+ M frontend/src/pages/organizer/reports/CompetitionReportPage.jsx
+ M frontend/src/pages/organizer/reports/ElectionReportPage.jsx
+ M frontend/src/pages/voter/JudgeScoringPage.jsx
+ M frontend/src/pages/voter/VoterDashboardPage.jsx
+ M frontend/src/pages/voter/VoterEventPage.jsx
+ M frontend/src/routes/index.jsx
+ M frontend/src/schemas/event.schemas.js
+ M frontend/src/services/api.js
+ M frontend/src/services/competition-session.service.js
+ M frontend/src/services/competition-tabulation.service.js
+ M frontend/src/services/election.service.js
+ M frontend/src/services/pageant.service.js
+ M frontend/src/services/socket.service.js
+ M frontend/src/store/auth.store.js
+ M frontend/src/utils/draftStorage.js
+ M frontend/src/utils/eventStages.js
+ M frontend/src/utils/eventStages.test.js
+ M frontend/src/utils/exportReport.js
+ M frontend/vite.config.js
+ M render.yaml
+?? .tmp/
+?? COMPETITION_WORKFLOW_IMPLEMENTATION.md
+?? VOTRIX_COMPLETE_EVENT_PROCESS.md
+?? VOTRIX_COMPLETE_FLOW_ANALYSIS.md
+?? VOTRIX_CONTESTANTS_ENTRIES_AND_ADVANCEMENT.md
+?? VOTRIX_CREATE_ROUND_REDESIGN.md
+?? VOTRIX_CRITERIA_GUIDANCE.md
+?? VOTRIX_CURRENT_SCORING_PROCESS_AND_FORMULAS.md
+?? VOTRIX_Competition_Architecture_Integrated_Live_Control_Tabulation_Results.md
+?? VOTRIX_FINAL_ROUND_PROGRESSION_FIX.md
+?? VOTRIX_ROUNDS_COMPACT_LAYOUT.md
+?? VOTRIX_SCORING_RULES_GUIDED_WORKFLOW.md
+?? VOTRIX_SCORING_RULES_REDESIGN.md
+?? audits/
+?? backend/__tests__/api/competition-native-rate-readiness.test.js
+?? backend/__tests__/api/competition-rate-policy.test.js
+?? backend/__tests__/api/cookie-csrf.test.js
+?? backend/__tests__/controllers/
+?? backend/__tests__/fixtures/
+?? backend/__tests__/foundation/collectRows.test.js
+?? backend/__tests__/modules/competition-capacity.test.js
+?? backend/__tests__/modules/competition-context.test.js
+?? backend/__tests__/modules/competition-hint-transport.test.js
+?? backend/__tests__/modules/competition-legacy-preflight.test.js
+?? backend/__tests__/modules/competition-native-configuration.test.js
+?? backend/__tests__/modules/competition-native-exports.test.js
+?? backend/__tests__/modules/competition-native-tabulation.test.js
+?? backend/__tests__/modules/competition-participation.test.js
+?? backend/__tests__/modules/competition-workbook.test.js
+?? backend/__tests__/modules/criteria-readiness.test.js
+?? backend/__tests__/modules/csv-export.test.js
+?? backend/__tests__/modules/official-competition.test.js
+?? backend/__tests__/modules/progression-validation.test.js
+?? backend/__tests__/modules/round-progression.test.js
+?? backend/__tests__/modules/scoring-rule-configuration.test.js
+?? backend/__tests__/scripts/
+?? backend/__tests__/services/competition-access.test.js
+?? backend/__tests__/services/competition-child.test.js
+?? backend/__tests__/services/competition-creation-retries.test.js
+?? backend/__tests__/services/competition-division-order.test.js
+?? backend/__tests__/services/competition-native-context-discovery.test.js
+?? backend/__tests__/services/competition-native-dashboard.test.js
+?? backend/__tests__/services/competition-native-results.test.js
+?? backend/__tests__/services/competition-native-scoring.test.js
+?? backend/__tests__/services/competition-native-setup-routes.test.js
+?? backend/__tests__/services/competition-native-tabulation.test.js
+?? backend/__tests__/services/competition-native.test.js
+?? backend/__tests__/services/competition-origins-and-capacity.test.js
+?? backend/__tests__/services/competition-progress.test.js
+?? backend/__tests__/services/competition-report-scope.test.js
+?? backend/__tests__/services/competition-tenant-boundaries.test.js
+?? backend/__tests__/services/competition-workflow-repairs.test.js
+?? backend/__tests__/services/criteria-foundation.test.js
+?? backend/__tests__/services/criteria-publication.test.js
+?? backend/__tests__/services/judge-event-open.test.js
+?? backend/__tests__/services/legacy-rank-results.test.js
+?? backend/__tests__/services/manual-advancement.test.js
+?? backend/__tests__/services/official-rankings.test.js
+?? backend/__tests__/services/round-participation-api.test.js
+?? backend/__tests__/services/round-rules-roster.test.js
+?? backend/__tests__/services/scoring-config-save.test.js
+?? backend/__tests__/services/ws-authorization.test.js
+?? backend/__tests__/validators/competition-entry.validator.test.js
+?? backend/scripts/check-round-progression.mjs
+?? backend/scripts/competition-hint-broker.mjs
+?? backend/scripts/competition-phase7-preservation.mjs
+?? backend/scripts/competition-phase8-preservation.mjs
+?? backend/scripts/competition-phase9-baseline.mjs
+?? backend/scripts/competition-preflight.mjs
+?? backend/scripts/phase8-local-db.mjs
+?? backend/scripts/phase8-postgrest-fixture.mjs
+?? backend/scripts/test-competition-child.mjs
+?? backend/scripts/test-competition-native-results.mjs
+?? backend/scripts/test-competition-native-scoring.mjs
+?? backend/scripts/test-competition-native-tabulation.mjs
+?? backend/scripts/test-competition-native.mjs
+?? backend/scripts/test-competition-participation.mjs
+?? backend/scripts/test-competition-phase7-browser.mjs
+?? backend/scripts/test-competition-phase7-integrations.mjs
+?? backend/scripts/test-competition-phase7-performance.mjs
+?? backend/scripts/test-competition-phase7-populated-restore.mjs
+?? backend/scripts/test-competition-phase7-recovery.mjs
+?? backend/scripts/test-competition-phase7-transport.mjs
+?? backend/scripts/test-competition-phase8-browser-extended.mjs
+?? backend/scripts/test-competition-phase8-browser.mjs
+?? backend/scripts/test-competition-phase8-capacity.mjs
+?? backend/scripts/test-competition-phase8-database.mjs
+?? backend/scripts/test-competition-phase8-integrations.mjs
+?? backend/scripts/test-competition-phase8-restore.mjs
+?? backend/scripts/test-competition-phase8-transport.mjs
+?? backend/scripts/test-competition-repairs.mjs
+?? backend/src/config/trusted-origins.js
+?? backend/src/controllers/competition-workflow.controller.js
+?? backend/src/database/migrations/080_election_groups.sql
+?? backend/src/database/migrations/087_competition_workflow.sql
+?? backend/src/database/migrations/088_competition_operations.sql
+?? backend/src/database/migrations/089_competition_verification.sql
+?? backend/src/database/migrations/090_competition_amendments.sql
+?? backend/src/database/migrations/091_competition_atomic_setup.sql
+?? backend/src/database/migrations/092_competition_input_invalidation.sql
+?? backend/src/database/migrations/093_competition_source_history.sql
+?? backend/src/database/migrations/094_competition_projection_reconciliation.sql
+?? backend/src/database/migrations/095_competition_criteria_publication_guard.sql
+?? backend/src/database/migrations/096_competition_participation_guards.sql
+?? backend/src/database/migrations/097_competition_round_progression.sql
+?? backend/src/database/migrations/098_repair_event_participants_event_fk.sql
+?? backend/src/database/migrations/099_competition_round_progression_upgrade.sql
+?? backend/src/database/migrations/100_competition_atomic_integrity.sql
+?? backend/src/database/migrations/101_competition_private_access.sql
+?? backend/src/database/migrations/102_competition_creation_idempotency.sql
+?? backend/src/database/migrations/103_competition_child_identity.sql
+?? backend/src/database/migrations/104_competition_scoped_rules.sql
+?? backend/src/database/migrations/105_competition_scoped_scoring.sql
+?? backend/src/database/migrations/106_competition_scoped_tabulation.sql
+?? backend/src/database/migrations/107_competition_scoped_results.sql
+?? backend/src/database/migrations/108_competition_navigation_draft_tools.sql
+?? backend/src/database/scripts/competition-preflight-catalog.sql
+?? backend/src/database/scripts/resolve_legacy_live_session_conflict.sql
+?? backend/src/foundation/collectRows.js
+?? backend/src/middleware/competition-context.js
+?? backend/src/middleware/competition-rate-policy.js
+?? backend/src/middleware/competition-workbook-upload.js
+?? backend/src/modules/competition-capacity.js
+?? backend/src/modules/competition-context.js
+?? backend/src/modules/competition-legacy-preflight.js
+?? backend/src/modules/competition-native-configuration.js
+?? backend/src/modules/competition-native-exports.js
+?? backend/src/modules/competition-native-tabulation.js
+?? backend/src/routes/competition-child.routes.js
+?? backend/src/routes/competition-public-results.routes.js
+?? backend/src/services/competition-access.service.js
+?? backend/src/services/competition-child.service.js
+?? backend/src/services/competition-native-results.service.js
+?? backend/src/services/competition-native-scoring.service.js
+?? backend/src/services/competition-native-tabulation.service.js
+?? backend/src/services/competition-native.service.js
+?? backend/src/services/competition-reconciliation.service.js
+?? backend/src/services/competition-workbook.service.js
+?? backend/src/services/competition-workflow.service.js
+?? backend/src/utils/electionGroups.js
+?? backend/src/websocket/competition-hint-transport.js
+?? backend/src/websocket/ws-authorization.js
+?? frontend/src/components/organizer/ElectionGroupEligibility.jsx
+?? frontend/src/components/organizer/OrganizerOverviewEvents.jsx
+?? frontend/src/components/organizer/OrganizerOverviewEvents.test.jsx
+?? frontend/src/components/organizer/competition/CompetitionAdvancementPanel.jsx
+?? frontend/src/components/organizer/competition/CompetitionAdvancementPanel.test.jsx
+?? frontend/src/components/organizer/competition/CompetitionControlSteps.jsx
+?? frontend/src/components/organizer/competition/CompetitionControlSteps.test.jsx
+?? frontend/src/components/organizer/competition/CompetitionHandoff.reconciliation.test.jsx
+?? frontend/src/components/organizer/competition/CompetitionJudgeWorksheets.jsx
+?? frontend/src/components/organizer/competition/CompetitionLiveWorkflowPanel.css
+?? frontend/src/components/organizer/competition/CompetitionLiveWorkflowPanel.jsx
+?? frontend/src/components/organizer/competition/CompetitionRoundActionsMenu.jsx
+?? frontend/src/components/organizer/competition/CompetitionRoundForm.jsx
+?? frontend/src/components/organizer/competition/CompetitionRoundParticipation.jsx
+?? frontend/src/components/organizer/competition/CompetitionRoundSettings.jsx
+?? frontend/src/components/organizer/competition/CompetitionRoundsTab.jsx
+?? frontend/src/components/organizer/competition/CompetitionRulesEditor.jsx
+?? frontend/src/components/organizer/competition/CompetitionRulesEditor.test.jsx
+?? frontend/src/components/organizer/competition/CompetitionTabulationWorkspace.jsx
+?? frontend/src/components/organizer/competition/CompetitionTabulationWorkspace.test.jsx
+?? frontend/src/components/organizer/competition/CriteriaProgress.jsx
+?? frontend/src/components/organizer/competition/JudgeAssignmentPanel.test.jsx
+?? frontend/src/components/organizer/competition/NativeCompetitionBoundaries.test.jsx
+?? frontend/src/components/organizer/competition/NativeResultsWorkspace.jsx
+?? frontend/src/components/organizer/competition/NativeResultsWorkspace.test.jsx
+?? frontend/src/components/organizer/competition/NativeSetupWorkspace.jsx
+?? frontend/src/components/organizer/competition/NativeSetupWorkspace.test.jsx
+?? frontend/src/components/organizer/competition/NativeTabulationWorkspace.jsx
+?? frontend/src/components/organizer/competition/NativeTabulationWorkspace.test.jsx
+?? frontend/src/components/organizer/competition/ScoringMethodExample.jsx
+?? frontend/src/components/organizer/competition/ScoringPenaltyRules.jsx
+?? frontend/src/components/ui/CalendarCard.test.jsx
+?? frontend/src/components/ui/ClockTimePicker.jsx
+?? frontend/src/components/voter/competition/CompetitionPublishedResults.jsx
+?? frontend/src/components/voter/competition/CompetitionPublishedResults.test.jsx
+?? frontend/src/components/voter/competition/CompetitionReviewer.jsx
+?? frontend/src/components/voter/competition/CompetitionScoringForm.css
+?? frontend/src/components/voter/competition/CompetitionScoringForm.test.jsx
+?? frontend/src/components/voter/competition/JudgeScoringHeader.jsx
+?? frontend/src/components/voter/competition/JudgeScoringHeader.test.jsx
+?? frontend/src/components/voter/competition/NativeCompetitionWorkspace.jsx
+?? frontend/src/components/voter/competition/NativeCompetitionWorkspace.test.jsx
+?? frontend/src/hooks/useCompetitionSync.js
+?? frontend/src/hooks/useCompetitionSync.test.jsx
+?? frontend/src/hooks/useCriteriaSave.js
+?? frontend/src/hooks/useJudgeScoreDrafts.js
+?? frontend/src/hooks/useJudgeScoreDrafts.test.jsx
+?? frontend/src/hooks/useLatestRequest.js
+?? frontend/src/hooks/useScoringRulesRecovery.js
+?? frontend/src/modules/analytics/hooks/useModuleAnalytics.test.jsx
+?? frontend/src/modules/competition/views/competitionMetrics.test.js
+?? frontend/src/pages/organizer/competition/CompetitionContestantsPage.test.jsx
+?? frontend/src/pages/organizer/competition/CompetitionCriteriaGuidance.test.jsx
+?? frontend/src/pages/organizer/competition/CompetitionEventFormPage.test.jsx
+?? frontend/src/pages/organizer/competition/CompetitionEventsPage.test.jsx
+?? frontend/src/pages/organizer/competition/CompetitionJudgesPage.test.jsx
+?? frontend/src/pages/organizer/competition/CompetitionLiveControlPage.repair.test.jsx
+?? frontend/src/pages/organizer/competition/CompetitionParticipationNavigation.test.jsx
+?? frontend/src/pages/organizer/competition/CompetitionRankingsPage.reconciliation.test.jsx
+?? frontend/src/pages/organizer/competition/CompetitionReviewPage.test.jsx
+?? frontend/src/pages/organizer/competition/CompetitionWorkspacePage.test.jsx
+?? frontend/src/pages/organizer/election/ElectionDashboardPage.test.jsx
+?? frontend/src/pages/organizer/election/ElectionEventFormPage.test.jsx
+?? frontend/src/pages/organizer/election/ElectionEventsPage.test.jsx
+?? frontend/src/pages/organizer/reports/CompetitionReportPage.test.jsx
+?? frontend/src/pages/public/
+?? frontend/src/pages/voter/JudgeScoringPage.reconciliation.test.jsx
+?? frontend/src/pages/voter/VoterDashboardPage.reconciliation.test.jsx
+?? frontend/src/services/api.refresh.test.js
+?? frontend/src/services/competition-native-results.service.js
+?? frontend/src/services/competition-native-tabulation.service.js
+?? frontend/src/services/competition-native.service.js
+?? frontend/src/services/competition-workflow.service.js
+?? frontend/src/services/socket.recovery.test.js
+?? frontend/src/utils/competitionRetry.js
+?? frontend/src/utils/competitionRetry.test.js
+?? frontend/src/utils/competitionRoundForm.js
+?? frontend/src/utils/draftStorage.test.js
+?? frontend/src/utils/exportReport.test.js
+?? shared/

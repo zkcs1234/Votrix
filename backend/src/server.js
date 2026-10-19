@@ -5,15 +5,25 @@ import { createServer } from 'http'
 import { attachWebSocketServer } from './websocket/ws-server.js'
 import { startEventScheduleSync } from './services/event-schedule-sync.service.js'
 import { startArchivalScheduler } from './services/archival.service.js'
+import {configureCompetitionHintTransport} from './websocket/ws-emitter.js'
+import {verifyLocalNativeRuntime} from './config/local-native-safety.js'
 
+const isolatedNative = await verifyLocalNativeRuntime(env)
 const app = createApp()
-const httpServer = createServer(app)
+const httpServer = createServer((req,res)=>{
+  if(isolatedNative){
+    res.setHeader('X-Votrix-Local-Database',isolatedNative.database)
+    res.setHeader('X-Votrix-Local-Identity',isolatedNative.nonce)
+  }
+  app(req,res)
+})
 
 attachWebSocketServer(httpServer)
+configureCompetitionHintTransport({url:process.env.COMPETITION_HINT_BROKER_URL,secret:process.env.COMPETITION_HINT_BROKER_SECRET})
 startEventScheduleSync()
 startArchivalScheduler()
 
-httpServer.listen(env.port, '0.0.0.0', () => {
+httpServer.listen(env.port, isolatedNative ? '127.0.0.1' : '0.0.0.0', () => {
   console.log(`[votrix] API listening on port ${env.port}`)
   console.log(`[votrix] Environment: ${env.nodeEnv}`)
   console.log(`[votrix] Frontend URL: ${env.clientUrl}`)

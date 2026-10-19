@@ -1,0 +1,298 @@
+{
+  "configKeyNamesOnly": {
+    "backend/.env": [
+      "CLIENT_URL",
+      "CLOUDINARY_API_KEY",
+      "CLOUDINARY_API_SECRET",
+      "CLOUDINARY_CLOUD_NAME",
+      "CSRF_SECRET",
+      "EMAIL_FROM",
+      "JWT_ACCESS_SECRET",
+      "JWT_COOKIE_NAME",
+      "JWT_EXPIRES_IN",
+      "JWT_REFRESH_SECRET",
+      "LOCK_PARTICIPANTS_ON_ACTIVE",
+      "NODE_ENV",
+      "PORT",
+      "RESEND_API_KEY",
+      "SMTP_HOST",
+      "SMTP_PASSWORD",
+      "SMTP_PORT",
+      "SMTP_USER",
+      "SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "SUPABASE_URL"
+    ],
+    "frontend/.env": [
+      "VITE_API_URL",
+      "VITE_LOCK_PARTICIPANTS_ON_ACTIVE"
+    ],
+    "render.yaml": [
+      "CLIENT_URLS",
+      "CLOUDINARY_API_KEY",
+      "CLOUDINARY_API_SECRET",
+      "CLOUDINARY_CLOUD_NAME",
+      "COOKIE_SAME_SITE",
+      "CSRF_SECRET",
+      "EMAIL_FROM",
+      "FRONTEND_URL",
+      "JWT_ACCESS_EXPIRES_IN",
+      "JWT_ACCESS_SECRET",
+      "JWT_REFRESH_EXPIRES_IN",
+      "JWT_REFRESH_SECRET",
+      "NODE_ENV",
+      "PORT",
+      "PREVIEW_CLIENT_URLS",
+      "RESEND_API_KEY",
+      "SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "SUPABASE_URL",
+      "WS_MAX_CONNECTIONS",
+      "WS_MAX_CONNECTIONS_PER_USER"
+    ]
+  },
+  "secretValuesRecorded": false,
+  "nativeFlags": [
+    "COMPETITION_CHILD_CONTEXTS_ENABLED",
+    "COMPETITION_NATIVE_SETUP_ENABLED",
+    "COMPETITION_NATIVE_SCORING_ENABLED",
+    "COMPETITION_NATIVE_TABULATION_ENABLED",
+    "COMPETITION_NATIVE_RESULTS_ENABLED",
+    "COMPETITION_NATIVE_RATE_POLICY_ENABLED",
+    "VITE_COMPETITION_NATIVE_SETUP_ENABLED",
+    "VITE_COMPETITION_NATIVE_SCORING_ENABLED",
+    "VITE_COMPETITION_NATIVE_TABULATION_ENABLED",
+    "VITE_COMPETITION_NATIVE_RESULTS_ENABLED"
+  ],
+  "defaults": "Native gates opt-in; no .env or hosting file changed",
+  "relayKeys": [
+    "COMPETITION_HINT_BROKER_URL",
+    "COMPETITION_HINT_BROKER_SECRET"
+  ],
+  "hostingDefinition": {
+    "file": "render.yaml",
+    "service": "votrix-api",
+    "declaredPlan": "free",
+    "declaredRuntime": "node",
+    "actualTopologyVerified": false
+  },
+  "databaseConfiguration": {
+    "provider": "Supabase",
+    "directDeployedCatalogAccessConfirmed": false,
+    "localFixture": "127.0.0.1:55439",
+    "productionBackupProviderVerified": false
+  },
+  "proxy": {
+    "source": "backend/src/app.js",
+    "trustProxyHops": 1,
+    "actualIngressVerified": false
+  },
+  "migrationReview": [
+    {
+      "file": "backend/src/database/migrations/100_competition_atomic_integrity.sql",
+      "sha256": "bbc40a2291a22de052ac9118d83a5e5d863237e9812d114227c5317add07e9c4",
+      "bytes": 17087,
+      "transactionBegin": true,
+      "transactionCommit": true,
+      "securityDefinerDeclarations": 9,
+      "explicitPublicSearchPaths": 10,
+      "functions": [
+        "competition_check_relations",
+        "competition_guard_relations",
+        "competition_revision_event",
+        "competition_revision_source",
+        "competition_publish_rules",
+        "competition_result_transition",
+        "competition_guard_calculation_revision",
+        "competition_guard_calculation_identity",
+        "competition_confirm_advancement",
+        "competition_reorder_divisions"
+      ],
+      "tableDeclarations": [],
+      "reviewMeaning": "Source review plus actual local catalog/integration evidence; not a target migration ledger"
+    },
+    {
+      "file": "backend/src/database/migrations/101_competition_private_access.sql",
+      "sha256": "3cd96fbc44efd2322707956a97c31668add32d13285224efdd361a24971ea892",
+      "bytes": 2005,
+      "transactionBegin": true,
+      "transactionCommit": true,
+      "securityDefinerDeclarations": 0,
+      "explicitPublicSearchPaths": 0,
+      "functions": [],
+      "tableDeclarations": [],
+      "reviewMeaning": "Source review plus actual local catalog/integration evidence; not a target migration ledger"
+    },
+    {
+      "file": "backend/src/database/migrations/102_competition_creation_idempotency.sql",
+      "sha256": "0baf3cdbd4c06fc6df6de3e825c2868766c1fa08294334dbf7269e98538e745c",
+      "bytes": 3348,
+      "transactionBegin": true,
+      "transactionCommit": true,
+      "securityDefinerDeclarations": 1,
+      "explicitPublicSearchPaths": 1,
+      "functions": [
+        "competition_create_event"
+      ],
+      "tableDeclarations": [
+        "competition_create_requests"
+      ],
+      "reviewMeaning": "Source review plus actual local catalog/integration evidence; not a target migration ledger"
+    },
+    {
+      "file": "backend/src/database/migrations/103_competition_child_identity.sql",
+      "sha256": "4c236303ac34287f968667db953c66ea34ab9d63f1124ad491ba77ced44c874d",
+      "bytes": 11360,
+      "transactionBegin": true,
+      "transactionCommit": true,
+      "securityDefinerDeclarations": 4,
+      "explicitPublicSearchPaths": 5,
+      "functions": [
+        "competition_child_relation_guard",
+        "competition_child_authority",
+        "competition_create_child",
+        "competition_add_entry",
+        "competition_map_legacy_event"
+      ],
+      "tableDeclarations": [
+        "competitions",
+        "competition_legacy_contexts",
+        "competition_entries"
+      ],
+      "reviewMeaning": "Source review plus actual local catalog/integration evidence; not a target migration ledger"
+    },
+    {
+      "file": "backend/src/database/migrations/104_competition_scoped_rules.sql",
+      "sha256": "f45c91b094f3025297f2030c4ac351f1e37b0db8808721b47ee80e89657c52db",
+      "bytes": 35659,
+      "transactionBegin": true,
+      "transactionCommit": true,
+      "securityDefinerDeclarations": 9,
+      "explicitPublicSearchPaths": 12,
+      "functions": [
+        "competition_native_authority",
+        "competition_native_source_guard",
+        "competition_native_judge_dependency",
+        "competition_native_entry_dependency",
+        "competition_validate_native_configuration",
+        "competition_save_native_configuration",
+        "competition_assign_native_judge",
+        "competition_native_judge_context",
+        "competition_freeze_native_rules",
+        "competition_native_foundation",
+        "competition_native_identity_guard",
+        "competition_add_entry"
+      ],
+      "tableDeclarations": [
+        "competition_child_configurations",
+        "competition_child_rounds",
+        "competition_child_criteria",
+        "competition_child_minors",
+        "competition_child_judge_assignments",
+        "competition_child_rule_versions"
+      ],
+      "reviewMeaning": "Source review plus actual local catalog/integration evidence; not a target migration ledger"
+    },
+    {
+      "file": "backend/src/database/migrations/105_competition_scoped_scoring.sql",
+      "sha256": "bea487c104be99b322a71de235c7d6d89d57f2599baa6a0aa84938d675f34ac9",
+      "bytes": 27342,
+      "transactionBegin": true,
+      "transactionCommit": true,
+      "securityDefinerDeclarations": 6,
+      "explicitPublicSearchPaths": 7,
+      "functions": [
+        "competition_child_scoring_relation_guard",
+        "competition_child_scoring_context",
+        "competition_child_scoring_choices",
+        "competition_child_scoring_recipients",
+        "competition_child_live_view",
+        "competition_child_live_control",
+        "competition_child_score_write"
+      ],
+      "tableDeclarations": [
+        "competition_child_sessions",
+        "competition_child_score_drafts",
+        "competition_child_submissions",
+        "competition_child_submission_heads",
+        "competition_child_scoring_audit"
+      ],
+      "reviewMeaning": "Source review plus actual local catalog/integration evidence; not a target migration ledger"
+    },
+    {
+      "file": "backend/src/database/migrations/106_competition_scoped_tabulation.sql",
+      "sha256": "6eafe2468c43ce44d123c53b4aef1d74b291dc73cedac410f58a8aa3a88518ff",
+      "bytes": 48972,
+      "transactionBegin": true,
+      "transactionCommit": true,
+      "securityDefinerDeclarations": 16,
+      "explicitPublicSearchPaths": 17,
+      "functions": [
+        "competition_child_official_relation_guard",
+        "competition_child_reviewer_authority",
+        "competition_child_current_sources",
+        "competition_child_tabulation_snapshot",
+        "competition_child_official_notice",
+        "competition_child_reviewer_choices",
+        "competition_child_appoint_reviewer",
+        "competition_child_qualification_state",
+        "competition_child_confirm_qualification",
+        "competition_child_live_view",
+        "competition_child_live_control",
+        "competition_child_qualified_scoring_guard",
+        "competition_child_official_calculate",
+        "competition_child_official_transition",
+        "competition_child_deduction_action",
+        "competition_child_pause_dependent_sessions",
+        "competition_child_deduction_source_revision"
+      ],
+      "tableDeclarations": [
+        "competition_child_review_policies",
+        "competition_child_deduction_decisions",
+        "competition_child_deduction_reviews",
+        "competition_child_calculations",
+        "competition_child_calculation_transitions",
+        "competition_child_qualifications"
+      ],
+      "reviewMeaning": "Source review plus actual local catalog/integration evidence; not a target migration ledger"
+    },
+    {
+      "file": "backend/src/database/migrations/107_competition_scoped_results.sql",
+      "sha256": "b5e5802e936f8c759546fba3d9fa0accf131a0d7ad07b4dd3cbde778ecc178e2",
+      "bytes": 17288,
+      "transactionBegin": true,
+      "transactionCommit": true,
+      "securityDefinerDeclarations": 5,
+      "explicitPublicSearchPaths": 6,
+      "functions": [
+        "competition_child_public_projection",
+        "competition_child_publication_guard",
+        "competition_child_publication_action",
+        "competition_child_public_results",
+        "competition_child_owned_results",
+        "competition_child_export_sources"
+      ],
+      "tableDeclarations": [
+        "competition_child_publications"
+      ],
+      "reviewMeaning": "Source review plus actual local catalog/integration evidence; not a target migration ledger"
+    },
+    {
+      "file": "backend/src/database/migrations/108_competition_navigation_draft_tools.sql",
+      "sha256": "bdbcf6e432a22caef8488b14b69a83ebd40b27340d0dfbbd66ada3caf2594805",
+      "bytes": 4147,
+      "transactionBegin": true,
+      "transactionCommit": true,
+      "securityDefinerDeclarations": 2,
+      "explicitPublicSearchPaths": 2,
+      "functions": [
+        "competition_child_judge_navigation",
+        "competition_remove_native_draft_entry"
+      ],
+      "tableDeclarations": [],
+      "reviewMeaning": "Source review plus actual local catalog/integration evidence; not a target migration ledger"
+    }
+  ],
+  "paidProvisioning": false,
+  "productionContactDuringPhase9": false
+}

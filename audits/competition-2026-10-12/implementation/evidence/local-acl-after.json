@@ -1,0 +1,86 @@
+[
+  {
+    "rls": true,
+    "table": "competition_advancement_decisions",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  },
+  {
+    "rls": true,
+    "table": "competition_criterion_lock_history",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  },
+  {
+    "rls": true,
+    "table": "competition_deductions",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  },
+  {
+    "rls": true,
+    "table": "competition_eligibility_decisions",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  },
+  {
+    "rls": true,
+    "table": "competition_judge_drafts",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  },
+  {
+    "rls": true,
+    "table": "competition_lineups",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  },
+  {
+    "rls": true,
+    "table": "competition_result_calculations",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  },
+  {
+    "rls": true,
+    "table": "competition_round_submissions",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  },
+  {
+    "rls": true,
+    "table": "competition_rule_amendments",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  },
+  {
+    "rls": true,
+    "table": "competition_rule_versions",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  },
+  {
+    "rls": true,
+    "table": "competition_scores",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  },
+  {
+    "rls": true,
+    "table": "competition_session_judge_scores",
+    "anonSelect": false,
+    "serviceSelect": true,
+    "authenticatedSelect": false
+  }
+]

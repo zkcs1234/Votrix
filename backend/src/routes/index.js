@@ -6,6 +6,7 @@ import adminRoutes from './admin.routes.js'
 import organizerRoutes from './organizer.routes.js'
 import voterRoutes from './voter.routes.js'
 import notificationsRoutes from './notifications.routes.js'
+import competitionPublicResultsRoutes from './competition-public-results.routes.js'
 
 const router = Router()
 
@@ -19,6 +20,7 @@ router.get('/', publicApiLimiter, (_req, res) => {
 })
 
 router.use('/health', healthRoutes)
+router.use('/public/competition',competitionPublicResultsRoutes)
 router.use('/auth', authRoutes)
 router.use('/admin', adminRoutes)
 router.use('/organizer', organizerRoutes)

@@ -1,6 +1,14 @@
 import { API_BASE_URL } from '@/utils/constants'
+import { refreshSession } from '@/services/api'
 
-const WS_URL = API_BASE_URL.replace(/^http/, 'ws').replace('/api', '') + '/ws'
+export function websocketUrl(apiUrl = API_BASE_URL, pageUrl = window.location.href) {
+  const url = new URL(apiUrl, pageUrl)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  url.pathname = url.pathname.replace(/\/api\/?$/, '').replace(/\/$/, '') + '/ws'
+  url.search = ''
+  url.hash = ''
+  return url.href
+}
 
 const MAX_RECONNECT_DELAY = 30_000
 const BASE_RECONNECT_DELAY = 1_000
@@ -11,33 +19,44 @@ let reconnectTimer = null
 let isIntentionallyClosed = false
 
 const listeners = new Map()
+const rooms = new Set()
 
 function getReconnectDelay() {
   return Math.min(BASE_RECONNECT_DELAY * 2 ** reconnectAttempts, MAX_RECONNECT_DELAY)
 }
 
 function connect() {
+  isIntentionallyClosed = false
   if (socket?.readyState === WebSocket.OPEN) return
   if (socket?.readyState === WebSocket.CONNECTING) return
 
-  socket = new WebSocket(WS_URL)
+  socket = new WebSocket(websocketUrl())
+  const connection = socket
 
   socket.onopen = () => {
+    if (socket !== connection) return
     reconnectAttempts = 0
     clearTimeout(reconnectTimer)
     console.log('[ws] connected')
+    for (const room of rooms) connection.send(JSON.stringify({ type: 'subscribe', room }))
     emit('ws:connected', {})
   }
 
   socket.onmessage = (event) => {
+    if (socket !== connection) return
     let msg
     try { msg = JSON.parse(event.data) } catch { return }
     emit(msg.type, msg.data ?? {})
   }
 
-  socket.onclose = (event) => {
+  socket.onclose = async (event) => {
+    if (socket !== connection) return
     if (isIntentionallyClosed) return
     emit('ws:disconnected', { code: event.code })
+    if (event.code === 4401) {
+      try { await refreshSession() } catch { /* HTTP fallback and retry handle outages; auth rejects clear the session. */ }
+      if (socket !== connection || isIntentionallyClosed) return
+    }
     const delay = getReconnectDelay()
     reconnectAttempts++
     reconnectTimer = setTimeout(connect, delay)
@@ -53,6 +72,8 @@ function disconnect() {
   clearTimeout(reconnectTimer)
   socket?.close()
   socket = null
+  rooms.clear()
+  emit('ws:disconnected', { intentional: true })
 }
 
 function emit(type, data) {
@@ -68,6 +89,7 @@ export function subscribe(eventType, handler) {
 }
 
 export function subscribeRoom(room) {
+  rooms.add(room)
   if (socket?.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ type: 'subscribe', room }))
   }
@@ -78,7 +100,12 @@ export function isConnected() {
 }
 
 window.addEventListener('votrix-token-refreshed', () => {
-  socket?.close()
+  if (isIntentionallyClosed) return
+  clearTimeout(reconnectTimer)
+  const prior = socket
+  socket = null
+  prior?.close()
+  connect()
 })
 
 export { connect, disconnect }

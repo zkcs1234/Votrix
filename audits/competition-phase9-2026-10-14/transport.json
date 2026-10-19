@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "roomRegistryProcesses": 2,
+  "actualHttpApiProcessesTested": false,
+  "crossProcessDeliveryMilliseconds": 64.10890000000006,
+  "scorePayloadRejected": true,
+  "unauthenticatedBrokerDenied": true,
+  "duplicateFrameSuppressed": true,
+  "brokerRestartReconciliation": true,
+  "queuedHintRecovery": true,
+  "transport": "Authenticated HMAC ws relay; loopback-only local test",
+  "productionTopologyVerified": false,
+  "externalInfrastructureProvisioned": false
+}

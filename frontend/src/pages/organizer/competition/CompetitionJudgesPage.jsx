@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { NativeSetupBoundary } from '@/components/organizer/competition/NativeSetupWorkspace'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Lock, Users, UserMinus, Send, Search } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
@@ -11,6 +12,8 @@ import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 import { isParticipantsLocked } from '@/utils/constants'
+import useCompetitionSync from '@/hooks/useCompetitionSync'
+import useLatestRequest from '@/hooks/useLatestRequest'
 
 // Phase 6: organizers no longer register or CSV-import judges. Judge accounts
 // are created by the admin; here the organizer PICKS judges from the pool into
@@ -19,7 +22,8 @@ function judgeName(j) {
   return j.displayName || [j.firstName, j.lastName].filter(Boolean).join(' ') || j.email
 }
 
-export default function CompetitionJudgesPage() {
+export default function CompetitionJudgesPage() { return <NativeSetupBoundary Legacy={LegacyCompetitionJudgesPage}/> }
+function LegacyCompetitionJudgesPage() {
   const { eventId } = useParams()
   const [judges, setJudges] = useState([])
   const [pool, setPool] = useState([])
@@ -31,42 +35,48 @@ export default function CompetitionJudgesPage() {
   const [picking, setPicking] = useState(false)
   const [removingId, setRemovingId] = useState(null)
   const [error, setError] = useState(null)
+  const [loadError, setLoadError] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [poolLoading, setPoolLoading] = useState(true)
+  const [poolError, setPoolError] = useState('')
+  const [roleBusy, setRoleBusy] = useState(null)
+  const mutationRef = useRef(false)
+  const beginRead = useLatestRequest(eventId)
+  const beginPoolRead = useLatestRequest(`${eventId}:${search}`)
   const { success, error: showError } = useToast()
 
-  const rosterLocked = isParticipantsLocked(eventStatus)
+  const rosterLocked = loading || !foundation || Boolean(loadError) || isParticipantsLocked(eventStatus) || Boolean(foundation?.event?.official_rules_id ?? foundation?.event?.officialRulesId) || (eventStatus !== 'draft' && !!foundation?.scoringConfig?.confirmed)
+  const mutationBusy = picking || Boolean(removingId) || Boolean(roleBusy)
 
-  const loadJudges = useCallback(async () => {
+  const reload = useCallback(async () => {
+    const isCurrent = beginRead()
     try {
-      const { data } = await pageantService.listJudges(eventId)
-      setJudges(Array.isArray(data?.judges) ? data.judges : [])
-    } catch {
-      setJudges([])
-    }
-  }, [eventId])
+      const [eventResponse, judgeResponse, foundationResponse] = await Promise.all([pageantService.getEvent(eventId), pageantService.listJudges(eventId), pageantService.getFoundation(eventId)])
+      if (!isCurrent()) return
+      setJudges(Array.isArray(judgeResponse.data?.judges) ? judgeResponse.data.judges : [])
+      setFoundation(foundationResponse.data.foundation)
+      setEventStatus(eventResponse.data.event?.status ?? null)
+      setError(null)
+      setLoadError(null)
+    } catch (err) { if (isCurrent()) setLoadError(getErrorMessage(err, 'Could not load enrolled judges')); throw err }
+    finally { if (isCurrent()) setLoading(false) }
+  }, [eventId, beginRead])
 
   const loadPool = useCallback(async () => {
+    const isCurrent = beginPoolRead()
+    setPoolLoading(true)
     try {
       const { data } = await pageantService.getJudgePool(eventId, search ? { search } : {})
-      setPool(Array.isArray(data?.judges) ? data.judges : [])
+      if (isCurrent()) { setPool(Array.isArray(data?.judges) ? data.judges : []); setPoolError('') }
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to load judge pool'))
-    }
-  }, [eventId, search])
-
-  const loadFoundation = useCallback(async () => {
-    try {
-      const { data } = await pageantService.getFoundation(eventId)
-      setFoundation(data.foundation)
-    } catch {
-      setFoundation(null)
-    }
-  }, [eventId])
+      if (isCurrent()) setPoolError(getErrorMessage(err, 'Failed to load judge pool'))
+    } finally { if (isCurrent()) setPoolLoading(false) }
+  }, [eventId, search, beginPoolRead])
 
   useEffect(() => {
-    pageantService.getEvent(eventId).then(({ data }) => setEventStatus(data.event?.status ?? null)).catch(() => {})
-    loadJudges()
-    loadFoundation()
-  }, [eventId, loadJudges, loadFoundation])
+    void reload().catch(() => {})
+  }, [reload])
+  useCompetitionSync(eventId, reload)
 
   // Reload the pool as the search term changes (debounced).
   useEffect(() => {
@@ -86,7 +96,8 @@ export default function CompetitionJudgesPage() {
   const selectableCount = useMemo(() => pool.filter((p) => !p.enrolled).length, [pool])
 
   const handlePick = async () => {
-    if (selected.size === 0) return
+    if (selected.size === 0 || rosterLocked || mutationRef.current) return
+    mutationRef.current = true
     setPicking(true)
     setError(null)
     try {
@@ -94,30 +105,41 @@ export default function CompetitionJudgesPage() {
       success(
         `Added ${data.enrolled} judge(s)` +
           (data.alreadyEnrolled ? ` (${data.alreadyEnrolled} already in)` : '') +
-          (notify ? ` · ${data.notified} emailed` : ''),
+          (notify ? ` · ${data.notified} invitation email(s) accepted for delivery; enrollment does not depend on email delivery` : ''),
       )
       setSelected(new Set())
-      await Promise.all([loadJudges(), loadPool(), loadFoundation()])
+      await Promise.all([reload(), loadPool()])
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to add judges')
       setError(message)
       showError(message)
     } finally {
       setPicking(false)
+      mutationRef.current = false
     }
   }
 
   const handleRemove = async (participantId) => {
+    if (rosterLocked || mutationRef.current) return
+    mutationRef.current = true
     setRemovingId(participantId)
     try {
       await pageantService.deleteJudgeV2(eventId, participantId)
       success('Judge removed from event')
-      await Promise.all([loadJudges(), loadPool(), loadFoundation()])
+      await Promise.all([reload(), loadPool()])
     } catch (err) {
       showError(getErrorMessage(err, 'Failed to remove judge'))
     } finally {
       setRemovingId(null)
+      mutationRef.current = false
     }
+  }
+  const changeRole = async (participantId, role) => {
+    if (rosterLocked || mutationRef.current) return
+    mutationRef.current = true; setRoleBusy(participantId)
+    try { await pageantService.updateJudgeV2(eventId, participantId, { role }); await reload() }
+    catch (err) { showError(getErrorMessage(err)); setError(getErrorMessage(err)) }
+    finally { mutationRef.current = false; setRoleBusy(null) }
   }
 
   return (
@@ -125,15 +147,15 @@ export default function CompetitionJudgesPage() {
       <div>
         <h1 className="v-page-title">Judges</h1>
         <p className="v-caption">
-          Pick judges from the registered pool for this competition, then scope their assignments below.
+          Enroll existing judge accounts, then scope their assignments. Invitations are notifications; round submission progress is shown in Live Control.
         </p>
       </div>
 
-      {rosterLocked && (
+      {!loading && foundation && rosterLocked && !loadError && (
         <FormAlert variant="warning">
           <span className="inline-flex items-center gap-2">
             <Lock className="h-4 w-4" strokeWidth={1.5} />
-            This event is active — the judge roster is locked and can no longer be changed.
+            The official judge panel and assignments are locked for this event.
           </span>
         </FormAlert>
       )}
@@ -152,7 +174,8 @@ export default function CompetitionJudgesPage() {
               />
             </div>
 
-            {pool.length === 0 ? (
+            {poolError && <div role="alert"><p className="v-error-text">{poolError}</p><Button variant="secondary" onClick={loadPool}>Retry judge pool</Button></div>}
+            {poolLoading ? <p className="v-caption">Loading judge pool…</p> : !poolError && pool.length === 0 ? (
               <p className="v-caption">
                 No judges in the pool. Ask an admin to register judges in User Management.
               </p>
@@ -174,7 +197,7 @@ export default function CompetitionJudgesPage() {
                       <input
                         type="checkbox"
                         checked={j.enrolled || checked}
-                        disabled={j.enrolled}
+                        disabled={j.enrolled || mutationBusy}
                         onChange={() => toggle(j.id)}
                         className="h-4 w-4"
                       />
@@ -194,11 +217,11 @@ export default function CompetitionJudgesPage() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-v-border pt-4">
               <label className="flex items-center gap-2 text-sm text-v-text-muted">
-                <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} className="h-4 w-4" />
+                <input type="checkbox" disabled={mutationBusy} checked={notify} onChange={(e) => setNotify(e.target.checked)} className="h-4 w-4" />
                 Email an invitation to newly added judges
               </label>
               <span className="v-caption">{selectableCount} available to add</span>
-              <Button onClick={handlePick} loading={picking} disabled={selected.size === 0}>
+              <Button onClick={handlePick} loading={picking} disabled={selected.size === 0 || mutationBusy || Boolean(poolError)}>
                 <Send className="h-4 w-4" strokeWidth={2} />
                 Add {selected.size || ''} judge{selected.size === 1 ? '' : 's'}
               </Button>
@@ -207,14 +230,14 @@ export default function CompetitionJudgesPage() {
         </Card>
       )}
 
-      {error && <FormAlert variant="error">{error}</FormAlert>}
+      {(error || loadError) && <FormAlert variant="error">{error || loadError} <Button variant="secondary" onClick={() => { void reload().catch(() => {}) }}>Retry enrolled judges</Button></FormAlert>}
 
       <Card padding="sm">
         <div className="flex items-center gap-2 px-4 pt-4">
           <Users className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
-          <h2 className="v-section-title">Judges in this event ({judges.length})</h2>
+          <h2 className="v-section-title">Manage Judges ({judges.length})</h2>
         </div>
-        {judges.length === 0 ? (
+        {loading ? <p className="v-caption p-5">Loading enrolled judges…</p> : !error && !loadError && judges.length === 0 ? (
           <div className="p-8 text-center v-caption">No judges added yet.</div>
         ) : (
           <div className="v-table-wrap mt-3">
@@ -230,12 +253,12 @@ export default function CompetitionJudgesPage() {
                   <tr key={j.id}>
                     <td>{judgeName(j)}</td>
                     <td>{j.email}</td>
-                    <td>{j.role}</td>
-                    <td><Badge tone={j.hasScored ? 'success' : 'default'}>{j.hasScored ? 'Submitted' : 'Pending'}</Badge></td>
+                    <td>{rosterLocked?j.role:<select aria-label={`Role for ${judgeName(j)}`} className={INPUT_CLASS} disabled={mutationBusy} value={j.role} onChange={e => changeRole(j.id, e.target.value)}><option value="judge">Judge</option><option value="head_judge">Head judge</option><option value="score_reviewer">Independent score reviewer</option></select>}</td>
+                    <td><Badge tone={j.isActive === false ? 'default' : 'success'}>{j.isActive === false ? 'Inactive enrollment' : 'Enrolled'}</Badge></td>
                     {!rosterLocked && (
                       <td>
                         <div className="flex justify-end">
-                          <Button size="sm" variant="ghost" loading={removingId === j.id} onClick={() => handleRemove(j.id)}>
+                          <Button size="sm" variant="ghost" disabled={mutationBusy} loading={removingId === j.id} onClick={() => handleRemove(j.id)}>
                             <UserMinus className="h-4 w-4" strokeWidth={1.5} /> Remove
                           </Button>
                         </div>
@@ -251,7 +274,7 @@ export default function CompetitionJudgesPage() {
 
       {/* Scope judges to divisions/categories/rounds once they're added. */}
       <div className="border-t border-v-border pt-6">
-        <JudgeAssignmentPanel foundation={foundation} reload={loadFoundation} />
+        <JudgeAssignmentPanel foundation={foundation} reload={reload} readOnly={rosterLocked || mutationBusy} />
       </div>
     </div>
   )

@@ -1,4 +1,5 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
+import { ApiError } from '../utils/ApiError.js'
 import * as draftService from '../services/draft.service.js'
 import { validateDraft } from '../validators/draft.validator.js'
 import { createElectionEvent } from '../services/election.service.js'
@@ -53,6 +54,10 @@ export const publishDraft = (module) =>
       image_asset_id: draft?.image_asset_id || req.body.image_asset_id,
     }
     const payload = validate(body)
+    if(module==='competition' && body.idempotencyKey!==undefined) {
+      if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.idempotencyKey)) throw new ApiError(400,'Invalid competition create request ID')
+      payload.idempotencyKey=body.idempotencyKey
+    }
     
     // Inject image_asset_id since validate strips unknown fields
     if (body.image_asset_id) payload.image_asset_id = body.image_asset_id

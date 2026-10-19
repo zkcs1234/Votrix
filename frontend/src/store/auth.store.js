@@ -4,12 +4,12 @@ import { removeItem, setJSON } from '@/utils/storage'
 
 import { clearCsrfToken, setCsrfToken } from '@/utils/csrf'
 
-import { clearVotrixDrafts } from '@/utils/draftStorage'
+import { clearVotrixDrafts, clearCompetitionScoreDrafts } from '@/utils/draftStorage'
 
-// Token is now stored in HTTP-only cookie.
 // Do NOT bootstrap user/role from localStorage because that can cause
 // role bleed-through when switching accounts without logout.
 const initialUser = null
+removeItem(STORAGE_KEYS.ACCESS_TOKEN)
 
 export const useAuthStore = create((set, get) => ({
   user: initialUser,
@@ -18,7 +18,8 @@ export const useAuthStore = create((set, get) => ({
 
 
   setSession({ user, csrfToken }) {
-    // accessToken stored in HTTP-only cookie - no localStorage access
+    if (get().user?.id && get().user.id !== user?.id) clearCompetitionScoreDrafts()
+    removeItem(STORAGE_KEYS.ACCESS_TOKEN)
     if (user) setJSON(STORAGE_KEYS.USER, user)
     if (csrfToken) setCsrfToken(csrfToken)
     set({
@@ -29,12 +30,13 @@ export const useAuthStore = create((set, get) => ({
   },
 
   updateUser(user) {
+    if (get().user?.id && get().user.id !== user?.id) clearCompetitionScoreDrafts()
     if (user) setJSON(STORAGE_KEYS.USER, user)
     set({ user: user ?? null })
   },
 
   clearSession() {
-    // Token cleared via cookie - only clear local user data
+    removeItem(STORAGE_KEYS.ACCESS_TOKEN)
     removeItem(STORAGE_KEYS.USER)
     clearCsrfToken()
     clearVotrixDrafts()

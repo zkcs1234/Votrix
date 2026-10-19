@@ -42,10 +42,47 @@ export default function VoterEventCard({ event, showAction = true }) {
   const [bannerFailed, setBannerFailed] = useState(false)
   const showBanner = Boolean(event.banner && event.banner.length > 0) && !bannerFailed
   const fallbackGradient = TYPE_GRADIENT[event.eventType] ?? TYPE_GRADIENT.election
-
-  // Resolve participant type label from event data
   const participantMeta = PARTICIPANT_TYPE_META[event.participantType]
   const roleLabel = participantMeta?.label ?? null
+  if(Array.isArray(event.nativeContexts)) {
+    return (
+      <article className={`rounded-xl border bg-v-surface overflow-hidden transition ${TYPE_BORDER[event.eventType] ?? 'border-v-border'}`}>
+        <div className="relative h-28 w-full overflow-hidden" style={showBanner ? {} : { background: fallbackGradient }}>
+          {showBanner && <img src={event.banner} alt="" className="h-full w-full object-cover" onError={() => setBannerFailed(true)} />}
+          <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
+        </div>
+        <div className="px-5 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <TypeIcon className={`h-3.5 w-3.5 ${TYPE_ACCENT[event.eventType]}`} strokeWidth={2} aria-hidden />
+                <p className={`text-xs font-medium uppercase tracking-wide ${TYPE_ACCENT[event.eventType]}`}>{meta.label}</p>
+                {roleLabel && <Badge variant="outline" size="sm" className="ml-1"><UserCheck className="mr-0.5 h-3 w-3 inline" aria-hidden />{roleLabel}</Badge>}
+              </div>
+              <h4 className="mt-1 font-medium text-v-text">{event.title}</h4>
+              {event.description && <p className="mt-1 text-sm text-v-text-subtle line-clamp-2">{event.description}</p>}
+            </div>
+            <VoterStatusBadge bucket={event.bucket} label={event.statusLabel} />
+          </div>
+          <nav className="mt-3 flex flex-wrap gap-2" aria-label={`Categories for ${event.title}`}>
+            {event.nativeContexts.map((context) => {
+              const query = new URLSearchParams({ competitionId: context.competitionId, ...(context.roundId ? { roundId: context.roundId } : {}) })
+              return (
+                <Link
+                  key={`${context.competitionId}:${context.roundId ?? 'single'}:${context.reviewer ? 'review' : 'judge'}`}
+                  to={`/participant/competition/events/${event.id}/score?${query}`}
+                  className="inline-flex items-center gap-2 rounded-lg border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text hover:border-v-border-strong"
+                >
+                  <span>{context.competitionName} ({context.roundName})</span>
+                  <span className="text-xs text-v-text-subtle">{context.statusLabel}</span>
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
+      </article>
+    )
+  }
 
   return (
     <Link

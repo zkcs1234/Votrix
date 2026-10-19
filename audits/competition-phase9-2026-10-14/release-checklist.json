@@ -1,0 +1,80 @@
+{
+  "release": "NO-GO",
+  "gates": [
+    {
+      "gate": "Source/migration baseline",
+      "state": "PASSED",
+      "evidence": "772-file baseline; earlier user changes retained; migration/report hashes preserved"
+    },
+    {
+      "gate": "Backend regressions",
+      "state": "PASSED",
+      "evidence": "88 files/664 tests; one gated file/three assertions skipped"
+    },
+    {
+      "gate": "Frontend regressions",
+      "state": "PASSED",
+      "evidence": "45 files/314 tests"
+    },
+    {
+      "gate": "Local PostgreSQL guards",
+      "state": "PASSED",
+      "evidence": "5 new groups plus 13 tabulation/8 results; 46 tables/zero local preflight blockers"
+    },
+    {
+      "gate": "Local chain/restore",
+      "state": "PASSED",
+      "evidence": "103–108 once; final108 rerun; fresh whole/populated restores"
+    },
+    {
+      "gate": "Local browser acceptance",
+      "state": "PASSED",
+      "evidence": "5-child, extended, six methods, three carry paths, saved CSV and 50-entrant table; synthetic JWT/local adapter"
+    },
+    {
+      "gate": "Local relay delivery/recovery",
+      "state": "PASSED",
+      "evidence": "Two room processes plus bounded no-ready retry regression; hosted topology not represented"
+    },
+    {
+      "gate": "Production catalog/ledger",
+      "state": "BLOCKED",
+      "evidence": "No direct read-only target catalog/ledger access; exact deployed diff unavailable"
+    },
+    {
+      "gate": "Production backup/restore",
+      "state": "BLOCKED",
+      "evidence": "No confirmed complete backup, RPO/RTO or approved isolated production-backup restore"
+    },
+    {
+      "gate": "Hosted login/auth/PostgREST",
+      "state": "BLOCKED",
+      "evidence": "No approved isolated candidate/accounts"
+    },
+    {
+      "gate": "Representative distributed transport",
+      "state": "BLOCKED",
+      "evidence": "No actual topology/WSS/HA/monitoring/rotation acceptance"
+    },
+    {
+      "gate": "Distributed quotas/trusted ingress",
+      "state": "BLOCKED",
+      "evidence": "Process-local quota stores and unverified one-hop ingress boundary"
+    },
+    {
+      "gate": "Production capacity",
+      "state": "NOT TESTED",
+      "evidence": "No sustained hosted HTTP/DB pool/lock waits/network/export envelope"
+    },
+    {
+      "gate": "Hosted election/polling acceptance",
+      "state": "BLOCKED",
+      "evidence": "Regression suites and hashes pass locally; sparse fixture has no recovery/browser data for these modules"
+    },
+    {
+      "gate": "Release decision",
+      "state": "FAILED",
+      "evidence": "Required P0 gates unresolved; NO-GO"
+    }
+  ]
+}

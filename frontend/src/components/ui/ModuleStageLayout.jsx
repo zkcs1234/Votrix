@@ -7,6 +7,8 @@ import StageFooter from '@/components/ui/StageFooter'
 import { electionService } from '@/services/election.service'
 import { pageantService } from '@/services/pageant.service'
 import { pollingService } from '@/services/polling.service'
+import {useEffect,useState} from 'react'
+import {nativeCompetitionService} from '@/services/competition-native.service'
 
 const EVENT_SERVICES = {
   election: electionService,
@@ -31,9 +33,9 @@ const PAGE_OWNS_FOOTER = {
   // (Voters/Judges/Respondents) now use the layout's default navigation footer.
   election: ['review'],
   // 'workspace' (Structure & Scoring) renders its own tab-aware footer
-  // (WorkspaceStageFooter) into #stage-footer-portal, so the layout must not
-  // add a second one — otherwise two footers stack in the portal.
-  competition: ['review', 'workspace'],
+  // (WorkspaceStageFooter); Criteria and Scoring rules use the sticky portal.
+  // Rounds and Divisions keep navigation in page flow. No duplicate footer.
+  competition: ['review', 'workspace', 'categories', 'type'],
   polling: ['review'],
 }
 
@@ -46,12 +48,24 @@ const PAGE_OWNS_FOOTER = {
 export default function ModuleStageLayout({ module, children }) {
   const { eventId } = useParams()
   const location = useLocation()
+  const [nativeCompetition,setNativeCompetition]=useState(false)
+  const [creationComplete,setCreationComplete]=useState(false)
+  useEffect(()=>{
+    setNativeCompetition(false);setCreationComplete(false)
+    if(module!=='competition'||!eventId||eventId==='new'||import.meta.env.VITE_COMPETITION_NATIVE_SETUP_ENABLED!=='true')return
+    let alive=true
+    pageantService.getEvent(eventId).then(({data})=>{if(alive)setCreationComplete(!!data.event.competitionCreatedAt)}).catch(()=>{})
+    nativeCompetitionService.list(eventId).then(({data})=>{if(alive)setNativeCompetition(data.competitions?.some(c=>c.origin==='native')===true)}).catch(()=>{})
+    const changed=event=>{if(event.detail?.eventId===eventId)setNativeCompetition(event.detail.native===true)}
+    window.addEventListener('votrix-native-contexts-changed',changed)
+    return()=>{alive=false;window.removeEventListener('votrix-native-contexts-changed',changed)}
+  },[module,eventId,location.pathname])
   const { completedKeys } = useEventProgress(module, eventId)
   const { status: eventStatus } = useEventStatus(EVENT_SERVICES[module], eventId)
 
   const currentKey = stageKeyFromPath(module, location.pathname)
   const isFormWizard = currentKey && (FORM_WIZARD_STAGES[module] ?? []).includes(currentKey)
-  const pageOwnsFooter = currentKey && (PAGE_OWNS_FOOTER[module] ?? []).includes(currentKey)
+  const pageOwnsFooter = currentKey && ((PAGE_OWNS_FOOTER[module] ?? []).includes(currentKey) || module === 'competition' && nativeCompetition && ['contestants', 'judges'].includes(currentKey))
 
   const enabled = Boolean(eventId && eventId !== 'new' && currentKey && !isFormWizard)
 
@@ -63,9 +77,10 @@ export default function ModuleStageLayout({ module, children }) {
         module={module}
         currentKey={currentKey}
         eventId={eventId}
-        completedKeys={completedKeys}
+        completedKeys={creationComplete?[...new Set([...completedKeys,'details','branding','type','categories','workspace','contestants','judges','review'])]:completedKeys}
         eventStatus={eventStatus}
         readOnly={eventStatus != null && eventStatus !== 'draft'}
+        nativeCompetition={nativeCompetition}
       />
       {children}
       {!pageOwnsFooter && (

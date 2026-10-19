@@ -1,0 +1,1628 @@
+{
+  "checkedAt": "2026-10-11T15:51:52.624Z",
+  "projectHost": "wmjgugqtzcwolytbexze.supabase.co",
+  "schemaOnly": true,
+  "definitions": {
+    "events": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "organization_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "title": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "description": {
+        "type": "string",
+        "format": "text"
+      },
+      "banner": {
+        "type": "string",
+        "format": "text"
+      },
+      "start_date": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "end_date": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "status": {
+        "type": "string",
+        "format": "public.event_status",
+        "enum": [
+          "draft",
+          "scheduled",
+          "active",
+          "completed",
+          "cancelled",
+          "archived"
+        ]
+      },
+      "event_type": {
+        "type": "string",
+        "format": "public.event_type",
+        "enum": [
+          "election",
+          "pageant",
+          "polling",
+          "competition_scoring"
+        ]
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "voting_enabled": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "scoring_enabled": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "polling_enabled": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "poll_anonymous": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "poll_allow_multiple_submissions": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "poll_expires_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "scoring_config": {
+        "format": "jsonb"
+      },
+      "results_visibility": {
+        "type": "string",
+        "format": "public.election_results_visibility",
+        "enum": [
+          "real_time",
+          "hidden",
+          "public"
+        ]
+      },
+      "participant_info_fields": {
+        "format": "jsonb"
+      },
+      "election_status": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "information_form_schema": {
+        "format": "jsonb"
+      },
+      "archived_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "image_asset_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "divisions_enabled": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "competition_type": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "official_rules_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "competition_lifecycle": {
+        "type": "string",
+        "format": "text"
+      }
+    },
+    "competition_rounds": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "category_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "description": {
+        "type": "string",
+        "format": "text"
+      },
+      "display_order": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "weight": {
+        "type": "number",
+        "format": "numeric"
+      },
+      "is_open": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "starts_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "ends_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "division_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "advancement_type": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "advancement_value": {
+        "type": "number",
+        "format": "numeric"
+      },
+      "score_policy": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "finalized_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "workflow": {
+        "format": "jsonb"
+      }
+    },
+    "competition_criteria": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "percentage": {
+        "type": "number",
+        "format": "numeric"
+      },
+      "min_score": {
+        "type": "number",
+        "format": "numeric"
+      },
+      "max_score": {
+        "type": "number",
+        "format": "numeric"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "category_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "display_order": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "division_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "is_active": {
+        "type": "boolean",
+        "format": "boolean"
+      }
+    },
+    "competition_minor_criteria": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "criteria_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "score_type": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "custom_min": {
+        "type": "number",
+        "format": "numeric"
+      },
+      "custom_max": {
+        "type": "number",
+        "format": "numeric"
+      },
+      "display_order": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "is_active": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      }
+    },
+    "competition_contestants": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "photo": {
+        "type": "string",
+        "format": "text"
+      },
+      "contestant_number": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "image_asset_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "division_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "entry_type": {
+        "type": "string",
+        "format": "text"
+      },
+      "entry_label": {
+        "type": "string",
+        "format": "text"
+      }
+    },
+    "competition_divisions": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "description": {
+        "type": "string",
+        "format": "text"
+      },
+      "display_order": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "is_active": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "row_color": {
+        "type": "string",
+        "format": "text"
+      }
+    },
+    "competition_sessions": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "status": {
+        "type": "string",
+        "format": "public.competition_session_status",
+        "enum": [
+          "pending",
+          "active",
+          "paused",
+          "completed"
+        ]
+      },
+      "current_round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "active_contestant_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "current_contestant_order": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "contestant_order": {
+        "type": "array",
+        "format": "uuid[]"
+      },
+      "started_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "paused_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "completed_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "current_division_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "active_contestant_ids": {
+        "format": "jsonb"
+      },
+      "active_criteria_ids": {
+        "type": "array",
+        "format": "uuid[]"
+      },
+      "arrangement": {
+        "format": "jsonb"
+      },
+      "rules_version": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "access_config": {
+        "format": "jsonb"
+      },
+      "submission_window": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "revision": {
+        "type": "integer",
+        "format": "bigint"
+      },
+      "lineup_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "active_slot": {
+        "type": "integer",
+        "format": "integer"
+      }
+    },
+    "competition_session_judge_scores": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "session_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "contestant_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "judge_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "scores": {
+        "format": "jsonb"
+      },
+      "is_locked": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "locked_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "division_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "participant_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "locked_criteria": {
+        "format": "jsonb"
+      },
+      "rules_version": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "revision": {
+        "type": "integer",
+        "format": "bigint"
+      },
+      "lock_versions": {
+        "format": "jsonb"
+      }
+    },
+    "competition_scores": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "judge_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "contestant_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "criteria_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "score": {
+        "type": "number",
+        "format": "numeric"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "category_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "division_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "participant_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "minor_criteria_id": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "competition_deductions": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "session_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "contestant_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "applied_by_user_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "authority_type": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "amount": {
+        "type": "number",
+        "format": "numeric"
+      },
+      "reason": {
+        "type": "string",
+        "format": "text"
+      },
+      "status": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "voided_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "voided_by_user_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "rule_id": {
+        "type": "string",
+        "format": "text"
+      },
+      "rules_version": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "decision_status": {
+        "type": "string",
+        "format": "text"
+      },
+      "evidence": {
+        "type": "string",
+        "format": "text"
+      },
+      "approved_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "approved_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "offense_key": {
+        "type": "string",
+        "format": "text"
+      }
+    },
+    "competition_result_calculations": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "session_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "status": {
+        "type": "string",
+        "format": "text"
+      },
+      "configuration_snapshot": {
+        "format": "jsonb"
+      },
+      "result_snapshot": {
+        "format": "jsonb"
+      },
+      "created_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "calculated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "finalized_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "finalized_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "published_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "published_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "rules_version": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "source_versions": {
+        "format": "jsonb"
+      },
+      "source_digest": {
+        "type": "string",
+        "format": "text"
+      },
+      "verified_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "verified_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "verification": {
+        "format": "jsonb"
+      }
+    },
+    "competition_judge_assignments": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "scope": {
+        "type": "string",
+        "format": "public.competition_assignment_scope",
+        "enum": [
+          "event",
+          "category",
+          "round",
+          "division"
+        ]
+      },
+      "scope_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "participant_id": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "event_participants": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "user_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "participant_type": {
+        "type": "string",
+        "format": "public.participant_type",
+        "enum": [
+          "ELECTION_VOTER",
+          "COMPETITION_JUDGE",
+          "POLLING_RESPONDENT"
+        ]
+      },
+      "has_voted": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "has_scored": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "has_responded": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "first_name": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "last_name": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "metadata": {
+        "format": "jsonb"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "voting_nonce": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "judge_role": {
+        "type": "string",
+        "format": "public.competition_judge_role",
+        "enum": [
+          "judge",
+          "head_judge",
+          "score_reviewer"
+        ]
+      },
+      "display_name": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "is_active": {
+        "type": "boolean",
+        "format": "boolean"
+      }
+    },
+    "competition_round_criteria": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "criteria_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      }
+    },
+    "competition_round_contestants": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "contestant_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      }
+    },
+    "competition_round_results": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "contestant_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "division_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "rank": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "score": {
+        "type": "number",
+        "format": "numeric"
+      },
+      "qualified": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      }
+    },
+    "competition_rule_versions": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "version": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "snapshot": {
+        "format": "jsonb"
+      },
+      "acknowledged_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "acknowledged_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "reason": {
+        "type": "string",
+        "format": "text"
+      }
+    },
+    "competition_lineups": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "criteria_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "rules_version": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string",
+        "format": "text"
+      },
+      "mode": {
+        "type": "string",
+        "format": "text"
+      },
+      "slots": {
+        "format": "jsonb"
+      },
+      "created_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      }
+    },
+    "competition_judge_drafts": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "session_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "judge_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "contestant_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "criteria_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "rules_version": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "scores": {
+        "format": "jsonb"
+      },
+      "revision": {
+        "type": "integer",
+        "format": "bigint"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      }
+    },
+    "competition_round_submissions": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "session_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "judge_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "rules_version": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "version": {
+        "type": "integer",
+        "format": "bigint"
+      },
+      "status": {
+        "type": "string",
+        "format": "text"
+      },
+      "sources": {
+        "format": "jsonb"
+      },
+      "submitted_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "invalidated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "reason": {
+        "type": "string",
+        "format": "text"
+      }
+    },
+    "competition_eligibility_decisions": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "contestant_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "rules_version": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "decision": {
+        "type": "string",
+        "format": "text"
+      },
+      "status": {
+        "type": "string",
+        "format": "text"
+      },
+      "reason": {
+        "type": "string",
+        "format": "text"
+      },
+      "evidence": {
+        "type": "string",
+        "format": "text"
+      },
+      "reported_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "approved_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "approved_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      }
+    },
+    "competition_advancement_decisions": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "next_round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "calculation_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "rules_version": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "qualifiers": {
+        "format": "jsonb"
+      },
+      "overrides": {
+        "format": "jsonb"
+      },
+      "reason": {
+        "type": "string",
+        "format": "text"
+      },
+      "confirmed_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "confirmed_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      }
+    },
+    "competition_rule_amendments": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "previous_rules": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "proposed_config": {
+        "format": "jsonb"
+      },
+      "reason": {
+        "type": "string",
+        "format": "text"
+      },
+      "requested_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "requested_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "status": {
+        "type": "string",
+        "format": "text"
+      },
+      "reviewed_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "reviewed_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "resulting_rules": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "competition_criterion_lock_history": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "score_row_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "rules_version": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "criterion_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "revision": {
+        "type": "integer",
+        "format": "bigint"
+      },
+      "scores": {
+        "format": "jsonb"
+      },
+      "locked_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "locked_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      }
+    },
+    "v_competition_active_session": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "status": {
+        "type": "string",
+        "format": "public.competition_session_status",
+        "enum": [
+          "pending",
+          "active",
+          "paused",
+          "completed"
+        ]
+      },
+      "current_round_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "active_contestant_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "current_contestant_order": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "contestant_order": {
+        "type": "array",
+        "format": "uuid[]"
+      },
+      "started_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "paused_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "completed_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "current_division_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "active_contestant_ids": {
+        "format": "jsonb"
+      },
+      "active_criteria_ids": {
+        "type": "array",
+        "format": "uuid[]"
+      },
+      "arrangement": {
+        "format": "jsonb"
+      },
+      "rules_version": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "access_config": {
+        "format": "jsonb"
+      },
+      "submission_window": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "revision": {
+        "type": "integer",
+        "format": "bigint"
+      },
+      "lineup_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "active_slot": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "current_round_name": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "active_contestant_name": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "active_contestant_number": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "active_contestant_photo": {
+        "type": "string",
+        "format": "text"
+      }
+    },
+    "election_ballot_sections": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "description": {
+        "type": "string",
+        "format": "text"
+      },
+      "display_order": {
+        "type": "integer",
+        "format": "integer"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "eligibility_mode": {
+        "type": "string",
+        "format": "text"
+      }
+    },
+    "election_group_voters": {
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "ballot_section_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "participant_id": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "user_participant_types": {
+      "user_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "participant_type": {
+        "type": "string",
+        "format": "character varying"
+      },
+      "is_active": {
+        "type": "boolean",
+        "format": "boolean"
+      },
+      "created_by": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "timestamp with time zone"
+      }
+    }
+  },
+  "checks": [
+    {
+      "table": "events",
+      "status": 206,
+      "count": "11"
+    },
+    {
+      "table": "competition_rounds",
+      "status": 206,
+      "count": "5"
+    },
+    {
+      "table": "competition_criteria",
+      "status": 206,
+      "count": "15"
+    },
+    {
+      "table": "competition_minor_criteria",
+      "status": 206,
+      "count": "34"
+    },
+    {
+      "table": "competition_contestants",
+      "status": 206,
+      "count": "16"
+    },
+    {
+      "table": "competition_divisions",
+      "status": 206,
+      "count": "8"
+    },
+    {
+      "table": "competition_sessions",
+      "status": 206,
+      "count": "3"
+    },
+    {
+      "table": "competition_session_judge_scores",
+      "status": 206,
+      "count": "2"
+    },
+    {
+      "table": "competition_scores",
+      "status": 206,
+      "count": "20"
+    },
+    {
+      "table": "competition_deductions",
+      "status": 200,
+      "count": "0"
+    },
+    {
+      "table": "competition_result_calculations",
+      "status": 206,
+      "count": "2"
+    },
+    {
+      "table": "competition_judge_assignments",
+      "status": 206,
+      "count": "7"
+    },
+    {
+      "table": "event_participants",
+      "status": 206,
+      "count": "22"
+    },
+    {
+      "table": "competition_round_criteria",
+      "status": 206,
+      "count": "14"
+    },
+    {
+      "table": "competition_round_contestants",
+      "status": 206,
+      "count": "14"
+    },
+    {
+      "table": "competition_round_results",
+      "status": 200,
+      "count": "0"
+    },
+    {
+      "table": "competition_rule_versions",
+      "status": 200,
+      "count": "0"
+    },
+    {
+      "table": "competition_lineups",
+      "status": 200,
+      "count": "0"
+    },
+    {
+      "table": "competition_judge_drafts",
+      "status": 200,
+      "count": "0"
+    },
+    {
+      "table": "competition_round_submissions",
+      "status": 200,
+      "count": "0"
+    },
+    {
+      "table": "competition_eligibility_decisions",
+      "status": 200,
+      "count": "0"
+    },
+    {
+      "table": "competition_advancement_decisions",
+      "status": 200,
+      "count": "0"
+    },
+    {
+      "table": "competition_rule_amendments",
+      "status": 200,
+      "count": "0"
+    },
+    {
+      "table": "competition_criterion_lock_history",
+      "status": 200,
+      "count": "0"
+    },
+    {
+      "table": "v_competition_active_session",
+      "status": 206,
+      "count": "2"
+    },
+    {
+      "table": "election_ballot_sections",
+      "status": 206,
+      "count": "6"
+    },
+    {
+      "table": "election_group_voters",
+      "status": 200,
+      "count": "0"
+    },
+    {
+      "table": "user_participant_types",
+      "status": 206,
+      "count": "29"
+    }
+  ],
+  "rpcNames": [
+    "competition_approve_amendment",
+    "competition_confirm_advancement",
+    "election_group_is_eligible",
+    "competition_gate_open",
+    "competition_scoring_write",
+    "competition_create_round_criterion",
+    "cast_poll_response",
+    "set_election_group_eligibility",
+    "competition_publish_rules",
+    "competition_owns_event",
+    "competition_reorder_rounds",
+    "competition_approve_decision",
+    "competition_reconcile_projection",
+    "competition_result_transition",
+    "cast_election_ballot",
+    "competition_operational_action"
+  ]
+}

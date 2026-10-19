@@ -104,7 +104,8 @@ export function validatePosition(body) {
 export function validateElectionBallotSection(body, { partial = false } = {}) {
   const payload = {}
   if (!partial || body?.name !== undefined) {
-    if (!body?.name?.trim()) throw new ApiError(400, 'Ballot section name is required')
+    if (typeof body?.name !== 'string' || !body.name.trim()) throw new ApiError(400, 'Election group name is required')
+    if (body.name.trim().length > 255) throw new ApiError(400, 'Election group name must be 255 characters or fewer')
     payload.name = body.name.trim()
   }
   if (body?.description !== undefined) {

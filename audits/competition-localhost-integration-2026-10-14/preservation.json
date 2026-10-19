@@ -1,0 +1,10 @@
+{
+  "baseline": "Phase10 pre-edit source snapshot",
+  "checked": 789,
+  "changed": [
+    "frontend/src/pages/organizer/competition/CompetitionDashboardPage.jsx"
+  ],
+  "protectedCount": 75,
+  "protectedChanged": [],
+  "configurationChanged": []
+}

@@ -1,0 +1,9 @@
+{
+  "cluster": "C:/Github/Votrix/.tmp/competition-postgres-tests",
+  "host": "127.0.0.1",
+  "port": 55439,
+  "shutdown": "pg_ctl fast shutdown completed successfully",
+  "stopped": true,
+  "disposableDatabasesRetainedForInspection": true,
+  "supabaseOperations": 0
+}

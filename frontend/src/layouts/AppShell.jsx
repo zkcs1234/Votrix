@@ -56,6 +56,19 @@ function readCollapsedPref() {
 }
 
 function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
+  const [expandedItem, setExpandedItem] = useState(() =>
+    items.find((item) =>
+      item.children?.some((child) => location.pathname.endsWith(`/${child.path}`)),
+    )?.label ?? '',
+  )
+
+  useEffect(() => {
+    const activeParent = items.find((item) =>
+      item.children?.some((child) => location.pathname.endsWith(`/${child.path}`)),
+    )
+    if (activeParent) setExpandedItem(activeParent.label)
+  }, [items, location.pathname])
+
   const linkClass = (active) =>
     `group relative flex items-center rounded-lg text-sm transition-colors duration-150 ${
       isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5 w-full'
@@ -69,6 +82,85 @@ function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
     <nav className={`space-y-0.5 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
       {items.map((item) => {
         const Icon = item.icon ?? null
+        if (item.children) {
+          const activeChild = item.children.some((child) =>
+            location.pathname.endsWith(`/${child.path}`),
+          )
+          const expanded = expandedItem === item.label
+          const childLinks = item.children.map((child) => {
+            const ChildIcon = child.icon ?? null
+            const href = child.scoped
+              ? child.hrefTemplate?.(eventId) ?? `${child.basePath}/${eventId}/${child.path}`
+              : child.path
+            const active = location.pathname.endsWith(`/${child.path}`)
+            return (
+              <Link
+                key={child.label}
+                to={href}
+                onClick={onNavigate}
+                className={`flex min-h-8 items-center gap-2 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                  active
+                    ? 'bg-white/10 font-medium text-v-sidebar-active'
+                    : 'text-v-sidebar-text hover:bg-white/5 hover:text-white'
+                }`}
+                aria-current={active ? 'page' : undefined}
+              >
+                {ChildIcon
+                  ? <ChildIcon className="h-3.5 w-3.5 shrink-0 opacity-80" strokeWidth={1.5} aria-hidden />
+                  : <span className="h-1 w-1 shrink-0 rounded-full bg-current opacity-60" aria-hidden />}
+                <span className="truncate">{child.label}</span>
+              </Link>
+            )
+          })
+
+          if (item.scoped && !eventId) {
+            return (
+              <span
+                key={item.label}
+                className={`flex cursor-not-allowed items-center rounded-lg text-sm text-gray-600 ${
+                  isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+                }`}
+                aria-disabled="true"
+                title="Select an event first"
+              >
+                {Icon && <Icon className="h-4 w-4 shrink-0 opacity-40" strokeWidth={1.5} aria-hidden />}
+                {!isCollapsed && <span className="truncate">{item.label}</span>}
+              </span>
+            )
+          }
+
+          return (
+            <div key={item.label} className="relative">
+              <button
+                type="button"
+                className={`${linkClass(activeChild)} ${!isCollapsed ? 'justify-between' : ''}`}
+                aria-expanded={expanded}
+                aria-controls={`nav-${item.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                aria-current={activeChild ? 'location' : undefined}
+                title={isCollapsed ? item.label : undefined}
+                onClick={() => setExpandedItem(expanded ? '' : item.label)}
+              >
+                <span className={`flex min-w-0 items-center ${isCollapsed ? '' : 'gap-3'}`}>
+                  {Icon && <Icon className={`shrink-0 ${isCollapsed ? 'h-5 w-5' : 'h-4 w-4'}`} strokeWidth={1.5} aria-hidden />}
+                  {!isCollapsed && <span className="truncate">{item.label}</span>}
+                </span>
+                {!isCollapsed && <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} aria-hidden />}
+              </button>
+              {expanded && (
+                <div
+                  id={`nav-${item.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                  className={
+                    isCollapsed
+                      ? 'absolute left-full top-0 z-50 ml-2 w-56 rounded-lg border border-white/10 bg-v-sidebar p-1.5 shadow-xl'
+                      : 'ml-5 mt-1 space-y-0.5 border-l border-white/10 pl-2'
+                  }
+                >
+                  {childLinks}
+                </div>
+              )}
+            </div>
+          )
+        }
 
         // Section header (non-clickable grouping label). Hidden when collapsed.
         if (item.section) {

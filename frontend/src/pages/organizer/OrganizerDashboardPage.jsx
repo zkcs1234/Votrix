@@ -15,6 +15,7 @@ import { organizerService } from '@/services/organizer.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
+import OrganizerOverviewEvents from '@/components/organizer/OrganizerOverviewEvents'
 
 // SVG Illustrations
 import ElectionSVG from '@/assets/module/undraw_voting_3ygx.svg'
@@ -67,6 +68,17 @@ export default function OrganizerDashboardPage() {
     organizerService.getDashboard().then(({ data }) => {
       setDashboard(data)
       setActiveSessions(data.activeSessions ?? [])
+    })
+  })
+
+  useSocketEvent('competition:native-invalidated', (payload) => {
+    if (!payload?.eventId) return
+    organizerService.getDashboard().then(({ data }) => {
+      setDashboard(data)
+      setActiveSessions(data.activeSessions ?? [])
+      setError(null)
+    }).catch((err) => {
+      setError(err.response?.data?.message || 'Failed to refresh organizer dashboard')
     })
   })
 
@@ -171,7 +183,7 @@ export default function OrganizerDashboardPage() {
               <div className="mt-3 space-y-2">
                 {activeSessions.map((activeSession) => (
                   <div
-                    key={activeSession.eventId}
+                    key={activeSession.session.id ?? activeSession.eventId}
                     className="flex flex-col gap-3 rounded-lg border border-v-border bg-v-surface p-3 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
@@ -182,6 +194,13 @@ export default function OrganizerDashboardPage() {
                         )}
                         {activeSession.session.activeContestantNumber && !activeSession.session.activeContestantName && (
                           <span>Now scoring: Contestant #{activeSession.session.activeContestantNumber}</span>
+                        )}
+                        {activeSession.session.competitionName && (
+                          <span>
+                            {activeSession.session.roundName
+                              ? `${activeSession.session.competitionName} · ${activeSession.session.roundName}`
+                              : activeSession.session.competitionName}
+                          </span>
                         )}
                         <span className="inline-flex items-center gap-1">
                           <Clock className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -223,18 +242,6 @@ export default function OrganizerDashboardPage() {
           icon={Users}
         />
       </div>
-
-      {/* Registered participants shown per type instead of one blended total —
-          voters, judges, and respondents are different cohorts across different
-          events. */}
-      <Card padding="sm">
-        <h3 className="v-section-title">Registered participants across your events</h3>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <ParticipantStat label="Voters" value={stats?.assignedVoters ?? 0} icon={Vote} />
-          <ParticipantStat label="Judges" value={stats?.assignedJudges ?? 0} icon={Trophy} />
-          <ParticipantStat label="Respondents" value={stats?.assignedRespondents ?? 0} icon={BarChart2} />
-        </div>
-      </Card>
 
       <OrganizationLogoUpload
         organizationName={dashboard?.organization?.organizationName}
@@ -329,6 +336,8 @@ export default function OrganizerDashboardPage() {
         </p>
       </Link>
 
+      <OrganizerOverviewEvents dashboard={dashboard} />
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card padding="sm">
           <h3 className="v-section-title">Recent activity</h3>
@@ -386,22 +395,6 @@ export default function OrganizerDashboardPage() {
           </div>
         )}
       </Card>
-    </div>
-  )
-}
-
-function ParticipantStat({ label, value, icon: Icon }) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg border border-v-border px-3 py-2.5">
-      {Icon && (
-        <div className="rounded-md bg-v-surface-elevated p-2 text-v-text-subtle">
-          <Icon className="h-4 w-4" strokeWidth={1.5} />
-        </div>
-      )}
-      <div>
-        <p className="text-lg font-semibold text-v-text tabular-nums">{value}</p>
-        <p className="v-caption">{label}</p>
-      </div>
     </div>
   )
 }

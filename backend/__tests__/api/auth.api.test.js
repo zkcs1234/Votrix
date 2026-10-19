@@ -1,5 +1,10 @@
+import { vi } from 'vitest'
+vi.mock('../../src/services/auth.service.js', async()=>{const original=await vi.importActual('../../src/services/auth.service.js');const {ApiError}=await import('../../src/utils/ApiError.js');return{...original,login:vi.fn(async()=>{throw new ApiError(401,'Invalid email or password')})}})
+vi.mock('../../src/services/admin.service.js',async()=>({...await vi.importActual('../../src/services/admin.service.js'),createAuditLog:vi.fn(async()=>null)}))
+vi.mock('../../src/services/alert.service.js',async()=>({...await vi.importActual('../../src/services/alert.service.js'),notifyAdminsOfFailedLoginThreshold:vi.fn(async()=>null)}))
 import request from 'supertest'
 import { createApp } from '../../src/app.js'
+import * as authService from '../../src/services/auth.service.js'
 
 const TEST_CREDENTIALS = {
   wrongPassword: 'wrongpassword',
@@ -62,6 +67,22 @@ describe('Auth API Endpoints', () => {
   // 503 (DB not configured — e.g. CI without secrets). The real assertion
   // is that the route is reachable and rejects bad input cleanly.
   describe('POST /api/auth/login', () => {
+    test('returns the access token while retaining HTTP-only authentication cookies', async () => {
+      authService.login.mockResolvedValueOnce({
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        user: { id: 'organizer-id', role: 'organizer', email: 'organizer@example.com' },
+      })
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'organizer@example.com', password: 'test-password' })
+
+      expect(response.status).toBe(200)
+      expect(response.body).not.toHaveProperty('accessToken')
+      expect(response.body).not.toHaveProperty('refreshToken')
+      expect(response.headers['set-cookie'].filter(cookie => cookie.includes('HttpOnly'))).toHaveLength(2)
+    })
+
     test('should reject invalid credentials', async () => {
       const response = await request(app)
         .post('/api/auth/login')

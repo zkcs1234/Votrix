@@ -1,0 +1,20 @@
+// Isolated visual fixture; not imported by the app or connected to a database.
+import '../src/index.css'
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import { MemoryRouter, Routes, Route, useParams } from 'react-router-dom'
+import Workspace from '../src/components/organizer/competition/NativeTabulationWorkspace'
+import { nativeTabulationService as service } from '../src/services/competition-native-tabulation.service'
+import { useAuthStore } from '../src/store/auth.store'
+
+const names = ['Adrian Reyes', 'Miguel Santos', 'Joshua Dela Cruz', 'Paolo Garcia', 'Lawrence Tan', 'Anthony Villanueva', 'Rafael Cruz', 'Daniel Bautista', 'Christian Lim', 'Jayson Sanchez', 'Carlo Ramos', 'John Paul Fernandez']
+const criteria = ['Poise and Confidence', 'Grooming and Presentation', 'Attire and Styling', 'Stage Presence', 'Overall Impression'].map((name, index) => ({ id: `criterion-${index}`, roundId: null, name, percentage: 20, minScore: 0, maxScore: 100, minorCriteria: [] }))
+const entries = names.map((name, index) => ({ id: `entry-${index}`, name, contestantNumber: index + 1 }))
+const progress = Array.from({ length: 7 }, (_, i) => ({ judgeId: `judge-${i}`, judgeName: `Judge ${i + 1}`, submitted: true, submissionId: `submission-judge-${i}`, submittedAt: '2026-10-19T01:30:00Z' }))
+const scores = (entry, judge) => 95 - entries.indexOf(entry) + [-1, 0, 1, -1, 0, 1, 0][progress.indexOf(judge)]
+const view = { eventId: 'event', competitionId: 'formal', roundId: null, viewerId: 'owner', complete: true, progress, session: { id: 'session-formal', status: 'closed', entry_ids: entries.map(entry => entry.id) }, sourceDigest: 'visual-fixture-digest', entries, deductionsResolved: true, deductions: [], reviewPolicy: { active: true, reviewerName: 'Independent Reviewer', reviewer_id: 'reviewer' }, rules: { id: 'rules-1', version: 1, configuration_snapshot: { structure: 'single', rounds: [], criteria, scoringConfig: { calculationMethod: 'weighted_average', decimalPlaces: 2, deductionMode: 'organizer', deductionRules: [{ id: 'time', description: 'Time limit', appliedBy: 'organizer', amount: 1, units: 'points' }] } } }, submissions: progress.map(judge => ({ id: `submission-${judge.judgeId}`, judge_id: judge.judgeId, session_id: 'session-formal', rules_version: 'rules-1', round_id: null, submitted_at: judge.submittedAt, sources: entries.flatMap(entry => criteria.map(criterion => ({ session_id: 'session-formal', judge_id: judge.judgeId, locked: true, entry_id: entry.id, criterion_id: criterion.id, revision: 1, scores: { [criterion.id]: scores(entry, judge) } }))) })), calculation: { id: 'calc-1', version: 1, created_at: '2026-10-19T01:40:00Z', verified: true, finalized: false, source_digest: 'visual-fixture-digest', output_snapshot: { results: entries.map((entry, i) => ({ contestantId: entry.id, rank: i + 1, baseScore: 95 - i, finalScore: 95 - i, deductionTotal: 0 })), worksheets: entries.flatMap(entry => progress.map(judge => ({ entryId: entry.id, judgeId: judge.judgeId, roundId: null, complete: true, total: scores(entry, judge), criteria: criteria.map(criterion => ({ criteriaId: criterion.id, name: criterion.name, percentage: 20, average: scores(entry, judge), contribution: scores(entry, judge) * .2 })) }))) } } }
+useAuthStore.setState({ user: { id: 'owner' }, isAuthenticated: true, isBootstrapping: false })
+service.snapshot = async () => ({ data: structuredClone(view) })
+const choices = [{ competitionId: 'formal', competitionName: 'Formal Wear', roundId: null, roundName: 'Final', eventName: 'Tabulation layout test' }]
+function Preview() { const { section = 'overview' } = useParams(); return <Workspace eventId="event" choices={choices} initialSection={section}/> }
+createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={['/organizer/competition/events/event/tabulation/overview']}><main style={{ maxWidth: 1440, padding: '14px 16px', margin: '0 auto', minWidth: 0 }}><Routes><Route path="/organizer/competition/events/:eventId/tabulation/:section" element={<Preview/>}/></Routes></main></MemoryRouter>)

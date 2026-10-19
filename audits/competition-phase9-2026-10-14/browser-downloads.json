@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "downloadEvidence": [
+    {
+      "kind": "Judge worksheet CSV",
+      "file": "62588291-9caa-4745-ba52-6bbf147fffca",
+      "bytes": 1527,
+      "sha256": "2576ba1ad4c35712a3ca96a765c63a1087117c66c5896a7496af6c130fd73ccf",
+      "rows": 1,
+      "scopeAndRawValues": true,
+      "formulaShielding": true
+    },
+    {
+      "kind": "All worksheets CSV",
+      "file": "c8fa5299-775d-4d09-a7b5-01e29862b038",
+      "bytes": 1527,
+      "sha256": "2576ba1ad4c35712a3ca96a765c63a1087117c66c5896a7496af6c130fd73ccf",
+      "rows": 1,
+      "scopeAndRawValues": true,
+      "formulaShielding": true
+    },
+    {
+      "kind": "Official tabulation CSV",
+      "file": "16dfa450-4ae9-404d-aacc-41dd0e6870fd",
+      "bytes": 5534,
+      "sha256": "a776b64a24ec3565698df79b7339a42f0cdaf7ccf20094c0d1f19447e3bfb5a6",
+      "rows": 3,
+      "scopeAndRawValues": true,
+      "formulaShielding": true
+    },
+    {
+      "kind": "Final results CSV",
+      "file": "10c47e5e-b9a1-413d-a234-ec79eff437bb",
+      "bytes": 1087,
+      "sha256": "7a8ee2589aa9a88973fc9c0005772b42525813642acfa7d10e70b1e8ad4cd959",
+      "rows": 1,
+      "scopeAndRawValues": true,
+      "formulaShielding": true
+    }
+  ],
+  "hosted": false
+}

@@ -39,6 +39,13 @@ describe('Round validator', () => {
 })
 
 describe('Scoring config validator', () => {
+  test('rejects malformed confirmation, reviewer, tie and penalty settings', () => {
+    for (const body of [{ confirmed: 'true' }, { perDivision: 'false' }, { independentApproval: 1 }, { tiePolicy: 'deliberation' }, { verifierId: {} }, { finalRoundId: [] }, { manualBasis: {} }, { deductionRules: {} }, { deductionRules: [{ id: 'r', units: 'percent' }] }]) expect(() => validateScoringConfig(body)).toThrow()
+  })
+  test('draft penalty details can be incomplete while identifiers and units remain valid', () => {
+    const rules = [{ id: 'draft-rule', units: 'points', description: '', amount: null }]
+    expect(validateScoringConfig({ confirmed: false, deductionRules: rules }).deductionRules).toEqual(rules)
+  })
   test('accepts a valid config', () => {
     const c = validateScoringConfig({
       scoreType: 'range_1_10',
@@ -90,4 +97,9 @@ describe('Assignment validator', () => {
   test('requires scopeId', () => {
     expect(() => validateAssignment({ scope: 'round' })).toThrow(/scopeId/i)
   })
+})
+
+test('partial judge updates preserve reviewer role and inactive state when omitted',()=>{
+ expect(validateJudgeRole({displayName:'Updated reviewer'},false)).toEqual({displayName:'Updated reviewer'})
+ expect(validateJudgeRole({isActive:false},false)).toEqual({isActive:false})
 })

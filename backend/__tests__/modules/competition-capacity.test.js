@@ -1,0 +1,4 @@
+import {expect,test} from 'vitest'
+import {assertNativeCapacity,COMPETITION_CAPACITY} from '../../src/modules/competition-capacity.js'
+const config={structure:'single',rounds:[],criteria:Array.from({length:4},()=>({roundId:null,minorCriteria:[{},{},{}]}))}
+test('measured 50 entrant/5 judge/4 major/3 minor profile is admitted; excess roster/panel/target bounds reject without changing inputs',()=>{const entries=Array.from({length:50},(_,i)=>({id:i})),panel=Array.from({length:5},(_,i)=>({participant_id:i,round_id:null})),before=JSON.stringify({config,entries,panel});expect(()=>assertNativeCapacity(config,entries,panel)).not.toThrow();expect(()=>assertNativeCapacity(config,Array(101).fill({}),panel)).toThrow('entrant limit');expect(()=>assertNativeCapacity(config,entries,Array.from({length:11},(_,i)=>({participant_id:i})))).toThrow('panel');expect(JSON.stringify({config,entries,panel})).toBe(before);expect(COMPETITION_CAPACITY.exportBytes).toBe(10485760)})

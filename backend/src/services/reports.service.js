@@ -7,29 +7,17 @@ import {
   PARTICIPANT_TYPES,
 } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
-import { listElectionEvents, getElectionAnalytics, listPositions } from './election.service.js'
+import { listElectionEvents, getElectionAnalytics, listPositions, listElectionBallotSections } from './election.service.js'
 import { listCompetitionEvents, getLiveRankings, getCompetitionResults } from './pageant.service.js'
 import { listPollEvents, getPollAnalytics } from './polling.service.js'
+import { serializeCsv } from '../../../shared/csv-export.js'
 
 
 function pct(part, total) {
   return total > 0 ? Math.round((part / total) * 10000) / 100 : 0
 }
 
-function csvEscape(value) {
-  const raw = value === null || value === undefined ? '' : String(value)
-  return `"${raw.replace(/"/g, '""')}"`
-}
-
-function rowsToCsv(rows) {
-  if (!rows?.length) return ''
-  const headers = Object.keys(rows[0])
-  const lines = [headers.join(',')]
-  for (const row of rows) {
-    lines.push(headers.map((header) => csvEscape(row[header])).join(','))
-  }
-  return lines.join('\n')
-}
+const rowsToCsv = serializeCsv
 
 export async function getReportsOverview(organizerId) {
   const [elections, competitions, polls] = await Promise.all([
@@ -154,7 +142,9 @@ export async function getElectionReport(eventId, organizerId) {
 
   const [analytics, positions] = await Promise.all([
     getElectionAnalytics(eventId, organizerId),
-    listPositions(eventId, organizerId),
+    listElectionBallotSections(eventId, organizerId).then(async (groups) => (await Promise.all(groups.map((group) =>
+      listPositions(eventId, organizerId, group.id).then((positions) => positions.map((position) => ({ ...position, ballotSectionName: group.name }))),
+    ))).flat()),
   ])
 
   const positionSummaries = positions.map((position) => {
@@ -176,6 +166,8 @@ export async function getElectionReport(eventId, organizerId) {
     return {
       positionId: position.id,
       positionName: position.name,
+      ballotSectionName: position.ballotSectionName,
+      ballotSectionId: position.ballotSectionId,
       minVote: position.minVote,
       maxVote: position.maxVote,
       totalVotes: totalPositionVotes,
@@ -228,9 +220,18 @@ export async function getCompetitionReport(eventId, organizerId, { divisionId = 
     getCompetitionResults(eventId, organizerId),
   ])
 
-  const reportRankings = resultsData.publishedCalculationId
+  const sourceRankings = resultsData.publishedCalculationId
     ? resultsData.overall
     : rankingsData.rankings
+  const reportRankings = (sourceRankings ?? []).filter(row => !divisionId || row.divisionId === divisionId)
+  const entryDivisions = new Map(reportRankings.map(row => [row.contestantId, row.divisionId]))
+  if (divisionId) {
+    // Historic round snapshots may predate divisionId in the result DTO. Read
+    // the event-scoped entry identity rather than silently dropping that scope.
+    const { data: entries, error } = await getClient().from(DB_TABLES.CONTESTANTS).select('id,division_id').eq('event_id', eventId)
+    if (error) throw new ApiError(500, error.message)
+    for (const entry of entries ?? []) entryDivisions.set(entry.id, entry.division_id)
+  }
 
   return {
     generatedAt: new Date().toISOString(),
@@ -257,9 +258,9 @@ export async function getCompetitionReport(eventId, organizerId, { divisionId = 
     publishedAt: resultsData.publishedAt ?? null,
     criteriaTotalPercentage: rankingsData.criteriaTotalPercentage,
     rounds: rankingsData.rounds ?? [],
-    roundResults: resultsData.rounds ?? [],
-    divisionResults: resultsData.divisions ?? [],
-    categoryAwards: resultsData.categoryAwards ?? [],
+    roundResults: (resultsData.rounds ?? []).map(round => ({ ...round, standings: (round.standings ?? []).filter(row => !divisionId || (row.divisionId ?? entryDivisions.get(row.contestantId)) === divisionId) })),
+    divisionResults: (resultsData.divisions ?? []).filter(division => !divisionId || division.divisionId === divisionId),
+    categoryAwards: (resultsData.categoryAwards ?? []).filter(award => !divisionId || (award.divisionId ?? entryDivisions.get(award.contestantId)) === divisionId),
   }
 }
 
@@ -359,11 +360,11 @@ export async function getPageantReportExport(eventId, organizerId) {
   return getCompetitionReportExport(eventId, organizerId)
 }
 
-export async function getCompetitionReportExport(eventId, organizerId) {
-  const report = await getCompetitionReport(eventId, organizerId)
+export async function getCompetitionReportExport(eventId, organizerId, options = {}) {
+  const report = await getCompetitionReport(eventId, organizerId, options)
   const rows = (report.rankings ?? []).map((row) => ({
     contestant: row.contestantName ?? row.name ?? '',
-    totalScore: row.totalScore ?? 0,
+    totalScore: row.finalScore ?? row.weightedScore ?? row.totalScore ?? '',
     rank: row.rank ?? '',
   }))
 

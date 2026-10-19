@@ -1,0 +1,393 @@
+import { ApiError } from '../utils/ApiError.js'
+import {
+  SCORE_TYPES,
+  CALCULATION_METHODS,
+  JUDGE_ROLES,
+  ASSIGNMENT_SCOPES,
+  EVENT_STATUS,
+  ADVANCEMENT_TYPES,
+  SCORE_POLICIES,
+} from '../utils/constants.js'
+import { validateUUID } from '../utils/sanitize.js'
+import { isValidCompetitionType, getTemplate } from '../modules/competition-templates.js'
+
+const ALLOWED_EVENT_STATUSES = new Set(Object.values(EVENT_STATUS))
+
+function normalizeEventStatus(value) {
+  if (value === undefined || value === null || value === '') {
+    return undefined
+  }
+
+  const normalized = String(value).trim().toLowerCase()
+  if (!ALLOWED_EVENT_STATUSES.has(normalized)) {
+    throw new ApiError(400, `status must be one of ${Array.from(ALLOWED_EVENT_STATUSES).join(', ')}`)
+  }
+  return normalized
+}
+
+export function validateCompetitionEvent(body, isCreate = false) {
+  if (isCreate && !body?.title?.trim()) {
+    throw new ApiError(400, 'Event title is required')
+  }
+  if (isCreate) {
+    if (!body?.startDate) throw new ApiError(400, 'Start date is required')
+    if (!body?.endDate) throw new ApiError(400, 'End date is required')
+    if (body.startDate && body.endDate && new Date(body.endDate) < new Date(body.startDate)) {
+      throw new ApiError(400, 'End date must be on or after start date')
+    }
+  }
+
+  const payload = {}
+  if (body.title !== undefined) payload.title = body.title.trim()
+  if (body.description !== undefined) payload.description = body.description?.trim() || null
+  if (body.banner !== undefined) payload.banner = body.banner
+  if (body.startDate !== undefined) payload.startDate = body.startDate
+  if (body.endDate !== undefined) payload.endDate = body.endDate
+  if (body.status !== undefined) payload.status = normalizeEventStatus(body.status)
+
+  // Phase 1: optional competition sub-type (nullable, validated against catalog).
+  if (body.competitionType !== undefined) {
+    const ct = typeof body.competitionType === 'string' ? body.competitionType.trim() || null : body.competitionType || null
+    if (!isValidCompetitionType(ct)) throw new ApiError(400, 'Invalid competition type')
+    payload.competitionType = ct
+  }
+
+  // Phase 2: optional starter template key (create only; ignored on update).
+  if (body.templateKey !== undefined && body.templateKey !== null && body.templateKey !== '') {
+    if (!getTemplate(body.templateKey)) throw new ApiError(400, 'Invalid template')
+    payload.templateKey = body.templateKey
+  }
+
+  return payload
+}
+
+export function validateContestant(body) {
+  if (!body?.name?.trim()) throw new ApiError(400, 'Contestant name is required')
+  const num = Number(body.contestantNumber)
+  if (!Number.isInteger(num) || num < 1) {
+    throw new ApiError(400, 'Contestant number must be a positive integer')
+  }
+  return {
+    name: body.name.trim(),
+    photo: body.photo || null,
+    contestantNumber: num,
+    divisionId: body.divisionId || null,
+    ...(body.entryType !== undefined ? {entryType:body.entryType} : {}),
+    ...(body.entryLabel !== undefined ? {entryLabel:String(body.entryLabel).trim()} : {}),
+  }
+}
+
+export function validateCriteria(body, isCreate = true) {
+  if ((isCreate || body?.name !== undefined) && !body?.name?.trim()) throw new ApiError(400, 'Criteria name is required')
+  const percentage = Number(body.percentage ?? 0)
+  const minScore = Number(body.minScore ?? 0)
+  const maxScore = Number(body.maxScore ?? 100)
+
+  if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+    throw new ApiError(400, 'Percentage must be between 0 and 100')
+  }
+  if (!Number.isFinite(minScore) || !Number.isFinite(maxScore) || maxScore < minScore) {
+    throw new ApiError(400, 'maxScore must be >= minScore')
+  }
+
+  const payload = {
+    name: body.name?.trim(),
+    percentage,
+    minScore,
+    maxScore,
+    divisionId: body.divisionId || null,
+  }
+  if (body.isActive !== undefined) payload.isActive = Boolean(body.isActive)
+  if (body.displayOrder !== undefined) {const n=Number(body.displayOrder);if(!Number.isInteger(n)||n<0)throw new ApiError(400,'Criterion order must be a nonnegative integer');payload.displayOrder=n}
+  if (!isCreate) for (const key of Object.keys(payload)) if (body[key] === undefined) delete payload[key]
+  return payload
+}
+
+// Minor criteria carry NO percentage (equal weight within their criterion) and
+// own the score type. `isCreate` requires name + scoreType; updates are partial.
+export function validateMinorCriteria(body, isCreate = true) {
+  const out = {}
+
+  if (isCreate || body?.name !== undefined) {
+    if (!body?.name?.trim()) throw new ApiError(400, 'Minor criteria name is required')
+    out.name = body.name.trim()
+  }
+
+  if (isCreate || body?.scoreType !== undefined) {
+    const scoreType = body?.scoreType
+    if (!Object.values(SCORE_TYPES).includes(scoreType)) {
+      throw new ApiError(400, `scoreType must be one of: ${Object.values(SCORE_TYPES).join(', ')}`)
+    }
+    out.scoreType = scoreType
+  }
+
+  // Custom bounds only meaningful for custom_range; validated when provided.
+  const effectiveType = out.scoreType ?? body?.scoreType
+  if (effectiveType === SCORE_TYPES.CUSTOM_RANGE) {
+    const customMin = Number(body?.customMin)
+    const customMax = Number(body?.customMax)
+    if (Number.isNaN(customMin) || Number.isNaN(customMax)) {
+      throw new ApiError(400, 'customMin and customMax are required for a custom range')
+    }
+    if (customMax <= customMin) {
+      throw new ApiError(400, 'customMax must be greater than customMin')
+    }
+    out.customMin = customMin
+    out.customMax = customMax
+  } else if (isCreate || body?.scoreType !== undefined) {
+    // Non-custom scale: clear any stray custom bounds.
+    out.customMin = null
+    out.customMax = null
+  }
+
+  if (body?.displayOrder !== undefined) {
+    const displayOrder = Number(body.displayOrder)
+    out.displayOrder = Number.isInteger(displayOrder) ? displayOrder : 0
+  }
+  if (body?.isActive !== undefined) out.isActive = Boolean(body.isActive)
+
+  return out
+}
+
+export function validateScoringToggle(body) {
+  if (typeof body?.scoringEnabled !== 'boolean') {
+    throw new ApiError(400, 'scoringEnabled must be a boolean')
+  }
+  return body.scoringEnabled
+}
+
+export function validateJudgeScores(body) {
+  const scores = body?.scores
+  if (!Array.isArray(scores) || !scores.length) {
+    throw new ApiError(400, 'scores array is required')
+  }
+
+  return scores.map((s) => ({
+    contestantId: validateUUID(s.contestantId, 'contestantId'),
+    criteriaId: validateUUID(s.criteriaId, 'criteriaId'),
+    roundId: s.roundId ? validateUUID(s.roundId, 'roundId') : null,
+    categoryId: s.categoryId ? validateUUID(s.categoryId, 'categoryId') : null,
+    divisionId: s.divisionId ? validateUUID(s.divisionId, 'divisionId') : null,
+    score: s.score,
+  }))
+}
+
+// Backward-compatible aliases. Existing imports from the pageant validator
+// keep working until all call sites are migrated.
+export const validatePageantEvent = validateCompetitionEvent
+
+// ---------------------------------------------------------------------------
+// Phase 4 — Categories
+// ---------------------------------------------------------------------------
+export function validateCategory(body, isCreate = true) {
+  if ((isCreate || body?.name !== undefined) && !body?.name?.trim()) throw new ApiError(400, 'Category name is required')
+  const weight = Number(body.weight ?? 0)
+  if (Number.isNaN(weight) || weight < 0 || weight > 100) {
+    throw new ApiError(400, 'Category weight must be between 0 and 100')
+  }
+  const displayOrder = body.displayOrder !== undefined ? Number(body.displayOrder) : 0
+  const payload = {
+    name: body.name?.trim(),
+    description: body.description?.trim() || null,
+    displayOrder: Number.isInteger(displayOrder) ? displayOrder : 0,
+    weight,
+    isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
+    divisionId: body.divisionId || null,
+  }
+  if (!isCreate) for (const key of Object.keys(payload)) if (body[key] === undefined) delete payload[key]
+  return payload
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 — Rounds
+// ---------------------------------------------------------------------------
+export function validateRound(body, isCreate = true) {
+  if ((isCreate || body?.name !== undefined) && !body?.name?.trim()) throw new ApiError(400, 'Round name is required')
+  const weight = Number(body.weight ?? 0)
+  if (Number.isNaN(weight) || weight < 0 || weight > 100) {
+    throw new ApiError(400, 'Round weight must be between 0 and 100')
+  }
+  const displayOrder = body.displayOrder !== undefined ? Number(body.displayOrder) : 0
+  const payload = {
+    name: body.name?.trim(),
+    description: body.description?.trim() || null,
+    categoryId: body.categoryId || null,
+    divisionId: body.divisionId || null,
+    displayOrder: Number.isInteger(displayOrder) ? displayOrder : 0,
+    weight,
+    isOpen: body.isOpen !== undefined ? Boolean(body.isOpen) : false,
+    startsAt: body.startsAt || null,
+    endsAt: body.endsAt || null,
+  }
+
+  // Phase 6 — advancement/elimination config (only when explicitly provided, so
+  // an ordinary name/weight edit never resets it).
+  if (body.advancementType !== undefined) {
+    if (!Object.values(ADVANCEMENT_TYPES).includes(body.advancementType)) {
+      throw new ApiError(
+        400,
+        `advancementType must be one of: ${Object.values(ADVANCEMENT_TYPES).join(', ')}`,
+      )
+    }
+    payload.advancementType = body.advancementType
+  }
+  if (body.advancementValue !== undefined) {
+    payload.advancementValue =
+      body.advancementValue === null || body.advancementValue === ''
+        ? null
+        : Number(body.advancementValue)
+  }
+  if (body.scorePolicy !== undefined) {
+    if (!Object.values(SCORE_POLICIES).includes(body.scorePolicy)) {
+      throw new ApiError(
+        400,
+        `scorePolicy must be one of: ${Object.values(SCORE_POLICIES).join(', ')}`,
+      )
+    }
+    payload.scorePolicy = body.scorePolicy
+  }
+
+  if (!isCreate) {
+    for (const key of Object.keys(payload)) if (body[key] === undefined) delete payload[key]
+  }
+  for (const key of ['purpose', 'progression', 'nextRoundId', 'judgingSettings']) {
+    if (body[key] !== undefined) payload[key] = body[key]
+  }
+  if (payload.purpose && !['qualification', 'final', 'regular', 'special'].includes(payload.purpose)) throw new ApiError(400, 'Invalid round purpose')
+  if (payload.progression && !['back_to_zero', 'carry_forward', 'weighted'].includes(payload.progression)) throw new ApiError(400, 'Invalid scoring relationship')
+  return payload
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — Scoring configuration
+// ---------------------------------------------------------------------------
+export function validateScoringConfig(body) {
+  if (!body || typeof body !== 'object') {
+    throw new ApiError(400, 'scoring config is required')
+  }
+
+  const config = {}
+
+  if (body.scoreType !== undefined) {
+    if (!Object.values(SCORE_TYPES).includes(body.scoreType)) {
+      throw new ApiError(
+        400,
+        `scoreType must be one of: ${Object.values(SCORE_TYPES).join(', ')}`,
+      )
+    }
+    config.scoreType = body.scoreType
+  }
+
+  if (body.calculationMethod !== undefined) {
+    if (![...Object.values(CALCULATION_METHODS),'manual','undecided'].includes(body.calculationMethod)) {
+      throw new ApiError(
+        400,
+        `calculationMethod must be one of: ${Object.values(CALCULATION_METHODS).join(', ')}`,
+      )
+    }
+    config.calculationMethod = body.calculationMethod
+  }
+
+  if (body.decimalPlaces !== undefined) {
+    const dp = Number(body.decimalPlaces)
+    if (!Number.isInteger(dp) || dp < 0 || dp > 6) {
+      throw new ApiError(400, 'decimalPlaces must be an integer between 0 and 6')
+    }
+    config.decimalPlaces = dp
+  }
+
+  if (body.scoreType === SCORE_TYPES.CUSTOM_RANGE) {
+    const min = Number(body.customMin)
+    const max = Number(body.customMax)
+    if (Number.isNaN(min) || Number.isNaN(max)) {
+      throw new ApiError(400, 'customMin and customMax are required for custom_range')
+    }
+    if (max < min) throw new ApiError(400, 'customMax must be >= customMin')
+    config.customMin = min
+    config.customMax = max
+  }
+
+  if (body.dropHighest !== undefined) {
+    const n = Number(body.dropHighest)
+    if (!Number.isInteger(n) || n < 0) {
+      throw new ApiError(400, 'dropHighest must be a non-negative integer')
+    }
+    config.dropHighest = n
+  }
+  if (body.dropLowest !== undefined) {
+    const n = Number(body.dropLowest)
+    if (!Number.isInteger(n) || n < 0) {
+      throw new ApiError(400, 'dropLowest must be a non-negative integer')
+    }
+    config.dropLowest = n
+  }
+
+  for (const key of ['confirmed','tiePolicy','perDivision','independentApproval','verifierId','manualBasis','deductionRules','finalRoundId']) if (body[key] !== undefined) config[key] = body[key]
+
+  // Division support: includeOverallRanking flag
+  if (body.includeOverallRanking !== undefined) {
+    config.includeOverallRanking = Boolean(body.includeOverallRanking)
+  }
+
+  // Phase 7: optional tie-breaker.
+  if (body.tieBreaker !== undefined) {
+    const allowed = [null, 'none', 'highest_criterion']
+    if (!allowed.includes(body.tieBreaker)) {
+      throw new ApiError(400, 'tieBreaker must be one of: none, highest_criterion')
+    }
+    config.tieBreaker = body.tieBreaker === 'none' ? null : body.tieBreaker
+  }
+
+  return config
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 — Judge permission roles and assignments
+// ---------------------------------------------------------------------------
+export function validateJudgeRole(body, isCreate = true) {
+  const role = body?.role
+  if (role !== undefined && !Object.values(JUDGE_ROLES).includes(role)) {
+    throw new ApiError(400, `Invalid role. Must be one of: ${Object.values(JUDGE_ROLES).join(', ')}`)
+  }
+  const payload = {
+    role: role ?? JUDGE_ROLES.JUDGE,
+    displayName: body?.displayName?.trim() || null,
+    isActive: body?.isActive !== undefined ? Boolean(body.isActive) : true,
+  }
+  if (!isCreate) for (const key of Object.keys(payload)) if (body[key] === undefined) delete payload[key]
+  return payload
+}
+
+export function validateAssignment(body) {
+  if (!Object.values(ASSIGNMENT_SCOPES).includes(body?.scope)) {
+    throw new ApiError(400, `scope must be one of: ${Object.values(ASSIGNMENT_SCOPES).join(', ')}`)
+  }
+  if (!body?.scopeId) {
+    throw new ApiError(400, 'scopeId is required')
+  }
+  return { scope: body.scope, scopeId: body.scopeId }
+}
+
+// ---------------------------------------------------------------------------
+// Division validators
+// ---------------------------------------------------------------------------
+export function validateDivision(body, isCreate = true) {
+  if ((isCreate || body?.name !== undefined) && !body?.name?.trim()) throw new ApiError(400, 'Division name is required')
+  const displayOrder = body.displayOrder !== undefined ? Number(body.displayOrder) : 0
+  const payload = {
+    name: body.name?.trim(),
+    ...(body.rowColor !== undefined ? {rowColor:/^#[0-9a-f]{6}$/i.test(body.rowColor)?body.rowColor:null}:{}),
+    description: body.description?.trim() || null,
+    displayOrder: Number.isInteger(displayOrder) ? displayOrder : 0,
+    isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
+  }
+  if (!isCreate) for (const key of Object.keys(payload)) if (body[key] === undefined) delete payload[key]
+  return payload
+}
+
+export function validateDivisionsToggle(body) {
+  if (typeof body?.divisionsEnabled !== 'boolean') {
+    throw new ApiError(400, 'divisionsEnabled must be a boolean')
+  }
+  return body.divisionsEnabled
+}

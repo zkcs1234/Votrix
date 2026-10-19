@@ -1,0 +1,258 @@
+{
+  "passed": true,
+  "event": "8c50d3f0-8f59-4eaa-b802-4390eed02f58",
+  "competition": "3475b758-a3e2-4ce6-9fb7-a9f1291f5daf",
+  "anonymous": true,
+  "organizerActualEventSelection": true,
+  "judgeActualDashboardDeepLink": true,
+  "actualMainRouter": true,
+  "realPostgrest": true,
+  "network": [
+    {
+      "session": "51A9BA5C6A7A8F828F26808C1BB238D5",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "51A9BA5C6A7A8F828F26808C1BB238D5",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "51A9BA5C6A7A8F828F26808C1BB238D5",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "51A9BA5C6A7A8F828F26808C1BB238D5",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "51A9BA5C6A7A8F828F26808C1BB238D5",
+      "path": "/api/public/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/3475b758-a3e2-4ce6-9fb7-a9f1291f5daf/results",
+      "status": 200
+    },
+    {
+      "session": "51A9BA5C6A7A8F828F26808C1BB238D5",
+      "path": "/api/public/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/3475b758-a3e2-4ce6-9fb7-a9f1291f5daf/results",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/dashboard",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/contestants",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/enrollments/pool",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/24f842f9-1f19-4ee5-9ca6-18ebc426af07/entries",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/contestants",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/enrollments",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/24f842f9-1f19-4ee5-9ca6-18ebc426af07/foundation",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/enrollments",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/24f842f9-1f19-4ee5-9ca6-18ebc426af07/entries",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/enrollments/pool",
+      "status": 200
+    },
+    {
+      "session": "A0CBE456D6FD75D769790C429774AB53",
+      "path": "/api/organizer/competition/events/8c50d3f0-8f59-4eaa-b802-4390eed02f58/competitions/24f842f9-1f19-4ee5-9ca6-18ebc426af07/foundation",
+      "status": 200
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/participant/login-redirect",
+      "status": 200
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/participant/overview",
+      "status": 200
+    },
+    {
+      "session": "299D93C91DC1EE9519253030CAB11A3B",
+      "path": "/api/participant/overview",
+      "status": 200
+    }
+  ],
+  "productionTouched": false
+}

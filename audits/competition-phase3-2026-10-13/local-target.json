@@ -1,0 +1,7 @@
+{
+  "database": "votrix_native_1791883232718",
+  "template": "votrix_child_1791877042044",
+  "host": "127.0.0.1",
+  "port": 55439,
+  "disposable": true
+}

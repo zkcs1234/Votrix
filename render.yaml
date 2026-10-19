@@ -32,8 +32,21 @@ services:
         sync: false
       - key: COOKIE_SAME_SITE
         value: none
-      - key: ALLOW_VERCEL_PREVIEWS
+      # Enable only after the reviewed child-competition migrations are deployed
+      # to Supabase (103+ for setup identity and the native foundation).
+      - key: COMPETITION_CHILD_CONTEXTS_ENABLED
         value: 'true'
+      - key: COMPETITION_NATIVE_SETUP_ENABLED
+        value: 'true'
+      # Exact additional production or preview origins, comma separated.
+      - key: CLIENT_URLS
+        sync: false
+      - key: PREVIEW_CLIENT_URLS
+        sync: false
+      - key: WS_MAX_CONNECTIONS_PER_USER
+        value: '5'
+      - key: WS_MAX_CONNECTIONS
+        value: '1000'
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY

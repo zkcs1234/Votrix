@@ -1,0 +1,7 @@
+{
+  "error": "Timeout document.readyState==='complete'&&location.pathname===\"/login\" / This site can’t be reached\n\nlocalhost refused to connect.\n\nTry:\n\nChecking the connection\nChecking the proxy and the firewall\nERR_CONNECTION_REFUSED\nReload\nDetails",
+  "scenarios": [],
+  "network": [],
+  "database": "votrix_dev_1791952165826",
+  "productionTouched": false
+}

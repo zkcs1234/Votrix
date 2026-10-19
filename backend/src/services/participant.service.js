@@ -116,7 +116,7 @@ export async function registerParticipant(eventId, userId, options = {}) {
 
   const { data: event, error: evErr } = await db()
     .from(DB_TABLES.EVENTS)
-    .select('event_type')
+    .select('event_type, organizations(organizer_id)')
     .eq('id', eventId)
     .maybeSingle()
   if (evErr) throw new ApiError(500, evErr.message)
@@ -130,7 +130,7 @@ export async function registerParticipant(eventId, userId, options = {}) {
 
   const { data: account, error: accountError } = await db()
     .from(DB_TABLES.USERS)
-    .select('role, account_status')
+    .select('role, account_status, profile_data')
     .eq('id', userId)
     .maybeSingle()
   if (accountError) throw new ApiError(500, accountError.message)
@@ -141,6 +141,7 @@ export async function registerParticipant(eventId, userId, options = {}) {
     throw new ApiError(403, 'Participant account is not active')
   }
 
+  if(resolvedType===PARTICIPANT_TYPES.COMPETITION_JUDGE){const authorized=account.profile_data?.organizerIds;if(Array.isArray(authorized)&&authorized.length&&!authorized.map(String).includes(String(event.organizations?.organizer_id)))throw new ApiError(403,"Judge is outside this organizer's authorized pool")}
   if (!(await hasParticipantTypeMembership(userId, resolvedType))) {
     throw new ApiError(403, 'Account is not eligible for this participant type')
   }

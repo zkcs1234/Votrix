@@ -9,6 +9,7 @@ import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { mapEvent } from '../foundation/mapper.js'
 import { assertJudgeEnrolled, canJudgeScore } from './pageant.service.js'
 import { mergeScoringConfig, resolveScoreBounds, computeRankings } from '../modules/scoring-engine.js'
+import { judgeAccess } from './competition-access.service.js'
 import { selectQualifiers, applyQualifierOverride } from '../modules/advancement.js'
 import { recordAudit } from '../foundation/audit.js'
 import { recordEventActivity } from '../foundation/activity.js'
@@ -23,6 +24,12 @@ function mapSession(row) {
   return {
     id: row.id,
     eventId: row.event_id,
+    rulesVersion: row.rules_version ?? null,
+    accessConfig: row.access_config ?? null,
+    submissionWindow: row.submission_window ?? true,
+    lineupId: row.lineup_id ?? null,
+    activeSlot: row.active_slot ?? 0,
+    revision: row.revision ?? 0,
     status: row.status,
     currentDivisionId: row.current_division_id ?? null,
     currentRoundId: row.current_round_id,
@@ -141,6 +148,7 @@ async function loadActiveScoringCriteria(eventId, session, fallbackBounds, { inc
     .from(DB_TABLES.MINOR_CRITERIA)
     .select('id, criteria_id, name, score_type, custom_min, custom_max, display_order')
     .in('criteria_id', openIds)
+    .eq('is_active', true)
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
   const minorsByCrit = new Map()
@@ -227,7 +235,7 @@ async function getCurrentSession(eventId) {
     .from('competition_sessions')
     .select('*')
     .eq('event_id', eventId)
-    .in('status', ['active', 'paused'])
+    .in('status', ['active', 'paused', 'completed'])
     .order('started_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -284,7 +292,7 @@ export async function getActiveSessionDetailed(eventId) {
   }
   // #4: mark each contestant open/closed from the gate (null = all open) so Live
   // Control can render per-contestant toggles.
-  const contestantGate = Array.isArray(session.activeContestantIds) ? session.activeContestantIds : null
+  const contestantGate = session.rulesVersion ? session.accessConfig?.entries?.mode==='all' ? null : session.accessConfig?.entries?.ids??[] : Array.isArray(session.activeContestantIds) ? session.activeContestantIds : null
   const contestantGateSet = contestantGate ? new Set(contestantGate) : null
   const roundContestants = order
     .map((id) => contestantsById.get(id))
@@ -296,7 +304,7 @@ export async function getActiveSessionDetailed(eventId) {
   // rounds) it's the event-wide criteria. Each criterion carries an `active`
   // flag (from the live gate; empty gate = all open) and its minor criteria, so
   // Live Control can render the per-criterion toggles in either shape.
-  const gate = session.activeCriteriaIds ?? []
+  const gate = session.rulesVersion ? session.accessConfig?.criteria?.mode==='none' ? ['00000000-0000-0000-0000-000000000000'] : session.accessConfig?.criteria?.mode==='selected' ? session.accessConfig.criteria.ids : [] : session.activeCriteriaIds ?? []
   const isActive = (id) => gate.length === 0 || gate.includes(id)
 
   let scopeCriteria = []
@@ -463,11 +471,6 @@ async function buildContestantOrder(eventId, roundId, divisionId) {
       }
     }
     
-    for (const c of eligibleContestants) {
-      if (!inRound.has(c.id)) {
-        order.push(c.id)
-      }
-    }
     return order
   }
 
@@ -604,6 +607,13 @@ export async function publishArrangement(eventId, organizerId, config = {}) {
 // Start a live session — organizer initiates the competition
 // ---------------------------------------------------------------------------
 export async function startSession(eventId, organizerId) {
+  const workflow = await import('./competition-workflow.service.js')
+  const confirmed = await workflow.rulesFor(eventId)
+  if (confirmed) return mapSession(await workflow.organizerAction(eventId, organizerId, 'start'))
+  throw new ApiError(409, 'Official rules must be confirmed and published before live scoring')
+}
+
+async function legacyStartSession(eventId, organizerId) {
   const event = await assertCompetitionEvent(eventId, organizerId)
 
   // A live session can only run on a published event. While the event is still
@@ -964,6 +974,8 @@ export async function setStageGroup(eventId, organizerId, contestantIds) {
 //   contestantIds = null            → gate off, every contestant open (default)
 // ---------------------------------------------------------------------------
 export async function setOpenContestants(eventId, organizerId, contestantIds) {
+  const workflow=await import('./competition-workflow.service.js')
+  if (await workflow.rulesFor(eventId)) return mapSession(await workflow.organizerAction(eventId, organizerId, 'access', { kind:'entries', gate:{mode:contestantIds===null?'all':contestantIds.length?'selected':'none',ids:contestantIds??[]} }))
   const session = await assertActiveSession(eventId, organizerId)
 
   let gate = null
@@ -1009,6 +1021,8 @@ export async function setOpenContestants(eventId, organizerId, contestantIds) {
 // Change round (advance to next round or set a specific one)
 // ---------------------------------------------------------------------------
 export async function setActiveRound(eventId, organizerId, roundId) {
+  const workflow=await import('./competition-workflow.service.js')
+  if (await workflow.rulesFor(eventId)) return mapSession(await workflow.organizerAction(eventId, organizerId, 'round', { roundId }))
   const session = await assertActiveSession(eventId, organizerId)
 
   // Verify round belongs to this event
@@ -1072,6 +1086,8 @@ export async function setActiveRound(eventId, organizerId, roundId) {
 // exposes all of its minor criteria; minors are never gated individually.
 // ---------------------------------------------------------------------------
 export async function setActiveCriteria(eventId, organizerId, criteriaIds) {
+  const workflow=await import('./competition-workflow.service.js')
+  if (await workflow.rulesFor(eventId)) return mapSession(await workflow.organizerAction(eventId, organizerId, 'access', { kind:'criteria', gate:{mode:criteriaIds.length?'selected':'none',ids:criteriaIds} }))
   const session = await assertActiveSession(eventId, organizerId)
 
   // Scope: the current round's criteria, or — for criteria-only events with no
@@ -1116,6 +1132,8 @@ export async function setActiveCriteria(eventId, organizerId, criteriaIds) {
 // Set Active Division
 // ---------------------------------------------------------------------------
 export async function setActiveDivision(eventId, organizerId, divisionId) {
+  const workflow=await import('./competition-workflow.service.js')
+  if(await workflow.rulesFor(eventId)) return mapSession(await workflow.organizerAction(eventId,organizerId,'division',{divisionId}))
   const session = await assertActiveSession(eventId, organizerId)
 
   if (divisionId) {
@@ -1167,6 +1185,8 @@ export async function setActiveDivision(eventId, organizerId, divisionId) {
 // Pause the session
 // ---------------------------------------------------------------------------
 export async function pauseSession(eventId, organizerId) {
+  const workflow=await import('./competition-workflow.service.js')
+  if (await workflow.rulesFor(eventId)) return mapSession(await workflow.organizerAction(eventId, organizerId, 'pause', {}))
   const session = await assertActiveSession(eventId, organizerId)
 
   const now = new Date().toISOString()
@@ -1202,6 +1222,8 @@ export async function pauseSession(eventId, organizerId) {
 // Resume the session
 // ---------------------------------------------------------------------------
 export async function resumeSession(eventId, organizerId) {
+  const workflow=await import('./competition-workflow.service.js')
+  if (await workflow.rulesFor(eventId)) return mapSession(await workflow.organizerAction(eventId, organizerId, 'resume', {}))
   await assertCompetitionEvent(eventId, organizerId)
 
   // Find the active OR paused session (the active-only view hides paused ones).
@@ -1240,6 +1262,8 @@ export async function resumeSession(eventId, organizerId) {
 // Complete the session
 // ---------------------------------------------------------------------------
 export async function completeSession(eventId, organizerId) {
+  const workflow = await import('./competition-workflow.service.js')
+  if (await workflow.rulesFor(eventId)) return mapSession(await workflow.organizerAction(eventId, organizerId, 'end-performance'))
   await assertCompetitionEvent(eventId, organizerId)
 
   // Allow ending an active OR paused session.
@@ -1435,6 +1459,10 @@ async function backfillLiveScoresToRankingStore(eventId) {
 // the live→rankings write-through existed). Idempotent.
 export async function resyncRankingStore(eventId, organizerId) {
   await assertCompetitionEvent(eventId, organizerId)
+  throw new ApiError(409,'Automatic projection repair is disabled. Reconcile explicitly against immutable lock history without changing official submissions.')
+}
+async function legacyResyncRankingStore(eventId, organizerId) {
+  await assertCompetitionEvent(eventId, organizerId)
   await backfillLiveScoresToRankingStore(eventId)
   emitToEvent(eventId, 'rankings:updated', { eventId })
   recordEventActivity({
@@ -1449,7 +1477,12 @@ export async function resyncRankingStore(eventId, organizerId) {
 // ---------------------------------------------------------------------------
 // Judge submits score for current contestant in the session
 // ---------------------------------------------------------------------------
-export async function submitJudgeSessionScore(eventId, judgeId, { scores, contestantId } = {}) {
+export async function submitJudgeSessionScore(eventId, judgeId, payload = {}) {
+  const workflow = await import('./competition-workflow.service.js')
+  return workflow.scoringWrite(eventId, judgeId, 'lock', payload)
+}
+
+async function legacySubmitJudgeSessionScore(eventId, judgeId, { scores, contestantId } = {}) {
   const enrollment = await assertJudgeEnrolled(eventId, judgeId)
   const event = await getEventById(eventId)
 
@@ -1653,6 +1686,10 @@ export async function submitJudgeSessionScore(eventId, judgeId, { scores, contes
 // Get judge's scoring view for the active session
 // ---------------------------------------------------------------------------
 export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {}) {
+  const workflow = await import('./competition-workflow.service.js')
+  const modern = await workflow.judgeSheet(eventId, judgeId)
+  if (modern) return modern
+  const access = await judgeAccess(eventId, judgeId)
   const enrollment = await assertJudgeEnrolled(eventId, judgeId)
   const event = await getEventById(eventId)
 
@@ -1692,7 +1729,14 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
   //   [...] → only these are open; the rest show but are locked (show-but-lock)
   // The full field is always returned so judges SEE everyone.
   let stageIds = session.contestantOrder ?? []
-  const contestantGate = Array.isArray(session.activeContestantIds) ? session.activeContestantIds : null
+  const { data: accessEntries } = await getClient().from(DB_TABLES.CONTESTANTS).select('id,division_id').in('id', stageIds)
+  let categoryId = null
+  if (session.currentRoundId) {
+    const { data: scopeRound } = await getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('category_id').eq('id',session.currentRoundId).maybeSingle()
+    categoryId = scopeRound?.category_id
+  }
+  stageIds = (accessEntries ?? []).filter(e => access.permits({roundId:session.currentRoundId,categoryId,divisionId:e.division_id})).map(e=>e.id)
+  const contestantGate = session.rulesVersion ? session.accessConfig?.entries?.mode==='all' ? null : session.accessConfig?.entries?.ids??[] : Array.isArray(session.activeContestantIds) ? session.activeContestantIds : null
   const contestantGateSet = contestantGate ? new Set(contestantGate) : null
   const isContestantOpen = (id) => !contestantGateSet || contestantGateSet.has(id)
 
@@ -1706,7 +1750,7 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
   // Safety net: never end up with an empty field when a single active contestant
   // is known (e.g. order not yet built).
   if (!stageIds.length && session.activeContestantId) {
-    stageIds = [session.activeContestantId]
+    stageIds = []
   }
 
   const { data: stageRows } = await getClient()
@@ -1801,8 +1845,9 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
     divisionsEnabled: Boolean(event.divisions_enabled),
     roundName,
     roundId: session.currentRoundId ?? null,
-    criteria,
+    criteria: criteria.map(c=>({...c,open:false})),
     activeCriteriaIds: session.activeCriteriaIds ?? [],
+    legacyTransitionRequired: true,
     scoringConfig,
     scoreBounds: eventBounds,
     totalContestants: session.contestantOrder.length,
@@ -1814,6 +1859,8 @@ export async function getJudgeSessionView(eventId, judgeId, { divisionId } = {})
 // Get judge progress for the current contestant (organizer view)
 // ---------------------------------------------------------------------------
 export async function getJudgeProgress(eventId, organizerId) {
+  const workflow = await import('./competition-workflow.service.js')
+  if (await workflow.rulesFor(eventId)) return workflow.judgeProgress(eventId, organizerId)
   const session = await assertActiveSession(eventId, organizerId)
 
   const { data: judges, error: judgeError } = await getClient()
@@ -1943,7 +1990,12 @@ export async function getJudgeProgress(eventId, organizerId) {
 // default, or a single judge when `judgeId` is given. Audited; judges are
 // notified so their now-reopened row becomes editable again.
 // ---------------------------------------------------------------------------
-export async function unlockSessionScore(eventId, organizerId, { contestantId, judgeId, criteriaId } = {}) {
+export async function unlockSessionScore(eventId, organizerId, payload = {}) {
+  const workflow=await import('./competition-workflow.service.js')
+  if (await workflow.rulesFor(eventId)) return workflow.organizerAction(eventId, organizerId, 'correction', payload)
+  throw new ApiError(409,'Historical score changes require a separately approved transition')
+}
+async function legacyUnlockSessionScore(eventId, organizerId, { contestantId, judgeId, criteriaId } = {}) {
   const session = await assertActiveSession(eventId, organizerId)
 
   if (!contestantId) {
@@ -2207,6 +2259,15 @@ async function getNextRound(eventId, round) {
 // the organizer can review and adjust before finalizing (real head-judge
 // discretion). No writes, no locking.
 export async function previewRoundAdvancement(eventId, organizerId, roundId) {
+  const workflow=await import('./competition-workflow.service.js')
+  const rules=await workflow.rulesFor(eventId)
+  if(rules){
+    const state=await workflow.advancementData(eventId,organizerId,roundId),round=rules.rounds.find(r=>r.id===roundId)
+    if(!round)throw new ApiError(404,'Round not found')
+    const groups=rules.scoringConfig.perDivision?[...new Set(state.results.map(r=>r.divisionId))].map(id=>state.results.filter(r=>r.divisionId===id)):[state.results]
+    const qualified=new Set(groups.flatMap(group=>[...selectQualifiers(group.map(r=>({contestantId:r.contestantId,rank:r.rank,score:r.finalScore})),round.advancementType,round.advancementValue)]))
+    return{roundId,roundName:round.name,ready:state.ready,standing:state.results.map(r=>({...r,score:r.finalScore,qualified:qualified.has(r.contestantId)})),qualifiers:[...qualified]}
+  }
   await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
   const scoringConfig = mergeScoringConfig(event.scoring_config)
@@ -2242,7 +2303,12 @@ export async function previewRoundAdvancement(eventId, organizerId, roundId) {
 // Finalize a round: compute its standing, snapshot it, choose qualifiers (auto +
 // organizer override), lock the round, and seed the next round with qualifiers.
 // Nothing is ever auto-deleted; the organizer confirms via `overrides`.
-export async function finalizeRound(eventId, organizerId, roundId, { overrides = null, force = false } = {}) {
+export async function finalizeRound(eventId, organizerId, roundId, options = {}) {
+  const workflow=await import('./competition-workflow.service.js')
+  if (await workflow.rulesFor(eventId)) return workflow.organizerAction(eventId, organizerId, 'advancement', { ...options, roundId })
+  throw new ApiError(409,'Historical qualifier decisions cannot be silently replaced')
+}
+async function legacyFinalizeRound(eventId, organizerId, roundId, { overrides = null, force = false } = {}) {
   await assertCompetitionEvent(eventId, organizerId)
   const event = await getEventById(eventId)
   const scoringConfig = mergeScoringConfig(event.scoring_config)

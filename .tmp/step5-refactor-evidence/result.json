@@ -1,0 +1,10 @@
+{
+  "checks": [
+    "1440px: list, collapsed settings, minor weights, final-round visibility, preview bounds and no writes",
+    "768px: list, collapsed settings, minor weights, final-round visibility, preview bounds and no writes",
+    "390px: list, collapsed settings, minor weights, final-round visibility, preview bounds and no writes",
+    "Folk Dance opens an empty independent configuration"
+  ],
+  "exceptions": [],
+  "apiRequests": []
+}

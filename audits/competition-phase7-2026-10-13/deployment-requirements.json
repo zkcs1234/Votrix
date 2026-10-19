@@ -1,0 +1,76 @@
+{
+  "phase": 7,
+  "releaseRecommendation": "NO-GO",
+  "productionReady": false,
+  "productionChangesAuthorized": false,
+  "productionDatabaseMutations": false,
+  "productionFlagsChanged": false,
+  "deploymentPerformed": false,
+  "phase8Started": false,
+  "deployedCatalog": {
+    "status": "BLOCKED",
+    "directCatalogVerified": false,
+    "appliedLedgerVerified": false,
+    "restOnlyTables": 27,
+    "readOnlyInventoryComparisonUnchanged": true
+  },
+  "recovery": {
+    "status": "BLOCKED",
+    "productionBackupConfirmed": false,
+    "productionRestoreVerified": false,
+    "retentionKnown": false,
+    "rpoApproved": false,
+    "rtoApproved": false,
+    "localPopulatedRestorePassed": true,
+    "localPublicTableInventories": 49,
+    "electionPollingRecoveryVerified": false
+  },
+  "hostedAcceptance": {
+    "status": "BLOCKED",
+    "stagingConfirmed": false,
+    "realProductionAuthStackVerified": false,
+    "localComponentSqlBrowserPassed": true,
+    "localBrowserScope": "Isolated contract adapter invoking real SQL RPCs, NOT production Express services/PostgREST"
+  },
+  "multiInstance": {
+    "status": "BLOCKED",
+    "currentCrossProcessDeliveryRequirement": "FAILED",
+    "sharedServiceConfirmed": false,
+    "sharedDeliveryImplemented": false,
+    "topologyConfirmed": false,
+    "processBoundaryEvidence": {
+      "singleProcessRoomDelivery": "PASSED",
+      "crossProcessDeliveryRequirement": "FAILED",
+      "sharedTransportInfrastructure": "BLOCKED",
+      "remoteProcessReceivedParentHint": false,
+      "confidentialScoresSent": false,
+      "conclusion": "Process-local registry does not reach a user room in another API process. Reconciliation is not shared delivery."
+    }
+  },
+  "ratePolicy": {
+    "status": "FAILED_WITH_DEFAULTS",
+    "globalLimiterBeforeAuthentication": true,
+    "defaultGlobalSharedIpRequestsPer15Minutes": 100,
+    "defaultPublicSharedIpRequestsPer15Minutes": 60,
+    "publicPollingSeconds": 15,
+    "sharedNetworkAcceptancePassed": false
+  },
+  "capacity": {
+    "status": "NOT_TESTED_AT_PRODUCTION_VOLUME",
+    "measurements": "performance.json",
+    "realLargeRoster": false,
+    "peakMemory": false,
+    "quantifiedLockContention": false
+  },
+  "uiAcceptance": {
+    "status": "PARTIAL_LOCAL_PASS",
+    "fiveChildComponentWorkflow": true,
+    "wholeHostedApplication": false,
+    "remainingJudgeDashboardLegacyProjection": true,
+    "remainingStepperDraftEditingReview": true
+  },
+  "approval": {
+    "deploymentRequired": true,
+    "phase8Required": true
+  }
+}

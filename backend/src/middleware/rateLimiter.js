@@ -1,4 +1,6 @@
 import rateLimit from 'express-rate-limit'
+import { env } from '../config/env.js'
+import { verifyAccessToken } from '../utils/jwt.js'
 
 /**
  * VOTRIX Rate Limiting & Abuse Prevention
@@ -26,6 +28,21 @@ function parseEnvInt(name, fallback) {
 function getClientIp(req) {
   // req.ip is set correctly when app.set('trust proxy', 1) is configured
   return req.ip || req.connection?.remoteAddress || 'unknown'
+}
+
+function getRateLimitUserId(req) {
+  if (req.user?.id) return req.user.id
+
+  const token = req.cookies?.[env.jwt.accessCookieName]
+  if (!token) return null
+
+  try {
+    const decoded = verifyAccessToken(token)
+    return typeof decoded.sub === 'string' && decoded.sub ? decoded.sub : null
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') return null
+    throw error
+  }
 }
 
 /**
@@ -74,13 +91,20 @@ function createLimiter(options) {
 export const globalLimiter = createLimiter({
   windowMs: parseEnvInt('RATE_LIMIT_GLOBAL_WINDOW_MS', FIFTEEN_MINUTES),
   max: (req) =>
-    req.user
+    getRateLimitUserId(req)
       ? parseEnvInt('RATE_LIMIT_GLOBAL_USER_MAX', 500)
       : parseEnvInt('RATE_LIMIT_GLOBAL_IP_MAX', 100),
-  keyGenerator: createKey({ user: true, ip: true }),
+  keyGenerator: (req) => {
+    const userId = getRateLimitUserId(req)
+    return userId ? `u:${userId}` : `ip:${getClientIp(req)}`
+  },
   skip: (req) => {
-    // Never throttle health probes
+    if(req.competitionRatePolicyApplied===true)return true
     const path = req.path || req.originalUrl
+    // Token refresh has a dedicated limiter and must remain available when
+    // ordinary API traffic exhausts the shared global IP budget.
+    if (req.method === 'POST' && path === '/api/auth/refresh') return true
+    // Never throttle health probes
     return path === '/api/health' || path === '/health'
   },
   message: stdMessage('Too many requests. Please slow down.'),

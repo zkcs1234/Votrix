@@ -1,0 +1,2341 @@
+import { db as getClient } from '../foundation/db.js'
+import { recordEventActivity } from '../foundation/activity.js'
+import { ApiError } from '../utils/ApiError.js'
+import {
+  DB_TABLES,
+  EVENT_STATUS,
+  COMPETITION_SCORING_EVENT_TYPES,
+  PARTICIPANT_TYPES,
+  USER_ROLES,
+  isParticipantRole,
+} from '../utils/constants.js'
+import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
+import {
+  getOrCreatePageantOrganization,
+  getOrCreateCompetitionScoringOrganization,
+  mapOrganization,
+} from './organization.service.js'
+import { hashPassword } from '../utils/password.js'
+import { generateTemporaryPassword } from '../utils/crypto.js'
+import { findUserByEmail, sanitizeUser } from './user.service.js'
+import { sendJudgeInvitationEmail, sendJudgeInvitationEmailRegistered } from './mailer.service.js'
+import { registerParticipant } from './participant.service.js'
+import {
+  computeRankings,
+  resolveScoreBounds,
+  mergeScoringConfig,
+} from '../modules/scoring-engine.js'
+import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
+import { emitToEvent } from '../websocket/ws-emitter.js'
+import { mapEvent } from '../foundation/mapper.js'
+import { syncEventSchedules } from './event-schedule-sync.service.js'
+import { notifyAdminsEventPublished } from './notification.service.js'
+import {
+  assertEventUpdateAllowed,
+  assertSetupEditable,
+  assertParticipantsEditable,
+  canUnpublishEventStatus,
+} from '../utils/eventLifecycle.js'
+import { deleteDraft } from './draft.service.js'
+import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
+import { getActiveSession } from './competition-session.service.js'
+
+
+
+function mapContestant(row) {
+  return {
+    id: row.id,
+    eventId: row.event_id,
+    divisionId: row.division_id ?? null,
+    name: row.name,
+    photo: row.photo,
+    contestantNumber: row.contestant_number,
+    entryType: row.entry_type ?? null,
+    entryLabel: row.entry_label ?? null,
+  }
+}
+
+function mapCriteria(row) {
+  return {
+    id: row.id,
+    eventId: row.event_id,
+    divisionId: row.division_id ?? null,
+    name: row.name,
+    percentage: Number(row.percentage),
+    minScore: Number(row.min_score),
+    maxScore: Number(row.max_score),
+    isActive: row.is_active !== false,
+    is_active: row.is_active !== false,
+    displayOrder: row.display_order ?? 0,
+  }
+}
+
+function mapMinorCriteria(row) {
+  return {
+    id: row.id,
+    criteriaId: row.criteria_id,
+    eventId: row.event_id,
+    name: row.name,
+    scoreType: row.score_type,
+    customMin: row.custom_min === null || row.custom_min === undefined ? null : Number(row.custom_min),
+    customMax: row.custom_max === null || row.custom_max === undefined ? null : Number(row.custom_max),
+    displayOrder: row.display_order ?? 0,
+    isActive: row.is_active !== false,
+  }
+}
+
+async function assertCompetitionEvent(eventId, organizerId) {
+  const event = await assertOrganizerOwnsEvent(eventId, organizerId)
+  if (!COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)) {
+    throw new ApiError(400, 'This event is not a competition scoring event')
+  }
+  return event
+}
+
+// Backward-compat alias.
+const assertPageantEvent = assertCompetitionEvent
+
+// ——— Organization resolution ———
+//
+// The pageant/competition-scoring organization is created on first use. The
+// helper in organization.service.js is the single source of truth.
+
+async function getOrCreateOrg(organizerId) {
+  if (typeof getOrCreateCompetitionScoringOrganization === 'function') {
+    return getOrCreateCompetitionScoringOrganization(organizerId)
+  }
+  return getOrCreatePageantOrganization(organizerId)
+}
+
+// ——— Dashboard & events ———
+
+export async function getOrganizerDashboard(organizerId) {
+  const org = await getOrCreateOrg(organizerId)
+  if (!org?.id) {
+    throw new ApiError(500, 'Failed to get or create organization')
+  }
+
+  const { data: events, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .select('id, title, status, scoring_enabled, event_type')
+    .eq('organization_id', org.id)
+    .in('event_type', Array.from(COMPETITION_SCORING_EVENT_TYPES))
+    .neq('status', EVENT_STATUS.ARCHIVED)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new ApiError(500, error.message)
+
+  const eventIds = (events ?? []).map((e) => e.id)
+  let totalContestants = 0
+  let totalJudges = 0
+  let completedJudges = 0
+  let scoresSubmitted = 0
+  let activeSessions = 0
+  // Per-event judge participation so the dashboard shows completion per event
+  // instead of one blended rate across every competition.
+  const perEvent = new Map(eventIds.map((id) => [id, { judges: 0, completed: 0 }]))
+
+  if (eventIds.length) {
+    const [contestantsRes, judgeRowsRes, scoresRes, sessionsRes] = await Promise.all([
+      getClient()
+        .from(DB_TABLES.CONTESTANTS)
+        .select('*', { count: 'exact', head: true })
+        .in('event_id', eventIds),
+      getClient()
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
+        .select('event_id, has_scored')
+        .in('event_id', eventIds)
+        .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
+      getClient()
+        .from(DB_TABLES.JUDGE_SCORES)
+        .select('id, competition_contestants!inner(event_id)', { count: 'exact', head: true })
+        .in('competition_contestants.event_id', eventIds),
+      getClient()
+        .from('competition_sessions')
+        .select('event_id, status')
+        .in('event_id', eventIds)
+        .eq('status', 'active'),
+    ])
+
+    if (contestantsRes.error) throw new ApiError(500, contestantsRes.error.message)
+    if (judgeRowsRes.error) throw new ApiError(500, judgeRowsRes.error.message)
+    if (scoresRes.error) throw new ApiError(500, scoresRes.error.message)
+    if (sessionsRes.error) throw new ApiError(500, sessionsRes.error.message)
+
+    totalContestants = contestantsRes.count ?? 0
+    scoresSubmitted = scoresRes.count ?? 0
+    activeSessions = sessionsRes.data?.length ?? 0
+
+    for (const row of judgeRowsRes.data ?? []) {
+      const bucket = perEvent.get(row.event_id)
+      if (!bucket) continue
+      bucket.judges += 1
+      totalJudges += 1
+      if (row.has_scored) {
+        bucket.completed += 1
+        completedJudges += 1
+      }
+    }
+
+    // Add session status to each event
+    const sessionsByEvent = new Map()
+    if (sessionsRes.data) {
+      for (const session of sessionsRes.data) {
+        sessionsByEvent.set(session.event_id, session.status)
+      }
+    }
+
+    // Enrich events with session status
+    events.forEach((event) => {
+      event.sessionStatus = sessionsByEvent.get(event.id) || null
+    })
+  }
+
+  const judgeCompletionRate =
+    totalJudges > 0 ? Math.round((completedJudges / totalJudges) * 10000) / 100 : 0
+
+  const eventBreakdown = (events ?? []).map((e) => {
+    const b = perEvent.get(e.id) ?? { judges: 0, completed: 0 }
+    return {
+      id: e.id,
+      title: e.title,
+      status: e.status,
+      registered: b.judges,
+      participated: b.completed,
+      rate: b.judges > 0 ? Math.round((b.completed / b.judges) * 10000) / 100 : 0,
+    }
+  })
+
+  return {
+    organization: mapOrganization(org),
+    events: (events ?? []).map(mapEvent),
+    eventBreakdown,
+    stats: {
+      totalEvents: events?.length ?? 0,
+      activeSessions,
+      totalContestants,
+      totalJudges,
+      completedJudges,
+      scoresSubmitted,
+      judgeCompletionRate,
+    },
+  }
+}
+
+export async function listPageantEvents(organizerId) {
+  return listCompetitionEvents(organizerId)
+}
+
+export async function listCompetitionEvents(organizerId, { limit = 200, offset = 0 } = {}) {
+  const org = await getOrCreateOrg(organizerId)
+  const { data, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .select('id, title, description, banner, status, scoring_enabled, event_type, start_date, end_date, created_at, updated_at, organization_id, scoring_config')
+    .eq('organization_id', org.id)
+    .in('event_type', Array.from(COMPETITION_SCORING_EVENT_TYPES))
+    .neq('status', EVENT_STATUS.ARCHIVED)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  if (error) throw new ApiError(500, error.message)
+  return (data ?? []).map(mapEvent)
+}
+
+export async function createPageantEvent(organizerId, payload) {
+  return createCompetitionEvent(organizerId, payload)
+}
+
+export async function createCompetitionEvent(organizerId, payload) {
+  const org = await getOrCreateOrg(organizerId)
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .insert({
+      organization_id: org.id,
+      title: payload.title,
+      description: payload.description ?? null,
+      banner: payload.banner ?? null,
+      image_asset_id: payload.image_asset_id ?? null,
+      start_date: payload.startDate ?? null,
+      end_date: payload.endDate ?? null,
+      status: payload.status ?? 'draft',
+      event_type: 'competition_scoring',
+      // Phase 1: optional sub-type label (display/template only). Nullable.
+      competition_type: payload.competitionType ?? null,
+      scoring_enabled: false,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+
+  // Competition type is stored as a LABEL only (see competition_type). We do not
+  // auto-seed any structure — the organizer configures rounds, criteria, etc.
+  // themselves in Structure & Scoring (the per-type hint guides them).
+
+  await syncEventSchedules().catch((err) => {
+    console.error('[competition] schedule sync failed after create:', err.message)
+  })
+  await deleteDraft(organizerId, 'competition').catch((err) => {
+    console.error('[competition] failed to clear draft after create:', err.message)
+  })
+  recordEventActivity({
+    eventId: data.id,
+    action: 'competition.event.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { title: data.title },
+  })
+  return mapEvent(data)
+}
+
+export async function updatePageantEvent(eventId, organizerId, payload) {
+  return updateCompetitionEvent(eventId, organizerId, payload)
+}
+
+export async function updateCompetitionEvent(eventId, organizerId, payload) {
+  const event = await assertCompetitionEvent(eventId, organizerId)
+
+  assertSetupEditable(event)
+  assertEventUpdateAllowed(event, payload)
+
+  // Capture old image_asset_id before updating so we can clean it up if replaced
+  const oldAssetId = event.image_asset_id ?? null
+
+  const updates = {}
+  if (payload.title !== undefined) updates.title = payload.title
+  if (payload.description !== undefined) updates.description = payload.description
+  if (payload.banner !== undefined) updates.banner = payload.banner
+  if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
+  if (payload.startDate !== undefined) updates.start_date = payload.startDate
+  if (payload.endDate !== undefined) updates.end_date = payload.endDate
+  if (payload.status !== undefined) updates.status = payload.status
+  if (payload.competitionType !== undefined) updates.competition_type = payload.competitionType
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update(updates)
+    .eq('id', eventId)
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+
+  // Cleanup old banner asset if it was replaced
+  if (oldAssetId && updates.image_asset_id !== undefined && oldAssetId !== updates.image_asset_id) {
+    removeReferenceAndDeleteIfUnused(oldAssetId).catch((err) =>
+      console.error('[competition] Old banner asset cleanup error:', err.message),
+    )
+  }
+
+  await syncEventSchedules().catch((err) => {
+    console.error('[competition] schedule sync failed after update:', err.message)
+  })
+  recordEventActivity({
+    eventId,
+    action: 'competition.event.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { changedKeys: Object.keys(updates) },
+  })
+  return mapEvent(data)
+}
+
+export async function getPageantEvent(eventId, organizerId) {
+  return getCompetitionEvent(eventId, organizerId)
+}
+
+export async function getCompetitionEvent(eventId, organizerId) {
+  const event = await assertCompetitionEvent(eventId, organizerId)
+  return mapEvent(event)
+}
+
+export async function setEventScoring(eventId, organizerId, scoringEnabled) {
+  const event = await assertCompetitionEvent(eventId, organizerId)
+  if (scoringEnabled || event.official_rules_id) throw new ApiError(409,'Use acknowledged rules and Live Control session access to operate scoring')
+
+  if (scoringEnabled) {
+    // Use the foundation validator so category, round, and criterion weights
+    // are ALL checked against 100%. Phase 4 / 5 engine owns the rules.
+    const { assertScoringWeightsValid } = await import('./competition.service.js')
+    await assertScoringWeightsValid(eventId, organizerId)
+  }
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({
+      scoring_enabled: Boolean(scoringEnabled),
+      status: scoringEnabled ? 'active' : 'scheduled',
+    })
+    .eq('id', eventId)
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+  
+  emitToEvent(eventId, 'competition:scoring-toggled', {
+    eventId,
+    scoringEnabled: Boolean(scoringEnabled),
+  })
+
+  recordEventActivity({
+    eventId,
+    action: scoringEnabled ? 'competition.scoring.enable' : 'competition.scoring.disable',
+    userId: organizerId,
+    module: 'competition',
+  })
+
+  return mapEvent(data)
+}
+
+// ——— Publish (finish setup → release to schedule) ———
+
+/**
+ * Publish a fully-built competition that is still in the `draft` (setup) state.
+ *
+ * Publishing does NOT start scoring. It only releases the event from the setup
+ * flow into the normal schedule-driven lifecycle by flipping `draft` →
+ * `scheduled`; the schedule sync then reconciles it to `scheduled` / `active` /
+ * `completed` based on the event's start/end dates. Scoring goes live
+ * separately, when the organizer starts a live session from Live Control.
+ *
+ * Guarded so an event can only be published once, and only when it has the
+ * minimum content needed to run: at least one contestant, one active judge, and
+ * one criterion. The stricter run-time rules (criteria weights totalling 100%,
+ * rounds with assigned contestants) are enforced when the session is started.
+ */
+export async function publishCompetitionEvent(eventId, organizerId) {
+  const event = await assertCompetitionEvent(eventId, organizerId)
+
+  if (event.status !== 'draft') {
+    throw new ApiError(400, 'This event has already been published')
+  }
+  const { getCompetitionFoundation } = await import('./competition.service.js')
+  const { assertCriteriaReady } = await import('./competition-workflow.service.js')
+  assertCriteriaReady(await getCompetitionFoundation(eventId, organizerId))
+
+  const { count: contestantCount, error: contestantErr } = await getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+  if (contestantErr) throw new ApiError(500, contestantErr.message)
+  if (!contestantCount || contestantCount === 0) {
+    throw new ApiError(400, 'Add at least one contestant before publishing.')
+  }
+
+  const { count: judgeCount, error: judgeErr } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .eq('is_active', true)
+  if (judgeErr) throw new ApiError(500, judgeErr.message)
+  if (!judgeCount || judgeCount === 0) {
+    throw new ApiError(400, 'Add at least one judge before publishing.')
+  }
+
+  const { count: criterionCount, error: criterionErr } = await getClient()
+    .from(DB_TABLES.CRITERIA)
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+  if (criterionErr) throw new ApiError(500, criterionErr.message)
+  if (!criterionCount || criterionCount === 0) {
+    throw new ApiError(400, 'Add at least one criterion before publishing.')
+  }
+
+  const { error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({ status: 'scheduled' })
+    .eq('id', eventId)
+
+  if (error) throw new ApiError(500, error.message)
+
+  // Hand the event to the scheduler; it decides scheduled/active/completed
+  // purely from the dates. The status may change again immediately here.
+  await syncEventSchedules().catch((err) => {
+    console.error('[competition] schedule sync failed after publish:', err.message)
+  })
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.event.publish',
+    userId: organizerId,
+    module: 'competition',
+    details: { title: event.title },
+  })
+
+  // Let admins know a new event went live. Non-fatal — never block publishing.
+  await notifyAdminsEventPublished({
+    eventId,
+    title: event.title,
+    eventType: event.event_type,
+  }).catch((err) => console.error('[competition] admin publish notification failed (non-fatal):', err.message))
+
+  // Re-read so the returned status reflects any reconciliation the sync applied.
+  const published = await getEventById(eventId)
+  return mapEvent(published)
+}
+
+/**
+ * Pull a published competition back to `draft` so its setup can be corrected.
+ * Only allowed while still `scheduled` (published but scoring has not gone
+ * live). Once a live session makes it `active` this is one-way.
+ */
+export async function unpublishCompetitionEvent(eventId, organizerId) {
+  const event = await assertCompetitionEvent(eventId, organizerId)
+  if(event.official_rules_id) throw new ApiError(409,'Acknowledged scoring rules require an independently approved amendment')
+
+  if (!canUnpublishEventStatus(event.status)) {
+    throw new ApiError(400, 'Only a scheduled event can be unpublished. Scoring has already gone live or the event is closed.')
+  }
+
+  const { error } = await getClient()
+    .from(DB_TABLES.EVENTS)
+    .update({ status: 'draft', scoring_enabled: false })
+    .eq('id', eventId)
+
+  if (error) throw new ApiError(500, error.message)
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.event.unpublish',
+    userId: organizerId,
+    module: 'competition',
+    details: { title: event.title },
+  })
+
+  const reverted = await getEventById(eventId)
+  return mapEvent(reverted)
+}
+
+// ——— Contestants ———
+
+export async function listContestants(eventId, organizerId, filters = {}) {
+  await assertCompetitionEvent(eventId, organizerId)
+
+  let query = getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .select('*')
+    .eq('event_id', eventId)
+
+  if (filters.divisionId !== undefined) {
+    query = query.eq('division_id', filters.divisionId)
+  }
+
+  const { data, error } = await query.order('contestant_number', { ascending: true })
+
+  if (error) throw new ApiError(500, error.message)
+  return (data ?? []).map(mapContestant)
+}
+
+export async function createContestant(eventId, organizerId, payload) {
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+
+  if (payload.divisionId) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .insert({
+      event_id: eventId,
+      division_id: payload.divisionId ?? null,
+      name: payload.name,
+      photo: payload.photo ?? null,
+      contestant_number: payload.contestantNumber,
+      entry_type: payload.entryType ?? 'individual',
+      entry_label: payload.entryLabel ?? null,
+    })
+    .select('*')
+    .single()
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new ApiError(
+        409,
+        payload.divisionId
+          ? 'Contestant number already exists for this division'
+          : 'Contestant number already exists for this event',
+      )
+    }
+    throw new ApiError(500, error.message)
+  }
+  recordEventActivity({
+    eventId,
+    action: 'competition.contestant.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { contestantId: data.id, name: data.name, contestantNumber: data.contestant_number },
+  })
+  return mapContestant(data)
+}
+
+export async function updateContestant(eventId, organizerId, contestantId, payload) {
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+
+  if (payload.divisionId !== undefined && payload.divisionId !== null) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
+  // Capture old image_asset_id before updating so we can clean it up if replaced
+  let oldAssetId = null
+  if (payload.image_asset_id !== undefined) {
+    const { data: prev } = await getClient()
+      .from(DB_TABLES.CONTESTANTS)
+      .select('image_asset_id')
+      .eq('id', contestantId)
+      .maybeSingle()
+    oldAssetId = prev?.image_asset_id ?? null
+  }
+
+  const updates = {}
+  if (payload.entryType !== undefined) updates.entry_type = payload.entryType
+  if (payload.entryLabel !== undefined) updates.entry_label = payload.entryLabel
+  if (payload.name !== undefined) updates.name = payload.name
+  if (payload.photo !== undefined) updates.photo = payload.photo
+  if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
+  if (payload.contestantNumber !== undefined) updates.contestant_number = payload.contestantNumber
+  if (payload.divisionId !== undefined) updates.division_id = payload.divisionId
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .update(updates)
+    .eq('id', contestantId)
+    .eq('event_id', eventId)
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+  if (!data) throw new ApiError(404, 'Contestant not found')
+
+  // Cleanup old photo asset if it was replaced
+  if (oldAssetId && oldAssetId !== payload.image_asset_id) {
+    removeReferenceAndDeleteIfUnused(oldAssetId).catch((err) =>
+      console.error('[competition] Old contestant photo cleanup error:', err.message),
+    )
+  }
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.contestant.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { contestantId, name: data.name },
+  })
+  return mapContestant(data)
+}
+
+export async function deleteContestant(eventId, organizerId, contestantId) {
+  const {count:referenced,error:referenceError}=await getClient().from(DB_TABLES.JUDGE_SCORES).select('id',{count:'exact',head:true}).eq('contestant_id',contestantId)
+  if(referenceError)throw new ApiError(503,'Could not verify historical score references')
+  if(referenced)throw new ApiError(409,'Scored records must be preserved; disable them instead')
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+
+  // Fetch contestant image_asset_id before deleting for cleanup
+  const { data: contestantData } = await getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .select('image_asset_id')
+    .eq('id', contestantId)
+    .single()
+
+  const assetId = contestantData?.image_asset_id ?? null
+
+  const { error } = await getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .delete()
+    .eq('id', contestantId)
+    .eq('event_id', eventId)
+
+  if (error) throw new ApiError(500, error.message)
+
+  // Cleanup photo asset if no other entities reference it
+  if (assetId) {
+    removeReferenceAndDeleteIfUnused(assetId).catch((err) =>
+      console.error('[competition] Contestant photo cleanup error:', err.message),
+    )
+  }
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.contestant.delete',
+    userId: organizerId,
+    module: 'competition',
+    details: { contestantId },
+  })
+}
+
+export async function getNextContestantNumber(eventId, organizerId, divisionId = null) {
+  await assertCompetitionEvent(eventId, organizerId)
+
+  let query = getClient()
+    .from(DB_TABLES.CONTESTANTS)
+    .select('contestant_number')
+    .eq('event_id', eventId)
+    .order('contestant_number', { ascending: false })
+    .limit(1)
+
+  if (divisionId) {
+    query = query.eq('division_id', divisionId)
+  } else {
+    query = query.is('division_id', null)
+  }
+
+  const { data, error } = await query
+  if (error) throw new ApiError(500, error.message)
+
+  const highest = data?.[0]?.contestant_number ?? 0
+  return highest + 1
+}
+
+// ——— Criteria ———
+
+export async function listCriteria(eventId, organizerId, filters = {}) {
+  await assertCompetitionEvent(eventId, organizerId)
+
+  let query = getClient()
+    .from(DB_TABLES.CRITERIA)
+    .select('*')
+    .eq('event_id', eventId)
+
+  if (filters.divisionId !== undefined) {
+    query = query.eq('division_id', filters.divisionId)
+  }
+
+  const { data, error } = await query.order('display_order', {ascending:true}).order('created_at', { ascending: true })
+
+  if (error) throw new ApiError(500, error.message)
+  const criteria = (data ?? []).map(mapCriteria)
+
+  // Nest minor criteria (judges score these; each carries its own score type).
+  if (criteria.length) {
+    const { data: minors, error: minErr } = await getClient()
+      .from(DB_TABLES.MINOR_CRITERIA)
+      .select('id, criteria_id, event_id, name, score_type, custom_min, custom_max, display_order, is_active')
+      .in('criteria_id', criteria.map((c) => c.id))
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true })
+    if (minErr) throw new ApiError(500, minErr.message)
+    const byCrit = new Map()
+    for (const m of minors ?? []) {
+      if (!byCrit.has(m.criteria_id)) byCrit.set(m.criteria_id, [])
+      byCrit.get(m.criteria_id).push(mapMinorCriteria(m))
+    }
+    for (const c of criteria) c.minorCriteria = byCrit.get(c.id) ?? []
+  }
+
+  return criteria
+}
+
+// ——— Minor criteria ———
+
+export async function listMinorCriteria(eventId, organizerId, criteriaId) {
+  await assertCompetitionEvent(eventId, organizerId)
+  const { data, error } = await getClient()
+    .from(DB_TABLES.MINOR_CRITERIA)
+    .select('id, criteria_id, event_id, name, score_type, custom_min, custom_max, display_order, is_active')
+    .eq('criteria_id', criteriaId)
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (error) throw new ApiError(500, error.message)
+  return (data ?? []).map(mapMinorCriteria)
+}
+
+async function assertCriteriaInEvent(eventId, criteriaId) {
+  const { data, error } = await getClient()
+    .from(DB_TABLES.CRITERIA)
+    .select('id')
+    .eq('id', criteriaId)
+    .eq('event_id', eventId)
+    .maybeSingle()
+  if (error) throw new ApiError(500, error.message)
+  if (!data) throw new ApiError(400, 'Criteria does not belong to this event')
+}
+
+export async function createMinorCriteria(eventId, organizerId, criteriaId, payload) {
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  await assertCriteriaInEvent(eventId, criteriaId)
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.MINOR_CRITERIA)
+    .insert({
+      criteria_id: criteriaId,
+      event_id: eventId,
+      name: payload.name,
+      score_type: payload.scoreType,
+      custom_min: payload.customMin,
+      custom_max: payload.customMax,
+      display_order: payload.displayOrder ?? 0,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.minor_criteria.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId, minorCriteriaId: data.id, name: data.name },
+  })
+  return mapMinorCriteria(data)
+}
+
+export async function updateMinorCriteria(eventId, organizerId, criteriaId, minorId, payload) {
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+
+  const updates = {}
+  if (payload.name !== undefined) updates.name = payload.name
+  if (payload.scoreType !== undefined) updates.score_type = payload.scoreType
+  if (payload.customMin !== undefined) updates.custom_min = payload.customMin
+  if (payload.customMax !== undefined) updates.custom_max = payload.customMax
+  if (payload.displayOrder !== undefined) updates.display_order = payload.displayOrder
+  if (payload.isActive !== undefined) updates.is_active = payload.isActive
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.MINOR_CRITERIA)
+    .update(updates)
+    .eq('id', minorId)
+    .eq('criteria_id', criteriaId)
+    .eq('event_id', eventId)
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+  if (!data) throw new ApiError(404, 'Minor criteria not found')
+  recordEventActivity({
+    eventId,
+    action: 'competition.minor_criteria.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId, minorCriteriaId: minorId, name: data.name },
+  })
+  return mapMinorCriteria(data)
+}
+
+export async function deleteMinorCriteria(eventId, organizerId, criteriaId, minorId) {
+  const {count:referenced,error:referenceError}=await getClient().from(DB_TABLES.JUDGE_SCORES).select('id',{count:'exact',head:true}).eq('minor_criteria_id',minorId)
+  if(referenceError)throw new ApiError(503,'Could not verify historical score references')
+  if(referenced)throw new ApiError(409,'Scored records must be preserved; disable them instead')
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  const { error } = await getClient()
+    .from(DB_TABLES.MINOR_CRITERIA)
+    .delete()
+    .eq('id', minorId)
+    .eq('criteria_id', criteriaId)
+    .eq('event_id', eventId)
+  if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.minor_criteria.delete',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId, minorCriteriaId: minorId },
+  })
+}
+
+export async function createCriteria(eventId, organizerId, payload) {
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+
+  // §F #1: for FLAT (no-round) events, event-wide criteria must total ≤ 100%.
+  // Round-based events are guarded per round when the criterion is attached
+  // (addCriteriaToRound), so the flat sum across rounds is skipped here.
+  if (Number(payload.percentage) > 0) {
+    const { count: roundCount } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUNDS)
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+    if (!roundCount) {
+      const { data: crits } = await getClient()
+        .from(DB_TABLES.CRITERIA)
+        .select('percentage')
+        .eq('event_id', eventId).eq('is_active',true)
+      const total = (crits ?? []).reduce((s, c) => s + Number(c.percentage ?? 0), 0)
+      const projected = total + Number(payload.percentage)
+      if (projected > 100 + 0.01) {
+        const remaining = Math.max(0, 100 - total)
+        throw new ApiError(
+          400,
+          `Criteria weight would exceed 100% (currently ${total.toFixed(2)}%, ${remaining.toFixed(2)}% left).`,
+        )
+      }
+    }
+  }
+
+  if (payload.divisionId) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.CRITERIA)
+    .insert({
+      event_id: eventId,
+      division_id: payload.divisionId ?? null,
+      name: payload.name,
+      percentage: payload.percentage,
+      min_score: payload.minScore,
+      max_score: payload.maxScore,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.criteria.create',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId: data.id, name: data.name },
+  })
+  return mapCriteria(data)
+}
+
+export async function updateCriteria(eventId, organizerId, criteriaId, payload) {
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+
+  if (payload.divisionId !== undefined && payload.divisionId !== null) {
+    const { data: div, error: divErr } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id')
+      .eq('id', payload.divisionId)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (divErr) throw new ApiError(500, divErr.message)
+    if (!div) throw new ApiError(400, 'Division does not belong to this event')
+  }
+
+  const updates = {}
+  if (payload.isActive !== undefined) updates.is_active = payload.isActive
+  if (payload.displayOrder !== undefined) updates.display_order = payload.displayOrder
+  if (payload.name !== undefined) updates.name = payload.name
+  if (payload.percentage !== undefined) updates.percentage = payload.percentage
+  if (payload.minScore !== undefined) updates.min_score = payload.minScore
+  if (payload.maxScore !== undefined) updates.max_score = payload.maxScore
+  if (payload.divisionId !== undefined) updates.division_id = payload.divisionId
+
+  const { data, error } = await getClient()
+    .from(DB_TABLES.CRITERIA)
+    .update(updates)
+    .eq('id', criteriaId)
+    .eq('event_id', eventId)
+    .select('*')
+    .single()
+
+  if (error) throw new ApiError(500, error.message)
+  if (!data) throw new ApiError(404, 'Criteria not found')
+  recordEventActivity({
+    eventId,
+    action: 'competition.criteria.update',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId, name: data.name },
+  })
+  return mapCriteria(data)
+}
+
+export async function deleteCriteria(eventId, organizerId, criteriaId) {
+  const {count:referenced,error:referenceError}=await getClient().from(DB_TABLES.JUDGE_SCORES).select('id',{count:'exact',head:true}).eq('criteria_id',criteriaId)
+  if(referenceError)throw new ApiError(503,'Could not verify historical score references')
+  if(referenced)throw new ApiError(409,'Scored records must be preserved; disable them instead')
+  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+
+  const { error } = await getClient()
+    .from(DB_TABLES.CRITERIA)
+    .delete()
+    .eq('id', criteriaId)
+    .eq('event_id', eventId)
+
+  if (error) throw new ApiError(500, error.message)
+  recordEventActivity({
+    eventId,
+    action: 'competition.criteria.delete',
+    userId: organizerId,
+    module: 'competition',
+    details: { criteriaId },
+  })
+}
+
+// ——— Judges ———
+
+async function ensureJudgeAccount(email) {
+  const normalizedEmail = email.toLowerCase().trim()
+  const existing = await findUserByEmail(normalizedEmail)
+
+  if (!existing) {
+    throw new ApiError(404, 'Participant account not found. Ask an administrator to add this account to the Competition Judge pool.')
+  }
+  if (!isParticipantRole(existing.role)) {
+    throw new ApiError(409, 'This email is already used by another account type')
+  }
+  return { user: sanitizeUser(existing), isNew: false }
+}
+
+function resolveDisplayName(firstName, lastName, fallback = null) {
+  return [firstName, lastName].filter(Boolean).join(' ') || fallback
+}
+
+async function upsertJudgeInvitationStatus(eventId, userId, values) {
+  const { error } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .upsert(
+      { event_id: eventId, voter_id: userId, ...values },
+      { onConflict: 'event_id,voter_id', ignoreDuplicates: false },
+    )
+
+  if (error) throw new ApiError(500, error.message)
+}
+
+export async function inviteJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName }) {
+  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
+  const event = await getEventById(eventId)
+
+  const tempPassword = temporaryPassword || generateTemporaryPassword()
+  // Existing judges keep their own password — never reset. isNew decides which email to send.
+  const { user, isNew } = await ensureJudgeAccount(email, tempPassword, false)
+
+  await registerParticipant(eventId, user.id, {
+    participantType: 'COMPETITION_JUDGE',
+    firstName: firstName || null,
+    lastName: lastName || null,
+    judgeRole: 'judge',
+    displayName: resolveDisplayName(firstName, lastName, user.email),
+    isActive: true,
+  })
+
+  const emailResult = isNew
+    ? await sendJudgeInvitationEmail({
+        email: user.email,
+        temporaryPassword: tempPassword,
+        eventId: event.id,
+        eventTitle: event.title,
+      })
+    : await sendJudgeInvitationEmailRegistered({
+        email: user.email,
+        eventId: event.id,
+        eventTitle: event.title,
+      })
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.invite',
+    userId: organizerId,
+    module: 'competition',
+    details: { judgeUserId: user.id, email: user.email, isNewJudge: isNew, emailSent: emailResult?.sent ?? null },
+  })
+
+  return { user: sanitizeUser(user), isNewJudge: isNew, email: emailResult }
+}
+
+/**
+ * Register a judge WITHOUT sending invitation email.
+ * @param {string} eventId
+ * @param {string} organizerId
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} [params.temporaryPassword]
+ * @param {string} [params.firstName]
+ * @param {string} [params.lastName]
+ * @param {boolean} [params.resetPasswordForExisting] - If false, won't reset password for existing judges (default: false for manual)
+ */
+export async function registerJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName, resetPasswordForExisting = false }) {
+  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
+
+  const tempPassword = temporaryPassword || generateTemporaryPassword()
+  const { user, isNew } = await ensureJudgeAccount(email, tempPassword, resetPasswordForExisting)
+
+  await registerParticipant(eventId, user.id, {
+    participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE,
+    firstName: firstName || null,
+    lastName: lastName || null,
+    judgeRole: 'judge',
+    displayName: resolveDisplayName(firstName, lastName, user.email),
+    isActive: true,
+  })
+
+  try {
+    await upsertJudgeInvitationStatus(eventId, user.id, { invitation_sent: false })
+  } catch (dbErr) {
+    console.error('[registerJudge] invitations upsert failed:', dbErr.message)
+  }
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.register',
+    userId: organizerId,
+    module: 'competition',
+    details: { judgeUserId: user.id, email: user.email, isNewJudge: isNew },
+  })
+
+  return { user, isNewJudge: isNew, invitationSent: false }
+}
+
+/**
+ * Send invitation email for an already-registered judge.
+ * If judge has an existing account, sends "you're invited" email without password reset.
+ * If judge is new, generates temp password and sends it.
+ */
+export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
+  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
+  const event = await getEventById(eventId)
+
+  const { data: judgeRow, error: judgeRowErr } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('user_id, users (id, email, must_change_password)')
+    .eq('user_id', judgeId)
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .maybeSingle()
+
+  if (judgeRowErr) throw new ApiError(500, judgeRowErr.message)
+  if (!judgeRow) {
+    console.error(`[sendJudgeInvitation] judge participant not found for judgeId=${judgeId}, eventId=${eventId}`)
+    throw new ApiError(404, 'Judge is not enrolled in this event')
+  }
+
+  const userId = judgeRow.user_id
+  const judgeEmail = judgeRow.users?.email
+  const invitationType = 'registered'
+  let emailResult = null
+
+  try {
+    emailResult = await sendJudgeInvitationEmailRegistered({
+      email: judgeEmail,
+      eventId: event.id,
+      eventTitle: event.title,
+    })
+  } catch (emailError) {
+    console.error(`[sendJudgeInvitation] email sending failed for ${judgeEmail}:`, emailError.message)
+    emailResult = { 
+      sent: false, 
+      error: emailError.message || 'Failed to send invitation email',
+      retryable: emailError.message?.includes('Network connectivity') || emailError.message?.includes('Unable to reach')
+    }
+  }
+
+  if (emailResult?.sent) {
+    try {
+      await upsertJudgeInvitationStatus(eventId, userId, {
+        invitation_sent: true,
+        is_new_account: false,
+      })
+    } catch (dbErr) {
+      console.error('[sendJudgeInvitation] failed to mark invitation_sent=true:', dbErr.message)
+      throw new ApiError(500, 'Invitation email was sent, but the system could not mark it as sent. Please refresh and try again if it still shows pending.')
+    }
+  }
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.invitation.send',
+    userId: organizerId,
+    module: 'competition',
+    details: { judgeUserId: userId, email: judgeEmail, invitationType, sent: emailResult?.sent || false },
+  })
+
+  return {
+    email: emailResult,
+    invitationSent: emailResult?.sent || false,
+    invitationType,
+    temporaryPassword: null,
+    message: emailResult?.sent
+      ? `Invitation sent successfully to ${judgeEmail}`
+      : `Invitation failed: ${emailResult?.error || 'Unknown error'}`
+  }
+}
+
+/**
+ * Send all pending judge invitations for an event.
+ * Handles both new and existing accounts appropriately.
+ */
+export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
+  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
+  const event = await getEventById(eventId)
+
+  // Start from event_participants — the source of truth for enrolled judges.
+  const { data: judgeParticipants, error: jpErr } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('user_id, users (id, email, must_change_password)')
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+
+  if (jpErr) throw new ApiError(500, jpErr.message)
+  if (!judgeParticipants?.length) return { total: 0, sent: 0, failed: 0, results: [] }
+
+  // Check which judges already had their invitation sent
+  const judgeUserIds = judgeParticipants.map((j) => j.user_id)
+  const { data: existingInvitations } = await getClient()
+    .from(DB_TABLES.INVITATIONS)
+    .select('voter_id, invitation_sent')
+    .eq('event_id', eventId)
+    .in('voter_id', judgeUserIds)
+
+  const sentSet = new Set(
+    (existingInvitations ?? []).filter((inv) => inv.invitation_sent).map((inv) => inv.voter_id),
+  )
+
+  // Only process judges whose invitation hasn't been sent yet
+  const pendingJudges = judgeParticipants.filter((j) => !sentSet.has(j.user_id))
+
+  console.log(`[sendAllPendingJudgeInvitations] total=${judgeParticipants.length}, alreadySent=${sentSet.size}, pending=${pendingJudges.length}`)
+
+  if (!pendingJudges.length) return { total: 0, sent: 0, failed: 0, results: [] }
+
+  let sent = 0, failed = 0
+  const results = []
+
+  for (const p of pendingJudges) {
+    const judgeEmail = p.users?.email
+    // A judge who has already set their own password is an existing account.
+    const isExistingAccount = !p.users?.must_change_password
+
+    let tempPassword = null
+    let emailResult = null
+    let invitationType = isExistingAccount ? 'existing' : 'new'
+
+    try {
+      if (isExistingAccount) {
+        // Existing account - send registered email without password reset
+        emailResult = await sendJudgeInvitationEmailRegistered({
+          email: judgeEmail,
+          eventId: event.id,
+          eventTitle: event.title,
+        })
+      } else {
+        // New account - generate temp password
+        tempPassword = generateTemporaryPassword()
+        const passwordHash = await hashPassword(tempPassword)
+
+        await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', p.user_id)
+
+        emailResult = await sendJudgeInvitationEmail({
+          email: judgeEmail,
+          temporaryPassword: tempPassword,
+          eventId: event.id,
+          eventTitle: event.title,
+        })
+      }
+
+      if (emailResult?.sent) {
+        await upsertJudgeInvitationStatus(eventId, p.user_id, {
+          invitation_sent: true,
+          is_new_account: !isExistingAccount,
+        })
+        sent++
+        results.push({
+          judgeId: p.user_id,
+          email: judgeEmail,
+          success: true,
+          invitationType,
+          temporaryPassword: tempPassword,
+        })
+      } else {
+        failed++
+        results.push({
+          judgeId: p.user_id,
+          email: judgeEmail,
+          success: false,
+          invitationType,
+          error: emailResult?.error || 'Email delivery failed',
+        })
+      }
+    } catch (err) {
+      failed++
+      results.push({
+        judgeId: p.user_id,
+        email: judgeEmail,
+        success: false,
+        invitationType,
+        error: err.message,
+      })
+    }
+  }
+
+  recordEventActivity({
+    eventId,
+    action: 'competition.judge.invitation.send_all',
+    userId: organizerId,
+    module: 'competition',
+    details: { total: pendingJudges.length, sent, failed },
+  })
+
+  return { total: pendingJudges.length, sent, failed, results }
+}
+
+export function mergeJudgeRows(participantRow = null, compatibilityRow = null) {
+  const fromParticipant = participantRow ?? {}
+  const fromCompatibility = compatibilityRow ?? {}
+
+  const participantDisplayName = [fromParticipant.first_name, fromParticipant.last_name]
+    .filter(Boolean)
+    .join(' ') || fromParticipant.users?.email || null
+
+  const compatibilityDisplayName = typeof fromCompatibility.display_name === 'string' && fromCompatibility.display_name.trim()
+    ? fromCompatibility.display_name.trim()
+    : null
+
+  const compatibilityNameParts = compatibilityDisplayName ? compatibilityDisplayName.split(/\s+/) : []
+
+  const displayName = compatibilityDisplayName ?? participantDisplayName
+
+  return {
+    id: fromParticipant.id ?? fromCompatibility.id ?? null,
+    eventId: fromCompatibility.event_id ?? fromParticipant.event_id ?? null,
+    judgeId: fromCompatibility.user_id ?? fromParticipant.user_id ?? fromParticipant.users?.id ?? null,
+    email: fromCompatibility.users?.email ?? fromParticipant.users?.email ?? fromParticipant.email ?? null,
+    firstName: fromParticipant.first_name ?? (compatibilityNameParts[0] ?? null),
+    lastName: fromParticipant.last_name ?? (compatibilityNameParts.slice(1).join(' ') || null),
+    displayName,
+    hasScored: Boolean(fromParticipant.has_scored || fromCompatibility.has_submitted),
+    metadata: fromParticipant.metadata ?? {},
+    invitationSent: false,
+    source: fromParticipant.id ? 'event_participants' : 'competition_judges_view',
+    role: fromParticipant.judge_role ?? fromCompatibility.role ?? 'judge',
+    isActive: fromParticipant.is_active ?? fromCompatibility.is_active ?? true,
+    hasSubmitted: Boolean(fromParticipant.has_scored || fromCompatibility.has_submitted),
+  }
+}
+
+export async function listJudges(eventId, organizerId) {
+  await assertCompetitionEvent(eventId, organizerId)
+
+  const { data: participantRows, error } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select(
+      `
+      id,
+      has_scored,
+      first_name,
+      last_name,
+      metadata,
+      user_id,
+      judge_role,
+      display_name,
+      is_active,
+      users!inner (id, email)
+    `,
+    )
+    .eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new ApiError(500, error.message)
+
+  const judgeUserIds = (participantRows ?? []).map((row) => row.user_id).filter(Boolean)
+  let invitationMap = {}
+
+  if (judgeUserIds.length) {
+    const { data: invitations } = await getClient()
+      .from(DB_TABLES.INVITATIONS)
+      .select('voter_id, invitation_sent')
+      .eq('event_id', eventId)
+      .in('voter_id', judgeUserIds)
+
+    for (const inv of invitations ?? []) {
+      invitationMap[inv.voter_id] = inv.invitation_sent
+    }
+  }
+
+  return {
+    judges: (participantRows ?? []).map((row) => ({
+      id: row.id,
+      judgeId: row.user_id,
+      email: row.users?.email ?? null,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      displayName: row.display_name || resolveDisplayName(row.first_name, row.last_name, row.users?.email ?? null),
+      role: row.judge_role ?? 'judge',
+      isActive: row.is_active ?? true,
+      hasScored: row.has_scored ?? false,
+      metadata: row.metadata ?? {},
+      invitationSent: invitationMap[row.user_id] ?? false,
+    })),
+  }
+}
+
+// ——— Judge scoring (voter/judge) ———
+
+export async function assertJudgeEnrolled(eventId, judgeId) {
+  const { data, error } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id, event_id, user_id, has_scored')
+    .eq('event_id', eventId)
+    .eq('user_id', judgeId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .neq('events.status', EVENT_STATUS.ARCHIVED)
+    .maybeSingle()
+
+  if (error) throw new ApiError(500, error.message)
+  if (!data) throw new ApiError(403, 'You are not a judge for this event')
+  // Normalize to the shape callers expect
+  return { ...data, voter_id: data.user_id, is_judge: true, has_voted: false }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 — Judge assignment enforcement.
+// A judge participant may have ZERO or MORE competition_judge_assignments rows.
+// If no rows exist, the judge is event-wide. If rows exist, the judge can only score
+// (contestant, criterion) pairs that belong to one of the assigned scopes.
+//
+// For Phase 6 we enforce this at submit time: the requested (round_id,
+// category_id) must be covered by the judge's assignments; otherwise the
+// submission is rejected.
+// ---------------------------------------------------------------------------
+export async function getJudgeAssignmentContext(eventId, judgeId) {
+  const { data, error } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select(
+      'id, judge_role, is_active, has_scored',
+    )
+    .eq('event_id', eventId)
+    .eq('user_id', judgeId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .maybeSingle()
+
+  if (error) throw new ApiError(500, error.message)
+  if (!data) return { isFirstClass: false, role: 'judge', assignments: [] }
+
+  const { data: assignments, error: assignmentError } = await getClient()
+    .from(DB_TABLES.COMPETITION_JUDGE_ASSIGNMENTS)
+    .select('id, scope, scope_id')
+    .eq('participant_id', data.id)
+
+  if (assignmentError) throw new ApiError(500, assignmentError.message)
+
+  return {
+    isFirstClass: true,
+    role: data.judge_role ?? 'judge',
+    isActive: data.is_active ?? true,
+    hasSubmitted: data.has_scored ?? false,
+    judgeRowId: data.id,
+    assignments: assignments ?? [],
+  }
+}
+
+export async function resolveAllowedDivisions(eventId, judgeId) {
+  const ctx = await getJudgeAssignmentContext(eventId, judgeId)
+  if (!ctx.isFirstClass) return null
+  if (ctx.role === 'score_reviewer') return new Set()
+  const list = ctx.assignments
+  if (!list || list.length === 0) return null
+
+  const allowed = new Set()
+  let hasEventScope = false
+  const roundIds = []
+  const categoryIds = []
+
+  for (const a of list) {
+    if (a.scope === 'event') {
+      hasEventScope = true
+      break
+    }
+    if (a.scope === 'division') allowed.add(a.scope_id)
+    if (a.scope === 'round') roundIds.push(a.scope_id)
+    if (a.scope === 'category') categoryIds.push(a.scope_id)
+  }
+
+  if (hasEventScope) return null
+
+  if (roundIds.length > 0) {
+    const { data } = await getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('division_id').in('id', roundIds)
+    for (const r of data ?? []) {
+      if (r.division_id) allowed.add(r.division_id)
+      else return null // Event-wide round grants access to all divisions for scoring purposes
+    }
+  }
+
+  if (categoryIds.length > 0) {
+    const { data } = await getClient().from(DB_TABLES.COMPETITION_CATEGORIES).select('division_id').in('id', categoryIds)
+    for (const c of data ?? []) {
+      if (c.division_id) allowed.add(c.division_id)
+      else return null
+    }
+  }
+
+  return allowed
+}
+
+export function canJudgeScore(assignmentContext, { roundId = null, categoryId = null, divisionId = null } = {}) {
+  if (!assignmentContext.isFirstClass) return true
+  if (assignmentContext.role === 'score_reviewer') return false
+  const list = assignmentContext.assignments
+  if (!list || list.length === 0) return true
+  return list.some((a) => {
+    if (a.scope === 'event') return true
+    if (a.scope === 'division' && divisionId && a.scope_id === divisionId) return true
+    if (a.scope === 'round' && roundId && a.scope_id === roundId) return true
+    if (a.scope === 'category' && categoryId && a.scope_id === categoryId) return true
+    return false
+  })
+}
+
+export async function getJudgeScoringSheet(eventId, judgeId, options = {}) {
+  const enrollment = await assertJudgeEnrolled(eventId, judgeId)
+  const event = await getEventById(eventId)
+
+  if (!COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)) {
+    throw new ApiError(400, 'Not a competition scoring event')
+  }
+
+  // Get active session to include live session state
+  const activeSession = await getActiveSession(eventId).catch(() => null)
+
+  // Query competition_divisions table to populate allowedDivisions array  
+  const { data: divisionRows } = await getClient()
+    .from(DB_TABLES.COMPETITION_DIVISIONS)
+    .select('id, name, description')
+    .eq('event_id', eventId)
+    .order('name')
+
+  const divisionsEnabled = (divisionRows?.length ?? 0) > 0
+  const allowedDivisions = await resolveAllowedDivisions(eventId, judgeId)
+
+  // Convert allowedDivisions Set to array with division details
+  let allowedDivisionsArray = []
+  if (allowedDivisions !== null && divisionsEnabled) {
+    const divisionMap = new Map((divisionRows ?? []).map(div => [div.id, div]))
+    allowedDivisionsArray = Array.from(allowedDivisions)
+      .map(id => divisionMap.get(id))
+      .filter(Boolean)
+  }
+
+  // Validate division access if specific division requested
+  if (options.divisionId) {
+    if (!allowedDivisions || !allowedDivisions.has(options.divisionId)) {
+      throw new ApiError(403, 'You are not assigned to judge this division')
+    }
+  }
+
+  let contestantsQuery = getClient().from(DB_TABLES.CONTESTANTS).select('id, event_id, division_id, name, photo, contestant_number').eq('event_id', eventId).order('contestant_number')
+  let criteriaQuery = getClient().from(DB_TABLES.CRITERIA).select('id, event_id, division_id, name, percentage, min_score, max_score').eq('event_id', eventId)
+
+  // Apply division filtering logic
+  if (options.divisionId) {
+    // Filter to specific division if requested AND judge is assigned to it
+    contestantsQuery = contestantsQuery.or(`division_id.eq.${options.divisionId},division_id.is.null`)
+    criteriaQuery = criteriaQuery.or(`division_id.eq.${options.divisionId},division_id.is.null`)
+  } else if (allowedDivisions !== null) {
+    // Apply normal division restrictions
+    if (allowedDivisions.size === 0) {
+      return {
+        event: mapEvent(event),
+        contestants: [],
+        criteria: [],
+        existingScores: {},
+        hasScored: enrollment.has_scored,
+        scoringOpen: isCompetitionScoringOpen(event),
+        divisionsEnabled,
+        allowedDivisions: allowedDivisionsArray,
+        activeSession,
+      }
+    }
+    const divIds = Array.from(allowedDivisions)
+    contestantsQuery = contestantsQuery.or(`division_id.in.(${divIds.join(',')}),division_id.is.null`)
+    criteriaQuery = criteriaQuery.or(`division_id.in.(${divIds.join(',')}),division_id.is.null`)
+  }
+
+  const [contestants, criteria] = await Promise.all([
+    contestantsQuery,
+    criteriaQuery,
+  ])
+
+  if (contestants.error) throw new ApiError(500, contestants.error.message)
+  if (criteria.error) throw new ApiError(500, criteria.error.message)
+
+  const { data: existingScores } = await getClient()
+    .from(DB_TABLES.JUDGE_SCORES)
+    .select('contestant_id, criteria_id, score')
+    .eq('judge_id', judgeId)
+    .in(
+      'contestant_id',
+      (contestants.data ?? []).map((c) => c.id),
+    )
+
+  const scoreMap = {}
+  for (const s of existingScores ?? []) {
+    scoreMap[`${s.contestant_id}:${s.criteria_id}`] = Number(s.score)
+  }
+
+  return {
+    event: mapEvent(event),
+    contestants: (contestants.data ?? []).map(mapContestant),
+    criteria: (criteria.data ?? []).map(mapCriteria),
+    existingScores: scoreMap,
+    hasScored: enrollment.has_scored,
+    scoringOpen: isCompetitionScoringOpen(event),
+    divisionsEnabled,
+    allowedDivisions: allowedDivisionsArray,
+    activeSession,
+  }
+}
+
+export async function submitJudgeScores(eventId, judgeId, scores) {
+  await assertJudgeEnrolled(eventId, judgeId)
+
+  const event = await getEventById(eventId)
+  if(event.official_rules_id) throw new ApiError(409,'Use the versioned criterion Lock and Submit Round endpoints')
+  if (!isCompetitionScoringOpen(event)) {
+    if (!event.scoring_enabled) {
+      throw new ApiError(403, 'Scoring is not open for this event')
+    }
+    if (event.start_date && new Date(event.start_date) > new Date()) {
+      throw new ApiError(403, 'Scoring has not started yet for this event')
+    }
+    if (event.end_date && new Date(event.end_date) < new Date()) {
+      throw new ApiError(403, 'Scoring has ended for this event')
+    }
+    throw new ApiError(403, 'Scoring is not open for this event')
+  }
+
+  const scoringConfig = mergeScoringConfig(event.scoring_config)
+  const eventBounds = resolveScoreBounds(scoringConfig)
+
+  // Phase 6: enforce assignment scope from the canonical judge participant.
+  // A score_reviewer is read-only.
+  const judgeCtx = await getJudgeAssignmentContext(eventId, judgeId)
+  if (judgeCtx.isFirstClass) {
+    if (!judgeCtx.isActive) {
+      throw new ApiError(403, 'This judge account is inactive for this event')
+    }
+    if (judgeCtx.role === 'score_reviewer') {
+      throw new ApiError(403, 'Score reviewers cannot submit scores')
+    }
+  }
+
+  const allowedDivisions = await resolveAllowedDivisions(eventId, judgeId)
+
+  let contestantsQuery = getClient().from(DB_TABLES.CONTESTANTS).select('id').eq('event_id', eventId)
+  let criteriaQuery = getClient().from(DB_TABLES.CRITERIA).select('id, event_id, name, percentage, min_score, max_score').eq('event_id', eventId)
+
+  if (allowedDivisions !== null) {
+    if (allowedDivisions.size === 0) {
+      throw new ApiError(403, 'You are not assigned to score any divisions')
+    }
+    const divIds = Array.from(allowedDivisions)
+    contestantsQuery = contestantsQuery.or(`division_id.in.(${divIds.join(',')}),division_id.is.null`)
+    criteriaQuery = criteriaQuery.or(`division_id.in.(${divIds.join(',')}),division_id.is.null`)
+  }
+
+  const [contestants, criteria] = await Promise.all([
+    contestantsQuery,
+    criteriaQuery,
+  ])
+
+  if (contestants.error || criteria.error) {
+    throw new ApiError(500, 'Failed to load competition scoring data')
+  }
+
+  const contestantIds = new Set((contestants.data ?? []).map((c) => c.id))
+  const criteriaList = (criteria.data ?? []).map(mapCriteria)
+  const criteriaMap = Object.fromEntries(criteriaList.map((c) => [c.id, c]))
+
+  const expectedCells = contestantIds.size * criteriaList.length
+  if (scores.length !== expectedCells) {
+    throw new ApiError(
+      400,
+      `Submit a score for every contestant and criteria (${expectedCells} scores required)`,
+    )
+  }
+
+  const seen = new Set()
+  const rows = []
+
+  for (const entry of scores) {
+    const key = `${entry.contestantId}:${entry.criteriaId}`
+    if (seen.has(key)) throw new ApiError(400, 'Duplicate score entry')
+    seen.add(key)
+
+    if (!contestantIds.has(entry.contestantId)) {
+      throw new ApiError(400, 'Invalid contestant')
+    }
+
+    const crit = criteriaMap[entry.criteriaId]
+    if (!crit) throw new ApiError(400, 'Invalid criteria')
+
+    const score = Number(entry.score)
+    if (Number.isNaN(score)) {
+      throw new ApiError(400, `Score for ${crit.name} must be a number`)
+    }
+
+    // §8C: the event score scale (Structure & Scoring → Scoring config) is the
+    // single source of truth for the valid range. Any stray per-criterion
+    // min_score/max_score is ignored — the UI no longer sets per-criterion ranges.
+    if (score < eventBounds.min || score > eventBounds.max) {
+      throw new ApiError(
+        400,
+        `Score for ${crit.name} must be between ${eventBounds.min} and ${eventBounds.max}`,
+      )
+    }
+
+    // Phase 6: assignment scope check.
+    if (judgeCtx.isFirstClass && !canJudgeScore(judgeCtx, {
+      divisionId: entry.divisionId ?? null,
+      roundId: entry.roundId ?? null,
+      categoryId: entry.categoryId ?? null,
+    })) {
+      throw new ApiError(
+        403,
+        `You are not assigned to score ${crit.name} for this contestant`,
+      )
+    }
+
+    rows.push({
+      judge_id: judgeId,
+      contestant_id: entry.contestantId,
+      criteria_id: entry.criteriaId,
+      division_id: entry.divisionId ?? null,
+      round_id: entry.roundId ?? null,
+      category_id: entry.categoryId ?? null,
+      score,
+    })
+  }
+
+  const { data: locked, error: lockErr } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .update({ has_scored: true })
+    .eq('event_id', eventId)
+    .eq('user_id', judgeId)
+    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .eq('has_scored', false)
+    .select('id')
+
+  if (lockErr) throw new ApiError(500, lockErr.message)
+  if (!locked?.length) {
+    throw new ApiError(409, 'You have already submitted scores for this event')
+  }
+
+  try {
+    const { error: insertErr } = await getClient().from(DB_TABLES.JUDGE_SCORES).insert(rows)
+    if (insertErr) {
+      if (insertErr.code === '23505') {
+        throw new ApiError(409, 'You have already submitted scores for this event')
+      }
+      throw new ApiError(500, insertErr.message)
+    }
+    
+    if (event.organizations?.organizer_id) {
+      const rankings = await getLiveRankings(eventId, event.organizations.organizer_id)
+      emitToEvent(eventId, 'rankings:updated', { eventId, rankings })
+      
+      // Trigger organizer dashboard stats refresh
+      const { emitToUser, emitToRole } = await import('../websocket/ws-emitter.js')
+      emitToUser(event.organizations.organizer_id, 'organizer:stats-updated', { eventId })
+      
+      // Trigger admin platform stats refresh
+      emitToRole('admin', 'platform:stats-updated', {})
+    }
+  } catch (err) {
+    await getClient()
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .update({ has_scored: false })
+      .eq('event_id', eventId)
+      .eq('user_id', judgeId)
+      .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    throw err
+  }
+
+  return { success: true, message: 'Scores submitted and locked', locked: true }
+}
+
+export async function listJudgePageantEvents(judgeId) {
+  return listJudgeCompetitionEvents(judgeId)
+}
+
+export async function listJudgeCompetitionEvents(judgeId) {
+  const { data, error } = await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('*,events!inner (*,organizations (id,organization_name,users (organization_logo)))')
+    .eq('user_id',judgeId).eq('participant_type',PARTICIPANT_TYPES.COMPETITION_JUDGE).eq('is_active',true)
+  if (error) throw new ApiError(500,error.message)
+  const modernIds = (data ?? []).filter(r => r.events?.official_rules_id).map(r => r.events.id)
+  let sessions = [], submissions = []
+  if (modernIds.length) {
+    const [sessionResult, submissionResult] = await Promise.all([
+      getClient().from('competition_sessions').select('*').in('event_id',modernIds).order('started_at',{ascending:false}),
+      getClient().from('competition_round_submissions').select('*').in('event_id',modernIds).eq('judge_id',judgeId).eq('status','submitted'),
+    ])
+    if (sessionResult.error || submissionResult.error) throw new ApiError(503,'Competition workflow migrations 087-094 are required')
+    sessions = sessionResult.data ?? []; submissions = submissionResult.data ?? []
+  }
+  return (data ?? []).filter(r => COMPETITION_SCORING_EVENT_TYPES.has(r.events?.event_type)).map(r => {
+    const session = sessions.find(s => s.event_id === r.events.id)
+    const submitted = submissions.some(s => s.session_id === session?.id && s.round_id === session?.current_round_id && s.rules_version === r.events.official_rules_id)
+    return {...mapEvent(r.events),scoringEnabled:Boolean(r.events.scoring_enabled),hasScored:r.events.official_rules_id ? submitted : r.has_scored,
+      workflow:r.events.official_rules_id ? {sessionStatus:session?.status,submissionWindow:session?.submission_window,roundSubmitted:submitted,reviewer:r.judge_role==='score_reviewer'} : null}
+  })
+}
+
+// ——— Live rankings ———
+
+function highestCriterionScore(row) {
+  return Math.max(...(row.criteriaBreakdown ?? []).map((criterion) => Number(criterion.average ?? 0)), 0)
+}
+
+async function getPublishedCalculation(eventId, roundId = null) {
+  const { data, error } = await getClient()
+    .from('competition_result_calculations')
+    .select('id, published_at, configuration_snapshot, result_snapshot')
+    .eq('event_id', eventId)
+    .eq('status', 'published')
+    .filter('round_id', roundId ? 'eq' : 'is', roundId)
+    .order('published_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new ApiError(500, error.message)
+  return data
+}
+
+export async function getOfficialRankings(eventId, organizerId, options = {}) {
+  const live = await getLiveRankings(eventId, organizerId, options)
+  const published = await getPublishedCalculation(eventId, options.roundId ?? null)
+  if (!published?.result_snapshot?.length) {
+    return { ...live, isOfficial: false, publishedAt: null, tabulationMethod: null }
+  }
+  const officialRows = options.divisionId
+    ? published.result_snapshot.filter((row) => row.divisionId === options.divisionId)
+    : published.result_snapshot
+  let previousScore = null
+  let previousRank = 0
+  const scopedOfficialRows = officialRows.map((row, index) => {
+    if(published.configuration_snapshot?.ruleVersion!=null || published.configuration_snapshot?.method==='manual')return row
+    const score = Number(row.finalScore ?? row.weightedScore ?? 0)
+    const rank = score === previousScore ? previousRank : index + 1
+    previousScore = score
+    previousRank = rank
+    return { ...row, rank }
+  })
+  return {
+    ...live,
+    rankings: scopedOfficialRows,
+    isOfficial: true,
+    publishedAt: published.published_at,
+    tabulationMethod: published.configuration_snapshot?.method ?? null,
+  }
+}
+
+export async function getLiveRankings(eventId, organizerId, { divisionId = null, roundId = null, calculationMethod = null } = {}) {
+  const currentEvent=await assertCompetitionEvent(eventId, organizerId)
+  if(currentEvent.official_rules_id){
+    const workflow=await import('./competition-workflow.service.js')
+    const state=await workflow.tabulationData(eventId,organizerId,{roundId})
+    if(calculationMethod&&calculationMethod!==state.rules.scoringConfig.calculationMethod) throw new ApiError(409,'Official method is frozen')
+    return {rankings:workflow.publicResults(state).filter(r=>!divisionId||r.divisionId===divisionId),scoringConfig:state.rules.scoringConfig,rounds:state.rules.rounds,judges:{total:state.rules.judges.filter(j=>j.role!=='score_reviewer').length,submitted:new Set(state.submissions.map(s=>s.judge_id)).size},divisionsEnabled:!!state.rules.divisions.length,criteriaTotalPercentage:100,roundWeightTotal:state.rules.rounds.reduce((n,r)=>n+Number(r.weight),0),categoryWeightTotal:state.rules.categories.reduce((n,c)=>n+Number(c.weight),0),isProvisional:!state.ready}
+  }
+
+  // Build division-aware queries
+  let contestantsQuery = getClient().from(DB_TABLES.CONTESTANTS).select('id, event_id, division_id, name, photo, contestant_number').eq('event_id', eventId)
+  let criteriaQuery = getClient().from(DB_TABLES.CRITERIA).select('id, event_id, division_id, name, percentage, min_score, max_score').eq('event_id', eventId)
+  let roundsQuery = getClient().from(DB_TABLES.COMPETITION_ROUNDS).select('*').eq('event_id', eventId)
+  let categoriesQuery = getClient().from(DB_TABLES.COMPETITION_CATEGORIES).select('*').eq('event_id', eventId)
+
+  if (divisionId) {
+    contestantsQuery = contestantsQuery.or(`division_id.eq.${divisionId},division_id.is.null`)
+    criteriaQuery = criteriaQuery.or(`division_id.eq.${divisionId},division_id.is.null`)
+    roundsQuery = roundsQuery.or(`division_id.eq.${divisionId},division_id.is.null`)
+    categoriesQuery = categoriesQuery.or(`division_id.eq.${divisionId},division_id.is.null`)
+  }
+
+  const [eventRes, contestantsRes, criteriaRes, judgesRes, roundsRes, categoriesRes, scoresRes] =
+    await Promise.all([
+      getClient()
+        .from(DB_TABLES.EVENTS)
+        .select('scoring_config, divisions_enabled')
+        .eq('id', eventId)
+        .single(),
+      contestantsQuery,
+      criteriaQuery,
+      getClient()
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', eventId)
+        .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
+      roundsQuery,
+      categoriesQuery,
+      getClient()
+        .from(DB_TABLES.JUDGE_SCORES)
+        .select('contestant_id, criteria_id, minor_criteria_id, round_id, category_id, division_id, score, judge_id')
+    ])
+
+  if (eventRes.error) throw new ApiError(500, eventRes.error.message)
+  if (contestantsRes.error) throw new ApiError(500, contestantsRes.error.message)
+  if (criteriaRes.error) throw new ApiError(500, criteriaRes.error.message)
+  if (roundsRes.error) throw new ApiError(500, roundsRes.error.message)
+  if (categoriesRes.error) throw new ApiError(500, categoriesRes.error.message)
+
+  const contestantIds = (contestantsRes.data ?? []).map((c) => c.id)
+  let scores = scoresRes.data ?? []
+  if (contestantIds.length) {
+    scores = scores.filter((s) => contestantIds.includes(s.contestant_id))
+  } else {
+    scores = []
+  }
+
+  // When filtering by division, also restrict scores to that division (or null)
+  if (divisionId) {
+    scores = scores.filter((s) => s.division_id === divisionId || !s.division_id)
+  }
+
+  const { count: totalJudges } = judgesRes
+  // H3: derive "judges submitted" from judges who actually have scores in the
+  // ranking store. Since Phase 3 writes live-session scores through to
+  // competition_scores, this is accurate for BOTH the live and batch paths —
+  // unlike the old event_participants.has_scored flag, which the live path never
+  // set (so live-session events wrongly showed 0 submitted here).
+  const submittedJudges = new Set((scores ?? []).map((s) => s.judge_id)).size
+
+  // Phase 4 (§8A): supply round→criteria membership so the engine scores each
+  // round with only its own criteria. Feature-guarded: when an event has NO
+  // round_criteria rows this stays null and the engine runs the legacy path,
+  // leaving pre-existing flat-model events' numbers unchanged.
+  const roundIds = (roundsRes.data ?? []).map((r) => r.id)
+  let roundCriteria = null
+  if (roundIds.length) {
+    const { data: rcRows } = await getClient()
+      .from(DB_TABLES.COMPETITION_ROUND_CRITERIA)
+      .select('round_id, criteria_id')
+      .in('round_id', roundIds)
+    if (rcRows && rcRows.length) {
+      roundCriteria = {}
+      for (const rc of rcRows) {
+        ;(roundCriteria[rc.round_id] ??= []).push(rc.criteria_id)
+      }
+    }
+  }
+
+  // Nest minor criteria under each criterion so the engine builds each
+  // criterion's score from its minors (normalized + averaged). A criterion with
+  // no minors (not-yet-migrated) falls back to the engine's legacy per-criterion
+  // path, leaving its numbers unchanged.
+  const critList = criteriaRes.data ?? []
+  if (critList.length) {
+    const { data: minorRows } = await getClient()
+      .from(DB_TABLES.MINOR_CRITERIA)
+      .select('id, criteria_id, name, score_type, custom_min, custom_max, display_order')
+      .in('criteria_id', critList.map((c) => c.id))
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true })
+    const byCrit = new Map()
+    for (const m of minorRows ?? []) {
+      if (!byCrit.has(m.criteria_id)) byCrit.set(m.criteria_id, [])
+      byCrit.get(m.criteria_id).push({
+        id: m.id,
+        criteriaId: m.criteria_id,
+        name: m.name,
+        scoreType: m.score_type,
+        customMin: m.custom_min,
+        customMax: m.custom_max,
+      })
+    }
+    for (const c of critList) c.minorCriteria = byCrit.get(c.id) ?? []
+  }
+
+  // H2 note: the FINAL event ranking is the weighted combination of rounds
+  // (Σ round.value × round.weight) — the standard model. A round's `score_policy`
+  // (independent/cumulative) governs how that round's standing is computed for
+  // ADVANCEMENT decisions (see computeRoundStanding), not the weighted final;
+  // applying cumulative here as well would double-count across the round weights.
+  const { rankings, debug } = computeRankings({
+    scores,
+    contestants: contestantsRes.data ?? [],
+    criteria: critList,
+    rounds: roundsRes.data ?? [],
+    categories: categoriesRes.data ?? [],
+    config: calculationMethod
+      ? { ...(eventRes.data?.scoring_config ?? {}), calculationMethod }
+      : eventRes.data?.scoring_config,
+    roundCriteria,
+  })
+
+  // Map the engine's nested shape to the public shape the UI already uses.
+  // Ranking views read these calculated values; they never recalculate scores.
+  const publicRankings = rankings.map((row) => ({
+    contestantId: row.contestantId,
+    contestantName: row.contestantName,
+    contestantNumber: row.contestantNumber,
+    photo: row.photo,
+    rank: row.rank,
+    divisionId: row.divisionId ?? divisionId ?? null,
+    weightedScore: row.finalScore,
+    finalScore: row.finalScore,
+    rankingScore: roundId
+      ? row.perRound[roundId]?.value ?? 0
+      : row.finalScore,
+    rankingView: roundId ? 'round' : divisionId ? 'division' : 'overall',
+    status: (() => {
+      const criteria = Object.values(row.perCriterion)
+      if (!criteria.length || criteria.every((criterion) => (criterion.judgeCount ?? 0) === 0)) {
+        return 'Awaiting scores'
+      }
+      return criteria.every((criterion) => (criterion.judgeCount ?? 0) > 0)
+        ? 'Fully scored'
+        : 'Partially scored'
+    })(),
+    criteriaBreakdown: Object.values(row.perCriterion).map((c) => ({
+      criteriaId: c.criteriaId,
+      criteriaName: c.criteriaName,
+      percentage: c.percentage,
+      average: c.average,
+      judgeCount: c.judgeCount,
+      weightedContribution: Number(c.average ?? 0) * Number(c.percentage ?? 0) / 100,
+    })),
+    perRound: Object.values(row.perRound).map((round) => ({
+      ...round,
+      contribution: Number(round.value ?? 0) * Number(round.weight ?? 0) / 100,
+    })),
+    perCategory: Object.values(row.perCategory).map((category) => ({
+      ...category,
+      contribution: Number(category.value ?? 0) * Number(category.weight ?? 0) / 100,
+    })),
+  }))
+
+  if (roundId) {
+    const tieBreaker = mergeScoringConfig(eventRes.data?.scoring_config).tieBreaker
+    publicRankings.sort((left, right) =>
+      right.rankingScore - left.rankingScore ||
+      (tieBreaker === 'highest_criterion'
+        ? highestCriterionScore(right) - highestCriterionScore(left)
+        : 0),
+    )
+    publicRankings.forEach((row, index) => {
+      const previous = publicRankings[index - 1]
+      row.rank = previous &&
+        previous.rankingScore === row.rankingScore &&
+        (tieBreaker !== 'highest_criterion' || highestCriterionScore(previous) === highestCriterionScore(row))
+        ? previous.rank
+        : index + 1
+    })
+  }
+
+  return {
+    divisionId: divisionId ?? null,
+    roundId: roundId ?? null,
+    divisionsEnabled: Boolean(eventRes.data?.divisions_enabled),
+    rounds: (roundsRes.data ?? []).map((round) => ({
+      id: round.id,
+      name: round.name,
+      weight: Number(round.weight ?? 0),
+      displayOrder: round.display_order ?? 0,
+      finalizedAt: round.finalized_at ?? null,
+    })),
+    rankings: publicRankings,
+    criteriaTotalPercentage: debug.criterionTotals,
+    roundWeightTotal: debug.roundTotals,
+    categoryWeightTotal: debug.categoryTotals,
+    scoringConfig: mergeScoringConfig(eventRes.data?.scoring_config),
+    judges: {
+      total: totalJudges ?? 0,
+      submitted: submittedJudges ?? 0,
+    },
+  }
+}
+
+// ——— Phase 7: Results & awards ———
+
+// "Best in {category}" — the top per-category sub-score across the field.
+function computeCategoryAwards(rankings) {
+  const byCategory = new Map()
+  for (const row of rankings) {
+    for (const cat of row.perCategory ?? []) {
+      const cur = byCategory.get(cat.categoryId)
+      if (!cur || cat.value > cur.value) {
+        byCategory.set(cat.categoryId, {
+          categoryId: cat.categoryId,
+          categoryName: cat.categoryName,
+          value: cat.value,
+          contestantId: row.contestantId,
+          contestantName: row.contestantName,
+          contestantNumber: row.contestantNumber,
+        })
+      }
+    }
+  }
+  return [...byCategory.values()]
+}
+
+// Assemble the full results view real competitions announce: overall standings +
+// champion, per-division winners, per-category ("Best in …") awards, and the
+// finalized per-round standings (from the Phase 6 snapshots). Read-only — builds
+// on getLiveRankings and competition_round_results; changes no scoring behavior.
+export async function getCompetitionResults(eventId, organizerId) {
+  const event=await assertCompetitionEvent(eventId, organizerId)
+  if(event.official_rules_id){const workflow=await import('./competition-workflow.service.js');return workflow.competitionResults(eventId,organizerId)}
+
+  const overall = await getLiveRankings(eventId, organizerId)
+  const publishedCalculation = await getPublishedCalculation(eventId)
+
+  // Published tabulation snapshots are authoritative for official results.
+  // If the additive snapshot table is not migrated yet, or no result has been
+  // published, preserve the existing live-ranking behavior.
+  const publishedRows = Array.isArray(publishedCalculation?.result_snapshot)
+    ? publishedCalculation.result_snapshot
+    : null
+  const officialRankings = publishedRows?.length ? publishedRows : overall.rankings
+  const categoryAwards = computeCategoryAwards(officialRankings)
+  const champion = officialRankings[0] ?? null
+
+  // Per-division standings + winners.
+  const divisions = []
+  if (overall.divisionsEnabled) {
+    const { data: divList } = await getClient()
+      .from(DB_TABLES.COMPETITION_DIVISIONS)
+      .select('id, name')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: true })
+    for (const d of divList ?? []) {
+      const dr = publishedRows?.length
+        ? { rankings: publishedRows.filter((row) => row.divisionId === d.id) }
+        : await getLiveRankings(eventId, organizerId, { divisionId: d.id })
+      divisions.push({
+        divisionId: d.id,
+        name: d.name,
+        winner: dr.rankings[0] ?? null,
+        rankings: dr.rankings,
+      })
+    }
+  }
+
+  // Finalized per-round standings (Phase 6 snapshots).
+  const { data: rounds } = await getClient()
+    .from(DB_TABLES.COMPETITION_ROUNDS)
+    .select('id, name, display_order, finalized_at')
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+  const finalizedRounds = (rounds ?? []).filter((r) => r.finalized_at)
+
+  let roundStandings = []
+  if (finalizedRounds.length) {
+    const roundIds = finalizedRounds.map((r) => r.id)
+    const [{ data: results }, { data: contestants }] = await Promise.all([
+      getClient()
+        .from(DB_TABLES.COMPETITION_ROUND_RESULTS)
+        .select('round_id, contestant_id, rank, score, qualified')
+        .in('round_id', roundIds),
+      getClient()
+        .from(DB_TABLES.CONTESTANTS)
+        .select('id, name, contestant_number')
+        .eq('event_id', eventId),
+    ])
+    const nameById = new Map((contestants ?? []).map((c) => [c.id, c]))
+    roundStandings = finalizedRounds.map((r) => ({
+      roundId: r.id,
+      roundName: r.name,
+      finalizedAt: r.finalized_at,
+      standings: (results ?? [])
+        .filter((x) => x.round_id === r.id)
+        .sort((a, b) => a.rank - b.rank)
+        .map((x) => ({
+          contestantId: x.contestant_id,
+          contestantName: nameById.get(x.contestant_id)?.name ?? 'Unknown',
+          contestantNumber: nameById.get(x.contestant_id)?.contestant_number ?? null,
+          rank: x.rank,
+          score: Number(x.score),
+          qualified: x.qualified,
+        })),
+    }))
+  }
+
+  return {
+    divisionsEnabled: overall.divisionsEnabled,
+    champion,
+    overall: officialRankings,
+    publishedCalculationId: publishedCalculation?.id ?? null,
+    publishedAt: publishedCalculation?.published_at ?? null,
+    tabulationMethod: publishedCalculation?.configuration_snapshot?.method ?? null,
+    categoryAwards,
+    divisions,
+    rounds: roundStandings,
+  }
+}
+
+export async function getPageantAnalytics(eventId, organizerId) {
+  return getCompetitionAnalytics(eventId, organizerId)
+}
+
+export async function getCompetitionAnalytics(eventId, organizerId) {
+  const event=await assertCompetitionEvent(eventId,organizerId)
+  if(event.official_rules_id){const workflow=await import('./competition-workflow.service.js');return workflow.competitionAnalytics(eventId,organizerId)}
+
+  const rankings = await getLiveRankings(eventId, organizerId)
+  const publishedCalculation = await getPublishedCalculation(eventId)
+  const officialRankings = publishedCalculation?.result_snapshot?.length
+    ? publishedCalculation.result_snapshot
+    : rankings.rankings
+
+  const [contestantsRes, criteriaRes, categoriesRes, roundsRes, scoresRes, judgesRes] =
+    await Promise.all([
+      getClient().from(DB_TABLES.CONTESTANTS).select('id').eq('event_id', eventId),
+      getClient().from(DB_TABLES.CRITERIA).select('id, name').eq('event_id', eventId),
+      getClient().from(DB_TABLES.COMPETITION_CATEGORIES).select('id').eq('event_id', eventId),
+      getClient()
+        .from(DB_TABLES.COMPETITION_ROUNDS)
+        .select('id, name, display_order')
+        .eq('event_id', eventId)
+        .order('display_order', { ascending: true }),
+      getClient()
+        .from(DB_TABLES.JUDGE_SCORES)
+        .select('score, criteria_id, contestant_id, round_id, judge_id, competition_criteria!inner(event_id)')
+        .eq('competition_criteria.event_id', eventId),
+      getClient()
+        .from(DB_TABLES.EVENT_PARTICIPANTS)
+        .select('user_id, display_name, first_name, last_name, users (email)')
+        .eq('event_id', eventId)
+        .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
+    ])
+
+  if (contestantsRes.error) throw new ApiError(500, contestantsRes.error.message)
+  if (criteriaRes.error) throw new ApiError(500, criteriaRes.error.message)
+  if (categoriesRes.error) throw new ApiError(500, categoriesRes.error.message)
+  if (roundsRes.error) throw new ApiError(500, roundsRes.error.message)
+  if (scoresRes.error) throw new ApiError(500, scoresRes.error.message)
+  if (judgesRes.error) throw new ApiError(500, judgesRes.error.message)
+
+  const scores = scoresRes.data ?? []
+  const totalContestants = (contestantsRes.data ?? []).length
+
+  const criteriaMap = new Map(
+    (criteriaRes.data ?? []).map((criteria) => [criteria.id, criteria.name]),
+  )
+
+  const grouped = new Map()
+  for (const scoreRow of scores) {
+    const key = scoreRow.criteria_id
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key).push(Number(scoreRow.score))
+  }
+
+  const criteriaAnalytics = Array.from(criteriaMap.entries()).map(([criteriaId, criteriaName]) => {
+    const critScores = grouped.get(criteriaId) ?? []
+    const total = critScores.reduce((sum, score) => sum + score, 0)
+    const averageScore = critScores.length ? Math.round((total / critScores.length) * 100) / 100 : 0
+    const highestScore = critScores.length ? Math.max(...critScores) : 0
+    const lowestScore = critScores.length ? Math.min(...critScores) : 0
+
+    return {
+      criteriaId,
+      criteriaName,
+      averageScore,
+      highestScore,
+      lowestScore,
+    }
+  })
+
+  // Judge turnout — judges who have submitted any score vs. the full roster.
+  const totalJudges = rankings.judges.total ?? 0
+  const submittedJudges = rankings.judges.submitted ?? 0
+  const pendingJudges = Math.max(totalJudges - submittedJudges, 0)
+  const judgeCompletionRate =
+    totalJudges > 0 ? Math.round((submittedJudges / totalJudges) * 10000) / 100 : 0
+
+  // Per-category leaderboards — invert each contestant's per-category sub-score
+  // into { category → contestants[] }, sorted high-to-low within the category.
+  const categoryAgg = new Map()
+  for (const row of officialRankings ?? []) {
+    for (const cat of row.perCategory ?? []) {
+      if (!categoryAgg.has(cat.categoryId)) {
+        categoryAgg.set(cat.categoryId, {
+          categoryId: cat.categoryId,
+          categoryName: cat.categoryName,
+          contestants: [],
+        })
+      }
+      categoryAgg.get(cat.categoryId).contestants.push({
+        contestantId: row.contestantId,
+        contestantName: row.contestantName,
+        weightedScore: Number(cat.value ?? 0),
+      })
+    }
+  }
+  const categoryRankings = Array.from(categoryAgg.values()).map((cat) => ({
+    ...cat,
+    contestants: cat.contestants.sort((a, b) => b.weightedScore - a.weightedScore),
+  }))
+
+  // Per-judge activity — how many contestants each judge has FULLY scored.
+  // A contestant only counts once the judge has locked every one of its criteria
+  // (#6: competition_session_judge_scores.is_locked is derived = all criteria in),
+  // so partially-scored contestants don't inflate the count. Batch-scored events
+  // have no live-session rows, so we fall back to distinct contestants that have
+  // any score in the ranking store.
+  const contestantsByJudge = new Map()
+  for (const s of scores) {
+    if (!s.judge_id || !s.contestant_id) continue
+    if (!contestantsByJudge.has(s.judge_id)) contestantsByJudge.set(s.judge_id, new Set())
+    contestantsByJudge.get(s.judge_id).add(s.contestant_id)
+  }
+
+  const { data: sessionScoreRows } = await getClient()
+    .from('competition_session_judge_scores')
+    .select('judge_id, contestant_id, is_locked')
+    .eq('event_id', eventId)
+  const hasSessionRows = (sessionScoreRows ?? []).length > 0
+  const fullyLockedByJudge = new Map()
+  for (const r of sessionScoreRows ?? []) {
+    if (!r.is_locked || !r.judge_id || !r.contestant_id) continue
+    if (!fullyLockedByJudge.has(r.judge_id)) fullyLockedByJudge.set(r.judge_id, new Set())
+    fullyLockedByJudge.get(r.judge_id).add(r.contestant_id)
+  }
+
+  const judgeActivity = (judgesRes.data ?? []).map((j) => ({
+    judgeId: j.user_id,
+    judgeName: resolveDisplayName(j.first_name, j.last_name, j.users?.email ?? null),
+    email: j.users?.email ?? null,
+    submittedCount: hasSessionRows
+      ? fullyLockedByJudge.get(j.user_id)?.size ?? 0
+      : contestantsByJudge.get(j.user_id)?.size ?? 0,
+    totalAssigned: totalContestants,
+  }))
+
+  // Per-round submitted-score counts.
+  const scoresByRound = new Map()
+  for (const s of scores) {
+    if (!s.round_id) continue
+    scoresByRound.set(s.round_id, (scoresByRound.get(s.round_id) ?? 0) + 1)
+  }
+  const rounds = (roundsRes.data ?? []).map((r) => ({
+    roundId: r.id,
+    name: r.name,
+    submittedCount: scoresByRound.get(r.id) ?? 0,
+  }))
+
+  return {
+    totalContestants,
+    totalJudges,
+    totalCategories: (categoriesRes.data ?? []).length,
+    totalRounds: (roundsRes.data ?? []).length,
+    scoresSubmitted: scores.length,
+    judgeCompletionRate,
+    judgeTurnout: {
+      totalJudges,
+      submittedCount: submittedJudges,
+      pendingCount: pendingJudges,
+      turnoutPercentage: judgeCompletionRate,
+    },
+    rankings: officialRankings,
+    isOfficial: Boolean(publishedCalculation?.result_snapshot?.length),
+    publishedAt: publishedCalculation?.published_at ?? null,
+    tabulationMethod: publishedCalculation?.configuration_snapshot?.method ?? null,
+    categoryRankings,
+    judgeActivity,
+    rounds,
+    criteriaAnalytics,
+  }
+}

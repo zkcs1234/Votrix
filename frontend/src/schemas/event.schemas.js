@@ -47,7 +47,7 @@ export const electionEventSchemaEdit = electionEventSchema.refine(
 export const electionEventSchemaStep1 = electionEventSchemaEdit
 
 export const pageantEventSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200, 'Title must be 200 characters or less'),
+  title: z.string().trim().min(1, 'Title is required').max(200, 'Title must be 200 characters or less'),
   description: z.string().max(2000, 'Description must be 2000 characters or less').optional(),
   startDate: z.string().min(1, 'Start date is required').refine(isValidDateString, 'Invalid start date'),
   endDate: z.string().min(1, 'End date is required').refine(isValidDateString, 'Invalid end date'),

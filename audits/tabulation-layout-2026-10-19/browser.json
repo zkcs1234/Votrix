@@ -1,0 +1,52 @@
+{
+  "passed": true,
+  "fixtureOnly": true,
+  "databaseTouched": false,
+  "contestantCount": 12,
+  "judgeCount": 7,
+  "criterionCount": 5,
+  "layouts": [
+    {
+      "width": 1440,
+      "pageWidth": 1440,
+      "matrixWidth": 1383,
+      "matrixContentWidth": 1383,
+      "rowHeight": 25.34375,
+      "overviewCardHeight": 175.671875,
+      "factFontSize": 10.72,
+      "panelCount": 0
+    },
+    {
+      "width": 1024,
+      "pageWidth": 1009,
+      "matrixWidth": 952,
+      "matrixContentWidth": 980,
+      "rowHeight": 25.34375,
+      "overviewCardHeight": 173.515625,
+      "factFontSize": 10.72,
+      "panelCount": 0
+    },
+    {
+      "width": 390,
+      "pageWidth": 375,
+      "matrixWidth": 318,
+      "matrixContentWidth": 980,
+      "rowHeight": 25.34375,
+      "overviewCardHeight": 173.515625,
+      "factFontSize": 10.72,
+      "panelCount": 0
+    },
+    {
+      "width": 320,
+      "pageWidth": 305,
+      "matrixWidth": 248,
+      "matrixContentWidth": 980,
+      "rowHeight": 25.34375,
+      "overviewCardHeight": 173.515625,
+      "factFontSize": 10.72,
+      "panelCount": 0
+    }
+  ],
+  "distinctSubsections": true,
+  "nestedActionTables": false
+}

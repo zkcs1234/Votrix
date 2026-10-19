@@ -1,0 +1,18 @@
+#tabulation-breakdown { border: 1px solid var(--v-border); border-radius: .75rem; }
+#tabulation-breakdown > div:first-child > h3 { font-size: 1.1rem; }
+.v-tab-dialog-actions { display: flex; justify-content: flex-end; }
+.v-tab-breakdown-intro { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .65rem; margin-bottom: .75rem; font-size: .85rem; }
+.v-tab-breakdown-tabs { display: flex; gap: .4rem; overflow-x: auto; margin: 1.25rem 0; padding-bottom: .25rem; }
+.v-tab-breakdown-tabs button { padding: .5rem .8rem; white-space: nowrap; color: var(--v-primary); background: var(--v-primary-soft); border-radius: .4rem; font-size: .8rem; }
+.v-tab-breakdown-tabs button[aria-selected=true] { color: white; background: var(--v-primary); }
+.v-tab-breakdown-panel { display: grid; gap: .85rem; }
+.v-tab-breakdown-panel h4 { font-size: .9rem; font-weight: 650; color: var(--v-text); }
+.v-tab-summary-row { background: var(--v-primary-soft); font-weight: 650; }
+.v-tab-number { font-variant-numeric: tabular-nums; font-weight: 600; }
+.v-tab-formula { padding: 1rem; border: 1px solid var(--v-border); border-radius: .5rem; background: var(--v-primary-soft); color: var(--v-primary); font-size: .85rem; line-height: 1.7; }
+.v-tab-breakdown-totals { display: grid; gap: .6rem; font-size: .85rem; }
+.v-tab-breakdown-totals > div { display: flex; justify-content: space-between; gap: 1rem; }
+.v-tab-breakdown-totals dd { font-weight: 650; font-variant-numeric: tabular-nums; }
+.v-tab-minor-trace { font-size: .8rem; }
+.v-tab-minor-trace > summary { cursor: pointer; color: var(--v-primary); }
+.v-tab-minor-trace > div { margin-top: .75rem; }

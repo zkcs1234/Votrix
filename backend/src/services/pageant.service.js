@@ -39,6 +39,7 @@ import {
 import { deleteDraft } from './draft.service.js'
 import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
 import { getActiveSession } from './competition-session.service.js'
+import { activeSessionsForOrganizer } from './competition-native-scoring.service.js'
 
 
 
@@ -50,6 +51,8 @@ function mapContestant(row) {
     name: row.name,
     photo: row.photo,
     contestantNumber: row.contestant_number,
+    entryType: row.entry_type ?? null,
+    entryLabel: row.entry_label ?? null,
   }
 }
 
@@ -62,6 +65,9 @@ function mapCriteria(row) {
     percentage: Number(row.percentage),
     minScore: Number(row.min_score),
     maxScore: Number(row.max_score),
+    isActive: row.is_active !== false,
+    is_active: row.is_active !== false,
+    displayOrder: row.display_order ?? 0,
   }
 }
 
@@ -104,6 +110,12 @@ async function getOrCreateOrg(organizerId) {
 
 // ——— Dashboard & events ———
 
+export function competitionDashboardEventStatus(status, hasActiveSession) {
+  return hasActiveSession && [EVENT_STATUS.DRAFT, EVENT_STATUS.SCHEDULED].includes(status)
+    ? EVENT_STATUS.ACTIVE
+    : status
+}
+
 export async function getOrganizerDashboard(organizerId) {
   const org = await getOrCreateOrg(organizerId)
   if (!org?.id) {
@@ -130,8 +142,11 @@ export async function getOrganizerDashboard(organizerId) {
   // instead of one blended rate across every competition.
   const perEvent = new Map(eventIds.map((id) => [id, { judges: 0, completed: 0 }]))
 
+  let legacyActiveEventIds = new Set()
+  let nativeActiveSessions = []
+  let nativeActiveEventIds = new Set()
   if (eventIds.length) {
-    const [contestantsRes, judgeRowsRes, scoresRes, sessionsRes] = await Promise.all([
+    const [contestantsRes, judgeRowsRes, scoresRes, sessionsRes, nativeSessions] = await Promise.all([
       getClient()
         .from(DB_TABLES.CONTESTANTS)
         .select('*', { count: 'exact', head: true })
@@ -150,6 +165,7 @@ export async function getOrganizerDashboard(organizerId) {
         .select('event_id, status')
         .in('event_id', eventIds)
         .eq('status', 'active'),
+      activeSessionsForOrganizer(organizerId),
     ])
 
     if (contestantsRes.error) throw new ApiError(500, contestantsRes.error.message)
@@ -160,6 +176,9 @@ export async function getOrganizerDashboard(organizerId) {
     totalContestants = contestantsRes.count ?? 0
     scoresSubmitted = scoresRes.count ?? 0
     activeSessions = sessionsRes.data?.length ?? 0
+    nativeActiveSessions = nativeSessions.filter((session) => eventIds.includes(session.eventId))
+    activeSessions += nativeActiveSessions.length
+    nativeActiveEventIds = new Set(nativeActiveSessions.map((session) => session.eventId))
 
     for (const row of judgeRowsRes.data ?? []) {
       const bucket = perEvent.get(row.event_id)
@@ -179,6 +198,7 @@ export async function getOrganizerDashboard(organizerId) {
         sessionsByEvent.set(session.event_id, session.status)
       }
     }
+    legacyActiveEventIds = new Set(sessionsByEvent.keys())
 
     // Enrich events with session status
     events.forEach((event) => {
@@ -194,7 +214,10 @@ export async function getOrganizerDashboard(organizerId) {
     return {
       id: e.id,
       title: e.title,
-      status: e.status,
+      status: competitionDashboardEventStatus(
+        e.status,
+        legacyActiveEventIds.has(e.id) || nativeActiveEventIds.has(e.id),
+      ),
       registered: b.judges,
       participated: b.completed,
       rate: b.judges > 0 ? Math.round((b.completed / b.judges) * 10000) / 100 : 0,
@@ -243,9 +266,7 @@ export async function createPageantEvent(organizerId, payload) {
 export async function createCompetitionEvent(organizerId, payload) {
   const org = await getOrCreateOrg(organizerId)
 
-  const { data, error } = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .insert({
+  const createRow = {
       organization_id: org.id,
       title: payload.title,
       description: payload.description ?? null,
@@ -258,11 +279,12 @@ export async function createCompetitionEvent(organizerId, payload) {
       // Phase 1: optional sub-type label (display/template only). Nullable.
       competition_type: payload.competitionType ?? null,
       scoring_enabled: false,
-    })
-    .select('*')
-    .single()
-
-  if (error) throw new ApiError(500, error.message)
+    }
+  const result = payload.idempotencyKey
+    ? await getClient().rpc('competition_create_event', {p_actor:organizerId,p_organization:org.id,p_request:payload.idempotencyKey,p_payload:createRow})
+    : await getClient().from(DB_TABLES.EVENTS).insert(createRow).select('*').single()
+  const {data,error}=result
+  if (error) throw new ApiError(['42P01','PGRST202','42703'].includes(error.code)?503:/FORBIDDEN/.test(error.message)?403:/CONFLICT/.test(error.message)?409:/INVALID|REQUIRED/.test(error.message)?400:500, ['42P01','PGRST202','42703'].includes(error.code)?'Apply migration 102 before retry-safe competition creation. No event was created.':error.message)
 
   // Competition type is stored as a LABEL only (see competition_type). We do not
   // auto-seed any structure — the organizer configures rounds, criteria, etc.
@@ -293,6 +315,7 @@ export async function updateCompetitionEvent(eventId, organizerId, payload) {
 
   assertSetupEditable(event)
   assertEventUpdateAllowed(event, payload)
+  if (event.competition_created_at) throw new ApiError(409, 'Competition creation is complete; its reviewed setup is frozen')
 
   // Capture old image_asset_id before updating so we can clean it up if replaced
   const oldAssetId = event.image_asset_id ?? null
@@ -346,7 +369,8 @@ export async function getCompetitionEvent(eventId, organizerId) {
 }
 
 export async function setEventScoring(eventId, organizerId, scoringEnabled) {
-  await assertCompetitionEvent(eventId, organizerId)
+  const event = await assertCompetitionEvent(eventId, organizerId)
+  if (scoringEnabled || event.official_rules_id) throw new ApiError(409,'Use acknowledged rules and Live Control session access to operate scoring')
 
   if (scoringEnabled) {
     // Use the foundation validator so category, round, and criterion weights
@@ -404,6 +428,9 @@ export async function publishCompetitionEvent(eventId, organizerId) {
   if (event.status !== 'draft') {
     throw new ApiError(400, 'This event has already been published')
   }
+  const { getCompetitionFoundation } = await import('./competition.service.js')
+  const { assertCriteriaReady } = await import('./competition-workflow.service.js')
+  assertCriteriaReady(await getCompetitionFoundation(eventId, organizerId))
 
   const { count: contestantCount, error: contestantErr } = await getClient()
     .from(DB_TABLES.CONTESTANTS)
@@ -474,6 +501,7 @@ export async function publishCompetitionEvent(eventId, organizerId) {
  */
 export async function unpublishCompetitionEvent(eventId, organizerId) {
   const event = await assertCompetitionEvent(eventId, organizerId)
+  if(event.official_rules_id) throw new ApiError(409,'Acknowledged scoring rules require an independently approved amendment')
 
   if (!canUnpublishEventStatus(event.status)) {
     throw new ApiError(400, 'Only a scheduled event can be unpublished. Scoring has already gone live or the event is closed.')
@@ -505,7 +533,7 @@ export async function listContestants(eventId, organizerId, filters = {}) {
 
   let query = getClient()
     .from(DB_TABLES.CONTESTANTS)
-    .select('id, event_id, division_id, name, photo, contestant_number')
+    .select('*')
     .eq('event_id', eventId)
 
   if (filters.divisionId !== undefined) {
@@ -519,17 +547,21 @@ export async function listContestants(eventId, organizerId, filters = {}) {
 }
 
 export async function createContestant(eventId, organizerId, payload) {
-  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  const event = await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(event)
+  if(event.divisions_enabled && !payload.divisionId)throw new ApiError(400,'Select a configured division for this entry')
+  if(!event.divisions_enabled && payload.divisionId)throw new ApiError(400,'Division selection is disabled for this event')
 
   if (payload.divisionId) {
     const { data: div, error: divErr } = await getClient()
       .from(DB_TABLES.COMPETITION_DIVISIONS)
-      .select('id')
+      .select('id, is_active')
       .eq('id', payload.divisionId)
       .eq('event_id', eventId)
       .maybeSingle()
     if (divErr) throw new ApiError(500, divErr.message)
     if (!div) throw new ApiError(400, 'Division does not belong to this event')
+    if(div.is_active===false)throw new ApiError(400,'Select an active division')
   }
 
   const { data, error } = await getClient()
@@ -540,6 +572,8 @@ export async function createContestant(eventId, organizerId, payload) {
       name: payload.name,
       photo: payload.photo ?? null,
       contestant_number: payload.contestantNumber,
+      entry_type: payload.entryType ?? 'individual',
+      entry_label: payload.entryLabel ?? null,
     })
     .select('*')
     .single()
@@ -566,17 +600,25 @@ export async function createContestant(eventId, organizerId, payload) {
 }
 
 export async function updateContestant(eventId, organizerId, contestantId, payload) {
-  assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  const event = await assertCompetitionEvent(eventId, organizerId)
+  assertSetupEditable(event)
+  const {data:existing,error:existingError}=await getClient().from(DB_TABLES.CONTESTANTS).select('id,division_id').eq('id',contestantId).eq('event_id',eventId).maybeSingle()
+  if(existingError)throw new ApiError(503,'Could not verify the entry registration')
+  if(!existing)throw new ApiError(404,'Contestant not found')
+  const effectiveDivision=payload.divisionId===undefined?existing.division_id:payload.divisionId
+  if(event.divisions_enabled && !effectiveDivision)throw new ApiError(400,'Select a configured division for this entry')
+  if(!event.divisions_enabled && effectiveDivision && effectiveDivision!==existing.division_id)throw new ApiError(400,'Division selection is disabled for this event')
 
   if (payload.divisionId !== undefined && payload.divisionId !== null) {
     const { data: div, error: divErr } = await getClient()
       .from(DB_TABLES.COMPETITION_DIVISIONS)
-      .select('id')
+      .select('id, is_active')
       .eq('id', payload.divisionId)
       .eq('event_id', eventId)
       .maybeSingle()
     if (divErr) throw new ApiError(500, divErr.message)
     if (!div) throw new ApiError(400, 'Division does not belong to this event')
+    if(div.is_active===false && effectiveDivision!==existing.division_id)throw new ApiError(400,'Select an active division')
   }
 
   // Capture old image_asset_id before updating so we can clean it up if replaced
@@ -591,6 +633,8 @@ export async function updateContestant(eventId, organizerId, contestantId, paylo
   }
 
   const updates = {}
+  if (payload.entryType !== undefined) updates.entry_type = payload.entryType
+  if (payload.entryLabel !== undefined) updates.entry_label = payload.entryLabel
   if (payload.name !== undefined) updates.name = payload.name
   if (payload.photo !== undefined) updates.photo = payload.photo
   if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
@@ -627,6 +671,9 @@ export async function updateContestant(eventId, organizerId, contestantId, paylo
 
 export async function deleteContestant(eventId, organizerId, contestantId) {
   assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
+  const {count:referenced,error:referenceError}=await getClient().from(DB_TABLES.JUDGE_SCORES).select('id',{count:'exact',head:true}).eq('contestant_id',contestantId)
+  if(referenceError)throw new ApiError(503,'Could not verify historical score references')
+  if(referenced)throw new ApiError(409,'Scored records must be preserved; disable them instead')
 
   // Fetch contestant image_asset_id before deleting for cleanup
   const { data: contestantData } = await getClient()
@@ -691,14 +738,14 @@ export async function listCriteria(eventId, organizerId, filters = {}) {
 
   let query = getClient()
     .from(DB_TABLES.CRITERIA)
-    .select('id, event_id, division_id, name, percentage, min_score, max_score')
+    .select('*')
     .eq('event_id', eventId)
 
   if (filters.divisionId !== undefined) {
     query = query.eq('division_id', filters.divisionId)
   }
 
-  const { data, error } = await query.order('created_at', { ascending: true })
+  const { data, error } = await query.order('display_order', {ascending:true}).order('created_at', { ascending: true })
 
   if (error) throw new ApiError(500, error.message)
   const criteria = (data ?? []).map(mapCriteria)
@@ -811,6 +858,9 @@ export async function updateMinorCriteria(eventId, organizerId, criteriaId, mino
 }
 
 export async function deleteMinorCriteria(eventId, organizerId, criteriaId, minorId) {
+  const {count:referenced,error:referenceError}=await getClient().from(DB_TABLES.JUDGE_SCORES).select('id',{count:'exact',head:true}).eq('minor_criteria_id',minorId)
+  if(referenceError)throw new ApiError(503,'Could not verify historical score references')
+  if(referenced)throw new ApiError(409,'Scored records must be preserved; disable them instead')
   assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
   const { error } = await getClient()
     .from(DB_TABLES.MINOR_CRITERIA)
@@ -843,7 +893,7 @@ export async function createCriteria(eventId, organizerId, payload) {
       const { data: crits } = await getClient()
         .from(DB_TABLES.CRITERIA)
         .select('percentage')
-        .eq('event_id', eventId)
+        .eq('event_id', eventId).eq('is_active',true)
       const total = (crits ?? []).reduce((s, c) => s + Number(c.percentage ?? 0), 0)
       const projected = total + Number(payload.percentage)
       if (projected > 100 + 0.01) {
@@ -906,6 +956,8 @@ export async function updateCriteria(eventId, organizerId, criteriaId, payload) 
   }
 
   const updates = {}
+  if (payload.isActive !== undefined) updates.is_active = payload.isActive
+  if (payload.displayOrder !== undefined) updates.display_order = payload.displayOrder
   if (payload.name !== undefined) updates.name = payload.name
   if (payload.percentage !== undefined) updates.percentage = payload.percentage
   if (payload.minScore !== undefined) updates.min_score = payload.minScore
@@ -933,6 +985,9 @@ export async function updateCriteria(eventId, organizerId, criteriaId, payload) 
 }
 
 export async function deleteCriteria(eventId, organizerId, criteriaId) {
+  const {count:referenced,error:referenceError}=await getClient().from(DB_TABLES.JUDGE_SCORES).select('id',{count:'exact',head:true}).eq('criteria_id',criteriaId)
+  if(referenceError)throw new ApiError(503,'Could not verify historical score references')
+  if(referenced)throw new ApiError(409,'Scored records must be preserved; disable them instead')
   assertSetupEditable(await assertCompetitionEvent(eventId, organizerId))
 
   const { error } = await getClient()
@@ -1353,7 +1408,7 @@ export async function listJudges(eventId, organizerId) {
 export async function assertJudgeEnrolled(eventId, judgeId) {
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id, event_id, user_id, has_scored')
+    .select('id, event_id, user_id, has_scored, events!inner(status)')
     .eq('event_id', eventId)
     .eq('user_id', judgeId)
     .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
@@ -1568,6 +1623,7 @@ export async function submitJudgeScores(eventId, judgeId, scores) {
   await assertJudgeEnrolled(eventId, judgeId)
 
   const event = await getEventById(eventId)
+  if(event.official_rules_id) throw new ApiError(409,'Use the versioned criterion Lock and Submit Round endpoints')
   if (!isCompetitionScoringOpen(event)) {
     if (!event.scoring_enabled) {
       throw new ApiError(403, 'Scoring is not open for this event')
@@ -1736,43 +1792,34 @@ export async function listJudgePageantEvents(judgeId) {
 }
 
 export async function listJudgeCompetitionEvents(judgeId) {
-  const { data, error } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select(
-      `
-      has_scored,
-      events!inner (
-        id,
-        title,
-        description,
-        banner,
-        scoring_enabled,
-        status,
-        event_type,
-        organization_id,
-        organizations (
-          id,
-          organization_name,
-          users ( organization_logo )
-        )
-      )
-    `,
-    )
-    .eq('user_id', judgeId)
-    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
-
-  if (error) throw new ApiError(500, error.message)
-
-  return (data ?? [])
-    .filter((r) => COMPETITION_SCORING_EVENT_TYPES.has(r.events?.event_type))
-    .map((r) => ({
-      ...mapEvent(r.events),
-      // mapEvent omits scoring_enabled, but the voter dashboard classifies a
-      // competition as "Scoring open" from it (set true by startSession) — so it
-      // must travel through, or the event stays stuck on "Waiting to open".
-      scoringEnabled: Boolean(r.events?.scoring_enabled),
-      hasScored: r.has_scored,
-    }))
+  const { data, error } = await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('*,events!inner (*,organizations (id,organization_name,users (organization_logo)))')
+    .eq('user_id',judgeId).eq('participant_type',PARTICIPANT_TYPES.COMPETITION_JUDGE).eq('is_active',true)
+  if (error) throw new ApiError(500,error.message)
+  const modernIds = (data ?? []).filter(r => r.events?.official_rules_id).map(r => r.events.id)
+  let sessions = [], submissions = []
+  if (modernIds.length) {
+    const [sessionResult, submissionResult] = await Promise.all([
+      getClient().from('competition_sessions').select('*').in('event_id',modernIds).order('started_at',{ascending:false}),
+      getClient().from('competition_round_submissions').select('*').in('event_id',modernIds).eq('judge_id',judgeId).eq('status','submitted'),
+    ])
+    if (sessionResult.error || submissionResult.error) throw new ApiError(503,'Competition workflow migrations 087-094 are required')
+    sessions = sessionResult.data ?? []; submissions = submissionResult.data ?? []
+  }
+  const rows=(data ?? []).filter(r => COMPETITION_SCORING_EVENT_TYPES.has(r.events?.event_type))
+  const nativeByEvent=new Map()
+  const native=await import('./competition-native-scoring.service.js')
+  if(native.nativeScoringEnabled())for(const row of rows){
+    const discovery=await native.scoringChoicesResponse(row.events.id,judgeId)
+    if(discovery.nativeEvent)nativeByEvent.set(row.events.id,await native.nativeJudgeNavigation(row.events.id,judgeId))
+  }
+  return rows.map(r => {
+    const session = sessions.find(s => s.event_id === r.events.id)
+    const submitted = submissions.some(s => s.session_id === session?.id && s.round_id === session?.current_round_id && s.rules_version === r.events.official_rules_id)
+    return {...mapEvent(r.events),scoringEnabled:Boolean(r.events.scoring_enabled),hasScored:r.events.official_rules_id ? submitted : r.has_scored,
+      ...(nativeByEvent.has(r.events.id)?{nativeContexts:nativeByEvent.get(r.events.id)}:{}),
+      workflow:r.events.official_rules_id ? {sessionStatus:session?.status,submissionWindow:session?.submission_window,roundSubmitted:submitted,reviewer:r.judge_role==='score_reviewer'} : null}
+  })
 }
 
 // ——— Live rankings ———
@@ -1781,13 +1828,13 @@ function highestCriterionScore(row) {
   return Math.max(...(row.criteriaBreakdown ?? []).map((criterion) => Number(criterion.average ?? 0)), 0)
 }
 
-async function getPublishedCalculation(eventId) {
+async function getPublishedCalculation(eventId, roundId = null) {
   const { data, error } = await getClient()
     .from('competition_result_calculations')
     .select('id, published_at, configuration_snapshot, result_snapshot')
     .eq('event_id', eventId)
     .eq('status', 'published')
-    .is('round_id', null)
+    .filter('round_id', roundId ? 'eq' : 'is', roundId)
     .order('published_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -1797,7 +1844,7 @@ async function getPublishedCalculation(eventId) {
 
 export async function getOfficialRankings(eventId, organizerId, options = {}) {
   const live = await getLiveRankings(eventId, organizerId, options)
-  const published = !options.roundId ? await getPublishedCalculation(eventId) : null
+  const published = await getPublishedCalculation(eventId, options.roundId ?? null)
   if (!published?.result_snapshot?.length) {
     return { ...live, isOfficial: false, publishedAt: null, tabulationMethod: null }
   }
@@ -1807,6 +1854,7 @@ export async function getOfficialRankings(eventId, organizerId, options = {}) {
   let previousScore = null
   let previousRank = 0
   const scopedOfficialRows = officialRows.map((row, index) => {
+    if(published.configuration_snapshot?.ruleVersion!=null || published.configuration_snapshot?.method==='manual')return row
     const score = Number(row.finalScore ?? row.weightedScore ?? 0)
     const rank = score === previousScore ? previousRank : index + 1
     previousScore = score
@@ -1823,7 +1871,13 @@ export async function getOfficialRankings(eventId, organizerId, options = {}) {
 }
 
 export async function getLiveRankings(eventId, organizerId, { divisionId = null, roundId = null, calculationMethod = null } = {}) {
-  await assertCompetitionEvent(eventId, organizerId)
+  const currentEvent=await assertCompetitionEvent(eventId, organizerId)
+  if(currentEvent.official_rules_id){
+    const workflow=await import('./competition-workflow.service.js')
+    const state=await workflow.tabulationData(eventId,organizerId,{roundId})
+    if(calculationMethod&&calculationMethod!==state.rules.scoringConfig.calculationMethod) throw new ApiError(409,'Official method is frozen')
+    return {rankings:workflow.publicResults(state).filter(r=>!divisionId||r.divisionId===divisionId),scoringConfig:state.rules.scoringConfig,rounds:state.rules.rounds,judges:{total:state.rules.judges.filter(j=>j.role!=='score_reviewer').length,submitted:new Set(state.submissions.map(s=>s.judge_id)).size},divisionsEnabled:!!state.rules.divisions.length,criteriaTotalPercentage:100,roundWeightTotal:state.rules.rounds.reduce((n,r)=>n+Number(r.weight),0),categoryWeightTotal:state.rules.categories.reduce((n,c)=>n+Number(c.weight),0),isProvisional:!state.ready}
+  }
 
   // Build division-aware queries
   let contestantsQuery = getClient().from(DB_TABLES.CONTESTANTS).select('id, event_id, division_id, name, photo, contestant_number').eq('event_id', eventId)
@@ -1961,11 +2015,20 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null,
     weightedScore: row.finalScore,
     finalScore: row.finalScore,
     rankingScore: roundId
-      ? row.perRound[roundId]?.value ?? 0
+      ? row.perRound?.[roundId]?.value ?? row.finalScore
       : row.finalScore,
+    ...(row.placementTotal !== undefined ? {
+      placementTotal: row.placementTotal,
+      averagePlacement: row.averagePlacement,
+      averageRawScore: row.averageRawScore,
+      judgeCount: row.judgeCount,
+    } : {}),
     rankingView: roundId ? 'round' : divisionId ? 'division' : 'overall',
     status: (() => {
-      const criteria = Object.values(row.perCriterion)
+      const criteria = Object.values(row.perCriterion ?? {})
+      if (row.placementTotal !== undefined) {
+        return row.judgeCount > 0 ? row.judgeCount >= (totalJudges ?? 0) ? 'Fully scored' : 'Partially scored' : 'Awaiting scores'
+      }
       if (!criteria.length || criteria.every((criterion) => (criterion.judgeCount ?? 0) === 0)) {
         return 'Awaiting scores'
       }
@@ -1973,7 +2036,7 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null,
         ? 'Fully scored'
         : 'Partially scored'
     })(),
-    criteriaBreakdown: Object.values(row.perCriterion).map((c) => ({
+    criteriaBreakdown: Object.values(row.perCriterion ?? {}).map((c) => ({
       criteriaId: c.criteriaId,
       criteriaName: c.criteriaName,
       percentage: c.percentage,
@@ -1981,11 +2044,11 @@ export async function getLiveRankings(eventId, organizerId, { divisionId = null,
       judgeCount: c.judgeCount,
       weightedContribution: Number(c.average ?? 0) * Number(c.percentage ?? 0) / 100,
     })),
-    perRound: Object.values(row.perRound).map((round) => ({
+    perRound: Object.values(row.perRound ?? {}).map((round) => ({
       ...round,
       contribution: Number(round.value ?? 0) * Number(round.weight ?? 0) / 100,
     })),
-    perCategory: Object.values(row.perCategory).map((category) => ({
+    perCategory: Object.values(row.perCategory ?? {}).map((category) => ({
       ...category,
       contribution: Number(category.value ?? 0) * Number(category.weight ?? 0) / 100,
     })),
@@ -2060,7 +2123,8 @@ function computeCategoryAwards(rankings) {
 // finalized per-round standings (from the Phase 6 snapshots). Read-only — builds
 // on getLiveRankings and competition_round_results; changes no scoring behavior.
 export async function getCompetitionResults(eventId, organizerId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  const event=await assertCompetitionEvent(eventId, organizerId)
+  if(event.official_rules_id){const workflow=await import('./competition-workflow.service.js');return workflow.competitionResults(eventId,organizerId)}
 
   const overall = await getLiveRankings(eventId, organizerId)
   const publishedCalculation = await getPublishedCalculation(eventId)
@@ -2154,6 +2218,9 @@ export async function getPageantAnalytics(eventId, organizerId) {
 }
 
 export async function getCompetitionAnalytics(eventId, organizerId) {
+  const event=await assertCompetitionEvent(eventId,organizerId)
+  if(event.official_rules_id){const workflow=await import('./competition-workflow.service.js');return workflow.competitionAnalytics(eventId,organizerId)}
+
   const rankings = await getLiveRankings(eventId, organizerId)
   const publishedCalculation = await getPublishedCalculation(eventId)
   const officialRankings = publishedCalculation?.result_snapshot?.length

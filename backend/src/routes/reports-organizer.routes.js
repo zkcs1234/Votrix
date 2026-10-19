@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import * as ctrl from '../controllers/reports-organizer.controller.js'
+import { requireLegacyCompetitionContext } from '../middleware/competition-context.js'
 
 const router = Router()
 
@@ -8,6 +9,7 @@ router.get('/overview/export', ctrl.exportOverview)
 router.get('/election/:eventId', ctrl.getElectionReport)
 router.get('/election/:eventId/export', ctrl.exportElectionReport)
 // Competition reports (formerly 'pageant')
+router.use('/competition/:eventId', requireLegacyCompetitionContext())
 router.get('/competition/:eventId', ctrl.getCompetitionReport)
 router.get('/competition/:eventId/export', ctrl.exportCompetitionReport)
 router.get('/polling/:eventId', ctrl.getPollingReport)

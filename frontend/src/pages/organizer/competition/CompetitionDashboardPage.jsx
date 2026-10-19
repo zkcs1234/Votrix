@@ -12,6 +12,7 @@ import { useSocketEvent } from '@/hooks/useSocketEvent'
 export const COMPETITION_DASHBOARD_KEY = ['competition', 'dashboard']
 
 export default function CompetitionDashboardPage() {
+  const nativeSetupEnabled = import.meta.env.VITE_COMPETITION_NATIVE_SETUP_ENABLED === 'true'
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: COMPETITION_DASHBOARD_KEY,
@@ -25,6 +26,7 @@ export default function CompetitionDashboardPage() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: COMPETITION_DASHBOARD_KEY })
   useSocketEvent('rankings:updated', invalidate)
   useSocketEvent('session:status-changed', invalidate)
+  useSocketEvent('competition:native-invalidated', invalidate)
 
   // Show nothing under 300ms
   if (isLoading && !showLoader) return null
@@ -47,14 +49,17 @@ export default function CompetitionDashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Competition Scoring dashboard"
-        description="Manage contestants, criteria, and judge scoring."
+        description={nativeSetupEnabled ? 'Choose an event to configure its independent competitions, judges, and scoring.' : 'Manage contestants, criteria, and judge scoring.'}
         actions={
+          <div className="flex flex-wrap gap-2">
+          {nativeSetupEnabled && <Link to="/organizer/competition/events"><Button variant="secondary">Manage competitions</Button></Link>}
           <Link to="/organizer/competition/events/new">
             <Button>
               <Plus className="h-4 w-4" strokeWidth={2} />
               Create Event
             </Button>
           </Link>
+          </div>
         }
       />
 
@@ -70,7 +75,7 @@ export default function CompetitionDashboardPage() {
       <EventStatsTable
         title="Judge completion by event"
         events={data?.eventBreakdown ?? []}
-        linkFor={(e) => `/organizer/competition/events/${e.id}/contestants`}
+        linkFor={(e) => `/organizer/competition/events/${e.id}/${nativeSetupEnabled ? 'workspace' : 'contestants'}`}
         registeredLabel="Judges"
         participatedLabel="Submitted"
         rateLabel="Completion"

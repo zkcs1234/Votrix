@@ -3,6 +3,8 @@ import { DB_TABLES, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.j
 import { assertOrganizerOwnsEvent } from './event.service.js'
 import { assertSetupEditable } from '../utils/eventLifecycle.js'
 import { recordEventActivity } from '../foundation/activity.js'
+import { ApiError } from '../utils/ApiError.js'
+import { validateUUID } from '../utils/sanitize.js'
 
 /**
  * Competition Division Service
@@ -125,6 +127,7 @@ export async function createDivision(eventId, organizerId, payload) {
       description: description?.trim() || null,
       display_order: displayOrder ?? 0,
       is_active: isActive,
+      row_color: payload.rowColor ?? null,
     })
     .select('*')
     .single()
@@ -161,6 +164,7 @@ export async function updateDivision(eventId, divisionId, organizerId, payload) 
 
   const { name, description, displayOrder, isActive } = payload
   const updates = {}
+  if (payload.rowColor !== undefined) updates.row_color = payload.rowColor
 
   if (name !== undefined) {
     if (!name || name.trim().length === 0) {
@@ -204,6 +208,21 @@ export async function updateDivision(eventId, divisionId, organizerId, payload) 
   })
 
   return updated
+}
+
+export async function reorderDivisions(eventId, organizerId, divisionIds) {
+  await assertCompetitionEvent(eventId)
+  assertSetupEditable(await assertEventOwnership(eventId, organizerId))
+  if (!Array.isArray(divisionIds) || new Set(divisionIds).size !== divisionIds.length) throw new ApiError(400, 'Division order must contain each event division exactly once')
+  for (const id of divisionIds) validateUUID(id, 'divisionId')
+  const existing = await listDivisions(eventId, true)
+  if (existing.length !== divisionIds.length || existing.some(division => !divisionIds.includes(division.id))) {
+    throw new ApiError(400, 'Division order must contain each event division exactly once')
+  }
+  const { error } = await getClient().rpc('competition_reorder_divisions', { p_event: eventId, p_actor: organizerId, p_ids: divisionIds })
+  if (error) throw new ApiError(['PGRST202', '42P01'].includes(error.code) ? 503 : 409,
+    ['PGRST202', '42P01'].includes(error.code) ? 'Apply competition migration 100 before reordering divisions.' : error.message)
+  return listDivisions(eventId, true)
 }
 
 /**
@@ -351,6 +370,7 @@ export default {
   getDivisionById,
   createDivision,
   updateDivision,
+  reorderDivisions,
   deleteDivision,
   setDivisionsEnabled,
   areDivisionsEnabled,

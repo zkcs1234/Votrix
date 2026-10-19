@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import { SkeletonGrid } from '@/components/ui/Skeleton'
@@ -96,6 +96,7 @@ function ElectionCandidatesPageContent() {
   const [candidates, setCandidates] = useState([])
   const [positionId, setPositionId] = useState('')
   const [loading, setLoading] = useState(true)
+  const requestRef = useRef(0)
   const [form, setForm] = useState(EMPTY_FORM)
   const [photoFile, setPhotoFile] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -123,18 +124,21 @@ function ElectionCandidatesPageContent() {
   const showLoader = useDelayedLoading(loading, 300)
 
   const load = useCallback(async () => {
+    const request = ++requestRef.current
+    if (!sectionId) { setPositions([]); setCandidates([]); setLoading(false); return }
     setLoading(true)
     try {
       const [posRes, candRes] = await Promise.all([
         electionService.listPositions(eventId, sectionId),
         electionService.listCandidates(eventId, null, sectionId),
       ])
+      if (request !== requestRef.current) return
       setPositions(posRes.data.positions ?? [])
       setCandidates(candRes.data.candidates ?? [])
     } catch (err) {
       console.error('Failed to load candidates:', err)
     } finally {
-      setLoading(false)
+      if (request === requestRef.current) setLoading(false)
     }
   }, [eventId, sectionId])
 
@@ -228,7 +232,7 @@ function ElectionCandidatesPageContent() {
         <div className="space-y-4">
         <div className="v-card p-4">
           <label className="mb-1 block text-sm text-v-text-muted" htmlFor="candidate-section">
-            Ballot section
+            Election Group
           </label>
           <select
             id="candidate-section"
@@ -239,6 +243,7 @@ function ElectionCandidatesPageContent() {
               setPositionId('')
             }}
           >
+            <option value="">Select an election group</option>
             {sections.map((section) => (
               <option key={section.id} value={section.id}>{section.name}</option>
             ))}

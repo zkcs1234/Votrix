@@ -1,0 +1,58 @@
+# Exact Phase 8 file changes
+
+## Modified source/tests
+
+- `backend/src/app.js`
+- `backend/src/middleware/rateLimiter.js`
+- `backend/src/modules/competition-legacy-preflight.js`
+- `backend/src/routes/competition-child.routes.js`
+- `backend/src/routes/competition-public-results.routes.js`
+- `backend/src/routes/pageant-judge.routes.js`
+- `backend/src/server.js`
+- `backend/src/services/competition-native-results.service.js`
+- `backend/src/services/competition-native-scoring.service.js`
+- `backend/src/services/competition-native.service.js`
+- `backend/src/services/pageant.service.js`
+- `backend/src/services/voter.service.js`
+- `backend/src/websocket/ws-emitter.js`
+- `backend/src/websocket/ws-rooms.js`
+- `frontend/src/components/organizer/competition/NativeCompetitionBoundaries.test.jsx`
+- `frontend/src/components/organizer/competition/NativeSetupWorkspace.jsx`
+- `frontend/src/components/organizer/competition/NativeSetupWorkspace.test.jsx`
+- `frontend/src/components/organizer/competition/NativeTabulationWorkspace.jsx`
+- `frontend/src/components/ui/EventStepper.jsx`
+- `frontend/src/components/ui/ModuleStageLayout.jsx`
+- `frontend/src/components/voter/competition/NativeCompetitionWorkspace.jsx`
+- `frontend/src/components/voter/competition/NativeCompetitionWorkspace.test.jsx`
+- `frontend/src/hooks/useCompetitionSync.js`
+- `frontend/src/pages/voter/VoterDashboardPage.jsx`
+- `frontend/src/services/api.js`
+- `frontend/src/services/competition-native.service.js`
+- `backend/__tests__/services/competition-native.test.js`
+- `backend/__tests__/services/competition-native-results.test.js`
+
+## Added source/tests
+
+- `backend/src/database/migrations/108_competition_navigation_draft_tools.sql`
+- `backend/src/middleware/competition-rate-policy.js`
+- `backend/src/modules/competition-capacity.js`
+- `backend/src/websocket/competition-hint-transport.js`
+- `backend/scripts/competition-hint-broker.mjs`
+- `backend/scripts/phase8-local-db.mjs`
+- `backend/scripts/phase8-postgrest-fixture.mjs`
+- `backend/scripts/test-competition-phase8-browser-extended.mjs`
+- `backend/scripts/test-competition-phase8-browser.mjs`
+- `backend/scripts/test-competition-phase8-capacity.mjs`
+- `backend/scripts/test-competition-phase8-database.mjs`
+- `backend/scripts/test-competition-phase8-integrations.mjs`
+- `backend/scripts/test-competition-phase8-restore.mjs`
+- `backend/scripts/test-competition-phase8-transport.mjs`
+- `frontend/src/utils/competitionRetry.js`
+- `frontend/src/utils/competitionRetry.test.js`
+- `backend/__tests__/api/competition-rate-policy.test.js`
+- `backend/__tests__/services/competition-native-dashboard.test.js`
+- `backend/__tests__/modules/competition-capacity.test.js`
+- `backend/__tests__/modules/competition-hint-transport.test.js`
+- `backend/scripts/competition-phase8-preservation.mjs`
+
+Audit reports/JSON/logs and generated `.tmp` browser fixtures/dumps are additional local evidence, not deployment assets. All 68 protected files are unchanged.

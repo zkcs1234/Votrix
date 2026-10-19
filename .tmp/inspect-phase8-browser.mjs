@@ -1,0 +1,3 @@
+import{WebSocket}from'../backend/node_modules/ws/wrapper.mjs'
+const pages=await(await fetch('http://127.0.0.1:9337/json/list')).json()
+for(const p of pages.filter(p=>p.type==='page')){const w=new WebSocket(p.webSocketDebuggerUrl);await new Promise(r=>w.once('open',r));w.send(JSON.stringify({id:1,method:'Runtime.evaluate',params:{expression:'({text:document.body.innerText.slice(0,500),selection:document.querySelector("[aria-label=Competition]")?.value})',returnByValue:true}}));const m=await new Promise(r=>w.once('message',b=>r(JSON.parse(b))));console.log(p.url,JSON.stringify(m.result?.result?.value));w.close()}

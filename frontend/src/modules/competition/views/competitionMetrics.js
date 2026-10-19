@@ -6,8 +6,12 @@
  * from election or polling modules; no shared event bus.
  */
 
-import { withPercentage, topN, sumBy } from '@/modules/analytics/utils/aggregations'
+import { withPercentage, sumBy } from '@/modules/analytics/utils/aggregations'
 import { safePercentage } from '@/modules/analytics/utils/format'
+
+const scoreValue = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value)
+const displayScore = value => scoreValue(value) === null ? 'Incomplete' : scoreValue(value).toFixed(2)
+const preserveMissingPercentage = rows => withPercentage(rows, 'value').map(row => ({ ...row, percentage: row.value === null ? null : row.percentage }))
 
 export function buildCompetitionStats(analytics) {
   return [
@@ -32,9 +36,9 @@ export function buildCompetitionScoreStats(analytics) {
 export function buildCompetitionOverallRankings(analytics, { limit } = {}) {
   const rows = (analytics?.rankings ?? analytics?.contestantRankings ?? []).map((r, idx) => ({
     id: r.contestantId ?? `${r.contestantName}-${idx}`,
-    rank: r.rank ?? idx + 1,
+    rank: r.rank ?? null,
     name: r.contestantName,
-    value: Number(r.weightedScore ?? 0),
+    value: r.manual ? r.rank : scoreValue(r.finalScore ?? r.weightedScore),
     sublabel: r.contestantNumber ? `#${r.contestantNumber}` : null,
     photo: r.photo,
     meta: r.criteriaBreakdown
@@ -43,18 +47,20 @@ export function buildCompetitionOverallRankings(analytics, { limit } = {}) {
           .join(' · ')
       : null,
   }))
-  return limit ? topN(rows, limit, 'value') : rows
+  // The server already ranked these rows with the governing numeric/placement
+  // direction and tie policy. Sorting by a displayed value reverses manual and
+  // rank-based standings and can reorder incomplete rows.
+  return limit ? rows.slice(0, limit) : rows
 }
 
 export function buildCompetitionCategoryRankings(analytics) {
   return (analytics?.categoryRankings ?? []).map((cat, idx) => {
-    const contestants = withPercentage(
+    const contestants = preserveMissingPercentage(
       (cat.contestants ?? cat.entries ?? []).map((c) => ({
         id: c.contestantId ?? c.id ?? `${c.name}-${idx}`,
         label: c.contestantName ?? c.name ?? '—',
-        value: Number(c.weightedScore ?? c.score ?? 0),
+        value: scoreValue(c.weightedScore ?? c.score),
       })),
-      'value',
     )
     return {
       id: cat.categoryId ?? cat.id ?? cat.name ?? `cat-${idx}`,
@@ -182,7 +188,7 @@ export function buildCompetitionExportPayload(report, { generatedAt } = {}) {
         rows: (report?.rankings ?? []).map((r) => ({
           rank: r.rank,
           contestant: `#${r.contestantNumber ?? ''} ${r.contestantName ?? ''}`.trim(),
-          score: Number(r.weightedScore ?? 0).toFixed(2),
+          score: r.manual ? 'Manual official decision' : displayScore(r.finalScore ?? r.weightedScore),
           status: r.status ?? '',
         })),
       },
@@ -223,7 +229,7 @@ export function buildCompetitionExportPayload(report, { generatedAt } = {}) {
             round: round.roundName ?? round.name ?? '',
             rank: standing.rank,
             contestant: `#${standing.contestantNumber ?? ''} ${standing.contestantName ?? ''}`.trim(),
-            score: Number(standing.score ?? 0).toFixed(2),
+            score: standing.manual ? 'Manual official decision' : displayScore(standing.score),
             qualified: standing.qualified === undefined ? '' : standing.qualified ? 'Yes' : 'No',
           })),
         ),
@@ -237,8 +243,8 @@ export function buildCompetitionContestantPerformance(report) {
     id: r.contestantId,
     rank: r.rank,
     name: `#${r.contestantNumber} ${r.contestantName}`,
-    sublabel: `Weighted ${Number(r.weightedScore ?? 0).toFixed(2)}`,
-    value: Number(r.weightedScore ?? 0),
+    sublabel: r.manual ? 'Manual official decision' : scoreValue(r.finalScore ?? r.weightedScore) === null ? 'Incomplete' : `Weighted ${displayScore(r.finalScore ?? r.weightedScore)}`,
+    value: r.manual ? r.rank : scoreValue(r.finalScore ?? r.weightedScore),
     photo: r.photo,
     meta: [
       r.status ?? 'Awaiting scores',
@@ -252,20 +258,19 @@ export function buildCompetitionRoundResults(report) {
   return (report?.roundResults ?? []).map((round, idx) => ({
     id: round.roundId ?? `round-${idx}`,
     name: round.roundName ?? round.name ?? `Round ${idx + 1}`,
-    value: Number(round.standings?.[0]?.score ?? 0),
+    value: scoreValue(round.standings?.[0]?.score),
     sublabel: round.finalizedAt ? `Finalized ${round.finalizedAt}` : 'Provisional',
   }))
 }
 
 export function buildCompetitionCategoryResults(report) {
   return (report?.categoryResults ?? []).map((cat, idx) => {
-    const contestants = withPercentage(
+    const contestants = preserveMissingPercentage(
       (cat.entries ?? cat.contestants ?? []).map((c) => ({
         id: c.contestantId ?? c.id ?? `${c.name}-${idx}`,
         label: c.contestantName ?? c.name ?? '—',
-        value: Number(c.weightedScore ?? c.score ?? 0),
+        value: scoreValue(c.weightedScore ?? c.score),
       })),
-      'value',
     )
     return {
       id: cat.categoryId ?? cat.id ?? cat.name ?? `cat-${idx}`,

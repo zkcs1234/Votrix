@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+import { normalizeOrigin } from './trusted-origins.js'
 
 dotenv.config()
 
@@ -28,12 +29,16 @@ function parseOrigins() {
     .trim()
     .replace(/\/$/, '')
 
-  const extra = (process.env.CLIENT_URLS || '')
+  const extra = [process.env.CLIENT_URLS, process.env.PREVIEW_CLIENT_URLS].filter(Boolean).join(',')
     .split(',')
     .map((s) => s.trim().replace(/\/$/, ''))
     .filter(Boolean)
 
-  return [...new Set([primary, ...extra])]
+  return [...new Set([primary, ...extra].map(value => {
+    const origin = normalizeOrigin(value)
+    if (!origin) throw new Error('Frontend origins must be exact HTTP(S) origins without paths, credentials, queries or wildcards.')
+    return origin
+  }))]
 }
 
 const clientOrigins = parseOrigins()
@@ -44,6 +49,10 @@ export const env = {
   /** Primary frontend origin (CORS + email links). FRONTEND_URL aliases CLIENT_URL. */
   clientUrl: clientOrigins[0],
   clientOrigins,
+  websocket: {
+    maxConnectionsPerUser: positiveInteger(process.env.WS_MAX_CONNECTIONS_PER_USER, 5),
+    maxConnections: positiveInteger(process.env.WS_MAX_CONNECTIONS, 1000),
+  },
 
   jwt: {
     accessSecret: getJwtSecret('access', 'JWT_ACCESS_SECRET', 'dev-access-secret'),
@@ -86,4 +95,11 @@ export const env = {
       process.env.RESEND_FROM_EMAIL ||
       'VOTRIX <onboarding@resend.dev>',
   },
+}
+
+function positiveInteger(value, fallback) {
+  if (value === undefined || value === '') return fallback
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100000) throw new Error('WebSocket connection limits must be integers from 1 to 100000.')
+  return parsed
 }

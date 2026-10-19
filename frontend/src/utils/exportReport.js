@@ -15,6 +15,8 @@
  *                 stylesheet, no external CSS.
  */
 
+import { serializeCsv } from '../../../shared/csv-export.js'
+
 const escapeXml = (s) =>
   String(s ?? '')
     .replace(/&/g, '&amp;')
@@ -43,18 +45,7 @@ export function downloadJson(filename, data) {
 
 export function downloadCsv(filename, rows) {
   if (!rows || !rows.length) return
-  const headers = Array.from(
-    rows.reduce((set, r) => {
-      Object.keys(r ?? {}).forEach((k) => set.add(k))
-      return set
-    }, new Set()),
-  )
-  const escape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const lines = [
-    headers.join(','),
-    ...rows.map((r) => headers.map((h) => escape(r?.[h])).join(',')),
-  ]
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+  const blob = new Blob([serializeCsv(rows)], { type: 'text/csv;charset=utf-8' })
   downloadBlob(blob, filename)
 }
 

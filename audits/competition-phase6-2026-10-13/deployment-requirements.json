@@ -1,0 +1,14 @@
+{
+  "productionReady": false,
+  "deploymentBlocked": true,
+  "deployedCatalogVerified": false,
+  "recoverableBackupConfirmed": false,
+  "restoreProcedureTested": false,
+  "hostedAuthenticatedAcceptancePassed": false,
+  "multiInstanceTransportImplemented": false,
+  "multiInstanceDeliveryVerified": false,
+  "topologyVerified": false,
+  "localTestsSatisfyDeploymentRequirements": false,
+  "supabaseTouched": false,
+  "phase7Started": false
+}

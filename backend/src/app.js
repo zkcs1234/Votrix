@@ -9,32 +9,16 @@ import { globalLimiter } from './middleware/rateLimiter.js'
 import { csrfProtection } from './middleware/csrf.js'
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js'
 import { assertProductionSecurity } from './config/security.js'
+import { isTrustedOrigin } from './config/trusted-origins.js'
 import apiRoutes from './routes/index.js'
+import {competitionRatePolicy} from './middleware/competition-rate-policy.js'
 
 export function createApp() {
   assertProductionSecurity()
 
   const app = express()
 
-  function isAllowedOrigin(origin) {
-    const normalizedOrigin = origin.replace(/\/$/, '')
-
-    if (env.clientOrigins.includes(normalizedOrigin)) {
-      return true
-    }
-
-    const allowVercelPreviews = (process.env.ALLOW_VERCEL_PREVIEWS || 'false').toLowerCase() !== 'false'
-    if (allowVercelPreviews) {
-      try {
-        const url = new URL(normalizedOrigin)
-        return url.protocol === 'https:' && url.hostname.endsWith('.vercel.app')
-      } catch {
-        return false
-      }
-    }
-
-    return false
-  }
+  const isAllowedOrigin = origin => isTrustedOrigin(origin, env.clientOrigins)
 
   app.set('trust proxy', 1)
 
@@ -76,10 +60,21 @@ export function createApp() {
     }),
   )
 
+  // CORS controls response visibility, not execution. Deny browser mutations
+  // from untrusted origins even if they carry a previously issued CSRF token.
+  app.use((req, res, next) => {
+    if (req.headers.origin && !['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isAllowedOrigin(req.headers.origin)) {
+      res.status(403).json({ success: false, message: 'Request origin is not trusted' })
+      return
+    }
+    next()
+  })
+
+  app.use(cookieParser())
+  app.use(competitionRatePolicy)
   app.use(globalLimiter)
   app.use(express.json({ limit: '1mb' }))
   app.use(express.urlencoded({ extended: true }))
-  app.use(cookieParser())
   app.use('/api', csrfProtection)
 
   configureCloudinary()

@@ -1,0 +1,194 @@
+{
+  "phase": 7,
+  "completedAt": "2026-10-13T18:59:45.614Z",
+  "releaseRecommendation": "NO-GO",
+  "backend": {
+    "filesPassed": 84,
+    "testsPassed": 652,
+    "filesSkipped": 1,
+    "testsSkipped": 3
+  },
+  "frontend": {
+    "filesPassed": 44,
+    "testsPassed": 309
+  },
+  "postgres": {
+    "tabulationScenarioGroups": 13,
+    "resultsScenarioGroups": 8,
+    "forwardChain": [
+      103,
+      104,
+      105,
+      106,
+      107
+    ],
+    "localTemplateBlockers": 0,
+    "localTemplateUnchanged": true
+  },
+  "browser": {
+    "passed": true,
+    "scenarioGroups": 4,
+    "database": "votrix_phase7_browser_1791906705261",
+    "requestCount": 848,
+    "syntheticAuth": true,
+    "isolatedHttpAdapter": true,
+    "hostedAcceptance": false
+  },
+  "builds": {
+    "nativeEnabled": true,
+    "default": true
+  },
+  "checks": {
+    "syntax": true,
+    "targetedEslint": true,
+    "gitDiffCheck": true,
+    "protectedSourceUnchanged": true
+  },
+  "workspaceCluster": {
+    "dataDirectory": "C:\\Github\\Votrix\\.tmp\\competition-postgres-tests",
+    "port": 55439,
+    "originalState": "stopped",
+    "finalState": "stopped",
+    "pgCtlStatusExitCode": 3
+  },
+  "sourcePreservation": {
+    "checked": 639,
+    "changed": [
+      "backend/src/routes/competition-child.routes.js",
+      "backend/src/routes/pageant-judge.routes.js",
+      "backend/src/services/competition-native-scoring.service.js",
+      "frontend/src/components/organizer/competition/NativeResultsWorkspace.jsx",
+      "frontend/src/components/organizer/competition/NativeTabulationWorkspace.jsx",
+      "frontend/src/components/voter/competition/NativeCompetitionWorkspace.jsx",
+      "frontend/src/pages/organizer/competition/CompetitionContestantsPage.jsx",
+      "frontend/src/pages/organizer/competition/CompetitionJudgesPage.jsx",
+      "frontend/src/pages/organizer/competition/CompetitionReviewPage.jsx",
+      "frontend/src/pages/organizer/competition/CompetitionWorkspacePage.jsx",
+      "frontend/src/pages/organizer/reports/CompetitionReportPage.jsx",
+      "frontend/src/pages/public/NativeCompetitionResultsPage.jsx",
+      "frontend/src/pages/public/NativeCompetitionResultsPage.test.jsx",
+      "frontend/src/services/competition-native.service.js"
+    ],
+    "added": [
+      "backend/scripts/test-competition-phase7-browser.mjs",
+      "backend/scripts/test-competition-phase7-integrations.mjs",
+      "backend/scripts/test-competition-phase7-performance.mjs",
+      "backend/scripts/test-competition-phase7-populated-restore.mjs",
+      "backend/scripts/test-competition-phase7-recovery.mjs",
+      "backend/scripts/test-competition-phase7-transport.mjs",
+      "frontend/src/components/organizer/competition/NativeCompetitionBoundaries.test.jsx",
+      "frontend/src/components/organizer/competition/NativeSetupWorkspace.jsx",
+      "frontend/src/components/organizer/competition/NativeSetupWorkspace.test.jsx"
+    ],
+    "protectedCount": 68,
+    "protectedChanged": []
+  },
+  "performance": {
+    "database": "votrix_publication_1791901422233",
+    "fixture": {
+      "eligibleEntries": 2,
+      "judges": 3
+    },
+    "tabulationReadPsqlProcessMilliseconds": {
+      "samples": 10,
+      "min": 165.06629999999996,
+      "max": 178.82870000000003,
+      "mean": 171.77784000000003
+    },
+    "tabulationReadExplainServerMilliseconds": 65.087,
+    "engineAdapterMilliseconds": {
+      "samples": 30,
+      "min": 0.07529999999997017,
+      "max": 4.326699999999619,
+      "mean": 0.28925666666661226
+    },
+    "csvSerializerOnly": {
+      "syntheticRepeatedRows": 10000,
+      "milliseconds": 177.26629999999977,
+      "bytes": 8157370,
+      "heapUsedDeltaBytes": 24245968,
+      "rssDeltaBytes": 51535872,
+      "peakMemoryMeasured": false
+    },
+    "productionVolumeCapacityVerified": false,
+    "largeActualRosterTested": false,
+    "lockContentionQuantified": false,
+    "networkLatencyMeasured": false
+  },
+  "requirements": {
+    "phase": 7,
+    "releaseRecommendation": "NO-GO",
+    "productionReady": false,
+    "productionChangesAuthorized": false,
+    "productionDatabaseMutations": false,
+    "productionFlagsChanged": false,
+    "deploymentPerformed": false,
+    "phase8Started": false,
+    "deployedCatalog": {
+      "status": "BLOCKED",
+      "directCatalogVerified": false,
+      "appliedLedgerVerified": false,
+      "restOnlyTables": 27,
+      "readOnlyInventoryComparisonUnchanged": true
+    },
+    "recovery": {
+      "status": "BLOCKED",
+      "productionBackupConfirmed": false,
+      "productionRestoreVerified": false,
+      "retentionKnown": false,
+      "rpoApproved": false,
+      "rtoApproved": false,
+      "localPopulatedRestorePassed": true,
+      "localPublicTableInventories": 49,
+      "electionPollingRecoveryVerified": false
+    },
+    "hostedAcceptance": {
+      "status": "BLOCKED",
+      "stagingConfirmed": false,
+      "realProductionAuthStackVerified": false,
+      "localComponentSqlBrowserPassed": true,
+      "localBrowserScope": "Isolated contract adapter invoking real SQL RPCs, NOT production Express services/PostgREST"
+    },
+    "multiInstance": {
+      "status": "BLOCKED",
+      "currentCrossProcessDeliveryRequirement": "FAILED",
+      "sharedServiceConfirmed": false,
+      "sharedDeliveryImplemented": false,
+      "topologyConfirmed": false,
+      "processBoundaryEvidence": {
+        "singleProcessRoomDelivery": "PASSED",
+        "crossProcessDeliveryRequirement": "FAILED",
+        "sharedTransportInfrastructure": "BLOCKED",
+        "remoteProcessReceivedParentHint": false,
+        "confidentialScoresSent": false,
+        "conclusion": "Process-local registry does not reach a user room in another API process. Reconciliation is not shared delivery."
+      }
+    },
+    "ratePolicy": {
+      "status": "FAILED_WITH_DEFAULTS",
+      "globalLimiterBeforeAuthentication": true,
+      "defaultGlobalSharedIpRequestsPer15Minutes": 100,
+      "defaultPublicSharedIpRequestsPer15Minutes": 60,
+      "publicPollingSeconds": 15,
+      "sharedNetworkAcceptancePassed": false
+    },
+    "capacity": {
+      "status": "NOT_TESTED_AT_PRODUCTION_VOLUME",
+      "measurements": "performance.json",
+      "realLargeRoster": false,
+      "peakMemory": false,
+      "quantifiedLockContention": false
+    },
+    "uiAcceptance": {
+      "status": "PARTIAL_LOCAL_PASS",
+      "fiveChildComponentWorkflow": true,
+      "wholeHostedApplication": false,
+      "remainingJudgeDashboardLegacyProjection": true,
+      "remainingStepperDraftEditingReview": true
+    },
+    "approval": {
+      "deploymentRequired": true,
+      "phase8Required": true
+    }
+  }
+}

@@ -96,7 +96,8 @@ export async function createDeduction(eventId, organizerId, payload = {}) {
 }
 
 export async function voidDeduction(eventId, organizerId, deductionId) {
-  await assertCompetitionEvent(eventId, organizerId)
+  const event = await assertCompetitionEvent(eventId, organizerId)
+  if (event.official_rules_id) throw new ApiError(409,'Versioned penalty changes require independent review or an approved amendment')
   const { data, error } = await getClient()
     .from('competition_deductions')
     .update({ status: 'voided', voided_at: new Date().toISOString(), voided_by_user_id: organizerId })
@@ -151,12 +152,13 @@ export async function getCalculation(eventId, organizerId, calculationId) {
   return data
 }
 
-export async function getLatestCalculation(eventId, organizerId) {
+export async function getLatestCalculation(eventId, organizerId, {roundId=null}={}) {
   await assertCompetitionEvent(eventId, organizerId)
   const { data, error } = await getClient()
     .from('competition_result_calculations')
     .select('*')
     .eq('event_id', eventId)
+    .filter('round_id',roundId?'eq':'is',roundId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()

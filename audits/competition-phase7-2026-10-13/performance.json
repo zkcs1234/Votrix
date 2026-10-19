@@ -1,0 +1,32 @@
+{
+  "database": "votrix_publication_1791901422233",
+  "fixture": {
+    "eligibleEntries": 2,
+    "judges": 3
+  },
+  "tabulationReadPsqlProcessMilliseconds": {
+    "samples": 10,
+    "min": 165.06629999999996,
+    "max": 178.82870000000003,
+    "mean": 171.77784000000003
+  },
+  "tabulationReadExplainServerMilliseconds": 65.087,
+  "engineAdapterMilliseconds": {
+    "samples": 30,
+    "min": 0.07529999999997017,
+    "max": 4.326699999999619,
+    "mean": 0.28925666666661226
+  },
+  "csvSerializerOnly": {
+    "syntheticRepeatedRows": 10000,
+    "milliseconds": 177.26629999999977,
+    "bytes": 8157370,
+    "heapUsedDeltaBytes": 24245968,
+    "rssDeltaBytes": 51535872,
+    "peakMemoryMeasured": false
+  },
+  "productionVolumeCapacityVerified": false,
+  "largeActualRosterTested": false,
+  "lockContentionQuantified": false,
+  "networkLatencyMeasured": false
+}

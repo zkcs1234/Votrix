@@ -6,6 +6,10 @@ import * as draftCtrl from '../controllers/draft.controller.js'
 import competitionRoutes from './competition-organizer.routes.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
 import { requireEditableEvent } from '../middleware/eventGuards.js'
+import { assertOrganizerOwnsEvent } from '../services/event.service.js'
+import { asyncHandler } from '../utils/asyncHandler.js'
+import childRoutes from './competition-child.routes.js'
+import { requireLegacyCompetitionContext } from '../middleware/competition-context.js'
 
 const router = Router()
 router.use(validateRouteUUIDParams)
@@ -14,6 +18,12 @@ router.use(validateRouteUUIDParams)
 // guards event-detail edits AND the competition setup sub-resources; the
 // live-session controls under /session/ are exempt (see requireEditableEvent).
 router.use('/events/:eventId', requireEditableEvent)
+router.use('/events/:eventId', asyncHandler(async (req, _res, next) => {
+  await assertOrganizerOwnsEvent(req.params.eventId, req.user.id)
+  next()
+}))
+router.use('/events/:eventId/competitions', childRoutes)
+router.use('/events/:eventId', requireLegacyCompetitionContext({ parentResources: true, pageantDivisions: true }))
 
 router.get('/dashboard', ctrl.getDashboard)
 router.get('/templates', ctrl.listTemplates)

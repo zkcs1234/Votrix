@@ -3,16 +3,28 @@ import { emailLimiter } from '../middleware/rateLimiter.js'
 import * as ctrl from '../controllers/competition.controller.js'
 import * as sessionCtrl from '../controllers/competition-session.controller.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
+import * as workflowCtrl from '../controllers/competition-workflow.controller.js'
+import { competitionWorkbookUpload } from '../middleware/competition-workbook-upload.js'
 
 // All routes are mounted under /api/organizer/competition/events/:eventId
 // (see pageant-organizer.routes.js) and share the same auth middleware.
 
 const router = Router({ mergeParams: true })
 router.use(validateRouteUUIDParams)
+router.post('/rounds/:roundId/criteria', workflowCtrl.createRoundCriterion)
+router.get('/workflow/rules', workflowCtrl.rules)
+router.get('/workflow/excel', workflowCtrl.exportExcel)
+router.post('/workflow/excel/verify', competitionWorkbookUpload, workflowCtrl.importExcel)
+router.get('/workflow/tabulation', workflowCtrl.tabulation)
+router.post('/workflow/calculations/:calculationId/verify', workflowCtrl.verify)
+for (const action of ['reconciliation-preview','reconciliation-apply','amendment-request','round-order','lineups','lineup-save','lineup-activate','slot','access','submission-window','end-performance','reopen-performance','correction','advancement','deduction-report','eligibility-report']) {
+  router.post(`/workflow/${action}`, workflowCtrl.organizerAction(action))
+}
 
 // Divisions
 router.get('/divisions', ctrl.listDivisions)
 router.post('/divisions', ctrl.createDivision)
+router.post('/divisions/reorder', ctrl.reorderDivisions)
 router.get('/divisions/:divisionId', ctrl.getDivision)
 router.patch('/divisions/:divisionId', ctrl.updateDivision)
 router.delete('/divisions/:divisionId', ctrl.deleteDivision)
@@ -43,7 +55,7 @@ router.patch('/scoring-config', ctrl.setScoringConfig)
 // Foundation snapshot (used by the workspace UI)
 router.get('/foundation', ctrl.getFoundation)
 
-// Judge participants — canonical event_participants-backed model.
+// Judge participants â€” canonical event_participants-backed model.
 // Plan Phase 6: organizers PICK judges from the admin-registered pool instead
 // of creating accounts. The judges-v2/invite (single account create) route was
 // removed; list / update (role) / delete (un-enroll) remain.
@@ -79,7 +91,7 @@ router.post('/session/set-contestant', sessionCtrl.setActiveContestant)
 router.post('/session/stage-group', sessionCtrl.setStageGroup)
 router.post('/session/arrangement/preview', sessionCtrl.previewArrangement)
 router.post('/session/arrangement/publish', sessionCtrl.publishArrangement)
-// #4 contestant gate — open/close which contestants judges may score
+// #4 contestant gate â€” open/close which contestants judges may score
 router.post('/session/open-contestants', sessionCtrl.setOpenContestants)
 router.post('/session/set-round', sessionCtrl.setActiveRound)
 router.post('/session/set-active-criteria', sessionCtrl.setActiveCriteria)
@@ -88,7 +100,7 @@ router.post('/session/set-division', sessionCtrl.setActiveDivision)
 // Judge progress (organizer view)
 router.get('/session/judge-progress', sessionCtrl.getJudgeProgress)
 
-// Organizer unlock a locked score (B5) — reopen for a contestant (all judges,
+// Organizer unlock a locked score (B5) â€” reopen for a contestant (all judges,
 // or one judge when judgeId is supplied). Audited.
 router.post('/session/unlock-score', sessionCtrl.unlockScore)
 

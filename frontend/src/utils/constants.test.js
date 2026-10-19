@@ -44,8 +44,10 @@ describe('event lifecycle edit-locking', () => {
       expect(isParticipantsLocked(EVENT_STATUS.SCHEDULED)).toBe(false)
     })
 
-    it('locks once voting/scoring is active and after', () => {
-      expect(isParticipantsLocked(EVENT_STATUS.ACTIVE)).toBe(true)
+    it('applies the configured active-state lock and always locks terminal events', () => {
+      expect(isParticipantsLocked(EVENT_STATUS.ACTIVE)).toBe(
+        import.meta.env.VITE_LOCK_PARTICIPANTS_ON_ACTIVE !== 'false',
+      )
       expect(isParticipantsLocked(EVENT_STATUS.COMPLETED)).toBe(true)
       expect(isParticipantsLocked(EVENT_STATUS.CANCELLED)).toBe(true)
     })

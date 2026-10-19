@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { pageantService } from '@/services/pageant.service'
-import { competitionSessionService } from '@/services/competition-session.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import SearchInput from '@/components/ui/SearchInput'
 
-import { useSocketEvent } from '@/hooks/useSocketEvent'
+import useCompetitionSync from '@/hooks/useCompetitionSync'
+import useLatestRequest from '@/hooks/useLatestRequest'
+import FormAlert from '@/components/ui/FormAlert'
 import useTableFilter from '@/hooks/useTableFilter'
-import { subscribeRoom } from '@/services/socket.service'
 import { INPUT_CLASS } from '@/utils/uiClasses'
+import {NativeResultsBoundary} from '@/components/organizer/competition/NativeResultsWorkspace'
 
-export default function CompetitionRankingsPage() {
+export default function CompetitionRankingsPage(){const {eventId}=useParams();return <NativeResultsBoundary eventId={eventId} Legacy={LegacyCompetitionRankingsPage} analytics/>}
+function LegacyCompetitionRankingsPage() {
   const { eventId } = useParams()
   const [data, setData] = useState(null)
   const [foundation, setFoundation] = useState(null)
@@ -19,50 +21,26 @@ export default function CompetitionRankingsPage() {
   const [divisionId, setDivisionId] = useState('')
   const [roundId, setRoundId] = useState('')
 
-  const load = useCallback(() => {
-    setLoading(true)
-    Promise.all([
-      pageantService.getRankings(eventId, {
-        divisionId: divisionId || undefined,
-        roundId: roundId || undefined,
-      }).catch(() => ({ data: {} })),
-      pageantService.getFoundation(eventId).catch(() => ({ data: {} })),
-      pageantService.getResults(eventId).catch(() => ({ data: {} })),
-    ]).then(([rankingsRes, foundationRes, resultsRes]) => {
-      if (rankingsRes.data) setData(rankingsRes.data)
-      if (foundationRes.data?.foundation) setFoundation(foundationRes.data.foundation)
-      if (resultsRes.data?.results) setResults(resultsRes.data.results)
-    }).finally(() => setLoading(false))
-  }, [eventId, divisionId, roundId])
-
-  // On first open, silently re-sync the ranking store from the real live-session
-  // scores judges submitted, THEN load — so the rankings reflect the corrected
-  // scores automatically (the first scoring wrote stale values during the bug).
-  // Idempotent; only runs once per mount. Division changes / refresh just reload.
-  const didResync = useRef(false)
-  useEffect(() => {
-    subscribeRoom(`event:${eventId}:organizer`)
-    if (didResync.current) {
-      load()
-      return
-    }
-    didResync.current = true
-    competitionSessionService
-      .resyncRankingStore(eventId)
-      .catch(() => {}) // best-effort; still show whatever the store has
-      .finally(() => load())
-  }, [eventId, load])
-
-  useSocketEvent('rankings:updated', ({ rankings }) => {
-    // Note: real-time updates might not have division filter applied, 
-    // so we should probably re-fetch if we have a filter, or just use the data if no filter.
-    // To be safe, we just reload the data if there's a specific division selected.
-    if (divisionId || roundId) {
-      load()
-    } else if (rankings) {
-      setData(rankings)
-    }
-  }, [eventId, divisionId, roundId, load])
+  const [error, setError] = useState(null)
+  const beginRequest = useLatestRequest(`${eventId}:${divisionId}:${roundId}`)
+  const load = useCallback(async () => {
+    const isCurrent = beginRequest()
+    try {
+      const [rankingsRes, foundationRes, resultsRes] = await Promise.all([
+        pageantService.getRankings(eventId, { divisionId: divisionId || undefined, roundId: roundId || undefined }),
+        pageantService.getFoundation(eventId), pageantService.getResults(eventId),
+      ])
+      if (!isCurrent()) return
+      setData(rankingsRes.data)
+      setFoundation(foundationRes.data.foundation)
+      setResults(resultsRes.data.results)
+      setError(null)
+    } catch (e) {
+      if (isCurrent()) setError(e.response?.data?.message ?? 'Rankings could not be loaded.')
+    } finally { if (isCurrent()) setLoading(false) }
+  }, [eventId, divisionId, roundId, beginRequest])
+  useEffect(() => { setLoading(true); setData(null); setResults(null); void load() }, [load])
+  const { connected } = useCompetitionSync(eventId, load)
 
   const {
     search,
@@ -84,13 +62,16 @@ export default function CompetitionRankingsPage() {
     )
   }
 
-  const divisionsEnabled = foundation?.event?.divisions_enabled
+  if (error && !data) return <div className="space-y-3"><FormAlert variant="error">{error}</FormAlert><button type="button" onClick={load}>Retry rankings</button></div>
+  const divisionsEnabled = foundation?.event?.divisionsEnabled ?? foundation?.event?.divisions_enabled
   const divisions = foundation?.divisions ?? []
   const rounds = data?.rounds ?? []
   const selectedRound = rounds.find((round) => round.id === roundId)
 
   return (
     <div className="space-y-6">
+      <p role="status" className="v-caption">{connected ? 'Live updates connected' : 'Live updates interrupted; checking saved rankings every 15 seconds.'}</p>
+      {error && <FormAlert variant="error">{error}</FormAlert>}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-semibold text-v-text">{data?.isOfficial ? 'Official rankings' : 'Live rankings preview'}</h2>
         <div className="flex flex-wrap items-center gap-3">
@@ -168,7 +149,7 @@ export default function CompetitionRankingsPage() {
                 #{r.contestantNumber} {r.contestantName}
               </p>
               <p className="mt-1 text-2xl font-bold text-v-text-muted">
-                {Number(r.rankingScore ?? r.weightedScore ?? 0).toFixed(2)}
+                {data?.tabulationMethod==='manual'?`Official placement ${r.rank}`:r.rankingScore===null?'Missing / Incomplete':Number(r.rankingScore ?? r.weightedScore ?? 0).toFixed(2)}
                 <span className="ml-1 text-sm font-normal text-v-text-subtle">
                   {selectedRound ? 'round score' : data?.isOfficial ? 'official result' : 'live preview score'}
                 </span>
@@ -257,13 +238,14 @@ function ResultsAndAwards({ results }) {
     <div className="space-y-5 rounded-2xl border border-v-border bg-v-surface p-5">
       <h3 className="text-lg font-semibold text-v-text">Results &amp; Awards</h3>
 
+      {results.champions?.length>1&&<p className="text-sm text-v-text">Shared first place: {results.champions.map(r=>r.contestantName).join(', ')}</p>}
       {results.champion && (
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-amber-300">Overall champion</p>
           <p className="mt-1 text-lg font-bold text-v-text">
             #{results.champion.contestantNumber} {results.champion.contestantName}
             <span className="ml-2 text-sm font-normal text-v-text-subtle">
-              {Number(results.champion.finalScore ?? results.champion.weightedScore ?? 0).toFixed(2)}
+              {results.champion.manual?`Manual placement ${results.champion.rank}`:Number(results.champion.finalScore ?? results.champion.weightedScore ?? 0).toFixed(2)}
             </span>
           </p>
         </div>
@@ -297,7 +279,7 @@ function ResultsAndAwards({ results }) {
             {results.divisions.map((d) => (
               <div key={d.divisionId} className="rounded-lg border border-v-border px-3 py-2 text-sm">
                 <span className="text-v-text-subtle">{d.name}: </span>
-                {d.winner ? (
+                {d.winners?.length>1 ? <span className="font-medium text-v-text">Shared: {d.winners.map(r=>r.contestantName).join(', ')}</span> : d.winner ? (
                   <span className="font-medium text-v-text">
                     #{d.winner.contestantNumber} {d.winner.contestantName}
                   </span>

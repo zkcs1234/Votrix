@@ -1,0 +1,9 @@
+{
+  "backend/.env": "581b0d2679d78e3729473109489d9cc06c6eee01d696e7ffa81e860d11edc27c",
+  "frontend/.env": "c15fd69c9bcf067f7a0257c64ccc4edcd3c53054a08639d86e552fdbccbfa7f5",
+  ".github/workflows/backend-ci.yml": "3aeb9068ee64c9b61613305cb2f33fa28f9a88ddbe03fa7125e249d8723c6a76",
+  ".github/workflows/ci.yml": "fcb283b52498e2770d574bac20a0cbc209c0868a27c2f61d77b9fdd6af372274",
+  ".github/workflows/frontend-ci.yml": "8797d1d9103a8ca35ffffb0378b9bbb8c49123f1477d161c5f2a5d3cde121509",
+  "frontend/vercel.json": "e9dafdda591d842d481fef6b4983b91f92a1f268598e453f0d97daabd9b8a704",
+  "render.yaml": "f7f661b60cd7b7792cadd45c071ce4055b5b100ae4725355233122e4046b3d96"
+}

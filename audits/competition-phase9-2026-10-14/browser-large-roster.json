@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "database": "votrix_hardening_1791937371081",
+  "scenarios": [
+    "Actual 50-entrant/600-input judge table renders locked sources, audited correction opens all targets, first draft and major lock persist without rebuilding submission completion"
+  ],
+  "initial": {
+    "rows": 50,
+    "targets": 600,
+    "locked": 50,
+    "enabled": 0
+  },
+  "firstEditLockMilliseconds": 3598.159599999999,
+  "requestCount": 18,
+  "fullRosterHttpAutosave": false,
+  "hosted": false,
+  "syntheticJwtIssuance": true,
+  "localPostgrestAdapter": true
+}

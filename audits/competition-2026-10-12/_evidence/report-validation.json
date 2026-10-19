@@ -1,0 +1,63 @@
+{
+  "reports": [
+    {
+      "name": "00_EXECUTIVE_SUMMARY.md",
+      "lines": 73,
+      "words": 1211,
+      "links": 11,
+      "controlRows": 19
+    },
+    {
+      "name": "01_COMPETITION_WORKFLOW_MAP.md",
+      "lines": 167,
+      "words": 2719,
+      "links": 26,
+      "controlRows": 52
+    },
+    {
+      "name": "02_FEATURE_AND_BUTTON_AUDIT.md",
+      "lines": 213,
+      "words": 8657,
+      "links": 4,
+      "controlRows": 137
+    },
+    {
+      "name": "03_GAPS_BUGS_AND_SECURITY_FINDINGS.md",
+      "lines": 207,
+      "words": 3702,
+      "links": 71,
+      "controlRows": 8
+    },
+    {
+      "name": "04_SCORING_AND_TABULATION_REVIEW.md",
+      "lines": 284,
+      "words": 4263,
+      "links": 51,
+      "controlRows": 50
+    },
+    {
+      "name": "05_REALTIME_SYNC_REVIEW.md",
+      "lines": 193,
+      "words": 3714,
+      "links": 3,
+      "controlRows": 28
+    },
+    {
+      "name": "06_PRIORITIZED_IMPLEMENTATION_PLAN.md",
+      "lines": 73,
+      "words": 2229,
+      "links": 5,
+      "controlRows": 27
+    },
+    {
+      "name": "07_END_TO_END_TEST_PLAN.md",
+      "lines": 212,
+      "words": 3604,
+      "links": 6,
+      "controlRows": 50
+    }
+  ],
+  "missingLinks": [],
+  "applicationFilesChanged": [],
+  "complete": true
+}

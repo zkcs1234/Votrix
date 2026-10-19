@@ -1,52 +1,64 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import CompetitionReviewer from '@/components/voter/competition/CompetitionReviewer'
+import CompetitionPublishedResults from '@/components/voter/competition/CompetitionPublishedResults'
+import useJudgeScoreDrafts from '@/hooks/useJudgeScoreDrafts'
+import { workflowService } from '@/services/competition-workflow.service'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { CheckCircle, AlertTriangle, RotateCcw, AlertCircle } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
-import { isConnected } from '@/services/socket.service'
-import { useSocketEvent } from '@/hooks/useSocketEvent'
+import useCompetitionSync from '@/hooks/useCompetitionSync'
+import useLatestRequest from '@/hooks/useLatestRequest'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import FormAlert from '@/components/ui/FormAlert'
 import CompetitionScoringForm from '@/components/voter/competition/CompetitionScoringForm'
-import VoterEventHeader from '@/components/voter/VoterEventHeader'
+import JudgeScoringHeader from '@/components/voter/competition/JudgeScoringHeader'
 import { useAuth } from '@/hooks/useAuth'
+import { CompetitionWorkspaceBoundary } from '@/components/voter/competition/NativeCompetitionWorkspace'
 
-// Build the flat scores map (keyed `contestantId:minorId`) of a judge's SAVED
-// scores, from each contestant's existingScores. Callers MERGE this over the
-// current local state ({ ...prev, ...scoresFromSheet }) rather than replacing —
-// a live re-sync (after a per-row submit, or an organizer gate/round/criteria
-// change) must not wipe scores the judge has typed but not yet submitted for
-// other contestants.
-function scoresFromSheet(data) {
-  const out = {}
-  for (const c of data?.contestants ?? []) {
-    for (const [critId, val] of Object.entries(c.existingScores ?? {})) {
-      out[`${c.id}:${critId}`] = val
-    }
-  }
-  return out
-}
-
-export default function JudgeScoringPage() {
+export default function JudgeScoringPage() { return <CompetitionWorkspaceBoundary Legacy={LegacyJudgeScoringPage}/> }
+function LegacyJudgeScoringPage() {
   const { eventId } = useParams()
   const { user } = useAuth()
+  const identityRef = useRef({ eventId, judgeId: user?.id })
+  identityRef.current = { eventId, judgeId: user?.id }
+  const beginViewRequest = useLatestRequest(`${eventId}:${user?.id}`)
+  const acceptedRevision = useRef(null)
+  const getGuardedView = useCallback(async (options) => {
+    const identity = { eventId, judgeId: user?.id }
+    const isCurrent = beginViewRequest()
+    const result = await pageantService.getSessionView(eventId, options)
+    const session = result.data.activeSession ?? result.data.session
+    const revisionKey = `${eventId}:${identity.judgeId}:${session?.id}:${result.data.context?.rulesVersion}`
+    const previous = acceptedRevision.current
+    if (!isCurrent() || identityRef.current.eventId !== identity.eventId ||
+        identityRef.current.judgeId !== identity.judgeId || result.data.viewerJudgeId !== identity.judgeId ||
+        (previous?.key === revisionKey && Number(session?.revision ?? 0) < previous.revision)) {
+      const stale = new Error('A newer scoring context is already available')
+      stale.staleContext = true
+      throw stale
+    }
+    acceptedRevision.current = { key: revisionKey, revision: Number(session?.revision ?? 0) }
+    return result
+  }, [eventId, user?.id, beginViewRequest])
   const judgeName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email
   const [sheet, setSheet] = useState(null)
+  const currentSheetRef = useRef(sheet)
+  currentSheetRef.current = sheet
+  const [reviewer,setReviewer]=useState(false)
   const [scores, setScores] = useState({})
   const [loading, setLoading] = useState(true)
+  const {changed:markDraftChanged,flush:flushDrafts,status:draftStatus,hasPending:pendingDrafts} = useJudgeScoreDrafts(eventId,user?.id,sheet,scores,setScores)
+  const [roundSubmitting,setRoundSubmitting]=useState(false)
   const [error, setError] = useState(null)
   
   // Live session state variables
   const [sessionState, setSessionState] = useState(null)
   const [activeContestantId, setActiveContestantId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
-  const [reconnectAttempts, setReconnectAttempts] = useState(0)
   // Which criterion is currently being submitted, keyed `contestantId:criterionId`
   // (per-criterion Lock). null when nothing is in flight.
   const [submittingKey, setSubmittingKey] = useState(null)
-  // The shared WS client (socket.service) may already be open before this page
-  // mounts (Bootstrap connects on auth), so seed from its live state.
-  const [socketConnected, setSocketConnected] = useState(() => isConnected())
   const isArchived = sheet?.event?.status === 'archived'
   
   // Division selector state
@@ -54,6 +66,7 @@ export default function JudgeScoringPage() {
 
   // Retry queue state management (Requirement 15.1, 15.2)
   const [submissionQueue, setSubmissionQueue] = useState([])
+  const retryInProgress = useRef(false)
   const [showRetryBanner, setShowRetryBanner] = useState(false)
   
   // Confirmation toast state
@@ -62,8 +75,8 @@ export default function JudgeScoringPage() {
 
   // Helper functions for retry queue localStorage persistence (Requirement 15.2)
   const getRetryQueueKey = useCallback(() => {
-    return `competition_retry_queue_${eventId}`
-  }, [eventId])
+    return `competition_retry_queue_v2_${user?.id}_${eventId}_${sheet?.context?.sessionId??'waiting'}_${sheet?.context?.roundId??'flat'}_${sheet?.context?.rulesVersion??'legacy'}`
+  }, [eventId,user?.id,sheet?.context?.sessionId,sheet?.context?.roundId,sheet?.context?.rulesVersion])
 
   const loadRetryQueueFromStorage = useCallback(() => {
     try {
@@ -108,57 +121,50 @@ export default function JudgeScoringPage() {
 
   const shouldShowNoDivisionsError = useMemo(() => {
     if (!sheet?.divisionsEnabled) return false
-    return sheet?.allowedDivisions?.length === 0
+    return sheet?.allowedDivisions?.length === 0 && !sheet?.contestants?.length
   }, [sheet])
 
-  // Load session view (live-session-only API)
+  // An event and authenticated Judge jointly own a scoring view.
   useEffect(() => {
-    pageantService
-      .getSessionView(eventId)
-      .then(({ data }) => {
-        setSheet(data)
-        // Initialize scores (per on-stage contestant) from existing submissions.
-        setScores((prev) => ({ ...prev, ...scoresFromSheet(data) }))
-      })
-      .catch((err) => {
-        console.error('[Load session view]', err)
-        setError(err.response?.data?.message || 'Failed to load scoring sheet')
-      })
-      .finally(() => setLoading(false))
-  }, [eventId])
+    let cancelled=false
+    setLoading(true);setSheet(null);setScores({});setReviewer(false);setError(null)
+    getGuardedView().then(({data})=>{if(!cancelled)setSheet(data)})
+      .catch(error=>{
+        if(cancelled || error.staleContext)return
+        setError(error.response?.data?.message??'Failed to load scoring sheet')
+        workflowService.review(eventId).then(()=>{if(!cancelled)setReviewer(true)}).catch(()=>{})
+      }).finally(()=>{if(!cancelled)setLoading(false)})
+    return()=>{cancelled=true}
+  },[eventId,getGuardedView])
 
   // Load retry queue from localStorage on mount (Requirement 15.2)
   useEffect(() => {
     const storedQueue = loadRetryQueueFromStorage()
-    if (storedQueue.length > 0) {
-      setSubmissionQueue(storedQueue)
-      setShowRetryBanner(true)
-    }
+    setSubmissionQueue(storedQueue)
+    setShowRetryBanner(storedQueue.length > 0)
   }, [loadRetryQueueFromStorage])
 
   // Handle division change with scoring sheet reload - MOVED UP to fix temporal dead zone issue
   const handleDivisionChange = useCallback(async (divisionId) => {
     try {
-      setLoading(true)
       setError(null)
-      
+      setSelectedDivisionId(divisionId)
       // Call API with division filter
-      const { data } = await pageantService.getSessionView(eventId, { 
+      const { data } = await getGuardedView({
         divisionId: divisionId || null 
       })
       
       // Update sheet with filtered data
       setSheet(data)
       setSelectedDivisionId(divisionId)
-      setScores((prev) => ({ ...prev, ...scoresFromSheet(data) }))
 
     } catch (err) {
-      console.error('Division change error:', err)
+      if (err.staleContext) return
       setError(err.response?.data?.message || 'Failed to load division data')
     } finally {
       setLoading(false)
     }
-  }, [eventId])
+  }, [getGuardedView])
 
   // Auto-select single division when divisions are enabled and only one is allowed (Requirement 19.2, 19.5)
   useEffect(() => {
@@ -189,135 +195,28 @@ export default function JudgeScoringPage() {
     }
   }, [sheet?.activeSession, sheet?.session])
 
-  // Re-sync the whole session view from the server (used on (re)connect and on
-  // round/contestant/stage changes so the round name, criteria, on-stage set and
-  // existing scores all refresh together).
-  const syncSessionView = useCallback(() => {
-    pageantService
-      .getSessionView(eventId)
-      .then(({ data }) => {
-        setSheet(data)
-        setScores((prev) => ({ ...prev, ...scoresFromSheet(data) }))
-        const s = data.activeSession ?? data.session
-        if (s) {
-          setSessionState(s)
-          setActiveContestantId(
-            s.status === 'active' ? s.activeContestantId ?? null : null,
-          )
-        } else {
-          // The session ended (or never existed) — drop back to the waiting view.
-          setSessionState(null)
-          setActiveContestantId(null)
-        }
-      })
-      .catch((err) => console.error('[WS] Failed to sync session:', err))
-  }, [eventId])
-
-  // Fallback polling while the session is NOT live yet. Socket events
-  // (session:status-changed) only reach judges who are already connected when
-  // the organizer starts the session; a judge who opens this page afterwards
-  // would otherwise sit on "No active session" until a manual refresh. Polling
-  // every few seconds makes the sheet flip to live automatically, and stops as
-  // soon as the session is active.
-  useEffect(() => {
-    if (loading) return undefined
-    if (sessionState?.status === 'active') return undefined
-    const intervalId = setInterval(syncSessionView, 5000)
-    return () => clearInterval(intervalId)
-  }, [loading, sessionState?.status, syncSessionView])
-
-  // Real-time updates via the shared WS client (socket.service). The voter is
-  // auto-joined to the event room on connect (ws-server setupRooms), and
-  // useSocketEvent handlers receive the emitted `data` object directly. This
-  // replaces the previous `window.socketClient` (socket.io-style) client, which
-  // this app never defined — so live updates never fired and the judge relied on
-  // manual refresh.
-  useSocketEvent('session:status-changed', ({ session }) => {
-    if (!session) return
-    setSessionState(session)
-    if (session.status === 'active') {
-      // Reload the sheet: the initial mount load may have run BEFORE the session
-      // existed (empty criteria/contestants), so without this the judge would see
-      // an "active" session with nothing to score.
-      pageantService
-        .getSessionView(eventId)
-        .then(({ data }) => {
-          setSheet(data)
-          setScores((prev) => ({ ...prev, ...scoresFromSheet(data) }))
-        })
-        .catch((err) => console.error('[Judge] reload on session start failed:', err))
-      setActiveContestantId(session.activeContestantId ?? null)
-    } else {
-      setActiveContestantId(null)
+  const syncSessionView = useCallback(async () => {
+    try {
+      const { data } = await getGuardedView()
+      if (!currentSheetRef.current) setError(null)
+      setSheet(data)
+      const session = data.activeSession ?? data.session ?? null
+      setSessionState(session)
+      setActiveContestantId(session?.status === 'active' ? session.activeContestantId ?? null : null)
+      setConnectionError(null)
+    } catch (err) {
+      if (!err.staleContext) setConnectionError(err.response?.data?.message ?? 'Unable to reconcile scoring permissions. Your local scores are retained; retry when connected.')
     }
-  }, [eventId])
-
-  useSocketEvent('session:contestant-changed', ({ session }) => {
-    if (!session) return
-    setSessionState(session)
-    // Reload the sheet so the on-stage set (single or stage group), its criteria
-    // and existing scores all refresh for the new context.
-    syncSessionView()
-  }, [syncSessionView])
-
-  useSocketEvent('session:arrangement-changed', ({ session }) => {
-    if (session) setSessionState(session)
-    syncSessionView()
-  }, [syncSessionView])
-
-  // Round switched by the organizer — reload so the round name + criteria update.
-  useSocketEvent('session:round-changed', ({ session }) => {
-    if (session) setSessionState(session)
-    syncSessionView()
-  }, [syncSessionView])
-
-  // Organizer opened/closed criteria for the current round — reload so closed
-  // criteria (and their minors) disappear from the sheet immediately.
-  useSocketEvent('session:active-criteria-changed', ({ session }) => {
-    if (session) setSessionState(session)
-    syncSessionView()
-  }, [syncSessionView])
-
-  useSocketEvent('session:division-changed', ({ session }) => {
-    if (!session) return
-    setSessionState(session)
-    if (session.currentDivisionId && sheet?.divisionsEnabled) {
-      const isAssigned = sheet?.allowedDivisions?.some((div) => div.id === session.currentDivisionId)
-      if (isAssigned) {
-        pageantService
-          .getSessionView(eventId, { divisionId: session.currentDivisionId })
-          .then(({ data }) => {
-            setSheet(data)
-            setScores((prev) => ({ ...prev, ...scoresFromSheet(data) }))
-          })
-          .catch((err) => {
-            console.error('[Division change] Failed to reload scoring sheet:', err)
-            setConnectionError('Failed to update division')
-          })
-      } else {
-        setConnectionError('You are not assigned to this division')
-      }
-    }
-  }, [eventId, sheet?.divisionsEnabled, sheet?.allowedDivisions])
-
-  useSocketEvent('ws:connected', () => {
-    setSocketConnected(true)
-    setConnectionError(null)
-    setReconnectAttempts(0)
-    syncSessionView()
-  }, [syncSessionView])
-
-  useSocketEvent('ws:disconnected', () => {
-    setSocketConnected(false)
-    setReconnectAttempts((prev) => prev + 1)
-  }, [])
+  }, [getGuardedView])
+  const { connected: socketConnected, recovering } = useCompetitionSync(eventId, syncSessionView, { enabled: !loading && !reviewer })
 
   // Update a single score cell in local state. No auto-save — the judge commits
   // each contestant explicitly with "Submit & lock" (B3), which is fairness-safe
   // and, because each submit reads only its own row, records every contestant.
   const onScoreChange = useCallback((contestantId, targetId, value) => {
     setScores((prev) => ({ ...prev, [`${contestantId}:${targetId}`]: value }))
-  }, [])
+    markDraftChanged(contestantId,targetId)
+  }, [markDraftChanged])
 
   // Build ONE criterion's payload for a contestant from the CURRENT scores,
   // validating each of that criterion's minors against its own bounds. The judge
@@ -340,7 +239,7 @@ export default function JudgeScoringPage() {
         const num = Number(raw)
         const min = t.minScore ?? sheet?.scoreBounds?.min
         const max = t.maxScore ?? sheet?.scoreBounds?.max
-        if (Number.isNaN(num) || num < min || num > max) {
+        if (!Number.isFinite(num) || num < min || num > max) {
           return { ok: false, error: `A score is out of range (${min}–${max}).` }
         }
         scoreMap[t.id] = num
@@ -352,6 +251,7 @@ export default function JudgeScoringPage() {
 
   const submitCriterion = useCallback(
     async (contestantId, criterionId) => {
+      if (submittingKey) return
       // #4: closed contestants aren't scorable (the organizer hasn't opened them).
       const target = (sheet?.contestants ?? []).find((c) => c.id === contestantId)
       if (target && target.open === false) {
@@ -366,7 +266,9 @@ export default function JudgeScoringPage() {
       setError(null)
       setSubmittingKey(`${contestantId}:${criterionId}`)
       try {
-        await pageantService.submitSessionScore(eventId, scoreMap, contestantId)
+        await flushDrafts(contestantId,criterionId)
+        if (eventId !== identityRef.current.eventId || sheet.context?.judgeId !== identityRef.current.judgeId || ['sessionId','roundId','rulesVersion'].some(key => sheet.context?.[key] !== currentSheetRef.current?.context?.[key])) return
+        await pageantService.submitSessionScore(eventId, scoreMap, contestantId, sheet.context, criterionId)
         const savedName = (sheet?.contestants ?? []).find((c) => c.id === contestantId)?.name || ''
         setLastSavedName(savedName)
         setShowConfirmation(true)
@@ -375,8 +277,9 @@ export default function JudgeScoringPage() {
         syncSessionView()
       } catch (err) {
         console.error('[Submit] Failed:', err)
+        if (eventId !== identityRef.current.eventId || sheet.context?.judgeId !== identityRef.current.judgeId || ['sessionId','roundId','rulesVersion'].some(key => sheet.context?.[key] !== currentSheetRef.current?.context?.[key])) return
         if (!err.response) {
-          addToRetryQueue({ contestantId, scores: scoreMap, timestamp: Date.now() })
+          addToRetryQueue({ contestantId, criteriaId:criterionId, context:sheet.context, scores: scoreMap, timestamp: Date.now() })
         } else {
           setError(err.response?.data?.message || 'Submit failed')
         }
@@ -384,94 +287,47 @@ export default function JudgeScoringPage() {
         setSubmittingKey(null)
       }
     },
-    [buildCriterionPayload, eventId, sheet, syncSessionView, addToRetryQueue],
+    [buildCriterionPayload, eventId, sheet, syncSessionView, addToRetryQueue, flushDrafts, submittingKey],
   )
 
-  // Automatic retry on reconnection (Requirement 15.5, 15.6, 15.7)
-  // Task 13.2: Add useEffect watching [socket.connected, submissionQueue]
-  useEffect(() => {
-    // Retry when the shared WS client is connected AND there are queued submissions.
-    const shouldRetry = socketConnected && submissionQueue.length > 0
-
-    if (!shouldRetry) return
-
-    // Iterate through queue and retry each submission
-    const retrySubmissions = async () => {
-      console.log(`[Retry Queue] Processing ${submissionQueue.length} queued submissions`)
-
+  const handleManualRetry = useCallback(async () => {
+    if (!submissionQueue.length || retryInProgress.current) return
+    retryInProgress.current = true
+    try {
       for (const submission of submissionQueue) {
+        const sameContext = ['judgeId','sessionId','roundId','rulesVersion'].every(key =>
+          (submission.context?.[key] ?? null) === (sheet?.context?.[key] ?? null))
+        if (!sameContext || submission.context?.judgeId !== identityRef.current.judgeId) {
+          setError('Queued scores belong to a different scoring context. They have been retained for review; they cannot be replayed into this round.')
+          continue
+        }
         try {
-          // Retry the submission
-          await pageantService.submitSessionScore(eventId, submission.scores, submission.contestantId)
-          
-          console.log(`[Retry Queue] Successfully submitted scores for contestant ${submission.contestantId}`)
-          
-          // On success, remove from queue (both state and localStorage) - Task 13.2
-          setSubmissionQueue(prevQueue => {
-            const updatedQueue = prevQueue.filter(s => s.contestantId !== submission.contestantId)
-            saveRetryQueueToStorage(updatedQueue)
-            
-            // When queue is empty, hide retry banner - Task 13.2
-            if (updatedQueue.length === 0) {
-              setShowRetryBanner(false)
-            }
-            
-            return updatedQueue
+          await pageantService.submitSessionScore(eventId, submission.scores, submission.contestantId, submission.context, submission.criteriaId)
+          setSubmissionQueue(previous => {
+            const remaining = previous.filter(item => !(item.timestamp === submission.timestamp && item.criteriaId === submission.criteriaId))
+            saveRetryQueueToStorage(remaining)
+            setShowRetryBanner(remaining.length > 0)
+            return remaining
           })
-          
-          // Show success confirmation
           setShowConfirmation(true)
           setTimeout(() => setShowConfirmation(false), 3000)
-          
         } catch (err) {
-          console.error(`[Retry Queue] Failed to submit scores for contestant ${submission.contestantId}:`, err)
-          // On failure, keep submission in queue for manual retry - Task 13.2
-          // Queue remains unchanged
+          setError(err.response?.data?.message ?? 'Scores remain queued. Check your connection and retry.')
         }
       }
-    }
+      await syncSessionView()
+    } finally { retryInProgress.current = false }
+  }, [submissionQueue, eventId, saveRetryQueueToStorage, sheet?.context, syncSessionView])
+  // One automatic attempt on transport recovery. Failed scores stay available for
+  // explicit retry instead of looping on every authoritative sheet refetch.
+  const wasConnected = useRef(socketConnected)
+  useEffect(() => {
+    if (socketConnected && !wasConnected.current) void handleManualRetry()
+    wasConnected.current = socketConnected
+  }, [socketConnected, handleManualRetry])
 
-    retrySubmissions()
-  }, [socketConnected, submissionQueue, eventId, saveRetryQueueToStorage, sheet?.contestants])
-
-  // Manual retry function for retry banner button (Task 13.3)
-  const handleManualRetry = useCallback(async () => {
-    if (submissionQueue.length === 0) return
-
-    console.log(`[Manual Retry] Processing ${submissionQueue.length} queued submissions`)
-
-    for (const submission of submissionQueue) {
-      try {
-        // Retry the submission
-        await pageantService.submitSessionScore(eventId, submission.scores, submission.contestantId)
-        
-        console.log(`[Manual Retry] Successfully submitted scores for contestant ${submission.contestantId}`)
-        
-        // On success, remove from queue (both state and localStorage)
-        setSubmissionQueue(prevQueue => {
-          const updatedQueue = prevQueue.filter(s => s.contestantId !== submission.contestantId)
-          saveRetryQueueToStorage(updatedQueue)
-          
-          // When queue is empty, hide retry banner
-          if (updatedQueue.length === 0) {
-            setShowRetryBanner(false)
-          }
-          
-          return updatedQueue
-        })
-        
-        // Show success confirmation
-        setShowConfirmation(true)
-        setTimeout(() => setShowConfirmation(false), 3000)
-        
-      } catch (err) {
-        console.error(`[Manual Retry] Failed to submit scores for contestant ${submission.contestantId}:`, err)
-        // On failure, keep submission in queue - user can try again
-      }
-    }
-  }, [submissionQueue, eventId, saveRetryQueueToStorage])
-
-  if (loading) {
+  if (reviewer) return <CompetitionReviewer eventId={eventId}/>
+  if (loading || sheet && sheet.viewerJudgeId!==user?.id) {
     return (
       <div className="flex justify-center py-20">
         <LoadingSpinner />
@@ -480,20 +336,22 @@ export default function JudgeScoringPage() {
   }
 
   // Show waiting message if no active session
-  if (!sessionState || sessionState.status !== 'active') {
+  if (!sessionState || (sessionState.status !== 'active' && !sheet?.context)) {
     return (
       <div className="mx-auto max-w-lg space-y-6">
-        <VoterEventHeader event={sheet?.event} eyebrow="Judge scoring">
-          <p className="text-sm font-medium text-white/75">Waiting for session to start</p>
-        </VoterEventHeader>
+        <JudgeScoringHeader sheet={sheet} sessionState={sessionState} judgeName={judgeName} />
+        <CompetitionPublishedResults eventId={eventId} judgeId={user?.id}/>
+        <p role="status" className="v-caption">{socketConnected ? 'Live updates connected' : 'Live updates interrupted; checking saved scoring state every 15 seconds.'}</p>
 
 
+        {error&&<FormAlert variant="error" message={error}/>}
+        {error&&<Button onClick={syncSessionView}>Retry scoring access</Button>}
         <div className="v-card p-8 text-center space-y-4">
           <div className="h-12 w-12 rounded-full bg-v-surface border border-v-border mx-auto flex items-center justify-center">
             <div className="h-2 w-2 rounded-full bg-v-text-muted"></div>
           </div>
           <div>
-            <p className="text-lg font-semibold text-white">No active session</p>
+            <p className="text-lg font-semibold text-v-text">No active session</p>
             <p className="mt-2 text-sm text-v-text-muted">
               The organizer has not started a live session yet. You'll be able to score contestants once the session begins.
             </p>
@@ -513,7 +371,7 @@ export default function JudgeScoringPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-24">
+    <div className="v-judge-page mx-auto max-w-7xl space-y-4 pb-24">
       {/* Retry error banner (Requirement 15.3, 15.4) - Task 13.3 */}
       {showRetryBanner && (
         <div className="rounded-lg border border-v-warning/30 bg-v-warning-bg p-4">
@@ -521,7 +379,7 @@ export default function JudgeScoringPage() {
             <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-v-warning" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-v-warning">
-                Couldn't save your scores yet. They'll be submitted automatically when your connection is restored.
+                Couldn't lock these scores yet. We retry once after live connection recovery; unresolved scores stay here for review.
               </p>
               <p className="mt-1 text-xs text-v-warning/80">
                 {submissionQueue.length} score{submissionQueue.length !== 1 ? 's' : ''} pending submission
@@ -541,55 +399,32 @@ export default function JudgeScoringPage() {
         </div>
       )}
 
-      <VoterEventHeader event={sheet?.event} eyebrow="Judge scoring">
-        <p className="text-sm font-medium text-white/75">
-          Live session scoring{judgeName ? ` · Scoring as ${judgeName}` : ''}
-        </p>
-      </VoterEventHeader>
+      <JudgeScoringHeader sheet={selectedDivisionId ? { ...sheet, contestants: sheet.contestants.filter(contestant => contestant.divisionId === selectedDivisionId) } : sheet} sessionState={sessionState} judgeName={judgeName} />
+      <CompetitionPublishedResults eventId={eventId} judgeId={user?.id}/>
 
+      <p role="status" className="v-caption">{socketConnected ? recovering ? 'Reconciling saved scoring state…' : 'Live updates connected' : 'Live updates interrupted; checking saved state every 15 seconds while this page is visible.'}</p>
       {/* Connection error banner */}
       {connectionError && (
         <div className="rounded-xl border border-v-danger/30 bg-v-danger-bg px-4 py-3">
           <div className="flex items-center justify-between">
             <p className="text-sm text-v-danger">{connectionError}</p>
-            {reconnectAttempts >= 3 && (
-              <Button 
-                size="sm" 
-                onClick={() => window.location.reload()}
-                className="ml-4"
-              >
-                Refresh now
-              </Button>
-            )}
+            <Button size="sm" onClick={syncSessionView} className="ml-4">Retry synchronization</Button>
           </div>
         </div>
       )}
 
-      {/* Live Mode Status */}
-      <div className="rounded-xl border border-emerald-900/50 bg-emerald-950/30 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></div>
-          <div className="flex-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-emerald-400/70">Live Session Active</p>
-            {(sheet?.roundName || sessionState?.currentRoundName || sessionState?.currentRoundId) ? (
-              <p className="mt-0.5 text-lg font-bold text-emerald-200">
-                {sheet?.roundName || sessionState?.currentRoundName || 'Current round'}
-              </p>
-            ) : (
-              <p className="mt-0.5 text-sm font-semibold text-emerald-200">Scoring</p>
-            )}
-            {activeContestantId && sessionState?.contestantOrder && (
-              <p className="text-xs text-emerald-400/80">
-                Contestant {sessionState.contestantOrder.indexOf(activeContestantId) + 1} of {sessionState.contestantOrder.length}
-              </p>
-            )}
-          </div>
-          {submittingKey && (
-            <span className="text-xs text-emerald-400">Saving…</span>
-          )}
-        </div>
-      </div>
-
+      {sheet?.context && <div className="v-judge-workflow-strip">
+        <p className="v-label">{sheet.submission ? 'Round submitted' : sheet.completion?.ready ? 'Ready to Submit Round' : `${sheet.completion?.locked ?? 0}/${sheet.completion?.required ?? 0} groups locked`} · Rules version {sheet.rulesVersion}</p>
+        <p className="v-caption">{Object.values(draftStatus).includes('Saving') ? 'Saving drafts…' : Object.values(draftStatus).some(value => value !== 'Saved draft') ? 'Local edits still need saving' : 'Numeric edits save drafts automatically. Lock commits a criterion; Submit Round sends the completed round.'}</p>
+        {!sheet.submission && <Button disabled={!sheet.completion?.ready || pendingDrafts || submissionQueue.length > 0 || roundSubmitting || !sheet.submissionWindow} loading={roundSubmitting} onClick={async () => {
+          if (roundSubmitting || !window.confirm(`Submit this round with ${sheet.completion.locked} locked groups? Ordinary edits will close.`)) return
+          setRoundSubmitting(true)
+          try { await workflowService.submit(eventId, { context: sheet.context }); await syncSessionView(); setError(null) }
+          catch (e) { setError(e.response?.data?.message ?? 'Round submission failed') }
+          finally { setRoundSubmitting(false) }
+        }}>Submit Round</Button>}
+      </div>}
+      {sheet?.legacyTransitionRequired&&<p className="v-card p-4">Historical scoring is read-only. Official rules must be acknowledged before a new scoring session; existing locks are not round submissions.</p>}
       {/* Division Selector */}
       {shouldShowNoDivisionsError && (
         <div className="v-card px-4 py-3">
@@ -603,7 +438,7 @@ export default function JudgeScoringPage() {
       {shouldShowSingleDivision && (
         <div className="v-card px-4 py-3">
           <p className="text-sm text-v-text-muted">
-            Division: <span className="font-medium text-white">{sheet.allowedDivisions[0].name}</span>
+            Division: <span className="font-medium text-v-text">{sheet.allowedDivisions[0].name}</span>
           </p>
         </div>
       )}
@@ -629,35 +464,8 @@ export default function JudgeScoringPage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3 text-sm">
-        {(() => {
-          // Round-driven: the whole field is on the sheet. The organizer gates
-          // which contestants/criteria are open (#4); summarize what's scorable.
-          const field = sheet?.contestants ?? []
-          if (!field.length) {
-            return <p className="text-v-text-muted">Waiting for the organizer to open scoring…</p>
-          }
-          const openContestants = field.filter((c) => c.open !== false)
-          const openCrit = (sheet?.criteria ?? []).filter((c) => c.open !== false)
-          return (
-            <p className="text-v-text-muted">
-              Scoring{' '}
-              <strong className="text-white">
-                {openContestants.length} of {field.length}
-              </strong>{' '}
-              contestant{field.length === 1 ? '' : 's'} on{' '}
-              <strong className="text-white">{openCrit.length}</strong> open criteri
-              {openCrit.length === 1 ? 'on' : 'a'}.
-              {openContestants.length < field.length &&
-                ' Locked contestants open when the organizer says so.'}
-            </p>
-          )
-        })()}
-      </div>
-
-
       <CompetitionScoringForm
-        sheet={sheet}
+        sheet={selectedDivisionId?{...sheet,contestants:sheet.contestants.filter(c=>c.divisionId===selectedDivisionId)}:sheet}
         scores={scores}
         onScoreChange={onScoreChange}
         submittingKey={submittingKey}
@@ -685,7 +493,7 @@ export default function JudgeScoringPage() {
           <div className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-lg border border-v-success/25 bg-v-success-bg px-4 py-3 text-sm text-v-success shadow-v-shadow-md">
             <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
             <div className="flex-1 leading-snug">
-              <p className="font-semibold">Scores submitted</p>
+              <p className="font-semibold">Criterion saved and locked</p>
               <p className="mt-0.5 opacity-90">
                 {lastSavedName || sheet?.contestants?.find(c => c.id === activeContestantId)?.name} — scores are locked
               </p>

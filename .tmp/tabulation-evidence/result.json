@@ -1,0 +1,9 @@
+{
+  "checks": [
+    "1440px: entries, judge and panel breakdown, rules and export fit viewport",
+    "768px: entries, judge and panel breakdown, rules and export fit viewport",
+    "390px: entries, judge and panel breakdown, rules and export fit viewport"
+  ],
+  "exceptions": [],
+  "apiRequests": []
+}

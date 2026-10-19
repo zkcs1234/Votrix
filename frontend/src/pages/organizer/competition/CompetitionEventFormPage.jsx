@@ -1,14 +1,14 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { pageantService } from '@/services/pageant.service'
 import { pageantEventSchemaStep1, isoToLocalInput, localInputToIso } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import CalendarCard from '@/components/ui/CalendarCard'
+import DateTimeInput from '@/components/ui/DateTimeInput'
 import Card from '@/components/ui/Card'
-import EventStepper from '@/components/ui/EventStepper'
-import StageFooter from '@/components/ui/StageFooter'
+import { getNextStage, stagePath } from '@/utils/eventStages'
+import SaveStatus from '@/components/ui/SaveStatus'
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
@@ -17,16 +17,21 @@ import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import { isSetupLocked } from '@/utils/constants'
+import Button from '@/components/ui/Button'
+
+import { COMPETITION_TYPES } from '../../../../../shared/competition-creation-flow.js'
+import EventStepper from '@/components/ui/EventStepper'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
 function inferStepFromPath(pathname) {
+  if (pathname.includes('/type')) return 'type'
   if (pathname.includes('/branding')) return 'branding'
   return 'details'
 }
 
 function normalizeDraftStep(step) {
-  if (step === 'branding') return step
+  if (['branding', 'type'].includes(step)) return step
   return 'details'
 }
 
@@ -36,7 +41,7 @@ export default function CompetitionEventFormPage() {
   const isNew = !eventId || eventId === 'new'
   const navigate = useNavigate()
 
-const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
+  const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   const [banner, setBanner] = useState(null)
   const [bannerFile, setBannerFile] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -47,15 +52,19 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   // structure; the organizer configures Structure & Scoring themselves. Kept as
   // local state and threaded through the draft payload so it survives step
   // navigation and draft restore.
-  const [templates, setTemplates] = useState([])
   const [competitionType, setCompetitionType] = useState(null)
   const [competitionTypeOther, setCompetitionTypeOther] = useState('')
   const [eventStatus, setEventStatus] = useState(null)
+  const [officialRulesId, setOfficialRulesId] = useState(null)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const operationRef = useRef(false)
+  const creationKeyRef = useRef(crypto.randomUUID())
   // A brand-new event has no status yet (null); it is always editable. Only an
   // existing event whose setup is locked (scheduled/active/…) is read-only.
-  const readOnly = !isNew && isSetupLocked(eventStatus)
+  const readOnly = !isNew && (loading || loadFailed || isSetupLocked(eventStatus) || Boolean(officialRulesId))
 
-const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
+const { markComplete, reset: resetProgress } = useEventProgress(
     'competition',
     eventId,
   )
@@ -66,7 +75,6 @@ const {
     getValues,
     handleSubmit: rhfHandleSubmit,
     formState: { errors, isDirty },
-    trigger,
     reset,
     watch,
   } = useForm({
@@ -94,7 +102,7 @@ const {
   })
 
   const formValues = watch()
-  const startDateValue = formValues.startDate ?? ''
+
 
   const buildDraftSnapshot = useCallback((data = getValues(), draftStep = step, currentBanner = banner) => ({
     step: draftStep,
@@ -109,6 +117,7 @@ const {
       endDate: data.endDate,
       competitionType,
       competitionTypeOther,
+      idempotencyKey: creationKeyRef.current,
     },
   }), [banner, competitionType, competitionTypeOther, getValues, step])
 
@@ -120,24 +129,19 @@ useEffect(() => {
     setStep(inferStepFromPath(location.pathname))
   }, [location.pathname])
 
-  // Load the starter-template catalog for the create wizard.
-  useEffect(() => {
-    if (!isNew) return
-    pageantService
-      .getTemplates()
-      .then(({ data }) => setTemplates(data.templates ?? []))
-      .catch(() => setTemplates([]))
-  }, [isNew])
-
   // Session-boundary cleanup: reset all transient form state whenever the
   // session identity changes so no stale values/errors/step/uploads leak.
   useEffect(() => {
+    creationKeyRef.current = crypto.randomUUID()
     setBanner(null)
     setBannerFile(null)
     setError(null)
     setDraftRestored(false)
     setCompetitionType(null)
     setCompetitionTypeOther('')
+    setOfficialRulesId(null)
+    setEventStatus(null)
+    setLoadFailed(false)
     reset({
       title: '',
       description: '',
@@ -165,6 +169,7 @@ useEffect(() => {
     setBanner(draft.banner ?? null)
     setCompetitionType(payload.competitionType ?? null)
     setCompetitionTypeOther(payload.competitionTypeOther ?? '')
+    if (payload.idempotencyKey) creationKeyRef.current = payload.idempotencyKey
     if (draft.banner) {
       markComplete('branding')
     }
@@ -179,7 +184,7 @@ useEffect(() => {
   }, [draft, draftRestored, isDirty, isNew, restoreDraft])
 
   useSilentDraftAutosave({
-    enabled: isNew && !bannerFile,
+    enabled: isNew && !bannerFile && !saving,
     data: buildDraftSnapshot(formValues),
     saveDraftAsync,
     onAutosave: markDraftTouched,
@@ -187,39 +192,53 @@ useEffect(() => {
 
   useEffect(() => {
     if (isNew) return
+    let alive = true
+    setLoading(true)
     pageantService.getEvent(eventId)
       .then(({ data }) => {
+        if (!alive) return
         setEventStatus(data.event.status ?? null)
+        setOfficialRulesId(data.event.competitionCreatedAt || data.event.officialRulesId || data.event.official_rules_id || null)
+        setLoadFailed(false)
+        setError(null)
         reset({
           title: data.event.title || '',
           description: data.event.description || '',
           startDate: isoToLocalInput(data.event.startDate),
           endDate: isoToLocalInput(data.event.endDate),
         })
-setBanner(data.event.banner)
+        setBanner(data.event.banner)
         if (data.event.banner) markComplete('branding')
         markComplete('details')
       })
       .catch((err) => {
+        if (!alive) return
         setError(err.response?.data?.message || 'Failed to load event')
+        setLoadFailed(true)
       })
-      .finally(() => setLoading(false))
-  }, [eventId, isNew, reset, markComplete])
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [eventId, isNew, reset, markComplete, loadAttempt])
 
-  const handleNext = async (e) => {
-    e.preventDefault()
-    const isValid = await trigger(['title', 'startDate', 'endDate'])
-    if (!isValid) return
+  const validateCompetitionType = () => {
+    if (!competitionType) { setError('Choose a competition type.'); return false }
+    if (competitionType === '__other__' && !competitionTypeOther.trim()) {
+      setError('Enter a competition type.')
+      return false
+    }
+    return true
+  }
 
-    if (isNew) {
-      const data = getValues()
-      setDraftRestored(true)
-      saveDraftAsync(buildDraftSnapshot(data, 'branding'))
-      setStep('branding')
-    } else {
-      setSaving(true)
-      try {
-        const data = getValues()
+  const handleNext = rhfHandleSubmit(async (data) => {
+    if (operationRef.current || readOnly) return
+    operationRef.current = true
+    setSaving(true)
+    setError(null)
+    try {
+      if (isNew) {
+        await saveDraft(buildDraftSnapshot(data, 'branding'))
+        setDraftRestored(true)
+      } else {
         const payload = {
           title: data.title,
           description: data.description,
@@ -227,17 +246,20 @@ setBanner(data.event.banner)
           endDate: localInputToIso(data.endDate),
         }
         await pageantService.updateEvent(eventId, payload)
-        setStep('branding')
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to update event')
-      } finally {
-        setSaving(false)
       }
+      markComplete('details')
+      setStep('branding')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save event details. Your entries are kept; retry when ready.')
+    } finally {
+      operationRef.current = false
+      setSaving(false)
     }
-  }
+  })
 
-  const handleNextBranding = async (e) => {
-    e.preventDefault()
+  const handleNextBranding = rhfHandleSubmit(async () => {
+    if (operationRef.current || readOnly) return
+    operationRef.current = true
     setSaving(true)
     setError(null)
 
@@ -253,58 +275,54 @@ setBanner(data.event.banner)
         const data = getValues()
         setDraftRestored(true)
         await saveDraft(buildDraftSnapshot(data, 'branding', currentBanner))
-        await handleContinueToContestants()
+        markComplete('branding')
+        setStep('type')
       } else {
         if (bannerFile) {
           await pageantService.uploadBanner(eventId, bannerFile)
           setBannerFile(null)
         }
-        navigate(`/organizer/competition/events/${eventId}/workspace`)
+        navigate(`/organizer/competition/events/${eventId}/type`)
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save event')
     } finally {
+      operationRef.current = false
       setSaving(false)
     }
-  }
+  }, () => { setStep('details'); setError('Check the event details before creating this competition.') })
 
   // Create the real event from the draft and continue into the setup steps
-  // (Contestants → Criteria → Judges). This is NOT the publish step anymore:
-  // the event is created in the `draft` (setup) state and stays out of the
-  // schedule until the organizer clicks "Finish & Publish" on the Judges page.
+  // The returned event remains draft until Review & Publish freezes its rules.
   const handleContinueToContestants = async () => {
-    setSaving(true)
-    setError(null)
-    try {
-      const data = getValues()
-      const payload = {
-        title: data.title,
-        description: data.description,
-        startDate: localInputToIso(data.startDate),
-        endDate: localInputToIso(data.endDate),
-        competitionType: getCompetitionTypeValue(),
-      }
-      const { data: res } = await draftService.publishDraft('competition', payload)
-      navigate(`/organizer/competition/events/${res.event.id}/workspace`, { replace: true })
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save event')
-    } finally {
-      setSaving(false)
+    const data = getValues()
+    const payload = {
+      title: data.title,
+      description: data.description,
+      startDate: localInputToIso(data.startDate),
+      endDate: localInputToIso(data.endDate),
+      competitionType: getCompetitionTypeValue(),
+      idempotencyKey: creationKeyRef.current,
     }
+    const { data: res } = await draftService.publishDraft('competition', payload)
+    await deleteDraft()
+    navigate(`/organizer/competition/events/${res.event.id}/categories`, { replace: true })
   }
+
+  const handleNextType = rhfHandleSubmit(async () => {
+    if (operationRef.current || readOnly || !validateCompetitionType()) return
+    operationRef.current = true; setSaving(true); setError(null)
+    try {
+      await saveDraft(buildDraftSnapshot(getValues(), 'type'))
+      await handleContinueToContestants()
+    } catch (err) { setError(err.response?.data?.message || 'Unable to save the event draft. Your progress is retained.') }
+    finally { operationRef.current = false; setSaving(false) }
+  })
 
   const getCompetitionTypeValue = () => {
     if (competitionType !== '__other__') return competitionType
     return competitionTypeOther.trim() || null
   }
-
-const handleSubmitDetails = rhfHandleSubmit(async () => {
-    if (competitionType === '__other__' && !competitionTypeOther.trim()) {
-      setError('Enter a competition type.')
-      return
-    }
-    setStep('branding')
-  })
 
   // Save the current Create session as a draft, then continue navigation.
   const handleSaveAsDraft = async () => {
@@ -341,22 +359,14 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
   const blocked = confirmLeave?.state === 'blocked'
 
   if (loading) return <p className="v-caption">Loading...</p>
-
-  const stepperEventId = isNew ? 'new' : eventId
+  if (loadFailed) return <div role="alert" className="v-card p-5 space-y-3"><p className="v-error-text">{error}</p><Button variant="secondary" onClick={() => setLoadAttempt(value => value + 1)}>Retry loading event</Button></div>
 
   return (
     <div className="space-y-6">
       <>
-          <EventStepper
-            module="competition"
-            currentKey={step}
-            eventId={stepperEventId}
-            completedKeys={completedKeys}
-            readOnly={readOnly}
-            eventStatus={eventStatus}
-          />
+          <EventStepper module="competition" currentKey={step} eventId={isNew ? 'new' : eventId} completedKeys={step === 'type' ? ['details', 'branding'] : step === 'branding' ? ['details'] : []} navigationDisabled={saving} onLocalStageSelect={setStep} />
 
-          {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="competition" />}
+          {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="competition" frozen={Boolean(officialRulesId)} />}
 
           <div className="w-full">
             <header>
@@ -364,61 +374,18 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                 {isNew ? 'Create Competition Scoring Event' : readOnly ? 'View Competition Scoring Event' : 'Edit Competition Scoring Event'}
               </h2>
               <p className="v-helper-text">
-                Fill out the event basics, branding, and optional information form. Use the stepper or sidebar
-                to jump between sections.
+                Complete the eight setup steps, then review and create your event. Each competition keeps its own scoring, entries, judges, and results.
               </p>
             </header>
           </div>
 
           <div className="w-full">
+            {error && <p role="alert" className="v-error-text">{error}</p>}
             <Card padding="md">
             <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 m-0">
             {step === 'details' && (
-          <form className="space-y-4" onSubmit={handleSubmitDetails}>
-            {isNew && (
-              <div className="v-form-field">
-                <label className={LABEL_CLASS} htmlFor="competition-template">
-                  Competition type <span className="text-v-text-subtle">(optional)</span>
-                </label>
-                <select
-                  id="competition-template"
-                  className={INPUT_CLASS}
-                  value={competitionType ?? ''}
-                  onChange={(e) => {
-                    setCompetitionType(e.target.value || null)
-                    if (e.target.value !== '__other__') setCompetitionTypeOther('')
-                    setError(null)
-                  }}
-                >
-                  <option value="">Unspecified</option>
-                  {templates.map((t) => (
-                    <option key={t.key} value={t.key}>
-                      {t.label}
-                    </option>
-                  ))}
-                  <option value="__other__">Others</option>
-                </select>
-                {competitionType === '__other__' && (
-                  <input
-                    id="competition-type-other"
-                    className={`${INPUT_CLASS} mt-2`}
-                    value={competitionTypeOther}
-                    onChange={(e) => {
-                      setCompetitionTypeOther(e.target.value.slice(0, 32))
-                      setError(null)
-                    }}
-                    placeholder="Enter competition type"
-                    maxLength={32}
-                    required
-                  />
-                )}
-                {error && <p className="v-error-text">{error}</p>}
-                <p className={HELPER_TEXT}>
-                  Just a label — it tailors the setup hints for your event. You&apos;ll configure the
-                  rounds, criteria, and scoring yourself in Structure &amp; Scoring.
-                </p>
-              </div>
-            )}
+          <form className="space-y-4" onSubmit={handleNext}>
+
 
             <div className="v-form-field">
               <label className={LABEL_CLASS} htmlFor="title">
@@ -448,7 +415,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               <p className={HELPER_TEXT}>Optional description for judges and contestants</p>
             </div>
 
-            <div className="v-date-row">
+            <div className="v-date-row grid gap-4 sm:grid-cols-2">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
                   Start Date and Time <span className="text-v-danger">*</span>
@@ -457,11 +424,8 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                   control={control}
                   name="startDate"
                   render={({ field }) => (
-                    <CalendarCard
+                    <DateTimeInput
                       id="startDate"
-                      required
-                      defaultHour={0}
-                      defaultMinute={0}
                       hasError={Boolean(errors.startDate)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
@@ -481,13 +445,9 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                   control={control}
                   name="endDate"
                   render={({ field }) => (
-                    <CalendarCard
+                    <DateTimeInput
                       id="endDate"
-                      required
-                      defaultHour={23}
-                      defaultMinute={59}
                       hasError={Boolean(errors.endDate)}
-                      min={startDateValue || undefined}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
@@ -501,6 +461,48 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
           </form>
         )}
 
+        {step === 'type' && (
+              <div className="v-form-field">
+                <label className={LABEL_CLASS} htmlFor="competition-template">
+                  Competition type <span className="text-v-text-subtle">*</span>
+                </label>
+                <select
+                  id="competition-template"
+                  className={INPUT_CLASS}
+                  value={competitionType ?? ''}
+                  onChange={(e) => {
+                    setCompetitionType(e.target.value || null)
+                    if (e.target.value !== '__other__') setCompetitionTypeOther('')
+                    setError(null)
+                  }}
+                >
+                  <option value="">Choose a competition type</option>
+                  {COMPETITION_TYPES.filter(([key]) => key !== 'other').map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                  <option value="__other__">Others</option>
+                </select>
+                {competitionType === '__other__' && (
+                  <input
+                    id="competition-type-other"
+                    className={`${INPUT_CLASS} mt-2`}
+                    value={competitionTypeOther}
+                    onChange={(e) => {
+                      setCompetitionTypeOther(e.target.value.slice(0, 32))
+                      setError(null)
+                    }}
+                    placeholder="Enter competition type"
+                    maxLength={32}
+                  />
+                )}
+                <p className={HELPER_TEXT}>
+                  This determines the competition and category choices in Step 4. Each selected competition is configured independently.
+                </p>
+              </div>
+            )}
+
         {step === 'branding' && (
           <form className="space-y-4" onSubmit={handleNextBranding}>
             <ImageUploadField
@@ -512,44 +514,36 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               disabled={saving || readOnly}
             />
 
-            {error && <p className="v-error-text">{error}</p>}
           </form>
         )}
 
         </fieldset>
       </Card>
 
-        {!readOnly && step === 'details' && (
-            <StageFooter
-              module="competition"
-              currentKey="details"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleNext}
-              nextLabel="Next: Branding"
-              backLabel={null}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
-        )}
-        
-        {!readOnly && step === 'branding' && (
-            <StageFooter
-              module="competition"
-              currentKey="branding"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleNextBranding}
-              nextLabel={isNew ? 'Create & continue' : 'Next: Structure & Scoring'}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
-        )}
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-v-border pt-4">
+          <div className="flex items-center gap-3">
+            {step !== 'details' && (
+              <Button type="button" variant="secondary" disabled={saving} onClick={() => { setError(null); setStep(step === 'type' ? 'branding' : 'details') }}>
+                Back: {step === 'type' ? 'Branding' : 'Event Details'}
+              </Button>
+            )}
+            {!readOnly && <SaveStatus status={saveStatus} lastSavedAt={lastSavedAt} />}
+          </div>
+          {readOnly ? (
+            <Button type="button" onClick={() => {
+              if (step === 'details') setStep('branding')
 
-        {/* Read-only events keep a plain Back/Next footer for viewing. */}
-        {readOnly && (
-          <StageFooter module="competition" currentKey={step} eventId={eventId} />
-        )}
+              else {
+                const next = getNextStage('competition', step)
+                if (next) navigate(stagePath('competition', next.key, eventId))
+              }
+            }}>Next</Button>
+          ) : (
+            <Button type="button" disabled={saving} onClick={step === 'details' ? handleNext : step === 'branding' ? handleNextBranding : handleNextType}>
+              {saving ? 'Saving...' : step === 'details' ? 'Next: Branding' : step === 'branding' ? 'Next: Competition Type' : 'Next: Competitions / Categories'}
+            </Button>
+          )}
+        </div>
           </div>
         </>
 
