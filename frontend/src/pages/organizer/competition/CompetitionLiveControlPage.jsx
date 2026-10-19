@@ -1,3 +1,4 @@
+import CompetitionLiveWorkflowPanel from '@/components/organizer/competition/CompetitionControlSteps'
 import { Fragment, useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
@@ -11,8 +12,11 @@ import { getErrorMessage } from '@/utils/getErrorMessage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
-import { useSocketEvent } from '@/hooks/useSocketEvent'
+import useCompetitionSync from '@/hooks/useCompetitionSync'
+import useLatestRequest from '@/hooks/useLatestRequest'
+import FormAlert from '@/components/ui/FormAlert'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import { CompetitionWorkspaceBoundary } from '@/components/voter/competition/NativeCompetitionWorkspace'
 
 const SESSION_STATUS = {
   IDLE: 'idle',
@@ -21,9 +25,12 @@ const SESSION_STATUS = {
   COMPLETED: 'completed',
 }
 
-export default function CompetitionLiveControlPage() {
+export default function CompetitionLiveControlPage() { return <CompetitionWorkspaceBoundary owner Legacy={LegacyCompetitionLiveControlPage}/> }
+function LegacyCompetitionLiveControlPage() {
   const { eventId } = useParams()
   const { success, error: toastError } = useToast()
+  const beginRequest = useLatestRequest(eventId)
+  const [loadError, setLoadError] = useState(null)
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
@@ -32,6 +39,7 @@ export default function CompetitionLiveControlPage() {
   const [event, setEvent] = useState(null)
   const [eventStatus, setEventStatus] = useState(null)
   const [foundation, setFoundation] = useState(null)
+  const [controlStep, setControlStep] = useState(2)
   const [arrangement, setArrangement] = useState({ mode: 'default', primaryDivisionId: '', secondaryDivisionId: '' })
   const [arrangementPreview, setArrangementPreview] = useState(null)
 
@@ -45,13 +53,16 @@ export default function CompetitionLiveControlPage() {
   const showLoader = useDelayedLoading(loading, 300)
 
   const loadSession = useCallback(async () => {
+    const isCurrent = beginRequest()
     try {
       const [{ data: sessionData }, { data: foundationData }, { data: eventData }] = await Promise.all([
-        competitionSessionService.getActiveSession(eventId).catch(() => ({ data: {} })),
-        pageantService.getFoundation(eventId).catch(() => ({ data: {} })),
-        pageantService.getEvent(eventId).catch(() => ({ data: {} })),
+        competitionSessionService.getActiveSession(eventId),
+        pageantService.getFoundation(eventId),
+        pageantService.getEvent(eventId),
       ])
 
+      if (!isCurrent()) return
+      setLoadError(null)
       setSession(sessionData.session || null)
       setEvent(sessionData.event || eventData.event || null)
       setEventStatus(eventData.event?.status ?? null)
@@ -59,16 +70,17 @@ export default function CompetitionLiveControlPage() {
 
       if (sessionData.session?.status === SESSION_STATUS.ACTIVE || sessionData.session?.status === SESSION_STATUS.PAUSED) {
         const { data: progressData } = await competitionSessionService.getJudgeProgress(eventId)
-        setJudgeProgress(progressData)
-      }
-    } catch {
-      setSession(null)
+        if (isCurrent()) setJudgeProgress(progressData)
+      } else { setJudgeProgress(null) }
+    } catch (err) {
+      if (isCurrent()) setLoadError(getErrorMessage(err))
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [eventId])
+  }, [eventId, beginRequest])
 
   useEffect(() => {
+    setSession(null); setFoundation(null); setEvent(null); setLoading(true)
     loadSession()
   }, [loadSession])
 
@@ -81,30 +93,11 @@ export default function CompetitionLiveControlPage() {
     })
   }, [session?.arrangement])
 
-  const refreshJudgeProgress = useCallback(async () => {
-    try {
-      const { data } = await competitionSessionService.getJudgeProgress(eventId)
-      setJudgeProgress(data)
-    } catch {
-      /* progress refresh is best-effort */
-    }
-  }, [eventId])
-
-  // Real-time WebSocket subscriptions. Event names MUST match what the backend
-  // emits (previously these listened for 'session:state-changed' /
-  // 'session:judge-submitted', which the backend never sends, so live updates
-  // silently never fired and the page relied on manual refresh). The organizer
-  // is auto-joined to the event rooms on socket connect (see ws-server setupRooms).
-  useSocketEvent('session:status-changed', () => loadSession(), [loadSession])
-  useSocketEvent('session:contestant-changed', () => loadSession(), [loadSession])
-  useSocketEvent('session:round-changed', () => loadSession(), [loadSession])
-  useSocketEvent('session:active-criteria-changed', () => loadSession(), [loadSession])
-  useSocketEvent('session:division-changed', () => loadSession(), [loadSession])
-  useSocketEvent('session:arrangement-changed', () => loadSession(), [loadSession])
-  useSocketEvent('session:judge-score-submitted', () => refreshJudgeProgress(), [refreshJudgeProgress])
+  const { connected, recovering } = useCompetitionSync(eventId, loadSession)
 
   // Actions
   const performAction = async (action, actionName) => {
+    if (actionLoading) return
     setActionLoading(actionName)
     try {
       const actions = {
@@ -190,10 +183,13 @@ export default function CompetitionLiveControlPage() {
   // B5 / #6 — reopen a locked score so judges can revise. Scope narrows from
   // broad to fine: all judges → one judge → one judge's single criterion.
   const unlockContestant = async (contestantId, judgeId = null, criteriaId = null) => {
+    if (actionLoading) return
+    const reason = window.prompt('Reason for reopening this score. The affected round submission will be invalidated and must be submitted again.')?.trim()
+    if (!reason || !window.confirm('Confirm this audited correction and require fresh round submission?')) return
     setActionLoading(`unlock:${contestantId}:${judgeId ?? 'all'}:${criteriaId ?? 'all'}`)
     try {
-      await competitionSessionService.unlockScore(eventId, contestantId, judgeId, criteriaId)
-      await refreshJudgeProgress()
+      await competitionSessionService.unlockScore(eventId, contestantId, judgeId, criteriaId, { reason, confirmed: true })
+      await loadSession()
       success(criteriaId ? 'Criterion reopened for editing' : 'Score reopened for editing')
     } catch (err) {
       toastError(getErrorMessage(err))
@@ -373,6 +369,9 @@ export default function CompetitionLiveControlPage() {
     )
   }
 
+  if (loadError && !event) return <div className="space-y-4"><FormAlert variant="error">{loadError}</FormAlert><Button onClick={loadSession}>Retry Live Control</Button></div>
+  const syncFeedback = <div className="space-y-2"><p role="status" className="v-caption">{connected ? recovering ? 'Updating saved competition state?' : 'Live updates connected' : 'Live updates interrupted; checking saved competition state every 15 seconds.'}</p>{loadError && <FormAlert variant="error">{loadError} <button type="button" className="underline" onClick={loadSession}>Retry</button></FormAlert>}</div>
+
   const status = session?.status ?? SESSION_STATUS.IDLE
 
   // No session exists — show start view
@@ -380,11 +379,12 @@ export default function CompetitionLiveControlPage() {
     return (
       <div className="space-y-6">
         <PageHeader eventId={eventId} title={event?.title ?? 'Competition Live Control'} />
-        <NoSessionView
+        {syncFeedback}
+        {event?.officialRulesId || foundation?.event?.official_rules_id ? <CompetitionLiveWorkflowPanel eventId={eventId} session={null} event={event} foundation={foundation} reload={loadSession} readOnly={eventStatus==='archived'||eventStatus==='cancelled'}/> : <>        <NoSessionView
           onStart={() => performAction('start', 'start')}
           actionLoading={actionLoading}
           isDraft={eventStatus === 'draft'}
-        />
+        /></>}
       </div>
     )
   }
@@ -394,7 +394,8 @@ export default function CompetitionLiveControlPage() {
     return (
       <div className="space-y-6">
         <PageHeader eventId={eventId} title={event?.title ?? 'Competition Live Control'} />
-        <CompletedSessionView session={session} onStart={() => performAction('start', 'start')} actionLoading={actionLoading} />
+        {syncFeedback}
+        {session.rulesVersion ? <><CompetitionLiveWorkflowPanel eventId={eventId} session={session} event={event} foundation={foundation} reload={loadSession} onStepChange={setControlStep} readOnly={event?.competitionLifecycle==='results_published'||eventStatus==='archived'}/></> : <CompletedSessionView session={session} onStart={() => performAction('start', 'start')} actionLoading={actionLoading} />}
       </div>
     )
   }
@@ -403,7 +404,10 @@ export default function CompetitionLiveControlPage() {
   return (
     <div className="space-y-6">
       <PageHeader eventId={eventId} title={event?.title ?? 'Competition Live Control'} />
+        {syncFeedback}
 
+      {session?.rulesVersion && <CompetitionLiveWorkflowPanel eventId={eventId} session={session} event={event} foundation={foundation} reload={loadSession} onStepChange={setControlStep} readOnly={event?.competitionLifecycle==='results_published'||eventStatus==='archived'}/>}
+      {!session.rulesVersion && <>
       {/* Session Status Bar */}
       <div className="flex items-center justify-between rounded-xl border border-v-border bg-v-surface-elevated px-6 py-4">
         <div className="flex items-center gap-4">
@@ -440,7 +444,7 @@ export default function CompetitionLiveControlPage() {
         </div>
       </div>
 
-      <StageOrderControl
+      {!session.rulesVersion && <StageOrderControl
         arrangement={arrangement}
         setArrangement={setArrangement}
         divisions={foundation?.divisions ?? []}
@@ -449,7 +453,7 @@ export default function CompetitionLiveControlPage() {
         onPublish={publishArrangement}
         actionLoading={actionLoading}
         locked={Boolean(judgeProgress?.progress?.length || judgeProgress?.submitted?.length)}
-      />
+      />}
 
       {/* Current Stage & Contestant */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -583,7 +587,7 @@ export default function CompetitionLiveControlPage() {
             {/* Phase 6 — finalize the active round & advance qualifiers.
                 Once finalized, the same control re-opens to RECOMPUTE the frozen
                 standings snapshot (e.g. after a scoring fix). */}
-            {session.activeRound?.id && (
+            {!session.rulesVersion && session.activeRound?.id && (
               <div className="space-y-1">
                 {/* #5: a round must be closed before finalizing. Offer the close
                     step inline so the organizer isn't blocked at finalize time. */}
@@ -728,14 +732,18 @@ export default function CompetitionLiveControlPage() {
         })()}
       </div>
 
+      </>}
+
       {/* Judge Progress — whole-round contestant × judge matrix. A locked cell
           can be reopened (B5) so the judge can revise; every unlock is audited. */}
+      {(!session.rulesVersion || controlStep === 2) && (
       <JudgeProgressGrid
         progress={judgeProgress}
         onUnlock={unlockContestant}
         actionLoading={actionLoading}
         divisionLabelById={divisionsEnabled ? divisionLabelByContestantId : null}
       />
+      )}
 
 
       {/* Phase 6 — finalize round & advancement review modal */}
@@ -933,7 +941,7 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelByI
 
   const cellByKey = new Map(perCell.map((p) => [`${p.judgeId}:${p.contestantId}`, p]))
   const lockedSet = new Set(submitted.map((s) => `${s.judgeId}:${s.contestantId}`))
-  const totalCells = judges.length * contestants.length
+  const totalCells = progress?.requiredCells ?? judges.length * contestants.length
   const fullyLockedCount = submitted.length
 
   return (
@@ -943,6 +951,7 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelByI
         {totalCells > 0 && (
           <span className="text-xs text-v-text-subtle">
             {fullyLockedCount}/{totalCells} fully locked
+            {progress?.roundSubmissions && `; ${progress.roundSubmissions.length}/${judges.length} rounds submitted`}
           </span>
         )}
       </div>
@@ -964,6 +973,7 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelByI
                 {judges.map((j) => (
                   <th key={j.judgeId} className="px-2 py-2 text-center font-medium text-v-text-muted">
                     <span className="block max-w-24 truncate">{j.displayName || 'Judge'}</span>
+                    {j.allowedEntryIds && <span className="block text-xs">{j.roundSubmitted ? `Submitted v${j.submissionVersion}` : 'Not submitted'}</span>}
                   </th>
                 ))}
                 <th className="py-2 pl-2 text-right font-medium text-v-text-muted">Done</th>
@@ -992,7 +1002,7 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelByI
                         const cellBusy = actionLoading === `unlock:${c.id}:${j.judgeId}:all`
                         return (
                           <td key={j.judgeId} className="px-2 py-2 text-center">
-                            {full ? (
+                            {j.allowedEntryIds && !j.allowedEntryIds.includes(c.id) ? <span className="text-v-text-subtle">Outside scope</span> : full ? (
                               <button
                                 type="button"
                                 onClick={() => onUnlock(c.id, j.judgeId)}
@@ -1105,7 +1115,7 @@ function PageHeader({ eventId, title }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h2 className="text-xl font-semibold text-v-text">Live Competition Control</h2>
+        <h2 className="text-xl font-semibold text-v-text">Competition Scoring</h2>
         <p className="mt-1 text-sm text-v-text-subtle">{title}</p>
       </div>
       <div className="flex gap-2 text-sm">
@@ -1139,11 +1149,11 @@ function NoSessionView({ onStart, actionLoading, isDraft = false }) {
       <h3 className="text-lg font-semibold text-v-text">No Active Session</h3>
       <p className="mt-2 mb-6 max-w-md text-sm text-v-text-muted">
         Start a live competition session to control the flow of rounds and contestants in real time.
-        Judges will automatically see only the active round and current contestant.
+        Judges receive the active round, presentation context and permitted scoring inputs automatically.
       </p>
       {isDraft && (
         <p className="mb-4 max-w-md text-sm text-v-warning">
-          This event is still in setup. Publish it from the Judges page before starting a live session.
+          This event is still in setup. Publish it from Review & Publish before starting a live session.
         </p>
       )}
       <Button onClick={onStart} loading={actionLoading === 'start'} size="lg" disabled={isDraft}>

@@ -1,0 +1,27 @@
+from pathlib import Path
+p=Path('shared/competition-calculation.js');s=p.read_text(encoding='utf-8')
+s=s.replace("const dp = rules.scoringConfig.decimalPlaces ?? 2, method = rules.scoringConfig.calculationMethod", "const dp = rules.scoringConfig.decimalPlaces ?? 2, defaultMethod = rules.scoringConfig.calculationMethod")
+s=s.replace("if (!OFFICIAL_METHODS.includes(method) || ['manual','undecided'].includes(method))", "if (!OFFICIAL_METHODS.includes(defaultMethod) || ['manual','undecided'].includes(defaultMethod))")
+s=s.replace("  const rounds = roundId ?", "  const method = target?.calculationMethod ?? final?.calculationMethod ?? defaultMethod\n  const rounds = roundId ?")
+s=s.replace('  for (const round of rounds) {\n    const field', '  for (const round of rounds) {\n    const method = round.calculationMethod ?? defaultMethod\n    const field')
+p.write_text(s,encoding='utf-8')
+p=Path('backend/src/modules/competition-native-configuration.js');s=p.read_text(encoding='utf-8')
+s=s.replace("if (r.calculationMethod !== undefined && r.calculationMethod !== config.calculationMethod) fail('Different round methods require an explicit compatible normalization policy')", "if (r.calculationMethod !== undefined && !SCORING_METHODS.some(m=>m.id===r.calculationMethod) || r.calculationMethod==='manual' && config.calculationMethod!=='manual') fail('Choose a supported round calculation method')\n    if (r.calculationMethod !== undefined && r.calculationMethod !== config.calculationMethod && (raw.rounds.some(x=>(x.progression??'back_to_zero')!=='back_to_zero') || (config.deductionRules??[]).length)) fail('Different round methods require an explicit compatible normalization policy for carry or deductions')")
+p.write_text(s,encoding='utf-8')
+p=Path('backend/src/modules/competition-native-tabulation.js');s=p.read_text(encoding='utf-8')
+s=s.replace("scoringConfig:{...cfg.scoringConfig,decimalPlaces", "scoringConfig:{...cfg.scoringConfig,calculationMethod:cfg.rounds.find(r=>r.id===snapshot.roundId)?.calculationMethod??cfg.scoringConfig.calculationMethod,decimalPlaces")
+p.write_text(s,encoding='utf-8')
+p=Path('frontend/src/components/organizer/competition/NativeSetupWorkspace.jsx');s=p.read_text(encoding='utf-8')
+s=s.replace('   <Button variant="secondary" onClick={()=>removeRound(i)}>', '''   <label>Round calculation method<select className={INPUT_CLASS} aria-label={`Round ${i+1} calculation method`} value={r.calculationMethod??value.scoringConfig.calculationMethod} onChange={e=>round(i,{calculationMethod:e.target.value})}>{methods.filter(([id])=>id!=='manual'||value.scoringConfig.calculationMethod==='manual').map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label><CalculationPreview method={r.calculationMethod??value.scoringConfig.calculationMethod}/>
+   <Button variant="secondary" onClick={()=>removeRound(i)}>''')
+p.write_text(s,encoding='utf-8')
+p=Path('frontend/src/components/organizer/competition/NativeTabulationWorkspace.jsx');s=p.read_text(encoding='utf-8');s=s.replace('const method=view?.rules?.configuration_snapshot.scoringConfig.calculationMethod', 'const method=view?.rules?.configuration_snapshot.rounds.find(r=>r.id===choice.roundId)?.calculationMethod??view?.rules?.configuration_snapshot.scoringConfig.calculationMethod');p.write_text(s,encoding='utf-8')
+p=Path('backend/src/database/migrations/111_competition_weighted_minors.sql');s=p.read_text(encoding='utf-8')
+s=s.replace("IF r ? 'calculationMethod' AND r->>'calculationMethod'<>method THEN RAISE EXCEPTION 'INCOMPATIBLE_ROUND_METHODS'; END IF;", """IF r ? 'calculationMethod' AND (r->>'calculationMethod' NOT IN('weighted_average','sum','rank_based','highest_score','lowest_removal','manual') OR r->>'calculationMethod'='manual' AND method<>'manual') THEN RAISE EXCEPTION 'UNSUPPORTED_ROUND_METHOD'; END IF;
+   IF r ? 'calculationMethod' AND r->>'calculationMethod'<>method AND (EXISTS(SELECT 1 FROM jsonb_array_elements(p_config->'rounds') x WHERE coalesce(x->>'progression','back_to_zero')<>'back_to_zero') OR jsonb_array_length(coalesce(p_config->'scoringConfig'->'deductionRules','[]'))>0) THEN RAISE EXCEPTION 'INCOMPATIBLE_ROUND_METHODS'; END IF;""")
+# Extreme-removal capacity must be checked for the actual selected round method.
+source=Path('backend/src/database/migrations/104_competition_scoped_rules.sql').read_text(encoding='utf-8')
+a=source.index('CREATE OR REPLACE FUNCTION competition_freeze_native_rules(');b=source.index('\nDO $$',a)
+freeze=source[a:b].replace("IF config->'scoringConfig'->>'calculationMethod'='lowest_removal'", "IF coalesce((SELECT r->>'calculationMethod' FROM jsonb_array_elements(config->'rounds') r WHERE (r->>'id')::uuid=scope),config->'scoringConfig'->>'calculationMethod')='lowest_removal'")
+s=s.replace("NOTIFY pgrst,'reload schema';", freeze+"\nNOTIFY pgrst,'reload schema';")
+p.write_text(s,encoding='utf-8')

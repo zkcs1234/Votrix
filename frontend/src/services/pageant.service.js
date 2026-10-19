@@ -37,8 +37,8 @@ export const pageantService = {
   },
 
   // Publish a fully-built setup (draft) competition: releases it to the schedule.
-  publishEvent(eventId) {
-    return api.post(`${org}/events/${eventId}/publish`)
+  publishEvent(eventId, acknowledgement = {}) {
+    return api.post(`${org}/events/${eventId}/publish`, acknowledgement)
   },
 
   // Pull a published (scheduled) competition back to draft so setup can be corrected.
@@ -176,6 +176,9 @@ export const pageantService = {
   updateDivision(eventId, divisionId, payload) {
     return api.patch(`${org}/events/${eventId}/divisions/${divisionId}`, payload)
   },
+  reorderDivisions(eventId, divisionIds) {
+    return api.post(`${org}/events/${eventId}/divisions/reorder`, { divisionIds })
+  },
   deleteDivision(eventId, divisionId) {
     return api.delete(`${org}/events/${eventId}/divisions/${divisionId}`)
   },
@@ -297,8 +300,8 @@ export const pageantService = {
   },
 
   // Live session scoring - individual score submission during live sessions
-  submitSessionScore(eventId, scores, contestantId) {
-    return api.post(`${judge}/events/${eventId}/session-score`, { scores, contestantId })
+  submitSessionScore(eventId, scores, contestantId, context, criteriaId) {
+    return api.post(`${judge}/events/${eventId}/session-score`, { scores, contestantId, context, criteriaId })
   },
 }
 

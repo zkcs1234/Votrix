@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { workflowService } from '@/services/competition-workflow.service'
+import { useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import { useToast } from '@/hooks/useToast'
@@ -8,6 +9,8 @@ import { HELPER_TEXT, INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 // not per-criterion, and each minor criterion carries its own score type. Both
 // live in the shared helper so this editor and the organizer previews agree.
 import { resolveScaleBounds, minorScoreLabel } from '@/utils/scoreScale'
+import CriteriaProgress, { CriteriaCompletion } from './CriteriaProgress'
+import { CRITERIA_WEIGHT_TOLERANCE, isCriteriaActive } from '../../../../../shared/competition-criteria-readiness.js'
 
 const inputClass = `${INPUT_CLASS} w-full`
 
@@ -23,7 +26,7 @@ const SCORE_TYPE_OPTIONS = [
 
 // Minor criteria sit beneath a criterion. Judges score THESE. They carry no
 // percentage (equal weight within the criterion) and each owns its score type.
-function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
+function MinorCriteriaManager({ eventId, criterion, mutate, showError }) {
   const minors = criterion.minorCriteria ?? []
   // A3: default the next minor's score type to the last one added on this
   // criterion, so the organizer isn't re-picking the same scale each time.
@@ -31,8 +34,10 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: '', scoreType: lastScoreType, customMin: '', customMax: '' })
   const [busy, setBusy] = useState(false)
+  const [editingId, setEditingId] = useState(null)
 
   const openAdd = () => {
+    setEditingId(null)
     setForm({ name: '', scoreType: lastScoreType, customMin: '', customMax: '' })
     setAdding(true)
   }
@@ -47,17 +52,17 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
     if (form.scoreType === 'custom_range') {
       payload.customMin = Number(form.customMin)
       payload.customMax = Number(form.customMax)
-      if (Number.isNaN(payload.customMin) || Number.isNaN(payload.customMax) || payload.customMax <= payload.customMin) {
+      if (!form.customMin.trim() || !form.customMax.trim() || !Number.isFinite(payload.customMin) || !Number.isFinite(payload.customMax) || payload.customMax <= payload.customMin || payload.customMax <= 0) {
         showError('Enter a valid custom range (max greater than min)')
         return
       }
     }
     setBusy(true)
     try {
-      await pageantService.createMinorCriteria(eventId, criterion.id, payload)
+      const saved = await mutate(() => editingId ? pageantService.updateMinorCriteria(eventId, criterion.id, editingId, payload) : pageantService.createMinorCriteria(eventId, criterion.id, payload), criterion.id)
+      if (!saved) return
       setForm({ name: '', scoreType: form.scoreType, customMin: '', customMax: '' })
       setAdding(false)
-      onChanged()
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to add minor criteria')
     } finally {
@@ -66,12 +71,7 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
   }
 
   const remove = async (minorId) => {
-    try {
-      await pageantService.deleteMinorCriteria(eventId, criterion.id, minorId)
-      onChanged()
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to delete minor criteria')
-    }
+    await mutate(() => pageantService.deleteMinorCriteria(eventId, criterion.id, minorId), criterion.id)
   }
 
   return (
@@ -84,9 +84,12 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
           {minors.map((m) => (
             <li
               key={m.id}
-              className="flex items-center justify-between gap-2 rounded-md border border-v-border bg-v-surface px-3 py-1.5 text-sm"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-v-border bg-v-surface px-3 py-1.5 text-sm"
             >
-              <span className="min-w-0 truncate text-v-text">{m.name}</span>
+              <span className="min-w-0 break-words text-v-text">{m.name}</span>
+              <button type="button" aria-label={`${isCriteriaActive(m) ? 'Disable' : 'Enable'} ${m.name}`} className="v-caption underline" onClick={() => mutate(() => pageantService.updateMinorCriteria(eventId, criterion.id, m.id, { isActive: !isCriteriaActive(m) }), criterion.id)}>{isCriteriaActive(m) ? 'Enabled' : 'Disabled'}</button>
+              <button type="button" className="v-caption" onClick={() => mutate(() => pageantService.updateMinorCriteria(eventId, criterion.id, m.id, { displayOrder: Math.max(0, (m.displayOrder ?? 0) - 1) }), criterion.id)}>Earlier</button>
+              <button type="button" aria-label={`Edit ${m.name}`} className="v-caption underline" onClick={() => { setEditingId(m.id); setForm({ name: m.name, scoreType: m.scoreType ?? 'range_1_100', customMin: m.customMin == null ? '' : String(m.customMin), customMax: m.customMax == null ? '' : String(m.customMax) }); setAdding(true) }}>Edit</button>
               <span className="flex items-center gap-2">
                 <span className="rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-v-primary">
                   {minorScoreLabel(m, { placeholder: '?' })}
@@ -105,7 +108,7 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
         </ul>
       ) : (
         <p className="text-xs text-v-text-subtle">
-          No minor criteria yet. Add at least one so judges can score this criterion.
+          No minor criteria yet. Judges use the major criterion&apos;s saved score range, or you can add minor criteria.
         </p>
       )}
 
@@ -114,12 +117,14 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
           <input
             className={`${inputClass} flex-1 min-w-[10rem]`}
             placeholder="Minor criterion name"
+            aria-label="Minor criterion name"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             autoFocus
           />
           <select
             className={`${inputClass} w-auto`}
+            aria-label="Minor score type"
             value={form.scoreType}
             onChange={(e) => setForm({ ...form, scoreType: e.target.value })}
           >
@@ -135,6 +140,7 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
                 type="number"
                 className={`${inputClass} w-20`}
                 placeholder="min"
+                aria-label="Minimum score"
                 value={form.customMin}
                 onChange={(e) => setForm({ ...form, customMin: e.target.value })}
               />
@@ -142,6 +148,7 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
                 type="number"
                 className={`${inputClass} w-20`}
                 placeholder="max"
+                aria-label="Maximum score"
                 value={form.customMax}
                 onChange={(e) => setForm({ ...form, customMax: e.target.value })}
               />
@@ -152,7 +159,7 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
             disabled={busy}
             className="rounded-lg bg-v-primary px-3 py-2 text-sm font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
           >
-            {busy ? 'Adding…' : 'Add'}
+            {busy ? 'Saving…' : editingId ? 'Save minor' : 'Add'}
           </button>
           <button
             type="button"
@@ -184,12 +191,13 @@ function MinorCriteriaManager({ eventId, criterion, onChanged, showError }) {
 //
 // Consumes the already-loaded `foundation` and the parent's `reload` — it does not
 // fetch its own data, so it stays in sync with the rest of the workspace.
-export default function CriteriaManager({ eventId, foundation, reload }) {
+export default function CriteriaManager({ eventId, foundation, initialRoundId = null, onRoundChange, progress, saveCriteria, saveState, recoverSave, readOnly = false }) {
   const list = foundation?.criteria ?? [] // all event criteria
-  const rounds = foundation?.rounds ?? []
+  const rounds = [...(foundation?.rounds ?? [])].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+  const editorTop = useRef(null)
   const roundIdsKey = rounds.map((r) => r.id).join(',')
 
-  const [selectedRoundId, setSelectedRoundId] = useState(() => rounds[0]?.id ?? null)
+  const [selectedRoundId, setSelectedRoundId] = useState(() => rounds.find(round => round.id === initialRoundId)?.id ?? rounds[0]?.id ?? null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', percentage: '', divisionId: '' })
   const [attachId, setAttachId] = useState('')
@@ -199,11 +207,12 @@ export default function CriteriaManager({ eventId, foundation, reload }) {
   useEffect(() => {
     setSelectedRoundId((cur) => {
       if (!rounds.length) return null
+      if (initialRoundId && rounds.some(round => round.id === initialRoundId)) return initialRoundId
       if (cur && rounds.some((r) => r.id === cur)) return cur
       return rounds[0].id
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roundIdsKey])
+  }, [roundIdsKey, initialRoundId])
 
   const divisionsEnabled = foundation?.event?.divisions_enabled
   const divisions = foundation?.divisions ?? []
@@ -217,148 +226,68 @@ export default function CriteriaManager({ eventId, foundation, reload }) {
 
   // Total that matters: per-round when rounds exist, else flat event-wide.
   const activeCriteria = hasRounds ? roundCriteria : list
-  const totalPct = activeCriteria.reduce((s, c) => s + Number(c.percentage), 0)
-  const isComplete = Math.abs(totalPct - 100) < 0.1
+  const currentProgress = progress.scopes.find(scope => scope.roundId === selectedRoundId) ?? progress.scopes[0]
+  const totalPct = currentProgress.total
   const previewTotalPct = totalPct + Number(form.percentage || 0)
   // §1: weight budget. Block adding once the scope is full (100%).
   const remaining = Math.max(0, 100 - totalPct)
-  const isFull = remaining <= 0.01
+  const isFull = remaining <= CRITERIA_WEIGHT_TOLERANCE
   const scopeLabel = hasRounds ? 'this round' : 'the criteria budget'
 
-  const handleCreate = async (e) => {
+  const selectRound = roundId => {
+    setSelectedRoundId(roundId)
+    setAttachId('')
+    onRoundChange?.(roundId)
+    editorTop.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  }
+  const mutate = async (operation, criterionId = null) => {
+    const affected = hasRounds ? criterionId ? rounds.filter(r => r.criteriaIds?.includes(criterionId)).map(r => r.id) : [selectedRoundId] : [null]
+    try { await saveCriteria(operation, affected); return true }
+    catch (error) { showError(error.response?.data?.message || error.message || 'Could not save criteria.'); return false }
+  }
+  const handleCreate = async e => {
     e.preventDefault()
     const percentage = Number(form.percentage)
-    if (!form.name.trim() || !Number.isFinite(percentage) || percentage <= 0) {
-      showError('Enter a criteria name and a weight greater than 0')
-      return
-    }
-    if (percentage > remaining + 0.01) {
-      showError(`Only ${remaining.toFixed(2)}% left in ${scopeLabel}. Lower the weight to add this criterion.`)
-      return
-    }
+    if (!form.name.trim() || !Number.isFinite(percentage) || percentage <= 0) { showError('Enter a criteria name and a weight greater than 0'); return }
+    if (percentage > remaining + CRITERIA_WEIGHT_TOLERANCE) { showError(`Only ${remaining.toFixed(2)}% left in ${scopeLabel}. Lower the weight to add this criterion.`); return }
     setSaving(true)
-    try {
-      const { data } = await pageantService.createCriteria(eventId, {
-        name: form.name.trim(),
-        percentage,
-        minScore: scoreBounds.min,
-        maxScore: scoreBounds.max,
-        divisionId: hasRounds ? null : form.divisionId || null,
-      })
-      const created = data?.criteria ?? data
-      if (hasRounds && selectedRoundId && created?.id) {
-        await pageantService.addRoundCriteria(eventId, selectedRoundId, created.id)
-      }
-      setForm({ name: '', percentage: '', divisionId: '' })
-      reload()
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to add criteria')
-    } finally {
-      setSaving(false)
-    }
+    const create = hasRounds && selectedRoundId ? payload => workflowService.createRoundCriterion(eventId, selectedRoundId, payload) : payload => pageantService.createCriteria(eventId, payload)
+    if (await mutate(() => create({ name: form.name.trim(), percentage, minScore: scoreBounds.min, maxScore: scoreBounds.max, divisionId: hasRounds ? null : form.divisionId || null }))) setForm({ name: '', percentage: '', divisionId: '' })
+    setSaving(false)
   }
-
-  const removeFromRound = async (criteriaId) => {
-    try {
-      await pageantService.removeRoundCriteria(eventId, selectedRoundId, criteriaId)
-      reload()
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to remove from round')
-    }
-  }
-
+  const removeFromRound = criteriaId => mutate(() => pageantService.removeRoundCriteria(eventId, selectedRoundId, criteriaId), criteriaId)
   const attachExisting = async () => {
     if (!attachId) return
-    const picked = list.find((c) => c.id === attachId)
-    if (picked && Number(picked.percentage) > remaining + 0.01) {
-      showError(
-        `Attaching “${picked.name}” (${Number(picked.percentage).toFixed(0)}%) would exceed 100% — only ${remaining.toFixed(2)}% left in ${scopeLabel}.`,
-      )
-      return
-    }
-    try {
-      await pageantService.addRoundCriteria(eventId, selectedRoundId, attachId)
-      setAttachId('')
-      reload()
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to attach criteria')
-    }
+    const picked = list.find(c => c.id === attachId)
+    if (picked && isCriteriaActive(picked) && Number(picked.percentage) > remaining + CRITERIA_WEIGHT_TOLERANCE) { showError(`Only ${remaining.toFixed(2)}% left in ${scopeLabel}. Lower the weight before attaching this criterion.`); return }
+    if (await mutate(() => pageantService.addRoundCriteria(eventId, selectedRoundId, attachId))) setAttachId('')
   }
-
-  const deleteCriterion = async (criteriaId) => {
-    try {
-      await pageantService.deleteCriteria(eventId, criteriaId)
-      reload()
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to delete criteria')
-    }
+  const deleteCriterion = criteriaId => mutate(() => pageantService.deleteCriteria(eventId, criteriaId), criteriaId)
+  const editMajor = async criterion => {
+    const name = window.prompt('Major criterion name', criterion.name)
+    if (!name) return
+    const weight = window.prompt('Major contribution percentage', String(criterion.percentage))
+    if (weight === null) return
+    const percentage = Number(weight)
+    if (!weight.trim() || !Number.isFinite(percentage) || percentage <= 0 || percentage > 100) { showError('Enter a weight greater than 0 and no more than 100%.'); return }
+    await mutate(() => pageantService.updateCriteria(eventId, criterion.id, { name, percentage }), criterion.id)
   }
+  const editingBlocked = readOnly || saveState.pending || Boolean(saveState.error)
 
   return (
-    <ManagementWorkspace
-      title="Criteria"
-      subtitle={
-        hasRounds
-          ? 'Pick a round, then configure the criteria judges score in that round.'
-          : 'Create the scoring items judges will use for this competition.'
-      }
-      headerActions={
-        <div
-          className={`rounded-lg border px-3 py-2 text-sm ${
-            isComplete
-              ? 'border-v-success/30 bg-v-success-bg text-v-success'
-              : 'border-v-warning/30 bg-v-warning-bg text-v-warning'
-          }`}
-        >
-          <span className="font-medium">
-            {hasRounds ? `${selectedRound?.name ?? 'Round'} total:` : 'Saved total:'}
-          </span>{' '}
-          {totalPct.toFixed(1)}%
-          <span className="block text-xs opacity-80">
-            {hasRounds ? "Each round's criteria must total 100%" : 'Must equal 100% to open scoring'}
-          </span>
-        </div>
-      }
+    <div ref={editorTop} className="v-rounds min-w-0 space-y-5 scroll-mt-5">
+      <CriteriaProgress progress={progress} selectedRoundId={selectedRoundId} onSelect={selectRound} />
+      <p className="text-sm text-v-text-muted">Currently configuring: <strong className="text-v-text">{currentProgress.name}</strong></p>
+      {saveState.error && <div role="alert" className="space-y-2 rounded-lg border border-v-warning/30 bg-v-warning-bg p-3 text-sm text-v-text">
+        <p>{saveState.phase === 'reload' ? 'Your change was saved, but the current configuration could not be confirmed.' : 'Your change could not be saved. Your entries are preserved. Use saved configuration before trying again.'} {saveState.error}</p>
+        <button type="button" disabled={saveState.pending} onClick={recoverSave} className="min-h-9 underline underline-offset-2">{saveState.phase === 'reload' ? 'Reload saved criteria' : 'Use saved configuration'}</button>
+      </div>}
+      <fieldset disabled={editingBlocked} className="min-w-0">
+      <ManagementWorkspace
+      formWidthClass="lg:grid-cols-[minmax(0,40fr)_minmax(0,60fr)]"
       formPanel={
         <>
-          {/* Round selector — defines which round the criteria below belong to. */}
-          {hasRounds && (
-            <div className="mb-3">
-              <p className="mb-1.5 text-[11px] uppercase tracking-wider text-v-text-muted">Round</p>
-              <div className="flex flex-wrap gap-2">
-                {rounds.map((r) => {
-                  const ids = r.criteriaIds ?? []
-                  const t = list
-                    .filter((c) => ids.includes(c.id))
-                    .reduce((s, c) => s + Number(c.percentage ?? 0), 0)
-                  const ok = ids.length > 0 && Math.abs(t - 100) < 0.1
-                  const active = r.id === selectedRoundId
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => setSelectedRoundId(r.id)}
-                      className={`rounded-lg border px-3 py-1.5 text-sm transition ${
-                        active
-                          ? 'border-v-primary bg-v-primary/10 text-v-text'
-                          : 'border-v-border text-v-text-muted hover:text-v-text'
-                      }`}
-                    >
-                      {r.name}
-                      <span className={`ml-1.5 text-[10px] ${ok ? 'text-v-success' : 'text-amber-400'}`}>
-                        {ids.length ? `${t.toFixed(0)}%` : '—'}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-              <p className={HELPER_TEXT}>
-                Rounds are created in the <strong>Rounds</strong> tab. Configure each round&apos;s
-                criteria here.
-              </p>
-            </div>
-          )}
-
+          <h3 className="mb-3 text-sm font-semibold text-v-text">Add Major Criterion</h3>
           {list.length === 0 && (
             <div className="mb-3 rounded-lg border border-v-border bg-v-surface px-4 py-2.5 text-xs text-v-text-muted">
               Add a criterion with its <strong>weight %</strong>, then add{' '}
@@ -472,7 +401,7 @@ export default function CriteriaManager({ eventId, foundation, reload }) {
         </>
       }
       recordsPanel={
-        <ul className="space-y-2 pb-8">
+        <div className="min-w-0"><h3 className="mb-3 text-sm font-semibold text-v-text">Existing Criteria</h3><ul className="space-y-2">
           {activeCriteria.map((c) => {
             const currentDivisionId = c.divisionId ?? c.division_id
             const divisionName = currentDivisionId
@@ -486,7 +415,11 @@ export default function CriteriaManager({ eventId, foundation, reload }) {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0 flex items-start gap-3">
                     <div>
-                      <p className="font-medium text-v-text">{c.name}</p>
+                      <p className="break-words font-medium text-v-text">{c.name}</p>
+                      <div className="flex gap-2">
+                        <button type="button" aria-label={`${isCriteriaActive(c) ? 'Disable' : 'Enable'} ${c.name}`} className="v-caption underline" onClick={() => mutate(() => pageantService.updateCriteria(eventId, c.id, { isActive: !isCriteriaActive(c) }), c.id)}>{isCriteriaActive(c) ? 'Disable' : 'Enable'}</button>
+                        <button type="button" aria-label={`Edit major ${c.name}`} className="v-caption underline" onClick={() => editMajor(c)}>Edit major</button>
+                      </div>
                       <p className="mt-1 text-xs text-v-text-subtle">
                         Weight: {Number(c.percentage).toFixed(2)}%
                       </p>
@@ -523,7 +456,7 @@ export default function CriteriaManager({ eventId, foundation, reload }) {
                 <MinorCriteriaManager
                   eventId={eventId}
                   criterion={c}
-                  onChanged={reload}
+                  mutate={mutate}
                   showError={showError}
                 />
               </li>
@@ -536,8 +469,11 @@ export default function CriteriaManager({ eventId, foundation, reload }) {
                 : 'No criteria yet. Add a criteria name and weight above.'}
             </li>
           )}
-        </ul>
+        </ul></div>
       }
     />
+    </fieldset>
+    <CriteriaCompletion progress={progress} selectedRoundId={selectedRoundId} onSelect={selectRound} pending={saveState.pending} />
+    </div>
   )
 }

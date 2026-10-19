@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { CalendarCheck2, Zap, CheckCircle2, CalendarDays, Vote, Trophy, BarChart2 } from 'lucide-react'
 import { voterService, PARTICIPANT_TYPE_META } from '@/services/voter.service'
 import { useAuth } from '@/hooks/useAuth'
@@ -14,6 +14,10 @@ import Badge from '@/components/ui/Badge'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
+import useCompetitionSync from '@/hooks/useCompetitionSync'
+import useLatestRequest from '@/hooks/useLatestRequest'
+import Button from '@/components/ui/Button'
+import {nativeCompetitionService} from '@/services/competition-native.service'
 
 const ROLE_ICONS = {
   ELECTION_VOTER: Vote,
@@ -59,7 +63,7 @@ function EventSection({ title, description, events }) {
       </div>
       <ul className="space-y-2">
         {events.map((event) => (
-          <li key={`${event.eventType}-${event.id}`}>
+          <li key={event.dashboardKey??`${event.eventType}-${event.id}`}>
             <VoterEventCard event={event} />
           </li>
         ))}
@@ -93,41 +97,25 @@ export default function VoterDashboardPage() {
 
   const showLoader = useDelayedLoading(loading, 300)
 
-  useEffect(() => {
-    let alive = true
-
-    const load = () => {
-      voterService.getOverview()
-        .then(({ data: res }) => {
-          if (!alive) return
-          setData(res)
-          setError(null)
-        })
-        .catch((err) => {
-          if (!alive) return
-          setError(err.response?.data?.message || 'Failed to load dashboard')
-        })
-        .finally(() => {
-          if (!alive) return
-          setLoading(false)
-        })
-    }
-
-    load()
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  const reload = () => {
-    voterService.getOverview().then(({ data: res }) => {
-      setData(res)
-    })
-  }
-
+  const beginRequest = useLatestRequest(user?.id)
+  const reload = useCallback(async () => {
+    const isCurrent = beginRequest()
+    try {
+      const { data: res } = await voterService.getOverview()
+      if (isCurrent()) { setData(res); setError(null) }
+    } catch (err) {
+      if (isCurrent()) setError(err.response?.data?.message ?? 'Failed to load dashboard')
+    } finally { if (isCurrent()) setLoading(false) }
+  }, [beginRequest])
+  useEffect(() => { setData(null); setLoading(true); void reload() }, [reload])
   useSocketEvent('election:voting-toggled', reload)
   useSocketEvent('poll:polling-toggled', reload)
-  useSocketEvent('competition:scoring-toggled', reload)
+  const beginNativeRead=useLatestRequest(`${user?.id}:native`)
+  const reloadNative=useCallback(async()=>{
+    const valid=beginNativeRead()
+    try{const response=await nativeCompetitionService.dashboard();if(!valid())return;setData(previous=>{if(!previous)return previous;const events=[...previous.events.filter(e=>!['competition_scoring','pageant'].includes(e.eventType)),...response.data.events];const group=b=>events.filter(e=>e.bucket===b);return {...previous,events,assigned:group('assigned'),active:group('active'),completed:group('completed'),stats:{total:events.length,assigned:group('assigned').length,active:group('active').length,completed:group('completed').length}}})}catch{if(valid())setData(previous=>{if(!previous)return previous;const events=previous.events.filter(e=>!e.nativeContext);const group=b=>events.filter(e=>e.bucket===b);return {...previous,events,assigned:group('assigned'),active:group('active'),completed:group('completed'),stats:{total:events.length,assigned:group('assigned').length,active:group('active').length,completed:group('completed').length}}})}
+  },[beginNativeRead])
+  useCompetitionSync(null,import.meta.env.VITE_COMPETITION_NATIVE_SCORING_ENABLED==='true'?reloadNative:reload)
 
   if (loading && !showLoader) {
     return null
@@ -153,7 +141,7 @@ export default function VoterDashboardPage() {
   }
 
   if (error) {
-    return <FormAlert variant="error">{error}</FormAlert>
+    return <div className="space-y-3"><FormAlert variant="error">{error}</FormAlert><Button onClick={reload}>Retry dashboard</Button></div>
   }
 
   const stats = data?.stats ?? { total: 0, active: 0, assigned: 0, completed: 0 }

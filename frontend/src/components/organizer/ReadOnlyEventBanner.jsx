@@ -14,7 +14,7 @@ import { Lock } from 'lucide-react'
  * @param {string} [props.status] - the event status
  * @param {string} [props.noun] - what to call the event ('election' | 'poll' | 'competition' | 'event')
  */
-export default function ReadOnlyEventBanner({ status, noun = 'event' }) {
+export default function ReadOnlyEventBanner({ status, noun = 'event', frozen = false }) {
   const isScheduled = status === 'scheduled'
   const isArchived = status === 'archived'
 
@@ -28,7 +28,9 @@ export default function ReadOnlyEventBanner({ status, noun = 'event' }) {
         ? `Read-only — this ${noun} is active`
         : `Read-only — this ${noun} is completed`
 
-  const detail = isScheduled
+  const detail = frozen && !isArchived
+    ? 'Official setup and registrations are frozen. Supported scoring changes use the authorized amendment procedure with approval and fresh judging; existing records are retained.'
+    : isScheduled
     ? `Setup can no longer be edited while published. Go to Review & Publish to unpublish it back to draft, then make your changes.`
     : isArchived
       ? `This ${noun} is kept for historical viewing and reporting. Editing, participant changes, and new activity are disabled.`

@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom'
+import {NativeResultsBoundary} from '@/components/organizer/competition/NativeResultsWorkspace'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import {
   AnalyticsLayout,
@@ -19,7 +20,8 @@ import {
   buildCompetitionRounds,
 } from '@/modules/competition'
 
-export default function CompetitionAnalyticsPage() {
+export default function CompetitionAnalyticsPage(){const {eventId}=useParams();return <NativeResultsBoundary eventId={eventId} Legacy={LegacyCompetitionAnalyticsPage} analytics/>}
+function LegacyCompetitionAnalyticsPage() {
   const { eventId } = useParams()
   const { data, loading } = useModuleAnalytics({
     moduleId: 'competition',
@@ -86,12 +88,12 @@ export default function CompetitionAnalyticsPage() {
 
       <AnalyticsSection
         title="Overall rankings"
-        description="Weighted score = Σ (criterion average × weight %)."
+        description="Results follow the confirmed scoring method and submitted source versions."
       >
         <RankingList
           items={overallRankings}
           emptyMessage="No rankings yet."
-          valueFormatter={(v) => Number(v ?? 0).toFixed(2)}
+          valueFormatter={(v) => v==null?'Missing / Incomplete':data.tabulationMethod==='manual'?`Placement ${v}`:Number(v).toFixed(2)}
         />
       </AnalyticsSection>
 

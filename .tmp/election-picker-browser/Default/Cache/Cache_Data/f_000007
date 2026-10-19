@@ -1,0 +1,342 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/ui/ClockTimePicker.jsx");const useEffect = __vite__cjsImport0_react["useEffect"]; const useId = __vite__cjsImport0_react["useId"]; const useRef = __vite__cjsImport0_react["useRef"]; const useState = __vite__cjsImport0_react["useState"];const _jsxDEV = __vite__cjsImport3_react_jsxDevRuntime["jsxDEV"];import __vite__cjsImport0_react from "/node_modules/.vite/deps/react.js?v=98c00f50";
+import Button from "/src/components/ui/Button.jsx";
+import { ArrowLeft } from "/node_modules/.vite/deps/lucide-react.js?v=e28000ff";
+var _jsxFileName = "C:/Github/Votrix/frontend/src/components/ui/ClockTimePicker.jsx";
+import __vite__cjsImport3_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=98c00f50";
+var _s = $RefreshSig$();
+export default function ClockTimePicker({ date, hour, minute, onHourChange, onMinuteChange, onBack, onDone, polished = false }) {
+	_s();
+	const [unit, setUnit] = useState("hour");
+	const hourRef = useRef(null);
+	const minuteRef = useRef(null);
+	const keyboardHintId = useId();
+	useEffect(() => {
+		hourRef.current?.focus();
+	}, []);
+	useEffect(() => {
+		if (polished) (unit === "hour" ? hourRef : minuteRef).current?.focus({ preventScroll: true });
+	}, [unit, polished]);
+	const displayHour = hour % 12 || 12;
+	const selected = unit === "hour" ? displayHour : minute;
+	const angle = (unit === "hour" ? displayHour * 30 : minute * 6) * Math.PI / 180;
+	const choose = (value) => {
+		if (unit === "hour") {
+			onHourChange(value % 12 + (hour >= 12 ? 12 : 0));
+			setUnit("minute");
+		} else {
+			onMinuteChange(value);
+		}
+	};
+	const adjustFromKeyboard = (event, selectedUnit) => {
+		if (![
+			"ArrowUp",
+			"ArrowDown",
+			"ArrowLeft",
+			"ArrowRight"
+		].includes(event.key)) return;
+		event.preventDefault();
+		const delta = ["ArrowUp", "ArrowRight"].includes(event.key) ? 1 : -1;
+		if (selectedUnit === "hour") {
+			setUnit("hour");
+			const next = (displayHour - 1 + delta + 12) % 12 + 1;
+			onHourChange(next % 12 + (hour >= 12 ? 12 : 0));
+		} else {
+			setUnit("minute");
+			onMinuteChange((minute + delta + 60) % 60);
+		}
+	};
+	const periodSelector = /* @__PURE__ */ _jsxDEV("div", {
+		className: "v-clock-period flex justify-center gap-1",
+		role: "group",
+		"aria-label": "AM or PM",
+		children: ["AM", "PM"].map((period) => /* @__PURE__ */ _jsxDEV("button", {
+			type: "button",
+			className: "v-cal-quick-btn",
+			"aria-pressed": period === (hour >= 12 ? "PM" : "AM"),
+			onClick: () => onHourChange(hour % 12 + (period === "PM" ? 12 : 0)),
+			children: period
+		}, period, false, {
+			fileName: _jsxFileName,
+			lineNumber: 41,
+			columnNumber: 9
+		}, this))
+	}, void 0, false, {
+		fileName: _jsxFileName,
+		lineNumber: 39,
+		columnNumber: 5
+	}, this);
+	return /* @__PURE__ */ _jsxDEV("div", {
+		className: `v-clock-picker ${polished ? "v-clock-polished" : ""}`,
+		children: [
+			!polished && /* @__PURE__ */ _jsxDEV("p", {
+				className: "text-center text-xs font-medium text-v-text-subtle",
+				children: "2. Select Time"
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 51,
+				columnNumber: 21
+			}, this),
+			/* @__PURE__ */ _jsxDEV("p", {
+				className: "text-center text-sm text-v-text",
+				children: date.toLocaleDateString(undefined, {
+					year: "numeric",
+					month: "long",
+					day: "numeric"
+				})
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 52,
+				columnNumber: 7
+			}, this),
+			/* @__PURE__ */ _jsxDEV("div", {
+				className: "v-clock-display flex items-center justify-center gap-2 text-v-text",
+				children: [
+					/* @__PURE__ */ _jsxDEV("button", {
+						ref: hourRef,
+						type: "button",
+						className: "v-clock-value",
+						"aria-label": "Select hour",
+						"aria-pressed": unit === "hour",
+						onClick: () => setUnit("hour"),
+						"aria-describedby": polished ? keyboardHintId : undefined,
+						onKeyDown: polished ? (event) => adjustFromKeyboard(event, "hour") : undefined,
+						children: String(displayHour).padStart(2, "0")
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 54,
+						columnNumber: 9
+					}, this),
+					/* @__PURE__ */ _jsxDEV("span", {
+						"aria-hidden": "true",
+						children: ":"
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 59,
+						columnNumber: 9
+					}, this),
+					polished ? /* @__PURE__ */ _jsxDEV("button", {
+						ref: minuteRef,
+						type: "button",
+						className: "v-clock-value",
+						"aria-label": "Select minute",
+						"aria-pressed": unit === "minute",
+						"aria-describedby": keyboardHintId,
+						onClick: () => setUnit("minute"),
+						onKeyDown: (event) => adjustFromKeyboard(event, "minute"),
+						children: String(minute).padStart(2, "0")
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 61,
+						columnNumber: 11
+					}, this) : /* @__PURE__ */ _jsxDEV("label", { children: [/* @__PURE__ */ _jsxDEV("span", {
+						className: "sr-only",
+						children: "Minute"
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 67,
+						columnNumber: 11
+					}, this), /* @__PURE__ */ _jsxDEV("input", {
+						type: "number",
+						min: 0,
+						max: 59,
+						value: String(minute).padStart(2, "0"),
+						className: "v-clock-value v-clock-minute",
+						onFocus: () => setUnit("minute"),
+						onChange: (event) => onMinuteChange(event.target.value)
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 68,
+						columnNumber: 11
+					}, this)] }, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 66,
+						columnNumber: 13
+					}, this),
+					polished ? /* @__PURE__ */ _jsxDEV("span", {
+						className: "v-clock-display-period",
+						children: hour >= 12 ? "PM" : "AM"
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 71,
+						columnNumber: 21
+					}, this) : periodSelector
+				]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 53,
+				columnNumber: 7
+			}, this),
+			/* @__PURE__ */ _jsxDEV("p", {
+				className: "text-center text-xs text-v-text-subtle",
+				"aria-live": "polite",
+				children: unit === "hour" ? "Select an hour" : "Select a minute"
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 73,
+				columnNumber: 7
+			}, this),
+			polished && /* @__PURE__ */ _jsxDEV("p", {
+				id: keyboardHintId,
+				className: "sr-only",
+				children: "Use arrow keys to adjust the selected hour or minute."
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 74,
+				columnNumber: 20
+			}, this),
+			/* @__PURE__ */ _jsxDEV("div", {
+				className: "v-clock-face",
+				role: "group",
+				"aria-label": unit === "hour" ? "Hour clock" : "Minute clock",
+				onPointerDown: (event) => {
+					if (event.target.closest("button")) return;
+					const rect = event.currentTarget.getBoundingClientRect();
+					const degrees = (Math.atan2(event.clientX - rect.left - rect.width / 2, -(event.clientY - rect.top - rect.height / 2)) * 180 / Math.PI + 360) % 360;
+					choose(unit === "hour" ? Math.round(degrees / 30) % 12 || 12 : Math.round(degrees / 6) % 60);
+				},
+				children: [/* @__PURE__ */ _jsxDEV("svg", {
+					viewBox: "0 0 220 220",
+					className: "v-clock-hand",
+					"aria-hidden": "true",
+					children: [
+						polished && Array.from({ length: 60 }, (_, index) => {
+							const radians = index * Math.PI / 30;
+							const major = index % 5 === 0;
+							return /* @__PURE__ */ _jsxDEV("line", {
+								className: `v-clock-tick ${major ? "v-clock-tick-major" : ""}`,
+								x1: 110 + Math.sin(radians) * (major ? 94 : 97),
+								y1: 110 - Math.cos(radians) * (major ? 94 : 97),
+								x2: 110 + Math.sin(radians) * 101,
+								y2: 110 - Math.cos(radians) * 101
+							}, index, false, {
+								fileName: _jsxFileName,
+								lineNumber: 86,
+								columnNumber: 20
+							}, this);
+						}),
+						/* @__PURE__ */ _jsxDEV("line", {
+							x1: "110",
+							y1: "110",
+							x2: 110 + Math.sin(angle) * 82,
+							y2: 110 - Math.cos(angle) * 82
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 90,
+							columnNumber: 11
+						}, this),
+						/* @__PURE__ */ _jsxDEV("circle", {
+							cx: "110",
+							cy: "110",
+							r: "4"
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 91,
+							columnNumber: 11
+						}, this),
+						polished && unit === "minute" && minute % 5 !== 0 && /* @__PURE__ */ _jsxDEV("circle", {
+							cx: 110 + Math.sin(angle) * 82,
+							cy: 110 - Math.cos(angle) * 82,
+							r: "4"
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 93,
+							columnNumber: 13
+						}, this)
+					]
+				}, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 82,
+					columnNumber: 9
+				}, this), Array.from({ length: 12 }, (_, index) => {
+					const value = unit === "hour" ? index || 12 : index * 5;
+					const radians = index * Math.PI / 6;
+					return /* @__PURE__ */ _jsxDEV("button", {
+						type: "button",
+						className: "v-clock-number",
+						style: {
+							left: `${50 + Math.sin(radians) * 38}%`,
+							top: `${50 - Math.cos(radians) * 38}%`
+						},
+						"aria-label": `${unit === "hour" ? "Hour" : "Minute"} ${value}`,
+						"aria-pressed": selected === value,
+						onClick: () => choose(value),
+						children: unit === "hour" ? value : String(value).padStart(2, "0")
+					}, `${unit}-${value}`, false, {
+						fileName: _jsxFileName,
+						lineNumber: 100,
+						columnNumber: 13
+					}, this);
+				})]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 75,
+				columnNumber: 7
+			}, this),
+			polished && periodSelector,
+			/* @__PURE__ */ _jsxDEV("div", {
+				className: "flex items-center justify-between gap-3",
+				children: [/* @__PURE__ */ _jsxDEV(Button, {
+					variant: "secondary",
+					size: "sm",
+					onClick: onBack,
+					children: [polished && /* @__PURE__ */ _jsxDEV(ArrowLeft, {
+						className: "h-3.5 w-3.5",
+						"aria-hidden": "true"
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 111,
+						columnNumber: 77
+					}, this), "Back"]
+				}, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 111,
+					columnNumber: 9
+				}, this), /* @__PURE__ */ _jsxDEV(Button, {
+					size: "sm",
+					onClick: onDone,
+					children: "Done"
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 112,
+					columnNumber: 9
+				}, this)]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 110,
+				columnNumber: 7
+			}, this)
+		]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 50,
+		columnNumber: 5
+	}, this);
+}
+_s(ClockTimePicker, "1rH7pIZjQ3AjkGecfiwIdkJaBVM=");
+_c = ClockTimePicker;
+var _c;
+$RefreshReg$(_c, "ClockTimePicker");
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+import * as __vite_react_currentExports from "/src/components/ui/ClockTimePicker.jsx";
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+
+  const currentExports = __vite_react_currentExports;
+  queueMicrotask(() => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Github/Votrix/frontend/src/components/ui/ClockTimePicker.jsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Github/Votrix/frontend/src/components/ui/ClockTimePicker.jsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+function $RefreshReg$(type, id) { return RefreshRuntime.register(type, "C:/Github/Votrix/frontend/src/components/ui/ClockTimePicker.jsx" + ' ' + id); }
+function $RefreshSig$() { return RefreshRuntime.createSignatureFunctionForTransform(); }
+
+//# sourceMappingURL=data:application/json;base64,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QUFVLFFBQVEsS0FBSyxLQUFLO0tBQ2xDLE9BQ0Usd0JBQUMsVUFBRDtNQUFpQyxNQUFLO01BQVMsV0FBVTtNQUN2RCxPQUFPO09BQUUsTUFBTSxHQUFHLEtBQUssS0FBSyxJQUFJLE9BQU8sSUFBSSxHQUFHO09BQUksS0FBSyxHQUFHLEtBQUssS0FBSyxJQUFJLE9BQU8sSUFBSSxHQUFHO01BQUc7TUFDekYsY0FBWSxHQUFHLFNBQVMsU0FBUyxTQUFTLFNBQVMsR0FBRztNQUFTLGdCQUFjLGFBQWE7TUFDMUYsZUFBZSxPQUFPLEtBQUs7Z0JBQzFCLFNBQVMsU0FBUyxRQUFRLE9BQU8sS0FBSyxFQUFFLFNBQVMsR0FBRyxHQUFHO0tBQ2xELEdBTEssR0FBRyxLQUFLLEdBQUc7Ozs7WUFLaEI7SUFFWixDQUFDLENBQ0U7Ozs7OztHQUNKLFlBQVk7R0FDYix3QkFBQyxPQUFEO0lBQUssV0FBVTtjQUFmLENBQ0Usd0JBQUMsUUFBRDtLQUFRLFNBQVE7S0FBWSxNQUFLO0tBQUssU0FBUztlQUEvQyxDQUF3RCxZQUFZLHdCQUFDLFdBQUQ7TUFBVyxXQUFVO01BQWMsZUFBWTtLQUFROzs7O2VBQUUsTUFBWTs7Ozs7Y0FDekksd0JBQUMsUUFBRDtLQUFRLE1BQUs7S0FBSyxTQUFTO2VBQVE7SUFBWTs7OztZQUM1Qzs7Ozs7O0VBQ0Y7Ozs7OztBQUVUIiwibmFtZXMiOltdLCJzb3VyY2VzIjpbIkNsb2NrVGltZVBpY2tlci5qc3giXSwidmVyc2lvbiI6Mywic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgdXNlRWZmZWN0LCB1c2VJZCwgdXNlUmVmLCB1c2VTdGF0ZSB9IGZyb20gJ3JlYWN0J1xuaW1wb3J0IEJ1dHRvbiBmcm9tICdAL2NvbXBvbmVudHMvdWkvQnV0dG9uJ1xuaW1wb3J0IHsgQXJyb3dMZWZ0IH0gZnJvbSAnbHVjaWRlLXJlYWN0J1xuXG5leHBvcnQgZGVmYXVsdCBmdW5jdGlvbiBDbG9ja1RpbWVQaWNrZXIoeyBkYXRlLCBob3VyLCBtaW51dGUsIG9uSG91ckNoYW5nZSwgb25NaW51dGVDaGFuZ2UsIG9uQmFjaywgb25Eb25lLCBwb2xpc2hlZCA9IGZhbHNlIH0pIHtcbiAgY29uc3QgW3VuaXQsIHNldFVuaXRdID0gdXNlU3RhdGUoJ2hvdXInKVxuICBjb25zdCBob3VyUmVmID0gdXNlUmVmKG51bGwpXG4gIGNvbnN0IG1pbnV0ZVJlZiA9IHVzZVJlZihudWxsKVxuICBjb25zdCBrZXlib2FyZEhpbnRJZCA9IHVzZUlkKClcbiAgdXNlRWZmZWN0KCgpID0+IHsgaG91clJlZi5jdXJyZW50Py5mb2N1cygpIH0sIFtdKVxuICB1c2VFZmZlY3QoKCkgPT4ge1xuICAgIGlmIChwb2xpc2hlZCkgKHVuaXQgPT09ICdob3VyJyA/IGhvdXJSZWYgOiBtaW51dGVSZWYpLmN1cnJlbnQ/LmZvY3VzKHsgcHJldmVudFNjcm9sbDogdHJ1ZSB9KVxuICB9LCBbdW5pdCwgcG9saXNoZWRdKVxuICBjb25zdCBkaXNwbGF5SG91ciA9IGhvdXIgJSAxMiB8fCAxMlxuICBjb25zdCBzZWxlY3RlZCA9IHVuaXQgPT09ICdob3VyJyA/IGRpc3BsYXlIb3VyIDogbWludXRlXG4gIGNvbnN0IGFuZ2xlID0gKHVuaXQgPT09ICdob3VyJyA/IGRpc3BsYXlIb3VyICogMzAgOiBtaW51dGUgKiA2KSAqIE1hdGguUEkgLyAxODBcbiAgY29uc3QgY2hvb3NlID0gKHZhbHVlKSA9PiB7XG4gICAgaWYgKHVuaXQgPT09ICdob3VyJykge1xuICAgICAgb25Ib3VyQ2hhbmdlKHZhbHVlICUgMTIgKyAoaG91ciA+PSAxMiA/IDEyIDogMCkpXG4gICAgICBzZXRVbml0KCdtaW51dGUnKVxuICAgIH0gZWxzZSB7XG4gICAgICBvbk1pbnV0ZUNoYW5nZSh2YWx1ZSlcbiAgICB9XG4gIH1cbiAgY29uc3QgYWRqdXN0RnJvbUtleWJvYXJkID0gKGV2ZW50LCBzZWxlY3RlZFVuaXQpID0+IHtcbiAgICBpZiAoIVsnQXJyb3dVcCcsICdBcnJvd0Rvd24nLCAnQXJyb3dMZWZ0JywgJ0Fycm93UmlnaHQnXS5pbmNsdWRlcyhldmVudC5rZXkpKSByZXR1cm5cbiAgICBldmVudC5wcmV2ZW50RGVmYXVsdCgpXG4gICAgY29uc3QgZGVsdGEgPSBbJ0Fycm93VXAnLCAnQXJyb3dSaWdodCddLmluY2x1ZGVzKGV2ZW50LmtleSkgPyAxIDogLTFcbiAgICBpZiAoc2VsZWN0ZWRVbml0ID09PSAnaG91cicpIHtcbiAgICAgIHNldFVuaXQoJ2hvdXInKVxuICAgICAgY29uc3QgbmV4dCA9IChkaXNwbGF5SG91ciAtIDEgKyBkZWx0YSArIDEyKSAlIDEyICsgMVxuICAgICAgb25Ib3VyQ2hhbmdlKG5leHQgJSAxMiArIChob3VyID49IDEyID8gMTIgOiAwKSlcbiAgICB9IGVsc2Uge1xuICAgICAgc2V0VW5pdCgnbWludXRlJylcbiAgICAgIG9uTWludXRlQ2hhbmdlKChtaW51dGUgKyBkZWx0YSArIDYwKSAlIDYwKVxuICAgIH1cbiAgfVxuICBjb25zdCBwZXJpb2RTZWxlY3RvciA9IChcbiAgICA8ZGl2IGNsYXNzTmFtZT1cInYtY2xvY2stcGVyaW9kIGZsZXgganVzdGlmeS1jZW50ZXIgZ2FwLTFcIiByb2xlPVwiZ3JvdXBcIiBhcmlhLWxhYmVsPVwiQU0gb3IgUE1cIj5cbiAgICAgIHtbJ0FNJywgJ1BNJ10ubWFwKChwZXJpb2QpID0+IChcbiAgICAgICAgPGJ1dHRvbiBrZXk9e3BlcmlvZH0gdHlwZT1cImJ1dHRvblwiIGNsYXNzTmFtZT1cInYtY2FsLXF1aWNrLWJ0blwiIGFyaWEtcHJlc3NlZD17cGVyaW9kID09PSAoaG91ciA+PSAxMiA/ICdQTScgOiAnQU0nKX1cbiAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBvbkhvdXJDaGFuZ2UoaG91ciAlIDEyICsgKHBlcmlvZCA9PT0gJ1BNJyA/IDEyIDogMCkpfT5cbiAgICAgICAgICB7cGVyaW9kfVxuICAgICAgICA8L2J1dHRvbj5cbiAgICAgICkpfVxuICAgIDwvZGl2PlxuICApXG5cbiAgcmV0dXJuIChcbiAgICA8ZGl2IGNsYXNzTmFtZT17YHYtY2xvY2stcGlja2VyICR7cG9saXNoZWQgPyAndi1jbG9jay1wb2xpc2hlZCcgOiAnJ31gfT5cbiAgICAgIHshcG9saXNoZWQgJiYgPHAgY2xhc3NOYW1lPVwidGV4dC1jZW50ZXIgdGV4dC14cyBmb250LW1lZGl1bSB0ZXh0LXYtdGV4dC1zdWJ0bGVcIj4yLiBTZWxlY3QgVGltZTwvcD59XG4gICAgICA8cCBjbGFzc05hbWU9XCJ0ZXh0LWNlbnRlciB0ZXh0LXNtIHRleHQtdi10ZXh0XCI+e2RhdGUudG9Mb2NhbGVEYXRlU3RyaW5nKHVuZGVmaW5lZCwgeyB5ZWFyOiAnbnVtZXJpYycsIG1vbnRoOiAnbG9uZycsIGRheTogJ251bWVyaWMnIH0pfTwvcD5cbiAgICAgIDxkaXYgY2xhc3NOYW1lPVwidi1jbG9jay1kaXNwbGF5IGZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktY2VudGVyIGdhcC0yIHRleHQtdi10ZXh0XCI+XG4gICAgICAgIDxidXR0b24gcmVmPXtob3VyUmVmfSB0eXBlPVwiYnV0dG9uXCIgY2xhc3NOYW1lPVwidi1jbG9jay12YWx1ZVwiIGFyaWEtbGFiZWw9XCJTZWxlY3QgaG91clwiIGFyaWEtcHJlc3NlZD17dW5pdCA9PT0gJ2hvdXInfSBvbkNsaWNrPXsoKSA9PiBzZXRVbml0KCdob3VyJyl9XG4gICAgICAgICAgYXJpYS1kZXNjcmliZWRieT17cG9saXNoZWQgPyBrZXlib2FyZEhpbnRJZCA6IHVuZGVmaW5lZH1cbiAgICAgICAgICBvbktleURvd249e3BvbGlzaGVkID8gKGV2ZW50KSA9PiBhZGp1c3RGcm9tS2V5Ym9hcmQoZXZlbnQsICdob3VyJykgOiB1bmRlZmluZWR9PlxuICAgICAgICAgIHtTdHJpbmcoZGlzcGxheUhvdXIpLnBhZFN0YXJ0KDIsICcwJyl9XG4gICAgICAgIDwvYnV0dG9uPlxuICAgICAgICA8c3BhbiBhcmlhLWhpZGRlbj1cInRydWVcIj46PC9zcGFuPlxuICAgICAgICB7cG9saXNoZWQgPyAoXG4gICAgICAgICAgPGJ1dHRvbiByZWY9e21pbnV0ZVJlZn0gdHlwZT1cImJ1dHRvblwiIGNsYXNzTmFtZT1cInYtY2xvY2stdmFsdWVcIiBhcmlhLWxhYmVsPVwiU2VsZWN0IG1pbnV0ZVwiIGFyaWEtcHJlc3NlZD17dW5pdCA9PT0gJ21pbnV0ZSd9XG4gICAgICAgICAgICBhcmlhLWRlc2NyaWJlZGJ5PXtrZXlib2FyZEhpbnRJZH1cbiAgICAgICAgICAgIG9uQ2xpY2s9eygpID0+IHNldFVuaXQoJ21pbnV0ZScpfSBvbktleURvd249eyhldmVudCkgPT4gYWRqdXN0RnJvbUtleWJvYXJkKGV2ZW50LCAnbWludXRlJyl9PlxuICAgICAgICAgICAge1N0cmluZyhtaW51dGUpLnBhZFN0YXJ0KDIsICcwJyl9XG4gICAgICAgICAgPC9idXR0b24+XG4gICAgICAgICkgOiA8bGFiZWw+XG4gICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwic3Itb25seVwiPk1pbnV0ZTwvc3Bhbj5cbiAgICAgICAgICA8aW5wdXQgdHlwZT1cIm51bWJlclwiIG1pbj17MH0gbWF4PXs1OX0gdmFsdWU9e1N0cmluZyhtaW51dGUpLnBhZFN0YXJ0KDIsICcwJyl9IGNsYXNzTmFtZT1cInYtY2xvY2stdmFsdWUgdi1jbG9jay1taW51dGVcIlxuICAgICAgICAgICAgb25Gb2N1cz17KCkgPT4gc2V0VW5pdCgnbWludXRlJyl9IG9uQ2hhbmdlPXsoZXZlbnQpID0+IG9uTWludXRlQ2hhbmdlKGV2ZW50LnRhcmdldC52YWx1ZSl9IC8+XG4gICAgICAgIDwvbGFiZWw+fVxuICAgICAgICB7cG9saXNoZWQgPyA8c3BhbiBjbGFzc05hbWU9XCJ2LWNsb2NrLWRpc3BsYXktcGVyaW9kXCI+e2hvdXIgPj0gMTIgPyAnUE0nIDogJ0FNJ308L3NwYW4+IDogcGVyaW9kU2VsZWN0b3J9XG4gICAgICA8L2Rpdj5cbiAgICAgIDxwIGNsYXNzTmFtZT1cInRleHQtY2VudGVyIHRleHQteHMgdGV4dC12LXRleHQtc3VidGxlXCIgYXJpYS1saXZlPVwicG9saXRlXCI+e3VuaXQgPT09ICdob3VyJyA/ICdTZWxlY3QgYW4gaG91cicgOiAnU2VsZWN0IGEgbWludXRlJ308L3A+XG4gICAgICB7cG9saXNoZWQgJiYgPHAgaWQ9e2tleWJvYXJkSGludElkfSBjbGFzc05hbWU9XCJzci1vbmx5XCI+VXNlIGFycm93IGtleXMgdG8gYWRqdXN0IHRoZSBzZWxlY3RlZCBob3VyIG9yIG1pbnV0ZS48L3A+fVxuICAgICAgPGRpdiBjbGFzc05hbWU9XCJ2LWNsb2NrLWZhY2VcIiByb2xlPVwiZ3JvdXBcIiBhcmlhLWxhYmVsPXt1bml0ID09PSAnaG91cicgPyAnSG91ciBjbG9jaycgOiAnTWludXRlIGNsb2NrJ31cbiAgICAgICAgb25Qb2ludGVyRG93bj17KGV2ZW50KSA9PiB7XG4gICAgICAgICAgaWYgKGV2ZW50LnRhcmdldC5jbG9zZXN0KCdidXR0b24nKSkgcmV0dXJuXG4gICAgICAgICAgY29uc3QgcmVjdCA9IGV2ZW50LmN1cnJlbnRUYXJnZXQuZ2V0Qm91bmRpbmdDbGllbnRSZWN0KClcbiAgICAgICAgICBjb25zdCBkZWdyZWVzID0gKE1hdGguYXRhbjIoZXZlbnQuY2xpZW50WCAtIHJlY3QubGVmdCAtIHJlY3Qud2lkdGggLyAyLCAtKGV2ZW50LmNsaWVudFkgLSByZWN0LnRvcCAtIHJlY3QuaGVpZ2h0IC8gMikpICogMTgwIC8gTWF0aC5QSSArIDM2MCkgJSAzNjBcbiAgICAgICAgICBjaG9vc2UodW5pdCA9PT0gJ2hvdXInID8gTWF0aC5yb3VuZChkZWdyZWVzIC8gMzApICUgMTIgfHwgMTIgOiBNYXRoLnJvdW5kKGRlZ3JlZXMgLyA2KSAlIDYwKVxuICAgICAgICB9fT5cbiAgICAgICAgPHN2ZyB2aWV3Qm94PVwiMCAwIDIyMCAyMjBcIiBjbGFzc05hbWU9XCJ2LWNsb2NrLWhhbmRcIiBhcmlhLWhpZGRlbj1cInRydWVcIj5cbiAgICAgICAgICB7cG9saXNoZWQgJiYgQXJyYXkuZnJvbSh7IGxlbmd0aDogNjAgfSwgKF8sIGluZGV4KSA9PiB7XG4gICAgICAgICAgICBjb25zdCByYWRpYW5zID0gaW5kZXggKiBNYXRoLlBJIC8gMzBcbiAgICAgICAgICAgIGNvbnN0IG1ham9yID0gaW5kZXggJSA1ID09PSAwXG4gICAgICAgICAgICByZXR1cm4gPGxpbmUga2V5PXtpbmRleH0gY2xhc3NOYW1lPXtgdi1jbG9jay10aWNrICR7bWFqb3IgPyAndi1jbG9jay10aWNrLW1ham9yJyA6ICcnfWB9XG4gICAgICAgICAgICAgIHgxPXsxMTAgKyBNYXRoLnNpbihyYWRpYW5zKSAqIChtYWpvciA/IDk0IDogOTcpfSB5MT17MTEwIC0gTWF0aC5jb3MocmFkaWFucykgKiAobWFqb3IgPyA5NCA6IDk3KX1cbiAgICAgICAgICAgICAgeDI9ezExMCArIE1hdGguc2luKHJhZGlhbnMpICogMTAxfSB5Mj17MTEwIC0gTWF0aC5jb3MocmFkaWFucykgKiAxMDF9IC8+XG4gICAgICAgICAgfSl9XG4gICAgICAgICAgPGxpbmUgeDE9XCIxMTBcIiB5MT1cIjExMFwiIHgyPXsxMTAgKyBNYXRoLnNpbihhbmdsZSkgKiA4Mn0geTI9ezExMCAtIE1hdGguY29zKGFuZ2xlKSAqIDgyfSAvPlxuICAgICAgICAgIDxjaXJjbGUgY3g9XCIxMTBcIiBjeT1cIjExMFwiIHI9XCI0XCIgLz5cbiAgICAgICAgICB7cG9saXNoZWQgJiYgdW5pdCA9PT0gJ21pbnV0ZScgJiYgbWludXRlICUgNSAhPT0gMCAmJiAoXG4gICAgICAgICAgICA8Y2lyY2xlIGN4PXsxMTAgKyBNYXRoLnNpbihhbmdsZSkgKiA4Mn0gY3k9ezExMCAtIE1hdGguY29zKGFuZ2xlKSAqIDgyfSByPVwiNFwiIC8+XG4gICAgICAgICAgKX1cbiAgICAgICAgPC9zdmc+XG4gICAgICAgIHtBcnJheS5mcm9tKHsgbGVuZ3RoOiAxMiB9LCAoXywgaW5kZXgpID0+IHtcbiAgICAgICAgICBjb25zdCB2YWx1ZSA9IHVuaXQgPT09ICdob3VyJyA/IGluZGV4IHx8IDEyIDogaW5kZXggKiA1XG4gICAgICAgICAgY29uc3QgcmFkaWFucyA9IGluZGV4ICogTWF0aC5QSSAvIDZcbiAgICAgICAgICByZXR1cm4gKFxuICAgICAgICAgICAgPGJ1dHRvbiBrZXk9e2Ake3VuaXR9LSR7dmFsdWV9YH0gdHlwZT1cImJ1dHRvblwiIGNsYXNzTmFtZT1cInYtY2xvY2stbnVtYmVyXCJcbiAgICAgICAgICAgICAgc3R5bGU9e3sgbGVmdDogYCR7NTAgKyBNYXRoLnNpbihyYWRpYW5zKSAqIDM4fSVgLCB0b3A6IGAkezUwIC0gTWF0aC5jb3MocmFkaWFucykgKiAzOH0lYCB9fVxuICAgICAgICAgICAgICBhcmlhLWxhYmVsPXtgJHt1bml0ID09PSAnaG91cicgPyAnSG91cicgOiAnTWludXRlJ30gJHt2YWx1ZX1gfSBhcmlhLXByZXNzZWQ9e3NlbGVjdGVkID09PSB2YWx1ZX1cbiAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gY2hvb3NlKHZhbHVlKX0+XG4gICAgICAgICAgICAgIHt1bml0ID09PSAnaG91cicgPyB2YWx1ZSA6IFN0cmluZyh2YWx1ZSkucGFkU3RhcnQoMiwgJzAnKX1cbiAgICAgICAgICAgIDwvYnV0dG9uPlxuICAgICAgICAgIClcbiAgICAgICAgfSl9XG4gICAgICA8L2Rpdj5cbiAgICAgIHtwb2xpc2hlZCAmJiBwZXJpb2RTZWxlY3Rvcn1cbiAgICAgIDxkaXYgY2xhc3NOYW1lPVwiZmxleCBpdGVtcy1jZW50ZXIganVzdGlmeS1iZXR3ZWVuIGdhcC0zXCI+XG4gICAgICAgIDxCdXR0b24gdmFyaWFudD1cInNlY29uZGFyeVwiIHNpemU9XCJzbVwiIG9uQ2xpY2s9e29uQmFja30+e3BvbGlzaGVkICYmIDxBcnJvd0xlZnQgY2xhc3NOYW1lPVwiaC0zLjUgdy0zLjVcIiBhcmlhLWhpZGRlbj1cInRydWVcIiAvPn1CYWNrPC9CdXR0b24+XG4gICAgICAgIDxCdXR0b24gc2l6ZT1cInNtXCIgb25DbGljaz17b25Eb25lfT5Eb25lPC9CdXR0b24+XG4gICAgICA8L2Rpdj5cbiAgICA8L2Rpdj5cbiAgKVxufVxuIl19

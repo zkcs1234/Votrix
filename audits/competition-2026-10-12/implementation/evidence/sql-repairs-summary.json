@@ -1,0 +1,27 @@
+{
+  "database": "votrix_repairs_1791835055235",
+  "template": "votrix_participation_1791805617459",
+  "dataDirectory": "C:/Github/Votrix/.tmp/competition-postgres-tests",
+  "checks": [
+    "Verified local cluster: C:/Github/Votrix/.tmp/competition-postgres-tests; cloned disposable votrix_participation_1791805617459 -> votrix_repairs_1791835055235",
+    "PASS install backend/src/database/migrations/100_competition_atomic_integrity.sql",
+    "PASS install backend/src/database/migrations/101_competition_private_access.sql",
+    "PASS actual local ACL inventory -> migration101: all twelve private tables have RLS/direct API-role denial and service-role reads",
+    "PASS install backend/src/database/migrations/102_competition_creation_idempotency.sql",
+    "PASS create-request payloads are not readable through anonymous/authenticated direct table access",
+    "PASS additive migrations preserve every cloned historical rule, locked source, submission, advancement and calculation payload",
+    "PASS actual idempotent event creation: identical retry returns original; changed payload/foreign organization reject without duplicate",
+    "PASS direct PostgreSQL same-event protection rejects foreign round criterion/contestant/category/division/next-round links",
+    "PASS full setup revision catches interleaved round weight/progression, category weight, scoring config, judge role and account changes before freezing",
+    "PASS actual atomic division reorder and invalid incomplete permutation rollback",
+    "PASS actual Draft revision, valid zero, Lock/Submit retries, closed-gate stale rejection, and atomic rollback of source/projection/history with draft retained",
+    "PASS confirmed reasoned correction invalidates prior submission without rewriting sources/lock history; relock creates new history and versioned resubmission",
+    "PASS stale calculation INSERT and stale finalized Publish after approved decision reject; independent reviewer enforced; frozen payload/source identity immutable",
+    "PASS actual submitted sources -> adjusted exact calculation -> appointed reviewer Verify -> organizer Finalize/Publish -> completed event/closed submission window",
+    "PASS actual verified advancement/source versions -> approved Top1 Final roster -> eliminated lock denied -> zero Final submission; shared engine championship34 excludes eliminated90",
+    "PASS two actual PostgreSQL connections: gate closure serializes stale lock; concurrent duplicate Lock/Submit yields one numeric source/current submission",
+    "SQL REPAIR ACCEPTANCE PASSED. Only verified localhost/votrix_repairs_1791835055235 was modified. Real HTTP cookies/browser authentication, multi-browser UI, deployed Supabase ACL and topology remain unverified."
+  ],
+  "productionOperations": 0,
+  "authenticatedBrowserTest": false
+}

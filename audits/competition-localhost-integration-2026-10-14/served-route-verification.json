@@ -1,0 +1,38 @@
+{
+  "checkedAt": "2026-10-14T04:05:35.438Z",
+  "url": "http://localhost:5173/organizer/competition",
+  "checks": [
+    {
+      "path": "/organizer/competition",
+      "status": 200,
+      "expectedModuleOrEntryPresent": true
+    },
+    {
+      "path": "/src/routes/index.jsx",
+      "status": 200,
+      "expectedModuleOrEntryPresent": true
+    },
+    {
+      "path": "/src/pages/organizer/competition/CompetitionDashboardPage.jsx",
+      "status": 200,
+      "expectedModuleOrEntryPresent": true
+    }
+  ],
+  "unauthenticatedApi": [
+    {
+      "path": "/api/organizer/competition/dashboard",
+      "status": 401
+    },
+    {
+      "path": "/api/organizer/competition/events/00000000-0000-4000-8000-000000000000/competitions",
+      "status": 401
+    }
+  ],
+  "frontendSourceServed": true,
+  "authenticatedDomVerified": false,
+  "realLoginVerified": false,
+  "backendStarted": false,
+  "authenticatedBackendRequests": false,
+  "nativeDatabaseWrites": false,
+  "nativeActivationVerified": false
+}

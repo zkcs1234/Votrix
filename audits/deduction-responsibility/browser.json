@@ -1,0 +1,1847 @@
+{
+  "passed": true,
+  "database": "votrix_dev_1791952165826",
+  "fixtures": {
+    "none": {
+      "actor": "d06e3e3f-551d-4e29-befe-bbc1a58cbbf3",
+      "child": "6f9f31c4-3838-4bc9-81c9-bf433ffcff17",
+      "entry": "2876b1bd-22e6-4f4c-8071-2ccbd55d31d7",
+      "event": "7126f2bc-27e3-446e-ae17-89e1582a9c00",
+      "first": "008436b4-17a2-45f7-aa23-42fbe1f28bfb",
+      "judge": "84f28a17-123b-4f25-a7e4-c0f51022fc1e",
+      "second": "cac05087-8fc9-48e8-ba3d-5a74298ec9e5",
+      "reviewer": "1a41228a-3674-428c-a7b6-ef58c0d7e3d6",
+      "reviewerEp": "9ded64b4-2ec3-4c50-bdef-4b566279c80c",
+      "configuration": {
+        "rounds": [],
+        "criteria": [
+          {
+            "id": "008436b4-17a2-45f7-aa23-42fbe1f28bfb",
+            "name": "Technique",
+            "roundId": null,
+            "maxScore": 100,
+            "minScore": 0,
+            "percentage": 50,
+            "minorCriteria": []
+          },
+          {
+            "id": "cac05087-8fc9-48e8-ba3d-5a74298ec9e5",
+            "name": "Artistry",
+            "roundId": null,
+            "maxScore": 100,
+            "minScore": 0,
+            "percentage": 50,
+            "minorCriteria": []
+          }
+        ],
+        "structure": "single",
+        "scoringConfig": {
+          "tiePolicy": "shared",
+          "decimalPlaces": 2,
+          "deductionMode": "none",
+          "deductionRules": [],
+          "calculationMethod": "weighted_average"
+        }
+      }
+    },
+    "judge": {
+      "actor": "d06e3e3f-551d-4e29-befe-bbc1a58cbbf3",
+      "child": "9a28fceb-9d2a-4909-bbd4-858a720e50c4",
+      "entry": "03578ad3-7da0-4238-9e07-e2358386bf3d",
+      "event": "bdcd2a18-0991-45ed-9bc6-c6c39fe00604",
+      "first": "42f6b7c4-51c2-46d2-afd3-30443687f63a",
+      "judge": "84f28a17-123b-4f25-a7e4-c0f51022fc1e",
+      "second": "c3ccaaac-0b47-4b40-8f95-92b870684523",
+      "reviewer": "1a41228a-3674-428c-a7b6-ef58c0d7e3d6",
+      "reviewerEp": "efa3e785-cc6d-4497-aadc-6ce812717b84",
+      "configuration": {
+        "rounds": [],
+        "criteria": [
+          {
+            "id": "42f6b7c4-51c2-46d2-afd3-30443687f63a",
+            "name": "Technique",
+            "roundId": null,
+            "maxScore": 100,
+            "minScore": 0,
+            "percentage": 50,
+            "minorCriteria": []
+          },
+          {
+            "id": "c3ccaaac-0b47-4b40-8f95-92b870684523",
+            "name": "Artistry",
+            "roundId": null,
+            "maxScore": 100,
+            "minScore": 0,
+            "percentage": 50,
+            "minorCriteria": []
+          }
+        ],
+        "structure": "single",
+        "scoringConfig": {
+          "tiePolicy": "shared",
+          "decimalPlaces": 2,
+          "deductionMode": "judge",
+          "deductionRules": [
+            {
+              "id": "time",
+              "units": "points",
+              "amount": 2,
+              "roundId": null,
+              "appliedBy": "judge",
+              "criteriaId": null,
+              "description": "Time limit",
+              "perViolation": true,
+              "maxOccurrences": 2
+            },
+            {
+              "id": "technique",
+              "units": "points",
+              "amount": 1,
+              "roundId": null,
+              "appliedBy": "judge",
+              "criteriaId": "42f6b7c4-51c2-46d2-afd3-30443687f63a",
+              "description": "Technique violation",
+              "perViolation": false,
+              "maxOccurrences": 1
+            }
+          ],
+          "calculationMethod": "weighted_average"
+        }
+      }
+    },
+    "organizer": {
+      "actor": "d06e3e3f-551d-4e29-befe-bbc1a58cbbf3",
+      "child": "84acd438-96f4-471a-99d4-f27bd4812680",
+      "entry": "3bdcff14-e4a7-4ab9-994a-3bec1b2b1962",
+      "event": "15f2151c-7270-4cd8-8fcc-25daa331e7f6",
+      "first": "0f70010c-0552-4e3c-b8a0-37234ae232a4",
+      "judge": "84f28a17-123b-4f25-a7e4-c0f51022fc1e",
+      "second": "432305fd-2d76-4445-996d-684bc8fec4f2",
+      "reviewer": "1a41228a-3674-428c-a7b6-ef58c0d7e3d6",
+      "reviewerEp": "0546d869-ca95-4da6-8248-b42518ae285e",
+      "configuration": {
+        "rounds": [],
+        "criteria": [
+          {
+            "id": "0f70010c-0552-4e3c-b8a0-37234ae232a4",
+            "name": "Technique",
+            "roundId": null,
+            "maxScore": 100,
+            "minScore": 0,
+            "percentage": 50,
+            "minorCriteria": []
+          },
+          {
+            "id": "432305fd-2d76-4445-996d-684bc8fec4f2",
+            "name": "Artistry",
+            "roundId": null,
+            "maxScore": 100,
+            "minScore": 0,
+            "percentage": 50,
+            "minorCriteria": []
+          }
+        ],
+        "structure": "single",
+        "scoringConfig": {
+          "tiePolicy": "shared",
+          "decimalPlaces": 2,
+          "deductionMode": "organizer",
+          "deductionRules": [
+            {
+              "id": "time",
+              "units": "points",
+              "amount": 2,
+              "roundId": null,
+              "appliedBy": "organizer",
+              "criteriaId": null,
+              "description": "Time limit",
+              "perViolation": true,
+              "maxOccurrences": 2
+            },
+            {
+              "id": "technique",
+              "units": "points",
+              "amount": 1,
+              "roundId": null,
+              "appliedBy": "organizer",
+              "criteriaId": "0f70010c-0552-4e3c-b8a0-37234ae232a4",
+              "description": "Technique violation",
+              "perViolation": false,
+              "maxOccurrences": 1
+            }
+          ],
+          "calculationMethod": "weighted_average"
+        }
+      }
+    }
+  },
+  "scenarios": [
+    "none: actual judge UI saves original scores, configured records, locks and submits",
+    "none: Live Control close, direct deductions when configured, calculate without reviewer, independent verify/finalize, results/publication/real CSV",
+    "organizer: actual judge UI saves original scores, configured records, locks and submits",
+    "organizer: Live Control close, direct deductions when configured, calculate without reviewer, independent verify/finalize, results/publication/real CSV",
+    "judge: actual judge UI saves original scores, configured records, locks and submits",
+    "judge: Live Control close, direct deductions when configured, calculate without reviewer, independent verify/finalize, results/publication/real CSV"
+  ],
+  "network": [
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/analytics",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/analytics",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/dashboard",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/dashboard",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/election/events",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/polling/events",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/election/events",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/polling/events",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/login-redirect",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/overview",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/5b5e4936-298a-4497-8063-9e7802016993/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/5b5e4936-298a-4497-8063-9e7802016993/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/5b5e4936-298a-4497-8063-9e7802016993/competitions/9c4cf8e4-ef66-4bea-9cba-16582ce0b3e4/live",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/5b5e4936-298a-4497-8063-9e7802016993/competitions/9c4cf8e4-ef66-4bea-9cba-16582ce0b3e4/live",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/overview",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/scores/lock",
+      "status": 204
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/scores/lock",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/scores/lock",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/login-redirect",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/dashboard",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/scores/submit",
+      "status": 204
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/scores/submit",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/818e9844-9025-417e-9089-afcc14ab87df/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/818e9844-9025-417e-9089-afcc14ab87df/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/dashboard",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/overview",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/election/events",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/polling/events",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/dashboard",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/election/events",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/818e9844-9025-417e-9089-afcc14ab87df/competitions/c2239f76-9c1f-435d-83cf-09f84cd0deee/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/polling/events",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/818e9844-9025-417e-9089-afcc14ab87df/competitions/c2239f76-9c1f-435d-83cf-09f84cd0deee/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/live-activity",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/overview",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/live-activity",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live/close",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live/close",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/live-activity",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/calculate",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/calculate",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/reviewer",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/verify",
+      "status": 204
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/verify",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/finalize",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/finalize",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/results/publication",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/results/publication",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/live",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/7126f2bc-27e3-446e-ae17-89e1582a9c00/competitions/6f9f31c4-3838-4bc9-81c9-bf433ffcff17/results/export",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/scores/lock",
+      "status": 204
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/scores/lock",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/scores/lock",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/scores/submit",
+      "status": 204
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/scores/submit",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/live-activity",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/live-activity",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live/close",
+      "status": 204
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live/close",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/live-activity",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/deductions",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/deductions",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/calculate",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/calculate",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/reviewer",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/verify",
+      "status": 204
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/verify",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/finalize",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/finalize",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/results/publication",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/results/publication",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/live",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/15f2151c-7270-4cd8-8fcc-25daa331e7f6/competitions/84acd438-96f4-471a-99d4-f27bd4812680/results/export",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/scores/lock",
+      "status": 204
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/scores/lock",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/scores/lock",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/scores/submit",
+      "status": 204
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/scores/submit",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/live-activity",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/live-activity",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live/close",
+      "status": 204
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live/close",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/live-activity",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/calculate",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/calculate",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/reviewer",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/verify",
+      "status": 204
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/verify",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/finalize",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/finalize",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/results/publication",
+      "status": 204
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/results/publication",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/live",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "E09AE1E653A75B70737BC4A77C177161",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation/reviewer",
+      "status": 200
+    },
+    {
+      "session": "5BB91981C24C008CBC25888A1F47BB63",
+      "path": "/api/participant/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/scoring-contexts",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/results",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/tabulation",
+      "status": 200
+    },
+    {
+      "session": "6A267DF15A0E22B05064D3D0D29999A5",
+      "path": "/api/organizer/competition/events/bdcd2a18-0991-45ed-9bc6-c6c39fe00604/competitions/9a28fceb-9d2a-4909-bbd4-858a720e50c4/results/export",
+      "status": 200
+    }
+  ],
+  "actualMainRouter": true,
+  "realPostgrest": true,
+  "mockedApi": false,
+  "productionTouched": false
+}

@@ -1,8 +1,16 @@
 import { describe, test, expect } from 'vitest'
-import { canJudgeScore, mergeJudgeRows } from '../../src/services/pageant.service.js'
+import { canJudgeScore, competitionDashboardEventStatus, mergeJudgeRows } from '../../src/services/pageant.service.js'
 
-// We import the pure helper from the service module to assert the
-// Phase 6 assignment-scope logic without standing up a Supabase client.
+// Import pure service helpers without standing up a Supabase client.
+
+describe('competition dashboard session status', () => {
+  test('an active live scoring session overrides only draft or scheduled status', () => {
+    expect(competitionDashboardEventStatus('scheduled', true)).toBe('active')
+    expect(competitionDashboardEventStatus('draft', true)).toBe('active')
+    expect(competitionDashboardEventStatus('scheduled', false)).toBe('scheduled')
+    expect(competitionDashboardEventStatus('completed', true)).toBe('completed')
+  })
+})
 
 describe('Phase 6: canJudgeScore', () => {
   test('mergeJudgeRows prefers the canonical event_participants id for assignment FK integrity', () => {

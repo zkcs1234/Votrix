@@ -10,11 +10,13 @@ export default function Bootstrap({ children }) {
   useAuthBootstrap()
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const identity = useAuthStore((s) => s.user?.id)
 
   useEffect(() => {
     if (isAuthenticated) connect()
     else disconnect()
-  }, [isAuthenticated])
+    return () => disconnect()
+  }, [isAuthenticated, identity])
 
   return (
     <>

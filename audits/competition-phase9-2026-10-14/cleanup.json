@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-10-14T03:22:16.692Z",
+  "observations": [
+    {
+      "port": 5057,
+      "state": "CLOSED",
+      "code": "ECONNREFUSED"
+    },
+    {
+      "port": 5059,
+      "state": "CLOSED",
+      "code": "ECONNREFUSED"
+    },
+    {
+      "port": 5177,
+      "state": "CLOSED",
+      "code": "ECONNREFUSED"
+    },
+    {
+      "port": 9337,
+      "state": "CLOSED",
+      "code": "ECONNREFUSED"
+    },
+    {
+      "port": 55439,
+      "state": "CLOSED",
+      "code": "ECONNREFUSED"
+    }
+  ],
+  "sourceTemplatesRetained": true
+}

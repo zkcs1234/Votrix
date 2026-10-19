@@ -1,0 +1,444 @@
+import { useCallback, useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { pageantService } from '@/services/pageant.service'
+import { useToast } from '@/hooks/useToast'
+import { getErrorMessage } from '@/utils/getErrorMessage'
+import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import ImageUploadField from '@/components/upload/ImageUploadField'
+import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
+import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
+import FilterBar from '@/components/ui/FilterBar'
+import useEventStatus from '@/hooks/useEventStatus'
+import useTableFilter from '@/hooks/useTableFilter'
+
+import { INPUT_CLASS } from '@/utils/uiClasses'
+const inputClass = INPUT_CLASS
+
+export default function CompetitionContestantsPage() {
+  const { eventId } = useParams()
+  const { success, error: toastError } = useToast()
+  const { status, setupLocked } = useEventStatus(pageantService, eventId)
+  const [entryType,setEntryType]=useState('individual')
+  const [entryLabel,setEntryLabel]=useState('')
+  const [list, setList] = useState([])
+  const [foundation, setFoundation] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const [name, setName] = useState('')
+  const [number, setNumber] = useState(1)
+  const [numberHint, setNumberHint] = useState('')
+  const [divisionId, setDivisionId] = useState('')
+  const [editingContestant, setEditingContestant] = useState(null)
+  const [photoFile, setPhotoFile] = useState(null)
+  // Round-aware assignment: pick a round, toggle which contestants are in it.
+  const [selectedRoundId, setSelectedRoundId] = useState(null)
+  const [roundBusy, setRoundBusy] = useState(null)
+
+  const load = useCallback(() => {
+    pageantService
+      .getFoundation(eventId)
+      .then(({ data }) => {
+        setFoundation(data.foundation)
+        setList(data.foundation.contestants ?? [])
+      })
+      .finally(() => setLoading(false))
+  }, [eventId])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const divisionsEnabled = foundation?.event?.divisions_enabled
+  const divisions = foundation?.divisions ?? []
+  const rounds = foundation?.rounds ?? []
+  const hasRounds = rounds.length > 0
+
+  // Search by name/number, and (when enabled) facet by division with counts.
+  const contestantDivisionName = (c) => {
+    const id = c.divisionId ?? c.division_id
+    return id ? (divisions.find((d) => d.id === id)?.name ?? null) : null
+  }
+  const {
+    search,
+    setSearch,
+    activeFilters,
+    setFilter,
+    clearFilters,
+    filtered: visibleList,
+    facets,
+    resultCount,
+    totalCount,
+    hasActiveFilters,
+  } = useTableFilter({
+    rows: list,
+    searchKeys: ['name', (c) => c.contestantNumber ?? c.contestant_number],
+    facetFields: divisionsEnabled
+      ? [{ id: 'division', label: 'Division', accessor: contestantDivisionName }]
+      : [],
+  })
+
+  useEffect(() => {
+    const rs = foundation?.rounds ?? []
+    if (!rs.length) {
+      setSelectedRoundId(null)
+      return
+    }
+    setSelectedRoundId((cur) => (cur && rs.some((r) => r.id === cur) ? cur : rs[0].id))
+  }, [foundation])
+
+  const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? null
+  const roundContestantIds = new Set(selectedRound?.contestantIds ?? [])
+
+  const toggleInRound = async (contestantId) => {
+    if (!selectedRoundId) return
+    setRoundBusy(contestantId)
+    try {
+      if (roundContestantIds.has(contestantId)) {
+        await pageantService.removeRoundContestant(eventId, selectedRoundId, contestantId)
+      } else {
+        await pageantService.addRoundContestant(eventId, selectedRoundId, contestantId)
+      }
+      await load()
+    } catch (err) {
+      toastError(getErrorMessage(err))
+    } finally {
+      setRoundBusy(null)
+    }
+  }
+
+  // Bulk assign/remove for the selected round. Operates on the currently VISIBLE
+  // contestants, so a division filter scopes the bulk action (e.g. "add all
+  // Senior contestants to the Final"). Manual per-contestant toggles still work.
+  const bulkRound = async (mode) => {
+    if (!selectedRoundId) return
+    const targets =
+      mode === 'add'
+        ? visibleList.filter((c) => !roundContestantIds.has(c.id))
+        : visibleList.filter((c) => roundContestantIds.has(c.id))
+    if (!targets.length) return
+    setRoundBusy('bulk')
+    try {
+      const results = await Promise.allSettled(
+        targets.map((c) =>
+          mode === 'add'
+            ? pageantService.addRoundContestant(eventId, selectedRoundId, c.id)
+            : pageantService.removeRoundContestant(eventId, selectedRoundId, c.id),
+        ),
+      )
+      await load()
+
+      const failed = results.filter((r) => r.status === 'rejected').length
+      const roundName = selectedRound?.name ?? 'the round'
+      if (failed) {
+        toastError(
+          `${targets.length - failed} of ${targets.length} updated — ${failed} couldn't be saved. Please try again.`,
+        )
+      } else if (mode === 'add') {
+        success(`Added ${targets.length} contestant${targets.length === 1 ? '' : 's'} to ${roundName}`)
+      } else {
+        success(`Removed ${targets.length} contestant${targets.length === 1 ? '' : 's'} from ${roundName}`)
+      }
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Bulk update failed. Some contestants may not have been updated.'))
+    } finally {
+      setRoundBusy(null)
+    }
+  }
+
+  const refreshNextNumber = useCallback(
+    async (divId) => {
+      try {
+        const { data } = await pageantService.getNextContestantNumber(eventId, divId || null)
+        setNumber(data.nextContestantNumber)
+        setNumberHint(
+          divId
+            ? `Next available in this division`
+            : `Next available number`,
+        )
+      } catch {
+        setNumber(1)
+        setNumberHint('')
+      }
+    },
+    [eventId],
+  )
+
+  useEffect(() => {
+    if (editingContestant) return
+    if (!foundation) return
+    refreshNextNumber(divisionId || null)
+  }, [foundation, divisionId, editingContestant, refreshNextNumber])
+
+  const handleCreate = async (e) => {
+    e.preventDefault()
+    const payload = {
+      name,
+      contestantNumber: Number(number),
+      ...(entryType==='legacy'?{}:{entryType}),entryLabel,
+      divisionId: divisionId || null,
+    }
+    const wasEditing = Boolean(editingContestant)
+    try {
+      const { data } = wasEditing
+        ? await pageantService.updateContestant(eventId, editingContestant.id, payload)
+        : await pageantService.createContestant(eventId, payload)
+      if (photoFile && data.contestant?.id) {
+        await pageantService.uploadContestantPhoto(eventId, data.contestant.id, photoFile)
+      }
+      setName('')
+      setDivisionId('')
+      setPhotoFile(null)
+      setEditingContestant(null)
+      setLoading(true)
+      await load()
+      await refreshNextNumber(divisionId || null)
+      success(wasEditing ? `${payload.name} updated` : `${payload.name} added`)
+    } catch (err) {
+      toastError(getErrorMessage(err, `Couldn't ${wasEditing ? 'update' : 'add'} the contestant.`))
+    }
+  }
+
+  const startEditing = (contestant) => {
+    setEditingContestant(contestant)
+    setName(contestant.name)
+    setEntryType(contestant.entryType ?? 'legacy')
+    setEntryLabel(contestant.entryLabel ?? '')
+    setNumber(contestant.contestantNumber ?? contestant.contestant_number)
+    setDivisionId(contestant.divisionId ?? contestant.division_id ?? '')
+    setPhotoFile(null)
+    setNumberHint('')
+  }
+
+  const cancelEdit = () => {
+    setEditingContestant(null)
+    setName('')
+    setDivisionId('')
+    setPhotoFile(null)
+    setNumberHint('')
+    refreshNextNumber(divisionId || null)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  return (
+    <ManagementWorkspace
+      title="Contestants"
+      formPanel={
+        setupLocked ? (
+          <ReadOnlyEventBanner status={status} noun="competition" />
+        ) : (
+        <>
+        {/* W1: divisions-before-contestants dependency, surfaced (not blocked). */}
+        {divisionsEnabled && divisions.length === 0 && (
+          <div className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/5 px-4 py-2.5 text-xs text-amber-300/90">
+            Divisions are enabled but none exist yet. Create your divisions in{' '}
+            <strong>Structure &amp; Scoring → Divisions</strong> first, so you can assign each contestant
+            to one as you add them.
+          </div>
+        )}
+        <form onSubmit={handleCreate} className="space-y-4 v-card p-6 mb-4">
+        <div className={`grid gap-4 ${divisionsEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+          <input className={inputClass} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
+          <div className="space-y-1">
+            <input
+              type="number"
+              min={1}
+              className={inputClass}
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              disabled={Boolean(editingContestant)}
+              aria-label="Contestant number"
+            />
+            {!editingContestant && numberHint && (
+              <p className="text-xs text-v-text-subtle">{numberHint}</p>
+            )}
+          </div>
+          {divisionsEnabled && (
+            <select
+              className={inputClass}
+              value={divisionId}
+              onChange={(e) => setDivisionId(e.target.value)}
+            >
+              <option value="">— Event-wide —</option>
+              {divisions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <label className="v-label">Entry type<select className={inputClass} value={entryType} onChange={e=>setEntryType(e.target.value)}><option value="legacy">Existing type unchanged</option><option value="individual">Individual</option><option value="duo">Pair / Duo</option><option value="group">Team / Group</option><option value="other">Other / Legacy</option></select></label><input className={inputClass} placeholder="Entry description (optional)" value={entryLabel} onChange={e=>setEntryLabel(e.target.value)}/>
+        <ImageUploadField label="Contestant photo" variant="photo" onFileSelect={setPhotoFile} />
+        <button type="submit" className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white">
+          {editingContestant ? 'Save contestant' : 'Add contestant'}
+        </button>
+        {editingContestant && (
+          <button
+            type="button"
+            className="ml-3 text-sm text-v-text-muted hover:text-v-text"
+            onClick={cancelEdit}
+          >
+            Cancel edit
+          </button>
+        )}
+      </form>
+        </>
+        )
+      }
+      recordsPanel={
+        <>
+        <div className="mb-4">
+          <FilterBar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search by name or number"
+            facetFields={divisionsEnabled ? [{ id: 'division', label: 'Division' }] : []}
+            facets={facets}
+            activeFilters={activeFilters}
+            onFilterChange={setFilter}
+            onClear={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+            resultCount={resultCount}
+            totalCount={totalCount}
+            noun="contestants"
+          />
+        </div>
+        {/* Round-aware assignment: rounds are created in Structure & Scoring;
+            here you assign which contestants compete in the selected round. */}
+        {hasRounds && !setupLocked && (
+          <div className="mb-4 rounded-lg border border-v-border bg-v-surface px-4 py-3">
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-v-text-muted">
+              Assign contestants to round
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {rounds.map((r) => {
+                const count = (r.contestantIds ?? []).length
+                const active = r.id === selectedRoundId
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSelectedRoundId(r.id)}
+                    className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                      active
+                        ? 'border-v-primary bg-v-primary/10 text-v-text'
+                        : 'border-v-border text-v-text-muted hover:text-v-text'
+                    }`}
+                  >
+                    {r.name}
+                    <span className="ml-1.5 text-[10px] text-v-text-subtle">{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={roundBusy === 'bulk'}
+                onClick={() => bulkRound('add')}
+                className="rounded-lg border border-v-border px-2.5 py-1 text-xs font-medium text-v-text-muted hover:bg-v-primary/10 hover:text-v-primary disabled:opacity-50"
+              >
+                {roundBusy === 'bulk' ? 'Working…' : `Add all ${hasActiveFilters ? 'shown' : ''} to ${selectedRound?.name ?? 'round'}`}
+              </button>
+              <button
+                type="button"
+                disabled={roundBusy === 'bulk'}
+                onClick={() => bulkRound('remove')}
+                className="rounded-lg border border-v-border px-2.5 py-1 text-xs font-medium text-v-text-muted hover:bg-v-danger/10 hover:text-v-danger disabled:opacity-50"
+              >
+                Remove all from {selectedRound?.name ?? 'round'}
+              </button>
+              <span className="text-xs text-v-text-subtle">
+                or use the “In {selectedRound?.name ?? 'round'}” button per contestant.
+              </span>
+            </div>
+          </div>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-8">
+          {visibleList.map((c) => {
+          // Both DB raw rows (snake_case) or mapped could be present depending on endpoints.
+          // getFoundation returns mapped rows for contestants.
+          const currentDivisionId = c.divisionId ?? c.division_id
+          const currentContestantNumber = c.contestantNumber ?? c.contestant_number
+          const divisionName = currentDivisionId ? divisions.find(d => d.id === currentDivisionId)?.name : null
+
+          return (
+            <div key={c.id} className="rounded-xl border border-v-border bg-v-surface p-4 flex flex-col">
+              {c.photo && <img src={c.photo} alt="" className="mb-3 h-40 w-full rounded-lg object-cover" />}
+              <div className="flex justify-between items-start gap-2">
+                <div>
+                  <p className="text-v-text-muted text-xs">#{currentContestantNumber}</p>
+                  <p className="font-medium text-v-text">{c.name}</p>
+                </div>
+                {divisionsEnabled && divisionName && (
+                  <span className="rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium text-v-primary uppercase tracking-wide">
+                    {divisionName}
+                  </span>
+                )}
+              </div>
+              {hasRounds && !setupLocked && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    disabled={roundBusy === c.id}
+                    onClick={() => toggleInRound(c.id)}
+                    className={`w-full rounded-lg px-2 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                      roundContestantIds.has(c.id)
+                        ? 'bg-v-success/10 text-v-success hover:bg-v-danger/10 hover:text-v-danger'
+                        : 'bg-v-surface-elevated text-v-text-muted hover:bg-v-primary/10 hover:text-v-primary'
+                    }`}
+                  >
+                    {roundBusy === c.id
+                      ? '...'
+                      : roundContestantIds.has(c.id)
+                        ? `✓ In ${selectedRound?.name ?? 'round'}`
+                        : `Add to ${selectedRound?.name ?? 'round'}`}
+                  </button>
+                </div>
+              )}
+              {!setupLocked && (
+              <div className="mt-auto flex gap-3 pt-3 text-sm">
+                <button type="button" className="text-v-primary" onClick={() => startEditing(c)}>Edit</button>
+                <button
+                  type="button"
+                  className="text-v-danger"
+                  onClick={async () => {
+                    if (confirm(`Delete contestant "${c.name}"? This can't be undone.`)) {
+                      try {
+                        await pageantService.deleteContestant(eventId, c.id)
+                        await load()
+                        if (!editingContestant) {
+                          await refreshNextNumber(divisionId || null)
+                        }
+                        success(`${c.name} deleted`)
+                      } catch (err) {
+                        toastError(getErrorMessage(err, "Couldn't delete the contestant."))
+                      }
+                    }
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+              )}
+            </div>
+          )
+        })}
+        {!visibleList.length && (
+          <p className="text-sm text-v-text-subtle">
+            {hasActiveFilters ? 'No contestants match your search.' : 'No contestants yet.'}
+          </p>
+        )}
+        </div>
+        </>
+      }
+    />
+  )
+}

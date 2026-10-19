@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "database": "votrix_hardening_1791930231077",
+  "entrants": 50,
+  "judges": 5,
+  "majors": 4,
+  "minorsPerMajor": 3,
+  "rawTargets": 3000,
+  "actualConcurrentRpcWrites": 20,
+  "concurrentBatchMilliseconds": 1874.7416000000012,
+  "writeWallMilliseconds": {
+    "min": 358.3666999999987,
+    "max": 1672.8877999999968,
+    "mean": 1035.9070549999997
+  },
+  "lockWaitTimeSeparated": false,
+  "tabulationPsqlWallMilliseconds": 384.8767000000007,
+  "calculationMilliseconds": 26.086300000002666,
+  "responseBytes": 1195468,
+  "csv": {
+    "milliseconds": 48.87109999999666,
+    "bytes": 2191364,
+    "heapUsedDelta": 10024416,
+    "rssDelta": 18264064,
+    "peakMemoryMeasured": false
+  },
+  "fullRosterHttpAutosaveTested": false,
+  "bulkSources": "Direct guarded local SQL fixture rows followed by actual submission RPCs",
+  "productionCapacityVerified": false
+}

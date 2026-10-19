@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { validScore } from '../../../../shared/competition-score-input.js'
 
 export default function ScoreInput({
   min = 0,
   max = 100,
   step = 1,
+  decimalPlaces,
   value,
   onChange,
   disabled = false,
@@ -18,8 +20,9 @@ export default function ScoreInput({
   // typed value stays visible with a clear error, and only a VALID value is
   // saved upstream.
   const [display, setDisplay] = useState(value ?? '')
+  const emitted = useRef(value)
   useEffect(() => {
-    setDisplay(value ?? '')
+    if (value !== emitted.current) { setDisplay(value ?? ''); setError(''); emitted.current = value }
   }, [value])
 
   const sizeClasses = {
@@ -34,6 +37,7 @@ export default function ScoreInput({
 
     if (val === '') {
       setError('')
+      emitted.current = val
       onChange(val)
       return
     }
@@ -41,6 +45,7 @@ export default function ScoreInput({
     const num = parseFloat(val)
     if (isNaN(num)) {
       setError('Enter a number')
+      emitted.current = ''; onChange('')
       return
     }
 
@@ -49,10 +54,18 @@ export default function ScoreInput({
       // out-of-range score (this is what surfaces a wrong score-range setup
       // instead of silently truncating it).
       setError(`Must be ${min}–${max}`)
+      emitted.current = ''; onChange('')
+      return
+    }
+
+    if (!validScore(val, {minScore:min,maxScore:max,decimalPlaces})) {
+      setError(decimalPlaces === 0 ? 'Use a whole number' : `Use at most ${decimalPlaces} decimal places`)
+      emitted.current = ''; onChange('')
       return
     }
 
     setError('')
+    emitted.current = val
     onChange(val)
   }
 

@@ -1,0 +1,32 @@
+{
+  "phase": 5,
+  "backend": {
+    "passedFiles": 79,
+    "skippedFiles": 1,
+    "passedTests": 631,
+    "skippedTests": 3
+  },
+  "frontend": {
+    "passedFiles": 40,
+    "passedTests": 285,
+    "workers": 2
+  },
+  "postgres": {
+    "passedScenarioGroups": 13,
+    "database": "votrix_tabulation_1791894228454",
+    "trackedOriginalTables": 39,
+    "finalTrackedTables": 45,
+    "blockers": 0,
+    "reviewItems": 12
+  },
+  "buildPassed": true,
+  "lintPassed": true,
+  "syntaxPassed": true,
+  "diffCheckPassed": true,
+  "protectedSourceFilesUnchanged": 67,
+  "sourceTemplateUnchanged": true,
+  "supabaseTouched": false,
+  "environmentFilesChanged": false,
+  "localClusterRestoredStopped": true,
+  "phase6Started": false
+}

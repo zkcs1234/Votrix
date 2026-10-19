@@ -1,0 +1,27 @@
+import api from '@/services/api'
+const base=(eventId,owner)=>`/${owner?'organizer':'participant'}/competition/events/${eventId}/competitions`
+export const nativeCompetitionService={
+ dashboard:()=>api.get('/participant/competition/dashboard'),
+ list:eventId=>api.get(base(eventId,true)),
+ create:(eventId,body)=>api.post(base(eventId,true),body),
+ edit:(eventId,competitionId,body)=>api.patch(`${base(eventId,true)}/${competitionId}`,body),
+ remove:(eventId,competitionId,body)=>api.delete(`${base(eventId,true)}/${competitionId}`,{data:body}),
+ complete:(eventId,body)=>api.post(`${base(eventId,true)}/complete-creation`,body),
+ parentReview:eventId=>api.get(`${base(eventId,true)}/creation-review`),
+ entries:(eventId,competitionId)=>api.get(`${base(eventId,true)}/${competitionId}/entries`),
+ addEntry:(eventId,competitionId,body)=>api.post(`${base(eventId,true)}/${competitionId}/entries`,body),
+ removeEntry:(eventId,competitionId,entryId,body)=>api.delete(`${base(eventId,true)}/${competitionId}/entries/${entryId}`,{data:body}),
+ foundation:(eventId,competitionId)=>api.get(`${base(eventId,true)}/${competitionId}/foundation`),
+ configure:(eventId,competitionId,body)=>api.put(`${base(eventId,true)}/${competitionId}/configuration`,body),
+ assign:(eventId,competitionId,body,remove=false)=>remove?api.delete(`${base(eventId,true)}/${competitionId}/judge-assignments`,{data:body}):api.post(`${base(eventId,true)}/${competitionId}/judge-assignments`,body),
+ freeze:(eventId,competitionId,body)=>api.post(`${base(eventId,true)}/${competitionId}/rules/freeze`,body),
+ enrollments:eventId=>api.get(`${base(eventId,true)}/enrollments`),
+ pool:eventId=>api.get(`${base(eventId,true)}/enrollments/pool`),
+ enroll:(eventId,userIds)=>api.post(`${base(eventId,true)}/enrollments/pick`,{userIds:Array.isArray(userIds)?userIds:[userIds],notify:false}),
+ role:(eventId,participantId,role)=>api.patch(`${base(eventId,true)}/enrollments/${participantId}`,{role}),
+ choices:(eventId,owner=false)=>api.get(`${base(eventId,owner)}/scoring-contexts`),
+ view:(eventId,competitionId,roundId,owner=false)=>api.get(`${base(eventId,owner)}/${competitionId}/live`,{params:roundId==null?{}:{roundId}}),
+ control:(eventId,competitionId,action,body)=>api.post(`${base(eventId,true)}/${competitionId}/live/${action}`,body),
+ activity:eventId=>api.get(`${base(eventId,true)}/live-activity`),
+ score:(eventId,competitionId,action,body)=>api.post(`${base(eventId,false)}/${competitionId}/scores/${action}`,body),
+}

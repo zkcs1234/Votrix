@@ -1,0 +1,136 @@
+{
+  "hash": "27c198b2",
+  "configHash": "2b9305fa",
+  "lockfileHash": "a892a1c7",
+  "browserHash": "b04d2ffe",
+  "optimized": {
+    "@dnd-kit/core": {
+      "src": "../../../../frontend/node_modules/@dnd-kit/core/dist/core.esm.js",
+      "file": "@dnd-kit_core.js",
+      "fileHash": "16bdd65f",
+      "needsInterop": false
+    },
+    "@dnd-kit/sortable": {
+      "src": "../../../../frontend/node_modules/@dnd-kit/sortable/dist/sortable.esm.js",
+      "file": "@dnd-kit_sortable.js",
+      "fileHash": "2a7d3273",
+      "needsInterop": false
+    },
+    "@dnd-kit/utilities": {
+      "src": "../../../../frontend/node_modules/@dnd-kit/utilities/dist/utilities.esm.js",
+      "file": "@dnd-kit_utilities.js",
+      "fileHash": "c69abfe9",
+      "needsInterop": false
+    },
+    "@hookform/resolvers/zod": {
+      "src": "../../../../frontend/node_modules/@hookform/resolvers/zod/dist/zod.mjs",
+      "file": "@hookform_resolvers_zod.js",
+      "fileHash": "49e4aed9",
+      "needsInterop": false
+    },
+    "@tanstack/react-query": {
+      "src": "../../../../frontend/node_modules/@tanstack/react-query/build/modern/index.js",
+      "file": "@tanstack_react-query.js",
+      "fileHash": "95a7f11a",
+      "needsInterop": false
+    },
+    "axios": {
+      "src": "../../../../frontend/node_modules/axios/index.js",
+      "file": "axios.js",
+      "fileHash": "faee2059",
+      "needsInterop": false
+    },
+    "date-fns": {
+      "src": "../../../../frontend/node_modules/date-fns/index.js",
+      "file": "date-fns.js",
+      "fileHash": "e2a8518c",
+      "needsInterop": false
+    },
+    "framer-motion": {
+      "src": "../../../../frontend/node_modules/framer-motion/dist/es/index.mjs",
+      "file": "framer-motion.js",
+      "fileHash": "4ac38add",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../../../frontend/node_modules/lucide-react/dist/esm/lucide-react.mjs",
+      "file": "lucide-react.js",
+      "fileHash": "2cb472cb",
+      "needsInterop": false
+    },
+    "react-dom": {
+      "src": "../../../../frontend/node_modules/react-dom/index.js",
+      "file": "react-dom.js",
+      "fileHash": "0c256de3",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../../../frontend/node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "8844059b",
+      "needsInterop": true
+    },
+    "react-hook-form": {
+      "src": "../../../../frontend/node_modules/react-hook-form/dist/index.esm.mjs",
+      "file": "react-hook-form.js",
+      "fileHash": "e9d60ff9",
+      "needsInterop": false
+    },
+    "react-router-dom": {
+      "src": "../../../../frontend/node_modules/react-router-dom/dist/index.mjs",
+      "file": "react-router-dom.js",
+      "fileHash": "5b5524ef",
+      "needsInterop": false
+    },
+    "react": {
+      "src": "../../../../frontend/node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "b6730273",
+      "needsInterop": true
+    },
+    "react/jsx-dev-runtime": {
+      "src": "../../../../frontend/node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "43c505f4",
+      "needsInterop": true
+    },
+    "react/jsx-runtime": {
+      "src": "../../../../frontend/node_modules/react/jsx-runtime.js",
+      "file": "react_jsx-runtime.js",
+      "fileHash": "86cc87a6",
+      "needsInterop": true
+    },
+    "recharts": {
+      "src": "../../../../frontend/node_modules/recharts/es6/index.js",
+      "file": "recharts.js",
+      "fileHash": "797080b5",
+      "needsInterop": false
+    },
+    "zod": {
+      "src": "../../../../frontend/node_modules/zod/index.js",
+      "file": "zod.js",
+      "fileHash": "89536bfd",
+      "needsInterop": false
+    },
+    "zustand": {
+      "src": "../../../../frontend/node_modules/zustand/esm/index.mjs",
+      "file": "zustand.js",
+      "fileHash": "196bec18",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-B-1-B7_t": {
+      "file": "chunk-B-1-B7_t.js",
+      "isDynamicEntry": false
+    },
+    "core-AhnQhJ2i": {
+      "file": "core-AhnQhJ2i.js",
+      "isDynamicEntry": false
+    },
+    "core.esm-BtJCM7OL": {
+      "file": "core.esm-BtJCM7OL.js",
+      "isDynamicEntry": false
+    }
+  }
+}

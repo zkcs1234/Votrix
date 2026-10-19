@@ -1,0 +1,17 @@
+from pathlib import Path
+p=Path('backend/src/database/migrations/112_competition_numeric_rank_carry.sql');s=p.read_text(encoding='utf-8')
+a=s.index('CREATE OR REPLACE FUNCTION competition_validate_native_configuration(');b=s.index('\nCREATE OR REPLACE FUNCTION',a+35)
+sql=s[a:b]
+sql=sql.replace(" OR jsonb_array_length(coalesce(p_config->'scoringConfig'->'deductionRules','[]'))>0", "")
+sql=sql.replace("r->>'advancementType'='threshold' AND (method IN('rank_based','manual')", "r->>'advancementType'='threshold' AND (coalesce(r->>'calculationMethod',method) IN('rank_based','manual')")
+sql=sql.replace("   IF coalesce(r->>'advancementType','none')", "   IF r->>'calculationMethod'='rank_based' AND coalesce(p_config->'scoringConfig'->>'tiePolicy','shared')<>'shared' THEN RAISE EXCEPTION 'UNSUPPORTED_TIE_POLICY'; END IF;\n   IF coalesce(r->>'advancementType','none')",1)
+sql=sql.replace("penalty->>'units' IS DISTINCT FROM (CASE WHEN method='rank_based' THEN 'placements' ELSE 'points' END)", "(coalesce(penalty->>'units','') NOT IN('points','placements') OR method<>'rank_based' AND penalty->>'units'<>'points')")
+sql=sql.replace("   IF penalty->>'roundId' IS NOT NULL", "   IF p_config->'scoringConfig' ? 'numericCarryBasis' AND penalty->>'units'='placements' AND coalesce(penalty->>'roundId',(SELECT c->>'roundId' FROM jsonb_array_elements(p_config->'criteria') c WHERE c->>'id'=penalty->>'criteriaId')) IS NOT NULL AND coalesce(penalty->>'roundId',(SELECT c->>'roundId' FROM jsonb_array_elements(p_config->'criteria') c WHERE c->>'id'=penalty->>'criteriaId')) IS DISTINCT FROM (p_config->'rounds'->(jsonb_array_length(p_config->'rounds')-1)->>'id') THEN RAISE EXCEPTION 'ORDINAL_DEDUCTION_CANNOT_CARRY'; END IF;\n   IF penalty->>'roundId' IS NOT NULL",1)
+Path('backend/src/database/migrations/113_competition_rank_point_deductions.sql').write_text('-- Point deductions adjust weighted scores before ranking; placement penalties retain ordinal units.\nBEGIN;\n'+sql+"\nNOTIFY pgrst,'reload schema';\nCOMMIT;\n",encoding='utf-8')
+p=Path('frontend/src/components/organizer/competition/NativeSetupWorkspace.jsx');s=p.read_text(encoding='utf-8')
+s=s.replace("value.scoringConfig.calculationMethod==='manual'||!!value.scoringConfig.numericCarryBasis", "value.scoringConfig.calculationMethod==='manual'")
+s=s.replace("units:value.scoringConfig.calculationMethod==='rank_based'?'placements':'points'", "units:'points'")
+s=s.replace('Rank-based penalties add placements.', 'Point deductions adjust numeric weighted scores before ranking. Placement penalties add ordinal placements after ranking.')
+s=s.replace('<Field label={`Deduction ${i+1} amount (${r.units})`}', '''{value.scoringConfig.calculationMethod==='rank_based'&&<label>Penalty units<select className={INPUT_CLASS} aria-label={`Deduction ${i+1} units`} value={r.units} onChange={e=>score({deductionRules:value.scoringConfig.deductionRules.map((x,k)=>k===i?{...x,units:e.target.value}:x)})}><option value="points">Points before ranking</option><option value="placements">Placements after ranking</option></select></label>}<Field label={`Deduction ${i+1} amount (${r.units})`}''')
+p.write_text(s,encoding='utf-8')
+p=Path('backend/scripts/competition-creation-flow-local.mjs');s=p.read_text(encoding='utf-8').replace("'112_competition_numeric_rank_carry.sql']", "'112_competition_numeric_rank_carry.sql','113_competition_rank_point_deductions.sql']");p.write_text(s,encoding='utf-8')

@@ -1,24 +1,18 @@
 import { useEffect } from 'react'
-import { authService } from '@/services/auth.service'
+import { refreshSession } from '@/services/api'
 import { useAuthStore } from '@/store/auth.store'
 
 export function useAuthBootstrap() {
-  const setSession = useAuthStore((s) => s.setSession)
-  const clearSession = useAuthStore((s) => s.clearSession)
   const finishBootstrap = useAuthStore((s) => s.finishBootstrap)
 
   useEffect(() => {
-    authService
-      .refresh()
-      .then(({ data }) => {
-        if (data?.user) {
-          setSession({ user: data.user, csrfToken: data.csrfToken })
-        } else {
-          finishBootstrap()
-        }
-      })
-      .catch(() => {
-        clearSession()
-      })
-  }, [setSession, clearSession, finishBootstrap])
+    let active = true
+    // Share the identity-bound refresh already used by API recovery. StrictMode
+    // can mount this effect twice; two independent refresh responses otherwise
+    // race the response interceptor and can clear a successfully restored login.
+    refreshSession().finally(() => {
+      if (active) finishBootstrap()
+    }).catch(() => {}) // refreshSession owns authorization failure handling.
+    return () => { active = false }
+  }, [finishBootstrap])
 }

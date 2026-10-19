@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -18,6 +18,8 @@ export default function ElectionPositionsPage() {
   const [sectionName, setSectionName] = useState('')
   const [sectionSaving, setSectionSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [groupsLoading, setGroupsLoading] = useState(true)
+  const positionRequest = useRef(0)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [numberOfWinners, setNumberOfWinners] = useState(1)
@@ -29,29 +31,31 @@ export default function ElectionPositionsPage() {
   const { status, setupLocked } = useEventStatus(electionService, eventId)
 
   const load = useCallback((selectedSectionId = sectionId) => {
-    if (!selectedSectionId) return
+    const request = ++positionRequest.current
+    setPositions([])
+    if (!selectedSectionId) { setLoading(false); return }
+    setLoading(true)
     electionService
       .listPositions(eventId, selectedSectionId)
-      .then(({ data }) => setPositions(data.positions ?? []))
-      .finally(() => setLoading(false))
-  }, [eventId, sectionId])
+      .then(({ data }) => { if (request === positionRequest.current) setPositions(data.positions ?? []) })
+      .catch((err) => showError(err.response?.data?.message || 'Failed to load positions'))
+      .finally(() => { if (request === positionRequest.current) setLoading(false) })
+  }, [eventId, sectionId, showError])
 
   useEffect(() => {
+    setGroupsLoading(true)
     electionService.listBallotSections(eventId).then(({ data }) => {
       const nextSections = data.sections ?? []
       setSections(nextSections)
-      const selected = nextSections.find((section) => section.id === sectionId) ?? nextSections[0]
+      const selected = nextSections[0]
       setSectionId(selected?.id ?? '')
-      if (selected) load(selected.id)
-      else {
-        setPositions([])
-        setLoading(false)
-      }
-    })
-  }, [eventId, sectionId, load])
+      setLoading(false)
+    }).catch((err) => { showError(err.response?.data?.message || 'Failed to load election groups'); setLoading(false) })
+      .finally(() => setGroupsLoading(false))
+  }, [eventId, showError])
 
   useEffect(() => {
-    if (sectionId) load(sectionId)
+    load(sectionId)
   }, [eventId, sectionId, load])
 
   const resetForm = () => {
@@ -65,6 +69,7 @@ export default function ElectionPositionsPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault()
+    if (!sectionId) { showError('Select an election group before adding a position'); return }
 
     // No need to validate minVote vs maxVote now
     // Validation removed – minVote feature eliminated
@@ -92,7 +97,10 @@ export default function ElectionPositionsPage() {
 
   const handleCreateSection = async (e) => {
     e.preventDefault()
-    if (!sectionName.trim()) return
+    if (!sectionName.trim()) { showError('Election group name is required'); return }
+    if (sections.some((section) => section.name.trim().toLowerCase() === sectionName.trim().toLowerCase())) {
+      showError('An election group with this name already exists'); return
+    }
     setSectionSaving(true)
     try {
       const { data } = await electionService.createBallotSection(eventId, {
@@ -103,9 +111,9 @@ export default function ElectionPositionsPage() {
       setSectionId(data.section.id)
       setSectionName('')
       setPositions([])
-      showSuccess(`Ballot section "${data.section.name}" added`)
+      showSuccess(`Election group "${data.section.name}" added`)
     } catch (err) {
-      showError(err.response?.data?.message || 'Failed to add ballot section')
+      showError(err.response?.data?.message || 'Failed to add election group')
     } finally {
       setSectionSaving(false)
     }
@@ -124,29 +132,31 @@ export default function ElectionPositionsPage() {
       setSections((current) => {
         const next = [...current]
         ;[next[index], next[target]] = [next[target], next[index]]
-        return next.map((item, order) => ({ ...item, displayOrder: order }))
+        return next.map((item) => item.id === section.id ? { ...item, displayOrder: other.displayOrder } : item.id === other.id ? { ...item, displayOrder: section.displayOrder } : item)
       })
     } catch (err) {
-      showError(err.response?.data?.message || 'Failed to reorder ballot sections')
+      showError(err.response?.data?.message || 'Failed to reorder election groups')
     }
   }
 
   const handleRenameSection = async (section) => {
-    const name = window.prompt('Ballot section name', section.name)?.trim()
-    if (!name || name === section.name) return
+    const entered = window.prompt('Election group name', section.name)
+    if (entered === null) return
+    const name = entered.trim()
+    if (!name) { showError('Election group name is required'); return }
+    if (name === section.name) return
+    if (sections.some((item) => item.id !== section.id && item.name.trim().toLowerCase() === name.toLowerCase())) {
+      showError('An election group with this name already exists'); return
+    }
     try {
       const { data } = await electionService.updateBallotSection(eventId, section.id, { name })
       setSections((current) => current.map((item) => item.id === section.id ? data.section : item))
     } catch (err) {
-      showError(err.response?.data?.message || 'Failed to rename ballot section')
+      showError(err.response?.data?.message || 'Failed to rename election group')
     }
   }
 
   const handleDeleteSection = async (section) => {
-    if (sections.length <= 1) {
-      showError('An election must keep at least one ballot section')
-      return
-    }
     if (!confirm(`Delete "${section.name}" and its positions?`)) return
     try {
       await electionService.deleteBallotSection(eventId, section.id)
@@ -154,7 +164,7 @@ export default function ElectionPositionsPage() {
       setSections(remaining)
       if (sectionId === section.id) setSectionId(remaining[0]?.id ?? '')
     } catch (err) {
-      showError(err.response?.data?.message || 'Failed to delete ballot section')
+      showError(err.response?.data?.message || 'Failed to delete election group')
     }
   }
 
@@ -179,7 +189,7 @@ export default function ElectionPositionsPage() {
     }
   }
 
-  if (loading) {
+  if (loading || groupsLoading) {
     return (
       <div className="flex justify-center py-20">
         <LoadingSpinner />
@@ -193,8 +203,10 @@ export default function ElectionPositionsPage() {
       formPanel={
         <div className="space-y-4">
           <div className="v-card space-y-3 p-4">
+            <h3 className="v-section-title">Election Groups</h3>
+            {!sections.length && <p className="v-caption">No election groups created yet. Create your first election group to start adding positions.</p>}
             <label className="block text-sm text-v-text-muted" htmlFor="election-section">
-              Ballot section
+              Select Election Group
             </label>
             <select
               id="election-section"
@@ -202,6 +214,7 @@ export default function ElectionPositionsPage() {
               value={sectionId}
               onChange={(e) => setSectionId(e.target.value)}
             >
+              <option value="">Select an election group</option>
               {sections.map((section) => (
                 <option key={section.id} value={section.id}>{section.name}</option>
               ))}
@@ -224,16 +237,18 @@ export default function ElectionPositionsPage() {
               ))}
             </ol>
             {!setupLocked && (
-              <form onSubmit={handleCreateSection} className="flex gap-2 border-t border-v-border pt-3">
+              <form onSubmit={handleCreateSection} className="flex flex-col gap-2 border-t border-v-border pt-3">
                 <input
                   className={`${inputClass} min-w-0 flex-1`}
-                  placeholder="New ballot section"
+                  placeholder="Enter election group name (e.g., SSG Election)"
+                  aria-label="Election group name"
+                  maxLength={255}
                   value={sectionName}
                   onChange={(e) => setSectionName(e.target.value)}
                   required
                 />
                 <button type="submit" disabled={sectionSaving} className="rounded-md bg-v-primary px-3 py-2 text-sm text-white disabled:opacity-50">
-                  {sectionSaving ? 'Adding...' : 'Add'}
+                  {sectionSaving ? 'Adding...' : '+ Add Election Group'}
                 </button>
               </form>
             )}
@@ -245,6 +260,7 @@ export default function ElectionPositionsPage() {
           onSubmit={handleCreate}
           className="grid gap-4 v-card p-6 sm:grid-cols-2 mb-4"
         >
+        <fieldset disabled={!sectionId || saving} className="contents">
         <div className="sm:col-span-2">
           <label className="mb-1 block text-sm text-v-text-muted">Position name</label>
           <input
@@ -279,7 +295,7 @@ export default function ElectionPositionsPage() {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Max votes</label>
+          <label className="mb-1 block text-sm text-v-text-muted">Maximum Selections</label>
           <input
             type="number"
             min={1}
@@ -303,17 +319,19 @@ export default function ElectionPositionsPage() {
 
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || !sectionId}
           className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white hover:bg-v-primary-hover disabled:opacity-50 sm:col-span-2"
         >
           {saving ? 'Adding...' : 'Add position'}
         </button>
+        </fieldset>
       </form>
           )}
         </div>
       }
       recordsPanel={
         <ul className="space-y-3 pb-8">
+          {!positions.length && <li className="v-caption">{sectionId ? 'No positions in this election group yet.' : 'Select an election group to view its positions.'}</li>}
           {positions.map((p, idx) => (
           <li
             key={p.id}

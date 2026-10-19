@@ -57,8 +57,41 @@ function classifyElection(event) {
 }
 
 function classifyCompetition(event) {
+  if(Array.isArray(event.nativeContexts)){
+    if(!event.nativeContexts.length)return []
+    const contexts=event.nativeContexts
+    const active=contexts.find(context=>context.state==='open'||context.reviewer)
+    const allSubmitted=contexts.every(context=>context.state==='submitted')
+    const allClosed=contexts.every(context=>context.state==='closed')
+    const bucket=active?'active':allSubmitted?'completed':'assigned'
+    const statusLabel=active?.reviewer?'Independent review':active?'Scoring open':contexts.some(context=>context.state==='paused')?'Scoring paused':allSubmitted?'Round submitted':allClosed?'Scoring closed':'Waiting to open'
+    const target=active??contexts[0]
+    const query=new URLSearchParams({competitionId:target.competitionId,...(target.roundId?{roundId:target.roundId}:{})})
+    const contextStatus={waiting:'Waiting to open',open:'Scoring open',paused:'Scoring paused',submitted:'Round submitted',closed:'Scoring closed',review:'Independent review'}
+    return enrichEventWithParticipantType({
+      id:event.id,
+      dashboardKey:`${event.id}:native`,
+      title:event.title,
+      description:event.description,
+      banner:event.banner??null,
+      organization:event.organization??null,
+      eventType:'competition_scoring',
+      participantType:PARTICIPANT_TYPES.COMPETITION_JUDGE,
+      bucket,
+      statusLabel,
+      actionPath:`/participant/competition/events/${event.id}/score?${query}`,
+      actionLabel:active?.reviewer?'Review results':active?'Open scoresheet':'Open competition workspace',
+      scoringEnabled:active?.scoringAvailable===true,
+      hasScored:contexts.some(context=>context.state==='submitted'),
+      eventStatus:event.status,
+      nativeContexts:contexts.map(context=>({...context,statusLabel:contextStatus[context.state]??'Waiting to open'})),
+    },'competition_scoring')
+  }
   let bucket = 'assigned'
-  if (event.hasScored) bucket = 'completed'
+  if (event.workflow) {
+    if (event.workflow.roundSubmitted) bucket = 'completed'
+    else if (event.workflow.sessionStatus === 'active' || event.workflow.submissionWindow === true || event.workflow.reviewer && event.status !== 'draft') bucket = 'active'
+  } else if (event.hasScored) bucket = 'completed'
   else if (isCompetitionScoringOpen({
     scoring_enabled: event.scoringEnabled,
     start_date: event.startDate,
@@ -75,10 +108,10 @@ function classifyCompetition(event) {
     eventType: 'competition_scoring',
     bucket,
     participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE,
-    statusLabel: bucket === 'completed' ? 'Scores submitted' : bucket === 'active' ? 'Scoring open' : 'Waiting to open',
+    statusLabel: event.workflow?.reviewer ? 'Review competition' : bucket === 'completed' ? 'Round submitted' : bucket === 'active' ? event.workflow?.sessionStatus === 'completed' ? 'Submission window open' : 'Scoring open' : 'Waiting to open',
     actionPath: `/participant/competition/events/${event.id}/score`,
     actionLabel:
-      bucket === 'active' ? 'Score contestants' : bucket === 'completed' ? 'View scores' : 'View event',
+      event.workflow?.reviewer ? 'Review results' : bucket === 'active' ? 'Open scoresheet' : bucket === 'completed' ? 'View scores' : 'View event',
     scoringEnabled: Boolean(event.scoringEnabled),
     hasScored: Boolean(event.hasScored),
     eventStatus: event.status,
@@ -152,7 +185,7 @@ export async function getVoterDashboard(voterId) {
       ...classifyElection(e),
       results: electionResults[e.id] || null,
     })),
-    ...competitions.map(classifyCompetition),
+    ...competitions.map(classifyCompetition).flat(),
     ...polls.map(classifyPoll),
   ]
 
@@ -171,6 +204,7 @@ export async function getVoterDashboard(voterId) {
     events,
   }
 }
+export async function getCompetitionDashboard(voterId){return (await listJudgeCompetitionEvents(voterId)).map(classifyCompetition).flat()}
 
 /**
  * Get the redirect path for a voter after login.

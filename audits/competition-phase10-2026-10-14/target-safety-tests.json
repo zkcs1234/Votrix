@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "tests": 15,
+  "checks": [
+    "Unidentified URL fails closed",
+    "Hosted Supabase is production sensitive",
+    "Unknown remote URL is production sensitive",
+    "Loopback SDK endpoint is not proof of isolation",
+    "Credential-bearing target rejected without disclosure",
+    "Malformed target fails closed",
+    "Positive workspace clone identity accepted",
+    "Remote host denied",
+    "Unexpected port denied",
+    "Wrong catalog identity denied",
+    "Outside workspace data directory denied",
+    "Unknown database name denied",
+    "Missing synthetic classification denied",
+    "Production-sensitive backend startup refused",
+    "Unknown loopback startup also refused"
+  ],
+  "databaseTarget": "NONE — pure tests only",
+  "networkOperations": false,
+  "backendStarted": false
+}

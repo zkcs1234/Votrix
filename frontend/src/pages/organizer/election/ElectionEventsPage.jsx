@@ -2,10 +2,11 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Edit2, Eye } from 'lucide-react'
 import { electionService } from '@/services/election.service'
-import { isSetupLocked } from '@/utils/constants'
+import { EVENT_STATUS } from '@/utils/constants'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import Button from '@/components/ui/Button'
+import Badge from '@/components/ui/Badge'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import useDraft from '@/hooks/useDraft'
 import DraftBanner from '@/components/organizer/DraftBanner'
@@ -105,58 +106,50 @@ function BallotPreviewModal({ eventId, onClose }) {
 
 function EventCard({ event, onPreview }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-border bg-v-surface p-5">
-      <div>
-        <Link
-          to={`/organizer/election/events/${event.id}/positions`}
-          className="text-lg font-medium text-v-text hover:text-v-text-muted"
-        >
-          {event.title}
-        </Link>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="text-sm text-v-text-subtle capitalize">
-            {event.status === 'draft' ? 'Setup — not published' : event.status}
-          </span>
+    <article aria-labelledby={`election-event-${event.id}`} className="flex min-w-0 flex-col gap-4 rounded-2xl border border-v-border bg-v-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h3 id={`election-event-${event.id}`} className="min-w-0 break-words text-lg font-medium text-v-text">
+            <Link to={`/organizer/election/events/${event.id}/positions`} className="hover:text-v-primary">
+              {event.title}
+            </Link>
+          </h3>
+          <Badge
+            tone={event.status === EVENT_STATUS.ACTIVE ? 'success' : event.status === EVENT_STATUS.CANCELLED ? 'danger' : 'default'}
+            className="capitalize"
+          >
+            {event.status === EVENT_STATUS.DRAFT ? 'Setup — not published' : event.status}
+          </Badge>
           {event.electionStatus && (
             <span className="v-badge v-badge-info text-xs">{event.electionStatus}</span>
           )}
         </div>
+        {event.description && (
+          <p className="mt-2 whitespace-pre-line break-words text-sm text-v-text-muted">{event.description}</p>
+        )}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onPreview(event.id)}
-          className="inline-flex items-center gap-1 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated"
-        >
-          <Eye className="h-3.5 w-3.5" strokeWidth={2} />
+      <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0">
+        <Button variant="secondary" onClick={() => onPreview(event.id)}>
+          <Eye className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
           Preview
-        </button>
-        {event.status === 'draft' && (
+        </Button>
+        <Link
+          to={`/organizer/election/events/${event.id}/edit`}
+          className="v-btn-primary"
+        >
+          <Edit2 className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+          Manage
+        </Link>
+        {event.status === EVENT_STATUS.DRAFT && (
           <Link
             to={`/organizer/election/events/${event.id}/positions`}
-            className="rounded-lg border border-v-primary bg-v-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-v-primary-hover"
+            className="v-btn-secondary"
           >
             Continue setup
           </Link>
         )}
-        <Link
-          to={`/organizer/election/events/${event.id}/edit`}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated"
-        >
-          {isSetupLocked(event.status) ? (
-            <>
-              <Eye className="h-3.5 w-3.5" strokeWidth={2} />
-              View
-            </>
-          ) : (
-            <>
-              <Edit2 className="h-3.5 w-3.5" strokeWidth={2} />
-              Edit
-            </>
-          )}
-        </Link>
       </div>
-    </div>
+    </article>
   )
 }
 
@@ -238,20 +231,24 @@ export default function ElectionEventsPage() {
         />
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold text-v-text">Events</h2>
-        <Link
-          to="/organizer/election/events/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white hover:bg-v-primary-hover font-medium"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2} />
-          New event
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0">
+          <Link
+            to="/organizer/election/events/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white hover:bg-v-primary-hover font-medium"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2} />
+            New event
+          </Link>
+        </div>
       </div>
 
       {hasDraft && (
         <DraftBanner
           module="election"
+          discardFirst
+          alignActionsRight
           draft={draft}
           onDelete={deleteDraft}
           newEventPath="/organizer/election/events/new"
@@ -266,7 +263,18 @@ export default function ElectionEventsPage() {
             onPreview={setPreviewEventId}
           />
         ))}
-        {!events.length && <p className="text-v-text-subtle">No events yet.</p>}
+        {!events.length && (
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-v-border bg-v-surface p-6 text-center">
+            <div>
+              <p className="font-medium text-v-text">No election events yet.</p>
+              <p className="v-caption mt-1">Create an election event to get started.</p>
+            </div>
+            <Link to="/organizer/election/events/new" className="v-btn-primary">
+              <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+              New event
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )

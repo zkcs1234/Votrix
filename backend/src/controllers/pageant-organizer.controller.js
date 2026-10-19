@@ -1,6 +1,7 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import * as pageantService from '../services/pageant.service.js'
+import * as workflow from '../services/competition-workflow.service.js'
 import * as tabulationService from '../services/competition-tabulation.service.js'
 import { uploadImageFile, UPLOAD_KIND } from '../services/upload.service.js'
 import {
@@ -55,7 +56,8 @@ export const setScoring = asyncHandler(async (req, res) => {
 })
 
 export const publishEvent = asyncHandler(async (req, res) => {
-  const event = await pageantService.publishCompetitionEvent(req.params.eventId, req.user.id)
+  await workflow.freezeRules(req.params.eventId, req.user.id, req.body)
+  const event = await pageantService.getCompetitionEvent(req.params.eventId, req.user.id)
   res.json({ success: true, event })
 })
 
@@ -145,7 +147,7 @@ export const createCriteria = asyncHandler(async (req, res) => {
 })
 
 export const updateCriteria = asyncHandler(async (req, res) => {
-  const payload = validateCriteria(req.body)
+  const payload = validateCriteria(req.body, false)
   const criteria = await pageantService.updateCriteria(
     req.params.eventId,
     req.user.id,
@@ -227,7 +229,7 @@ export const listDeductions = asyncHandler(async (req, res) => {
 })
 
 export const createDeduction = asyncHandler(async (req, res) => {
-  const deduction = await tabulationService.createDeduction(req.params.eventId, req.user.id, req.body)
+  const deduction = await workflow.organizerAction(req.params.eventId, req.user.id, 'deduction-report', req.body)
   res.status(201).json({ success: true, deduction })
 })
 
@@ -237,8 +239,9 @@ export const voidDeduction = asyncHandler(async (req, res) => {
 })
 
 export const calculateResults = asyncHandler(async (req, res) => {
-  const result = await tabulationService.calculateResults(req.params.eventId, req.user.id, {
+  const result = await workflow.calculate(req.params.eventId, req.user.id, {
     method: req.body?.method ?? req.query.method ?? null,
+    results: req.body?.results, reason: req.body?.reason,
     divisionId: req.body?.divisionId ?? req.query.divisionId ?? null,
     roundId: req.body?.roundId ?? req.query.roundId ?? null,
   })
@@ -251,17 +254,17 @@ export const getCalculation = asyncHandler(async (req, res) => {
 })
 
 export const getLatestCalculation = asyncHandler(async (req, res) => {
-  const calculation = await tabulationService.getLatestCalculation(req.params.eventId, req.user.id)
+  const calculation = await tabulationService.getLatestCalculation(req.params.eventId, req.user.id, {roundId:req.query.roundId??null})
   res.json({ success: true, calculation })
 })
 
 export const finalizeCalculation = asyncHandler(async (req, res) => {
-  const calculation = await tabulationService.finalizeCalculation(req.params.eventId, req.user.id, req.params.calculationId)
+  const calculation = await workflow.transitionCalculation(req.params.eventId, req.user.id, req.params.calculationId, 'finalize', req.body)
   res.json({ success: true, calculation })
 })
 
 export const publishCalculation = asyncHandler(async (req, res) => {
-  const calculation = await tabulationService.publishCalculation(req.params.eventId, req.user.id, req.params.calculationId)
+  const calculation = await workflow.transitionCalculation(req.params.eventId, req.user.id, req.params.calculationId, 'publish', req.body)
   res.json({ success: true, calculation })
 })
 

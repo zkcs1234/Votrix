@@ -1,0 +1,1187 @@
+{
+  "format": "votrix-competition-preflight-v1",
+  "readOnly": true,
+  "schema": {
+    "tables": {
+      "events": {
+        "columns": [
+          "id",
+          "organization_id",
+          "title",
+          "description",
+          "banner",
+          "start_date",
+          "end_date",
+          "status",
+          "event_type",
+          "created_at",
+          "updated_at",
+          "voting_enabled",
+          "scoring_enabled",
+          "polling_enabled",
+          "poll_anonymous",
+          "poll_allow_multiple_submissions",
+          "poll_expires_at",
+          "scoring_config",
+          "results_visibility",
+          "participant_info_fields",
+          "election_status",
+          "information_form_schema",
+          "archived_at",
+          "image_asset_id",
+          "divisions_enabled",
+          "competition_type",
+          "official_rules_id",
+          "competition_lifecycle",
+          "competition_setup_revision",
+          "competition_input_revision"
+        ]
+      },
+      "event_participants": {
+        "columns": [
+          "id",
+          "event_id",
+          "user_id",
+          "participant_type",
+          "has_voted",
+          "has_scored",
+          "has_responded",
+          "first_name",
+          "last_name",
+          "metadata",
+          "created_at",
+          "updated_at",
+          "voting_nonce",
+          "judge_role",
+          "display_name",
+          "is_active"
+        ]
+      },
+      "competition_contestants": {
+        "columns": [
+          "id",
+          "event_id",
+          "name",
+          "photo",
+          "contestant_number",
+          "created_at",
+          "updated_at",
+          "image_asset_id",
+          "division_id",
+          "entry_type",
+          "entry_label"
+        ]
+      },
+      "competition_categories": {
+        "columns": [
+          "id",
+          "event_id",
+          "name",
+          "description",
+          "display_order",
+          "weight",
+          "is_active",
+          "created_at",
+          "updated_at",
+          "division_id"
+        ]
+      },
+      "competition_divisions": {
+        "columns": [
+          "id",
+          "event_id",
+          "name",
+          "description",
+          "display_order",
+          "is_active",
+          "created_at",
+          "updated_at",
+          "row_color"
+        ]
+      },
+      "competition_rounds": {
+        "columns": [
+          "id",
+          "event_id",
+          "category_id",
+          "name",
+          "description",
+          "display_order",
+          "weight",
+          "is_open",
+          "starts_at",
+          "ends_at",
+          "created_at",
+          "updated_at",
+          "division_id",
+          "advancement_type",
+          "advancement_value",
+          "score_policy",
+          "finalized_at",
+          "workflow"
+        ]
+      },
+      "competition_criteria": {
+        "columns": [
+          "id",
+          "event_id",
+          "name",
+          "percentage",
+          "min_score",
+          "max_score",
+          "created_at",
+          "updated_at",
+          "category_id",
+          "display_order",
+          "division_id",
+          "is_active"
+        ]
+      },
+      "competition_minor_criteria": {
+        "columns": [
+          "id",
+          "criteria_id",
+          "event_id",
+          "name",
+          "score_type",
+          "custom_min",
+          "custom_max",
+          "display_order",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "competition_round_contestants": {
+        "columns": [
+          "id",
+          "round_id",
+          "contestant_id",
+          "created_at"
+        ]
+      },
+      "competition_round_criteria": {
+        "columns": [
+          "id",
+          "round_id",
+          "criteria_id",
+          "created_at"
+        ]
+      },
+      "competition_judges": {
+        "columns": [
+          "id",
+          "event_id",
+          "user_id",
+          "role",
+          "display_name",
+          "is_active",
+          "has_submitted",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "competition_judge_assignments": {
+        "columns": [
+          "id",
+          "scope",
+          "scope_id",
+          "created_at",
+          "participant_id"
+        ]
+      },
+      "competition_sessions": {
+        "columns": [
+          "id",
+          "event_id",
+          "status",
+          "current_round_id",
+          "active_contestant_id",
+          "current_contestant_order",
+          "contestant_order",
+          "started_at",
+          "paused_at",
+          "completed_at",
+          "created_at",
+          "updated_at",
+          "current_division_id",
+          "active_contestant_ids",
+          "active_criteria_ids",
+          "arrangement",
+          "rules_version",
+          "access_config",
+          "submission_window",
+          "revision",
+          "lineup_id",
+          "active_slot"
+        ]
+      },
+      "competition_scores": {
+        "columns": [
+          "id",
+          "judge_id",
+          "contestant_id",
+          "criteria_id",
+          "score",
+          "created_at",
+          "updated_at",
+          "round_id",
+          "category_id",
+          "event_id",
+          "division_id",
+          "participant_id",
+          "minor_criteria_id"
+        ]
+      },
+      "competition_session_judge_scores": {
+        "columns": [
+          "id",
+          "session_id",
+          "event_id",
+          "round_id",
+          "contestant_id",
+          "judge_id",
+          "scores",
+          "is_locked",
+          "locked_at",
+          "created_at",
+          "updated_at",
+          "division_id",
+          "participant_id",
+          "locked_criteria",
+          "rules_version",
+          "revision",
+          "lock_versions"
+        ]
+      },
+      "competition_round_results": {
+        "columns": [
+          "id",
+          "round_id",
+          "contestant_id",
+          "division_id",
+          "rank",
+          "score",
+          "qualified",
+          "created_at"
+        ]
+      },
+      "competition_deductions": {
+        "columns": [
+          "id",
+          "event_id",
+          "session_id",
+          "round_id",
+          "contestant_id",
+          "applied_by_user_id",
+          "authority_type",
+          "amount",
+          "reason",
+          "status",
+          "voided_at",
+          "voided_by_user_id",
+          "created_at",
+          "updated_at",
+          "rule_id",
+          "rules_version",
+          "decision_status",
+          "evidence",
+          "approved_by",
+          "approved_at",
+          "offense_key"
+        ]
+      },
+      "competition_result_calculations": {
+        "columns": [
+          "id",
+          "event_id",
+          "session_id",
+          "round_id",
+          "status",
+          "configuration_snapshot",
+          "result_snapshot",
+          "created_by",
+          "calculated_at",
+          "finalized_by",
+          "finalized_at",
+          "published_by",
+          "published_at",
+          "created_at",
+          "updated_at",
+          "rules_version",
+          "source_versions",
+          "source_digest",
+          "verified_by",
+          "verified_at",
+          "verification",
+          "source_input_revision"
+        ]
+      },
+      "competition_rule_versions": {
+        "columns": [
+          "id",
+          "event_id",
+          "version",
+          "snapshot",
+          "acknowledged_by",
+          "acknowledged_at",
+          "reason"
+        ]
+      },
+      "competition_lineups": {
+        "columns": [
+          "id",
+          "event_id",
+          "round_id",
+          "criteria_id",
+          "rules_version",
+          "name",
+          "mode",
+          "slots",
+          "created_by",
+          "created_at"
+        ]
+      },
+      "competition_judge_drafts": {
+        "columns": [
+          "id",
+          "session_id",
+          "event_id",
+          "round_id",
+          "judge_id",
+          "contestant_id",
+          "criteria_id",
+          "rules_version",
+          "scores",
+          "revision",
+          "updated_at"
+        ]
+      },
+      "competition_round_submissions": {
+        "columns": [
+          "id",
+          "event_id",
+          "session_id",
+          "round_id",
+          "judge_id",
+          "rules_version",
+          "version",
+          "status",
+          "sources",
+          "submitted_at",
+          "invalidated_at",
+          "reason"
+        ]
+      },
+      "competition_eligibility_decisions": {
+        "columns": [
+          "id",
+          "event_id",
+          "round_id",
+          "contestant_id",
+          "rules_version",
+          "decision",
+          "status",
+          "reason",
+          "evidence",
+          "reported_by",
+          "approved_by",
+          "created_at",
+          "approved_at"
+        ]
+      },
+      "competition_advancement_decisions": {
+        "columns": [
+          "id",
+          "event_id",
+          "round_id",
+          "next_round_id",
+          "calculation_id",
+          "rules_version",
+          "qualifiers",
+          "overrides",
+          "reason",
+          "confirmed_by",
+          "confirmed_at",
+          "automatic_qualifiers",
+          "selection_basis"
+        ]
+      },
+      "competition_rule_amendments": {
+        "columns": [
+          "id",
+          "event_id",
+          "previous_rules",
+          "proposed_config",
+          "reason",
+          "requested_by",
+          "requested_at",
+          "status",
+          "reviewed_by",
+          "reviewed_at",
+          "resulting_rules"
+        ]
+      },
+      "competition_criterion_lock_history": {
+        "columns": [
+          "id",
+          "score_row_id",
+          "rules_version",
+          "criterion_id",
+          "revision",
+          "scores",
+          "locked_by",
+          "locked_at"
+        ]
+      },
+      "competition_create_requests": {
+        "columns": [
+          "organizer_id",
+          "request_id",
+          "event_id",
+          "request_payload",
+          "created_at"
+        ]
+      }
+    },
+    "functions": [
+      "competition_approve_amendment",
+      "competition_set_round_membership",
+      "competition_confirm_advancement",
+      "competition_publish_rules_v099",
+      "election_group_is_eligible",
+      "competition_gate_open",
+      "competition_scoring_write",
+      "competition_create_event",
+      "competition_sync_continuing_roster",
+      "competition_progression_sources",
+      "competition_create_round_criterion",
+      "competition_require_qualified",
+      "cast_poll_response",
+      "set_election_group_eligibility",
+      "competition_validate_participation",
+      "competition_confirm_advancement_v099",
+      "competition_publish_rules",
+      "competition_owns_event",
+      "competition_scoring_write_v095",
+      "competition_participation_context",
+      "competition_registration_source",
+      "competition_reorder_rounds",
+      "competition_publish_rules_v095",
+      "competition_check_relations",
+      "competition_result_transition_v099",
+      "competition_approve_decision",
+      "competition_reconcile_projection",
+      "competition_result_transition",
+      "competition_qualification_sources",
+      "cast_election_ballot",
+      "competition_round_roster",
+      "competition_criteria_source",
+      "competition_reorder_divisions",
+      "competition_operational_action"
+    ]
+  },
+  "metadata": null,
+  "capabilities": [
+    {
+      "name": "legacy_scoring",
+      "observed": true,
+      "missing": [],
+      "unverified": [],
+      "migrationExecutionVerified": false
+    },
+    {
+      "name": "rounds_and_assignments",
+      "observed": true,
+      "missing": [],
+      "unverified": [],
+      "migrationExecutionVerified": false
+    },
+    {
+      "name": "minor_criteria_071",
+      "observed": true,
+      "missing": [],
+      "unverified": [],
+      "migrationExecutionVerified": false
+    },
+    {
+      "name": "submitted_workflow_087_088",
+      "observed": true,
+      "missing": [],
+      "unverified": [],
+      "migrationExecutionVerified": false
+    },
+    {
+      "name": "decision_approval_089",
+      "observed": true,
+      "missing": [],
+      "unverified": [],
+      "migrationExecutionVerified": false
+    },
+    {
+      "name": "amendments_090",
+      "observed": true,
+      "missing": [],
+      "unverified": [],
+      "migrationExecutionVerified": false
+    },
+    {
+      "name": "source_history_093",
+      "observed": false,
+      "missing": [],
+      "unverified": [
+        "catalog-function:competition_snapshot_immutable",
+        "catalog-function:competition_archive_lock"
+      ],
+      "migrationExecutionVerified": false
+    },
+    {
+      "name": "projection_reconciliation_094",
+      "observed": true,
+      "missing": [],
+      "unverified": [],
+      "migrationExecutionVerified": false
+    },
+    {
+      "name": "criteria_publication_095",
+      "observed": true,
+      "missing": [],
+      "unverified": [],
+      "migrationExecutionVerified": false
+    },
+    {
+      "name": "participation_096_099",
+      "observed": true,
+      "missing": [],
+      "unverified": [],
+      "migrationExecutionVerified": false
+    },
+    {
+      "name": "atomic_integrity_100",
+      "observed": false,
+      "missing": [],
+      "unverified": [
+        "catalog-function:competition_guard_calculation_revision"
+      ],
+      "migrationExecutionVerified": false
+    },
+    {
+      "name": "creation_idempotency_102",
+      "observed": true,
+      "missing": [],
+      "unverified": [],
+      "migrationExecutionVerified": false
+    }
+  ],
+  "inventory": {
+    "events": {
+      "count": 11,
+      "complete": true,
+      "fingerprint": "ae032e4f7d0026ae3e1a6f1cd0e8f2cbd798c0e5e3af260c30857243a9ed025a"
+    },
+    "event_participants": {
+      "count": 15,
+      "complete": true,
+      "fingerprint": "def50a5c1da13b07aab369cab15d4752a34e22e779a69458e057aa7240563d3d"
+    },
+    "competition_contestants": {
+      "count": 28,
+      "complete": true,
+      "fingerprint": "839694c90d27829dd20a950909ea182a73d9c7959a33c2029bf8b2e6a1c8ef9c"
+    },
+    "competition_categories": {
+      "count": 0,
+      "complete": true,
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "competition_divisions": {
+      "count": 12,
+      "complete": true,
+      "fingerprint": "6c62dd953eee468e261d6feb4bbb19f747d8405ba2a18ba2333835d99b897f47"
+    },
+    "competition_rounds": {
+      "count": 9,
+      "complete": true,
+      "fingerprint": "ae472a2a23e7ad9c478cb5c2c7e38a1667c2d53a082956b9be01ea7043319f68"
+    },
+    "competition_criteria": {
+      "count": 31,
+      "complete": true,
+      "fingerprint": "0a6bc8f31b07bfbc647c04a1359c87287bf6f8f59322e6fdc65d33a325b46604"
+    },
+    "competition_minor_criteria": {
+      "count": 46,
+      "complete": true,
+      "fingerprint": "91775bab924610010aa46d9d629b90115318be15998ed561de6080674f62fcc9"
+    },
+    "competition_round_contestants": {
+      "count": 32,
+      "complete": true,
+      "fingerprint": "29f2896fe2260d7dda2dcf1a78511936617eea1e48931beaeae1cabe1f7f7d10"
+    },
+    "competition_round_criteria": {
+      "count": 28,
+      "complete": true,
+      "fingerprint": "699f565b6598935d160c38693ddb2ec757cf6d0a4d5968d3f463befc77a85c58"
+    },
+    "competition_judges": {
+      "count": 15,
+      "complete": true,
+      "fingerprint": "88ac58384523c49aa85234ca3301bb83e75b43feb2bca25bc591c195b4022010"
+    },
+    "competition_judge_assignments": {
+      "count": 12,
+      "complete": true,
+      "fingerprint": "8c8e8c38adba564d82ba7dc16b89194fd96b4a1e23be04b235f95e72654421e7"
+    },
+    "competition_sessions": {
+      "count": 5,
+      "complete": true,
+      "fingerprint": "b1027f4ee3c8e89a70750e9c5f2e64716ab1abe7ddcf2028c89fa9019834884f"
+    },
+    "competition_scores": {
+      "count": 28,
+      "complete": true,
+      "fingerprint": "0c43d09808bb73c79e8bddf64758ed10dea49fbcdb5ed1b59353d32febe79f65"
+    },
+    "competition_session_judge_scores": {
+      "count": 4,
+      "complete": true,
+      "fingerprint": "7899169d117f0bd00d2fe931bfd7c8ddbd2d8440effc313a4c637ca9333a4ffc"
+    },
+    "competition_round_results": {
+      "count": 0,
+      "complete": true,
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "competition_deductions": {
+      "count": 0,
+      "complete": true,
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "competition_result_calculations": {
+      "count": 2,
+      "complete": true,
+      "fingerprint": "4b09cdd40b1a32063eccdb80caf86c9a95bc399c0e457fff8d3ad38576912b95"
+    },
+    "competition_rule_versions": {
+      "count": 2,
+      "complete": true,
+      "fingerprint": "82f9a835f098a994c17aa0cab9b71e2fb75cf104ddf15e2ae4cf5cae4af29ba7"
+    },
+    "competition_lineups": {
+      "count": 5,
+      "complete": true,
+      "fingerprint": "4b3541a19010498548de63e2243e7d01e47d34e6b1cb0829fa1a6b5da532a8bf"
+    },
+    "competition_judge_drafts": {
+      "count": 1,
+      "complete": true,
+      "fingerprint": "deb5629a76070e51e5808297ab202b46037da1625707d6d78aff725b5ebc0e47"
+    },
+    "competition_round_submissions": {
+      "count": 0,
+      "complete": true,
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "competition_eligibility_decisions": {
+      "count": 0,
+      "complete": true,
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "competition_advancement_decisions": {
+      "count": 0,
+      "complete": true,
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "competition_rule_amendments": {
+      "count": 0,
+      "complete": true,
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "competition_criterion_lock_history": {
+      "count": 5,
+      "complete": true,
+      "fingerprint": "8ded807db2c730c2da8c78494c568ba14a242470d2ea84d06af9e4e3b03d6ee7"
+    },
+    "competition_create_requests": {
+      "count": 2,
+      "complete": true,
+      "fingerprint": "d4114dc3d6bcb06a51be0158f44541758f3601bcc268c7afc1093620c34ddbbd"
+    }
+  },
+  "historicalResults": {
+    "total": 2,
+    "legacy": 2,
+    "finalized": 1,
+    "published": 0,
+    "missingInputRevision": 0
+  },
+  "ruleProfiles": [
+    {
+      "recordId": "30110472-d824-4c79-b9fc-b6bc94c4d11c",
+      "eventId": "30110472-d824-4c79-b9fc-b6bc94c4d11c",
+      "engine": "legacy",
+      "method": "weighted_average",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "subtract approved points after aggregation",
+      "rankBasis": "numeric judge totals",
+      "transitions": [
+        {
+          "roundId": "195d67db-c447-44c8-aa1c-b0ce5dd02a78",
+          "progression": "weighted",
+          "weight": 100
+        }
+      ],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "35ec02bd-0737-47e4-9443-04456ffeef43",
+      "eventId": "35ec02bd-0737-47e4-9443-04456ffeef43",
+      "engine": "legacy",
+      "method": "weighted_average",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "subtract approved points after aggregation",
+      "rankBasis": "numeric judge totals",
+      "transitions": [
+        {
+          "roundId": "80760f83-3da2-4a1d-8644-f478081da1e8",
+          "progression": "weighted",
+          "weight": 0
+        }
+      ],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "366baaa7-e071-4c86-bbdb-3954f5bbb357",
+      "eventId": "366baaa7-e071-4c86-bbdb-3954f5bbb357",
+      "engine": "legacy",
+      "method": "weighted_average",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "subtract approved points after aggregation",
+      "rankBasis": "numeric judge totals",
+      "transitions": [],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "3beb7871-cee3-42cf-8436-02c4d9af4bbd",
+      "eventId": "3beb7871-cee3-42cf-8436-02c4d9af4bbd",
+      "engine": "legacy",
+      "method": "weighted_average",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "subtract approved points after aggregation",
+      "rankBasis": "numeric judge totals",
+      "transitions": [
+        {
+          "roundId": "65d81046-6b07-4853-98d3-19d83e96a082",
+          "progression": "weighted",
+          "weight": 100
+        }
+      ],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "434a9420-71a0-4764-bd10-1d810ec1f580",
+      "eventId": "434a9420-71a0-4764-bd10-1d810ec1f580",
+      "engine": "legacy",
+      "method": "weighted_average",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "subtract approved points after aggregation",
+      "rankBasis": "numeric judge totals",
+      "transitions": [
+        {
+          "roundId": "85872171-401c-40fe-8d41-6a6e62dc234e",
+          "progression": "weighted",
+          "weight": 100
+        }
+      ],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "50ee9351-eb9d-4976-977d-29d2005a6af7",
+      "eventId": "50ee9351-eb9d-4976-977d-29d2005a6af7",
+      "engine": "legacy",
+      "method": "weighted_average",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "subtract approved points after aggregation",
+      "rankBasis": "numeric judge totals",
+      "transitions": [],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "ba8b5fcf-408d-43ec-880f-04589dea429e",
+      "eventId": "ba8b5fcf-408d-43ec-880f-04589dea429e",
+      "engine": "legacy",
+      "method": "weighted_average",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "subtract approved points after aggregation",
+      "rankBasis": "numeric judge totals",
+      "transitions": [],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "d7f89969-80b5-4467-9352-5d2c01f705a5",
+      "eventId": "d7f89969-80b5-4467-9352-5d2c01f705a5",
+      "engine": "legacy",
+      "method": "weighted_average",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "subtract approved points after aggregation",
+      "rankBasis": "numeric judge totals",
+      "transitions": [
+        {
+          "roundId": "73cda0f2-b3cc-4aee-9202-0bec49aec99d",
+          "progression": "weighted",
+          "weight": 100
+        }
+      ],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "ee7a563a-d6b8-4cea-8304-27fdcc275a97",
+      "eventId": "ee7a563a-d6b8-4cea-8304-27fdcc275a97",
+      "engine": "legacy",
+      "method": "weighted_average",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "subtract approved points after aggregation",
+      "rankBasis": "numeric judge totals",
+      "transitions": [],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "15aac30b-a666-4aa5-9278-c80d7ce171ad",
+      "eventId": "b98c8f3c-109f-4abe-8609-e5e0cbbf8114",
+      "engine": "versioned_official",
+      "method": "rank_based",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "add placement penalty after aggregation",
+      "rankBasis": "positive placement aggregate; lower wins",
+      "transitions": [
+        {
+          "roundId": "3077b7bc-362f-4d4f-87e4-5034726540d4",
+          "progression": "back_to_zero",
+          "weight": 0
+        },
+        {
+          "roundId": "81840100-3a08-4dba-bba9-ee1d552b6b6c",
+          "progression": "back_to_zero",
+          "weight": 0
+        }
+      ],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "1be1e073-83c1-4cf0-8f70-7ec674bef2aa",
+      "eventId": "03dc8d7c-156f-4cbe-911b-07a6054a2ff9",
+      "engine": "versioned_official",
+      "method": "rank_based",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "add placement penalty after aggregation",
+      "rankBasis": "positive placement aggregate; lower wins",
+      "transitions": [
+        {
+          "roundId": "1fd763ad-ad20-4882-8dea-aec311d28ad5",
+          "progression": "back_to_zero",
+          "weight": 0
+        },
+        {
+          "roundId": "076b518d-5dff-424f-9bce-8eef7a4e2f15",
+          "progression": "back_to_zero",
+          "weight": 0
+        }
+      ],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "1218be81-8bfa-458f-a53a-77be91d61ecc",
+      "eventId": "3beb7871-cee3-42cf-8436-02c4d9af4bbd",
+      "engine": "legacy",
+      "method": "weighted_average",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "subtract approved points after aggregation",
+      "rankBasis": "numeric judge totals",
+      "transitions": [],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    },
+    {
+      "recordId": "6aeeaff3-c660-4c69-8499-0cc6c3b6b948",
+      "eventId": "d7f89969-80b5-4467-9352-5d2c01f705a5",
+      "engine": "legacy",
+      "method": "weighted_average",
+      "supported": true,
+      "defaultMethod": false,
+      "normalization": "raw / maximum * 100; minor criteria use equal mean",
+      "deduction": "subtract approved points after aggregation",
+      "rankBasis": "numeric judge totals",
+      "transitions": [],
+      "carryForward": "existing carry_forward adds applicable prior results; it is not percentage carry",
+      "cutoffTies": "existing Top N/percentage policy includes every tied cutoff rank",
+      "action": "preserve existing rules and snapshots; no implicit conversion or recalculation"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "review",
+      "code": "locks_are_not_round_submissions"
+    },
+    {
+      "severity": "blocker",
+      "code": "database_metadata_unverified",
+      "reason": "REST schema does not prove FK validation, trigger definitions, RLS, grants or RPC implementations. Run the PostgreSQL catalog preflight before a migration."
+    }
+  ],
+  "blockers": 1,
+  "reviewItems": 1,
+  "migrationApproved": false,
+  "preservation": "No scores, locks, submissions, deductions, rules or result snapshots are changed or recalculated.",
+  "checkedAt": "2026-10-13T14:06:49.871Z",
+  "target": {
+    "kind": "configured_supabase",
+    "host": "wmjgugqtzcwolytbexze.supabase.co"
+  },
+  "consistency": "REST observations; concurrent writes may occur between requests",
+  "migrationSources": [
+    {
+      "filename": "005_pageant_module.sql",
+      "sourceSha256": "c22675343e42ec9999fb1103f701b5547e8640a39f8018c05469d9679a78e6c9",
+      "executed": false
+    },
+    {
+      "filename": "011_rename_pageant_to_competition_scoring.sql",
+      "sourceSha256": "7d55bce20d0c503c1f3cb3976f9778ccf63a46562a84fd6fd1f4b75d7d0eff7b",
+      "executed": false
+    },
+    {
+      "filename": "015_competition_scoring_foundation.sql",
+      "sourceSha256": "b64bf73133665ca4e3213ae999169fb95b83c05698a78088e84d9712def3c459",
+      "executed": false
+    },
+    {
+      "filename": "023_competition_live_session.sql",
+      "sourceSha256": "60d995653da8729a5cbffe4be028c43f1d502b0e1d0e2237448aa8e6dce9df8f",
+      "executed": false
+    },
+    {
+      "filename": "038_competition_divisions.sql",
+      "sourceSha256": "88ce4f5b6ae25f19aca31be57fd42054cd96407932973aec8f6746056e677813",
+      "executed": false
+    },
+    {
+      "filename": "038_fix_competition_tables_event_id.sql",
+      "sourceSha256": "bbfca2c3643793f3298b33c1a5434eeb3a2b9ebac466bfcc7e3536eabdbfd577",
+      "executed": false
+    },
+    {
+      "filename": "041_unify_competition_judges.sql",
+      "sourceSha256": "ff63a1c71da8dc9865249f052c49d98b4e277e7fd83c9a59269e9af524d4567c",
+      "executed": false
+    },
+    {
+      "filename": "055_competition_performance_indexes.sql",
+      "sourceSha256": "79cbc773381826db591b9bc1f42a41b03c5933eade56222dfe59b3ff859ab7cd",
+      "executed": false
+    },
+    {
+      "filename": "057_competition_type.sql",
+      "sourceSha256": "249bdbd0f3c15e13d354390e64905a9b1435e9a3e6d20df1c2a4f9356b0c04a8",
+      "executed": false
+    },
+    {
+      "filename": "058_round_advancement.sql",
+      "sourceSha256": "2a43b49b78118e6118da9f4b306d877299af80d5ce00e6e3dcd3698a0cfacf24",
+      "executed": false
+    },
+    {
+      "filename": "059_stage_group.sql",
+      "sourceSha256": "d74706093b642b070173623cd5a30740e96a922a3cdb9cb7e99789e05f128320",
+      "executed": false
+    },
+    {
+      "filename": "063_judge_assignment_scope_guard.sql",
+      "sourceSha256": "30b65239927e14e69077282f7d95b873fbf24fedbd28dbbc6cba8318cc7678a5",
+      "executed": false
+    },
+    {
+      "filename": "066_competition_awards.sql",
+      "sourceSha256": "a4ad433c5945615c8f16fa609a1e392e8c057924a59f54b4c5035615f9f5d1a3",
+      "executed": false
+    },
+    {
+      "filename": "068_remove_competition_awards.sql",
+      "sourceSha256": "477e9ba5c9cfad3e386ff401c6ac853dc06e84aa9489db01ad04f97ade911c1b",
+      "executed": false
+    },
+    {
+      "filename": "071_minor_criteria.sql",
+      "sourceSha256": "c7ea376a71a154f04a965766b93a85853cdecc8c78bbf1774f48b72eb2804779",
+      "executed": false
+    },
+    {
+      "filename": "080_competition_session_arrangement.sql",
+      "sourceSha256": "a23cc9590ffcc86bf23ac12d29913f56ef44437e05a07497641adf914293c430",
+      "executed": false
+    },
+    {
+      "filename": "081_competition_deductions.sql",
+      "sourceSha256": "f194708cb52e241bbe0ec8f5fafc86c3a666077699e5e7305548694b15585691",
+      "executed": false
+    },
+    {
+      "filename": "082_competition_result_calculations.sql",
+      "sourceSha256": "f0d1b201215682655ef3a4769e8ebb1c9640424d888d461cc893430816a80f24",
+      "executed": false
+    },
+    {
+      "filename": "087_competition_workflow.sql",
+      "sourceSha256": "3604eacd9966b9e42cff7bd060f3d9e1fcac47b31ff460d733f9146e0a707412",
+      "executed": false
+    },
+    {
+      "filename": "088_competition_operations.sql",
+      "sourceSha256": "65219651f09c6eba8b4b272e059c8dce3a730ed046f16cc6a15ec4c7759c2cc0",
+      "executed": false
+    },
+    {
+      "filename": "089_competition_verification.sql",
+      "sourceSha256": "e0fbb37d4e5dd8cfce7100f931ced3fc56146411f8d17145352d98dfb69ef4f2",
+      "executed": false
+    },
+    {
+      "filename": "090_competition_amendments.sql",
+      "sourceSha256": "a406d98927617b48fbe00b7819b45983eb17dd44e63f015ccfab53e0964892d6",
+      "executed": false
+    },
+    {
+      "filename": "091_competition_atomic_setup.sql",
+      "sourceSha256": "2ddef04df22159acd0125b019264c9a1c33abc1fc089eb139d9859920114a5c6",
+      "executed": false
+    },
+    {
+      "filename": "092_competition_input_invalidation.sql",
+      "sourceSha256": "7fdf29bf562b374765cf61a2bef4d00e318dc482c6c36769a893f1ac5689e673",
+      "executed": false
+    },
+    {
+      "filename": "093_competition_source_history.sql",
+      "sourceSha256": "971108cb56fe535ab54fcc116ad12fb5e96a5b63069946c50a7ca6934bccc500",
+      "executed": false
+    },
+    {
+      "filename": "094_competition_projection_reconciliation.sql",
+      "sourceSha256": "7c42dbd466165165c0b15858df776da5b6818117c2985e2055ccff886a784ac1",
+      "executed": false
+    },
+    {
+      "filename": "095_competition_criteria_publication_guard.sql",
+      "sourceSha256": "1e6fbcfe72ce746f2c287848865db20362e62e7cc79dbf2184348b7f6e485eb6",
+      "executed": false
+    },
+    {
+      "filename": "096_competition_participation_guards.sql",
+      "sourceSha256": "b9837b3ca6078680925c5ceed477f8784ae3d6712124184a06ebaa47e9c3625d",
+      "executed": false
+    },
+    {
+      "filename": "097_competition_round_progression.sql",
+      "sourceSha256": "bbbee13ded9f4263e75f999aab80694ba69353229dcf0a6d6e024e7a3b21e5f9",
+      "executed": false
+    },
+    {
+      "filename": "098_repair_event_participants_event_fk.sql",
+      "sourceSha256": "57d1fce33f41c4e442daa50f80fa349461fe65da601115c11854f4930395b4d2",
+      "executed": false
+    },
+    {
+      "filename": "099_competition_round_progression_upgrade.sql",
+      "sourceSha256": "0651380609344f3de64a7e0c34940f134ad124d1e73acb2eb4efafdd8cb1f6d2",
+      "executed": false
+    },
+    {
+      "filename": "100_competition_atomic_integrity.sql",
+      "sourceSha256": "bbc40a2291a22de052ac9118d83a5e5d863237e9812d114227c5317add07e9c4",
+      "executed": false
+    },
+    {
+      "filename": "101_competition_private_access.sql",
+      "sourceSha256": "3cd96fbc44efd2322707956a97c31668add32d13285224efdd361a24971ea892",
+      "executed": false
+    },
+    {
+      "filename": "102_competition_creation_idempotency.sql",
+      "sourceSha256": "0baf3cdbd4c06fc6df6de3e825c2868766c1fa08294334dbf7269e98538e745c",
+      "executed": false
+    },
+    {
+      "filename": "103_competition_child_identity.sql",
+      "sourceSha256": "4c236303ac34287f968667db953c66ea34ab9d63f1124ad491ba77ced44c874d",
+      "executed": false
+    },
+    {
+      "filename": "104_competition_scoped_rules.sql",
+      "sourceSha256": "f45c91b094f3025297f2030c4ac351f1e37b0db8808721b47ee80e89657c52db",
+      "executed": false
+    },
+    {
+      "filename": "105_competition_scoped_scoring.sql",
+      "sourceSha256": "bea487c104be99b322a71de235c7d6d89d57f2599baa6a0aa84938d675f34ac9",
+      "executed": false
+    },
+    {
+      "filename": "106_competition_scoped_tabulation.sql",
+      "sourceSha256": "6eafe2468c43ce44d123c53b4aef1d74b291dc73cedac410f58a8aa3a88518ff",
+      "executed": false
+    },
+    {
+      "filename": "107_competition_scoped_results.sql",
+      "sourceSha256": "b5e5802e936f8c759546fba3d9fa0accf131a0d7ad07b4dd3cbde778ecc178e2",
+      "executed": false
+    }
+  ]
+}

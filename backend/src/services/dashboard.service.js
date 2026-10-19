@@ -9,6 +9,7 @@ import {
   PARTICIPANT_TYPES,
 } from '../utils/constants.js'
 import { getActiveSessionsForEvents } from './competition-session.service.js'
+import { activeSessionsForOrganizer } from './competition-native-scoring.service.js'
 
 
 function monthKey(dateLike) {
@@ -452,16 +453,29 @@ export async function getOrganizerDashboardStats(organizerId) {
   // Fold what used to be one getActiveSession request per competition event
   // (an N+1 on the organizer home) into a single batched lookup here.
   const eventTitleById = new Map(events.map((e) => [e.id, e.title]))
-  const sessionsByEvent = await getActiveSessionsForEvents(competitionEventIds).catch(
-    () => new Map(),
-  )
-  const activeSessions = [...sessionsByEvent.entries()]
+  const [sessionsByEvent, nativeSessions] = await Promise.all([
+    getActiveSessionsForEvents(competitionEventIds).catch(() => new Map()),
+    activeSessionsForOrganizer(organizerId),
+  ])
+  const legacyActiveSessions = [...sessionsByEvent.entries()]
     .filter(([, session]) => session && session.status === 'active')
     .map(([eventId, session]) => ({
       eventId,
       eventTitle: eventTitleById.get(eventId) ?? 'Untitled event',
       session,
     }))
+  const activeSessions = [
+    ...legacyActiveSessions,
+    ...nativeSessions.map((activeSession) => ({
+      ...activeSession,
+      eventTitle: eventTitleById.get(activeSession.eventId) ?? activeSession.eventTitle ?? 'Untitled event',
+      session: {
+        ...activeSession.session,
+        competitionName: activeSession.competitionName,
+        roundName: activeSession.roundName,
+      },
+    })),
+  ]
 
 return {
     organization: orgData

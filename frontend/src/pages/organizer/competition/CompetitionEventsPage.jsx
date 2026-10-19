@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Edit2, Eye } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import { isReadOnlyEventStatus, isSetupLocked } from '@/utils/constants'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
-import { useSocketEvent } from '@/hooks/useSocketEvent'
+import useCompetitionSync from '@/hooks/useCompetitionSync'
+import useLatestRequest from '@/hooks/useLatestRequest'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 import useDraft from '@/hooks/useDraft'
 import DraftBanner from '@/components/organizer/DraftBanner'
 import { resolveScaleBounds, scaleBoundsLabel, minorScoreLabel } from '@/utils/scoreScale'
@@ -16,27 +18,32 @@ function ScoringSheetPreviewModal({ eventId, eventTitle, onClose }) {
   const [scoringConfig, setScoringConfig] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const beginRead = useLatestRequest(eventId)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
+    const isCurrent = beginRead()
+    setLoading(true); setError(null)
     // The foundation carries the event's real score scale and each criterion's
     // minor criteria, so the preview shows the range judges actually score
     // against instead of a criterion's stale stored min/max.
-    pageantService
+    await pageantService
       .getFoundation(eventId)
       .then(({ data }) => {
+        if (!isCurrent()) return
         const foundation = data.foundation ?? data
         setContestants(foundation.contestants ?? [])
         setCriteria(foundation.criteria ?? [])
         setScoringConfig(foundation.scoringConfig ?? foundation.event?.scoring_config ?? null)
       })
-      .catch((err) => setError(err.response?.data?.message || 'Failed to load preview'))
-      .finally(() => setLoading(false))
-  }, [eventId])
+      .catch((err) => { if (isCurrent()) setError(getErrorMessage(err, 'Failed to load preview')) })
+      .finally(() => { if (isCurrent()) setLoading(false) })
+  }, [eventId, beginRead])
+  useEffect(() => { void load() }, [load])
 
   const eventBounds = resolveScaleBounds(scoringConfig)
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+    <div role="dialog" aria-modal="true" aria-label="Scoring sheet preview" className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="bg-v-surface rounded-2xl p-6 max-w-2xl w-full max-h-[85vh] overflow-y-auto border border-v-border space-y-6">
         <div className="flex items-center justify-between border-b border-v-border pb-3">
           <div>
@@ -54,7 +61,7 @@ function ScoringSheetPreviewModal({ eventId, eventTitle, onClose }) {
           </div>
         )}
 
-        {error && <p className="text-sm text-v-danger">{error}</p>}
+        {error && <div role="alert"><p className="text-sm text-v-danger">{error}</p><Button variant="secondary" onClick={load}>Retry preview</Button></div>}
 
         {!loading && !error && (
           <div className="space-y-6">
@@ -139,23 +146,23 @@ export default function CompetitionEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [previewEventId, setPreviewEventId] = useState(null)
+  const [error, setError] = useState('')
+  const beginRead = useLatestRequest('competition-events')
   const { hasDraft, draft, deleteDraft } = useDraft('competition')
 
-  const load = () => {
-    pageantService
-      .listEvents()
-      .then(({ data }) => setEvents(data.events ?? []))
-      .finally(() => setLoading(false))
-  }
+  const load = useCallback(async () => {
+    const isCurrent = beginRead()
+    try { const { data } = await pageantService.listEvents(); if (isCurrent()) { setEvents(data.events ?? []); setError('') } }
+    catch (err) { if (isCurrent()) setError(getErrorMessage(err, 'Could not load competitions')) }
+    finally { if (isCurrent()) setLoading(false) }
+  }, [beginRead])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   // Listen for session status changes to update event list
-  useSocketEvent('session:status-changed', () => {
-    load()
-  })
+  useCompetitionSync(null, load)
 
   if (loading) {
     return (
@@ -196,6 +203,8 @@ New event
           newEventPath="/organizer/competition/events/new"
         />
       )}
+      {error && <div role="alert" className="v-card p-4 space-y-2"><p className="v-error-text">{error}</p><Button variant="secondary" onClick={load}>Retry loading competitions</Button></div>}
+      {!error && events.length === 0 && <p className="v-caption">No competitions yet. Create an event to begin setup.</p>}
 
       {events.map((event) => (
         <div
@@ -204,7 +213,7 @@ New event
         >
           <div>
             <Link
-              to={`/organizer/competition/events/${event.id}/contestants`}
+              to={`/organizer/competition/events/${event.id}/${event.status === 'draft' ? 'workspace' : isReadOnlyEventStatus(event.status) ? 'rankings' : 'live'}`}
               className="text-lg font-medium text-v-text hover:text-v-text"
             >
               {event.title}
@@ -224,7 +233,7 @@ New event
             </button>
             {event.status === 'draft' ? (
               <Link
-                to={`/organizer/competition/events/${event.id}/contestants`}
+                to={`/organizer/competition/events/${event.id}/workspace`}
                 className="rounded-lg border border-v-primary bg-v-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-v-primary-hover"
               >
                 Continue setup

@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "database": "votrix_review115_1792040879344",
+  "file": "115_competition_review_lifecycle.sql",
+  "sha256": "1c74f277b8c4af15bb65a35fdbeb0d5708e08e0be93b04617ad4a3eb9e263d21",
+  "checks": [
+    "migration repeat preserves all existing event/rule/submission/calculation/publication rows",
+    "complete branches, incomplete rollback and idempotent retry with parent token",
+    "pageant arithmetic configuration remains accepted",
+    "live before all-child completion rejected",
+    "title and banner edits invalidate reviewed parent and roll back freezes",
+    "old completion signature fails closed",
+    "private helpers and old signature blocked; new mutation restricted to backend"
+  ],
+  "productionTouched": false,
+  "originalApplicationDatabaseTouched": false
+}

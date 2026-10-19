@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { eligibleGroups, validateGroupName } from '../utils/electionGroups.js'
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, EVENT_STATUS, EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
@@ -212,15 +213,6 @@ export async function createElectionEvent(organizerId, payload) {
 
   if (error) throw new ApiError(500, error.message)
 
-  const { error: sectionError } = await getClient()
-    .from(DB_TABLES.ELECTION_BALLOT_SECTIONS)
-    .insert({ event_id: data.id, name: 'Main Election', display_order: 0 })
-
-  if (sectionError) {
-    await getClient().from(DB_TABLES.EVENTS).delete().eq('id', data.id)
-    throw new ApiError(500, sectionError.message)
-  }
-
   await syncEventSchedules().catch((err) => {
     console.error('[election] schedule sync failed after create:', err.message)
   })
@@ -343,6 +335,60 @@ function mapBallotSection(row) {
   }
 }
 
+async function groupAssignments(eventId) {
+  const { data, error } = await getClient().from('election_group_voters')
+    .select('ballot_section_id, participant_id').eq('event_id', eventId)
+  if (error) throw new ApiError(500, error.message)
+  return data ?? []
+}
+
+export async function getElectionGroupEligibility(eventId, organizerId, sectionId) {
+  await assertElectionEvent(eventId, organizerId)
+  const { data: group, error } = await getClient().from(DB_TABLES.ELECTION_BALLOT_SECTIONS)
+    .select('id, eligibility_mode').eq('event_id', eventId).eq('id', sectionId).maybeSingle()
+  if (error) throw new ApiError(500, error.message)
+  if (!group) throw new ApiError(404, 'Election group not found')
+  const assignments = await groupAssignments(eventId)
+  const scope = await getOrganizerScope(organizerId)
+  const voters = []
+  for (let offset = 0; ; offset += 500) {
+    const { data: rows, error: rosterError } = await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
+      .select('id, users!inner(email, first_name, last_name, program, year_section)')
+      .eq('event_id', eventId).eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER).order('id').range(offset, offset + 499)
+    if (rosterError) throw new ApiError(500, rosterError.message)
+    for (const row of rows ?? []) {
+      const profile = row.users
+      if (isAllAccess(scope) || isStudentInScope(scope, { program: profile.program, yearSection: profile.year_section })) {
+        voters.push({ id: row.id, email: profile.email, name: [profile.first_name, profile.last_name].filter(Boolean).join(' '), program: profile.program, yearSection: profile.year_section })
+      }
+    }
+    if ((rows ?? []).length < 500) break
+  }
+  return { mode: group.eligibility_mode, participantIds: assignments.filter((row) => row.ballot_section_id === sectionId).map((row) => row.participant_id), voters }
+}
+
+export async function setElectionGroupEligibility(eventId, organizerId, sectionId, payload) {
+  assertParticipantsEditable(await assertElectionEvent(eventId, organizerId))
+  if (!['all', 'selected'].includes(payload?.mode) || !Array.isArray(payload?.participantIds)) {
+    throw new ApiError(400, 'Choose all enrolled voters or selected enrolled voters')
+  }
+  const ids = [...new Set(payload.participantIds)]
+  const scope = await getOrganizerScope(organizerId)
+  const { data: voters, error: rosterError } = ids.length ? await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id, users!inner(program, year_section)').eq('event_id', eventId)
+    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER).in('id', ids) : { data: [], error: null }
+  if (rosterError) throw new ApiError(500, rosterError.message)
+  const allowed = new Set((voters ?? []).filter((voter) => isAllAccess(scope) || isStudentInScope(scope, { program: voter.users?.program, yearSection: voter.users?.year_section })).map((voter) => voter.id))
+  if (ids.some((id) => !allowed.has(id))) throw new ApiError(400, 'Select enrolled voters within your organizer scope')
+  await getElectionGroupEligibility(eventId, organizerId, sectionId)
+  const { error } = await getClient().rpc('set_election_group_eligibility', {
+    p_event_id: eventId, p_section_id: sectionId, p_mode: payload.mode, p_participant_ids: ids,
+  })
+  if (error) throw new ApiError(409, error.message)
+  await recordAudit({ userId: organizerId, action: 'election.group.eligibility', entity: 'election_ballot_sections', entityId: sectionId, details: { eventId, mode: payload.mode, count: ids.length } })
+  return getElectionGroupEligibility(eventId, organizerId, sectionId)
+}
+
 export async function listElectionBallotSections(eventId, organizerId) {
   await assertElectionEvent(eventId, organizerId)
   const { data, error } = await getClient()
@@ -359,19 +405,20 @@ export async function listElectionBallotSections(eventId, organizerId) {
 export async function createElectionBallotSection(eventId, organizerId, payload) {
   assertSetupEditable(await assertElectionEvent(eventId, organizerId))
   const sections = await listElectionBallotSections(eventId, organizerId)
+  const name = validateGroupName(payload.name, sections)
   const displayOrder = payload.displayOrder ?? sections.length
   const { data, error } = await getClient()
     .from(DB_TABLES.ELECTION_BALLOT_SECTIONS)
     .insert({
       event_id: eventId,
-      name: payload.name,
+      name,
       description: payload.description ?? null,
       display_order: displayOrder,
     })
     .select('id, event_id, name, description, display_order, created_at')
     .single()
 
-  if (error) throw new ApiError(500, error.message)
+  if (error) throw new ApiError(error.code === '23505' ? 409 : 500, error.code === '23505' ? 'An election group with this name already exists' : error.message)
   await recordAudit({
     userId: organizerId,
     action: 'election.section.create',
@@ -385,7 +432,7 @@ export async function createElectionBallotSection(eventId, organizerId, payload)
 export async function updateElectionBallotSection(eventId, organizerId, sectionId, payload) {
   assertSetupEditable(await assertElectionEvent(eventId, organizerId))
   const updates = {}
-  if (payload.name !== undefined) updates.name = payload.name
+  if (payload.name !== undefined) updates.name = validateGroupName(payload.name, await listElectionBallotSections(eventId, organizerId), sectionId)
   if (payload.description !== undefined) updates.description = payload.description
   if (payload.displayOrder !== undefined) updates.display_order = payload.displayOrder
   if (!Object.keys(updates).length) throw new ApiError(400, 'No section changes provided')
@@ -398,7 +445,7 @@ export async function updateElectionBallotSection(eventId, organizerId, sectionI
     .select('id, event_id, name, description, display_order, created_at')
     .maybeSingle()
 
-  if (error) throw new ApiError(500, error.message)
+  if (error) throw new ApiError(error.code === '23505' ? 409 : 500, error.code === '23505' ? 'An election group with this name already exists' : error.message)
   if (!data) throw new ApiError(404, 'Ballot section not found')
   await recordAudit({
     userId: organizerId,
@@ -412,8 +459,6 @@ export async function updateElectionBallotSection(eventId, organizerId, sectionI
 
 export async function deleteElectionBallotSection(eventId, organizerId, sectionId) {
   assertSetupEditable(await assertElectionEvent(eventId, organizerId))
-  const sections = await listElectionBallotSections(eventId, organizerId)
-  if (sections.length <= 1) throw new ApiError(409, 'An election must have at least one ballot section')
 
   const { count: submissionCount, error: submissionError } = await getClient()
     .from(DB_TABLES.ELECTION_BALLOT_SUBMISSIONS)
@@ -448,6 +493,7 @@ export async function deleteElectionBallotSection(eventId, organizerId, sectionI
 
 export async function listPositions(eventId, organizerId, sectionId = null) {
   await assertElectionEvent(eventId, organizerId)
+  if (!sectionId && !(await listElectionBallotSections(eventId, organizerId)).length) return []
   const section = sectionId
     ? { id: sectionId }
     : await getDefaultBallotSection(eventId)
@@ -480,6 +526,7 @@ async function nextPositionDisplayOrder(eventId, sectionId) {
 }
 
 export async function createPosition(eventId, organizerId, payload, sectionId = null) {
+  if (!sectionId) throw new ApiError(400, 'Select an election group before adding a position')
   assertSetupEditable(await assertElectionEvent(eventId, organizerId))
 
   const section = sectionId
@@ -904,7 +951,7 @@ export async function getVoterBallot(eventId, voterId) {
 
   const { data: sections, error: sectionsError } = await getClient()
     .from(DB_TABLES.ELECTION_BALLOT_SECTIONS)
-    .select('id, event_id, name, description, display_order, created_at')
+    .select('id, event_id, name, description, display_order, created_at, eligibility_mode')
     .eq('event_id', eventId)
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
@@ -921,13 +968,14 @@ export async function getVoterBallot(eventId, voterId) {
   const submittedBySection = new Map(
     (submissions ?? []).map((submission) => [submission.ballot_section_id, submission.submitted_at]),
   )
-  const sectionProgress = sections.map((section) => ({
+  const accessibleSections = eligibleGroups(sections, await groupAssignments(eventId), enrollment.id)
+  const sectionProgress = accessibleSections.map((section) => ({
     ...mapBallotSection(section),
     completed: submittedBySection.has(section.id),
     submittedAt: submittedBySection.get(section.id) ?? null,
   }))
   const currentSection = sectionProgress.find((section) => !section.completed) ?? null
-  const hasVoted = sectionProgress.every((section) => section.completed)
+  const hasVoted = sectionProgress.length > 0 && sectionProgress.every((section) => section.completed)
 
   if (currentSection && !enrollment.voting_nonce) {
     const { data: updated, error } = await getClient()
@@ -1371,7 +1419,7 @@ async function fetchElectionResultsData(eventId) {
       .eq('has_voted', true),
     getClient()
       .from(DB_TABLES.EVENT_PARTICIPANTS)
-      .select('has_voted, users!inner (program, year_section)')
+      .select('id, has_voted, users!inner (program, year_section)')
       .eq('event_id', eventId)
       .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
     getClient().from(DB_TABLES.ELECTION_VOTES).select('candidate_id, position_id').eq('event_id', eventId),
@@ -1505,7 +1553,7 @@ async function fetchElectionResultsData(eventId) {
 
   const { data: sectionRows, error: sectionError } = await getClient()
     .from(DB_TABLES.ELECTION_BALLOT_SECTIONS)
-    .select('id, event_id, name, description, display_order, created_at')
+    .select('id, event_id, name, description, display_order, created_at, eligibility_mode')
     .eq('event_id', eventId)
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true })
@@ -1534,15 +1582,17 @@ async function fetchElectionResultsData(eventId) {
   const partialVotedCount = Math.max(0, distinctParticipants.size - voted)
 
   const sectionSummaries = (sectionRows ?? []).map((section) => {
+    const eligibleVoterCount = (participantRows ?? []).filter((participant) => eligibleGroups([section], assignments, participant.id).length).length
     const sectionPositions = positionSummaries.filter(
       (position) => position.ballotSectionId === section.id,
     )
     const sectionVotedCount = submissionsBySection.get(section.id) ?? 0
     return {
       ...mapBallotSection(section),
-      totalVoters: totalVoters ?? 0,
+      totalVoters: eligibleVoterCount,
       votedCount: sectionVotedCount,
-      turnoutPercentage: computeTurnoutRate(sectionVotedCount, totalVoters ?? 0),
+      eligibleVoters: eligibleVoterCount,
+      turnoutPercentage: computeTurnoutRate(sectionVotedCount, eligibleVoterCount),
       totalVotes: sectionPositions.reduce((sum, position) => sum + position.totalVotes, 0),
       positionSummaries: sectionPositions,
     }
@@ -1567,7 +1617,7 @@ async function fetchElectionResultsData(eventId) {
 }
 
 export async function getVoterElectionResults(eventId, voterId) {
-  await assertVoterEnrolled(eventId, voterId)
+  const participant = await assertVoterEnrolled(eventId, voterId)
   const event = await getEventById(eventId)
 
   if (event.event_type !== EVENT_TYPES.ELECTION) {
@@ -1578,7 +1628,19 @@ export async function getVoterElectionResults(eventId, voterId) {
     throw new ApiError(403, 'Results are not available yet')
   }
 
-  return fetchElectionResultsData(eventId)
+  const results = await fetchElectionResultsData(eventId)
+  const { data: groups, error } = await getClient().from(DB_TABLES.ELECTION_BALLOT_SECTIONS)
+    .select('id, eligibility_mode').eq('event_id', eventId)
+  if (error) throw new ApiError(500, error.message)
+  const allowed = new Set(eligibleGroups(groups ?? [], await groupAssignments(eventId), participant.id).map((group) => group.id))
+  if (!allowed.size) throw new ApiError(403, 'No eligible election groups available')
+  const positions = results.positionSummaries.filter((position) => allowed.has(position.ballotSectionId))
+  const positionIds = new Set(positions.map((position) => position.positionId))
+  return { ...results, positionSummaries: positions,
+    candidateResults: results.candidateResults.filter((candidate) => positionIds.has(candidate.positionId)),
+    ballotSections: results.ballotSections.filter((group) => allowed.has(group.id)),
+    liveTotalVotes: positions.reduce((sum, position) => sum + position.totalVotes, 0),
+  }
 }
 
 export async function getElectionAnalytics(eventId, organizerId) {
@@ -1682,19 +1744,8 @@ export async function duplicateElectionEvent(eventId, organizerId) {
   const newEvent = await createElectionEvent(organizerId, newEventPayload)
 
   const originalSections = await listElectionBallotSections(eventId, organizerId)
-  const newSections = await listElectionBallotSections(newEvent.id, organizerId)
   const sectionIdMap = new Map()
-  if (originalSections.length && newSections.length) {
-    const firstSection = originalSections[0]
-    const defaultSection = newSections[0]
-    const updatedDefault = await updateElectionBallotSection(newEvent.id, organizerId, defaultSection.id, {
-      name: firstSection.name,
-      description: firstSection.description,
-      displayOrder: firstSection.displayOrder,
-    })
-    sectionIdMap.set(firstSection.id, updatedDefault.id)
-
-    for (const section of originalSections.slice(1)) {
+    for (const section of originalSections) {
       const createdSection = await createElectionBallotSection(newEvent.id, organizerId, {
         name: section.name,
         description: section.description,
@@ -1702,7 +1753,6 @@ export async function duplicateElectionEvent(eventId, organizerId) {
       })
       sectionIdMap.set(section.id, createdSection.id)
     }
-  }
 
   const positionIdMap = new Map()
 
@@ -1809,6 +1859,7 @@ export async function publishElectionEvent(eventId, organizerId) {
   }
 
   const sections = await listElectionBallotSections(eventId, organizerId)
+  if (!sections.length) throw new ApiError(400, 'Create an election group before publishing.')
   for (const section of sections) {
     const positions = await listPositions(eventId, organizerId, section.id)
     if (positions.length === 0) {

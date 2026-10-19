@@ -1,0 +1,44 @@
+{
+  "geometry": {
+    "layout": {
+      "x": 3,
+      "y": 112.78125,
+      "width": 1407,
+      "height": 483
+    },
+    "form": {
+      "x": 3,
+      "y": 112.78125,
+      "width": 556.625,
+      "height": 483
+    },
+    "card": {
+      "x": 607.625,
+      "y": 112.78125,
+      "width": 802.359375,
+      "height": 467
+    },
+    "range": {
+      "x": 651.625,
+      "y": 413.78125,
+      "width": 714.359375,
+      "height": 60
+    },
+    "labels": [
+      "Criteria name",
+      "Weight percentage"
+    ],
+    "buttons": [
+      "Add",
+      "Cancel"
+    ],
+    "rangeLabel": "1–10",
+    "pageWidth": 1413
+  },
+  "mobile": {
+    "pageWidth": 390,
+    "viewport": 390,
+    "stacked": true
+  },
+  "errors": []
+}

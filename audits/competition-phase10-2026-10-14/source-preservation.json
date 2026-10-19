@@ -1,0 +1,15 @@
+{
+  "checked": 789,
+  "changed": [
+    "frontend/src/pages/organizer/competition/CompetitionDashboardPage.jsx"
+  ],
+  "added": [
+    "backend/scripts/competition-phase10-discovery.mjs",
+    "backend/scripts/diagnose-native-competition-ui.mjs",
+    "backend/scripts/production-target-safety.mjs",
+    "backend/scripts/test-production-target-safety.mjs",
+    "frontend/src/pages/organizer/competition/CompetitionDashboardPage.native-navigation.test.jsx"
+  ],
+  "protectedCount": 75,
+  "protectedChanged": []
+}

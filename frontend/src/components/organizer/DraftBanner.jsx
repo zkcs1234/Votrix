@@ -14,8 +14,9 @@ import { EVENT_STAGES } from '@/utils/eventStages'
  * @param {object} props.draft - the persisted draft (or null)
  * @param {() => void} props.onDelete - deletes the draft and refreshes state
  * @param {string} props.newEventPath - path to start a fresh Create session
+ * @param {boolean} [props.alignActionsRight] Align actions to the card content edge, including when stacked.
  */
-export default function DraftBanner({ module, draft, onDelete, newEventPath }) {
+export default function DraftBanner({ module, draft, onDelete, newEventPath, discardFirst = false, alignActionsRight = false }) {
   const [confirming, setConfirming] = useState(false)
   const navigate = useNavigate()
 
@@ -33,13 +34,26 @@ export default function DraftBanner({ module, draft, onDelete, newEventPath }) {
     navigate(newEventPath)
   }
 
+  const openDraftButton = (
+    <Button size="sm" onClick={resume}>
+      Open draft
+      <ArrowRight className="h-4 w-4" strokeWidth={2} />
+    </Button>
+  )
+  const discardButton = (
+    <Button size="sm" variant="ghost" onClick={() => setConfirming(true)}>
+      <Trash2 className="h-4 w-4" strokeWidth={2} />
+      Discard
+    </Button>
+  )
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-primary/40 bg-v-primary/5 p-4">
-      <div className="flex items-center gap-3">
-        <div className="mt-0.5 rounded-full bg-v-primary/10 p-1.5 text-v-primary">
+    <div className={`flex gap-4 rounded-2xl border border-v-primary/40 bg-v-primary/5 ${alignActionsRight ? 'flex-col p-5 sm:flex-row sm:items-center sm:justify-between' : 'flex-wrap items-center justify-between p-4'}`}>
+      <div className={`flex items-center gap-3 ${alignActionsRight ? 'min-w-0 flex-1' : ''}`}>
+        <div className={`mt-0.5 rounded-full bg-v-primary/10 p-1.5 text-v-primary ${alignActionsRight ? 'shrink-0' : ''}`}>
           <FileEdit className="h-5 w-5" strokeWidth={2} />
         </div>
-        <div>
+        <div className={alignActionsRight ? 'min-w-0 break-words' : ''}>
           <p className="text-sm font-semibold text-v-text">
             Draft saved
           </p>
@@ -49,15 +63,9 @@ export default function DraftBanner({ module, draft, onDelete, newEventPath }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={resume}>
-          Open draft
-          <ArrowRight className="h-4 w-4" strokeWidth={2} />
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => setConfirming(true)}>
-          <Trash2 className="h-4 w-4" strokeWidth={2} />
-          Discard
-        </Button>
+      <div className={`flex flex-wrap items-center gap-2 ${alignActionsRight ? 'justify-end sm:shrink-0' : ''}`}>
+        {discardFirst ? discardButton : openDraftButton}
+        {discardFirst ? openDraftButton : discardButton}
       </div>
 
       {confirming && (

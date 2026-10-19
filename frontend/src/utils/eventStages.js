@@ -14,25 +14,17 @@ export const EVENT_STAGES = {
   // Order mirrors the regrouped sidebar (Setup → Run → Results) so the stepper
   // and its footer next/prev walk the same round-first workflow.
   competition: [
-    // Create
-    { key: 'details', label: 'Details', path: 'edit' },
+    { key: 'details', label: 'Event Details', path: 'edit' },
     { key: 'branding', label: 'Branding', path: 'branding' },
-    // Setup — Structure & Scoring holds rounds, criteria (with minor criteria +
-    // score types), divisions and scoring rules; Contestants are added then
-    // assigned to rounds on their own page; Judges are added + assigned.
-    { key: 'workspace', label: 'Structure & Scoring', path: 'workspace' },
-    { key: 'contestants', label: 'Contestants', path: 'contestants' },
+    { key: 'type', label: 'Competition Type', path: 'type' },
+    { key: 'categories', label: 'Competitions / Categories', path: 'categories' },
+    { key: 'workspace', label: 'Rounds & Scoring', path: 'workspace' },
+    { key: 'contestants', label: 'Contestants / Entries', path: 'contestants' },
     { key: 'judges', label: 'Judges', path: 'judges' },
-    // Publishing happens here, before scoring goes live. Setup (structure,
-    // contestants) locks on publish; Judges stays editable through `scheduled`.
-    { key: 'review', label: 'Review & Publish', path: 'review' },
-    // Run
+    { key: 'review', label: 'Review & Create', path: 'review' },
     { key: 'live', label: 'Live Control', path: 'live' },
-    // Results
     { key: 'tabulation', label: 'Tabulation', path: 'tabulation' },
-    { key: 'rankings', label: 'Rankings', path: 'rankings' },
-    { key: 'analytics', label: 'Analytics', path: 'analytics' },
-    { key: 'report', label: 'Report', path: 'report' },
+    { key: 'rankings', label: 'Results & Analysis', path: 'rankings' },
   ],
   polling: [
     { key: 'details', label: 'Details', path: 'edit' },
@@ -56,7 +48,7 @@ export const MODULE_BASE_PATH = {
 
 const SETUP_STAGE_KEYS = {
   election: new Set(['details', 'branding', 'positions', 'candidates', 'voters', 'review']),
-  competition: new Set(['details', 'branding', 'workspace', 'contestants', 'judges', 'review']),
+  competition: new Set(['details', 'branding', 'type', 'categories', 'workspace', 'contestants', 'judges', 'review']),
   polling: new Set(['details', 'branding', 'settings', 'builder', 'respondents', 'review']),
 }
 
@@ -83,8 +75,12 @@ export function stagePath(module, stageKey, eventId) {
   if (!stage) return null
   if (stage.path === null) return null
   if (eventId === 'new') {
-    const persisted = stages.find((s) => s.path !== null && s.path !== 'edit')
-    return `${base}/new/${persisted?.path ?? stage.path}`
+    if (stageKey === 'details') return `${base}/new`
+    if (stageKey === 'branding' || (module === 'polling' && stageKey === 'settings')) {
+      return `${base}/new/${stage.path}`
+    }
+    // Event-specific setup routes require a saved event identifier.
+    return null
   }
   return `${base}/${eventId}/${stage.path}`
 }

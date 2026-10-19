@@ -1,0 +1,361 @@
+{
+  "scope": "Fresh empty isolated database only; source README numeric/filename forward order; down scripts excluded",
+  "migrations": [
+    {
+      "file": "001_initial_schema.sql",
+      "sha256": "f5fdee6885774816ebcd9b27743bb9786414750e685dbe09ea31352a56342c0b"
+    },
+    {
+      "file": "003_password_reset_tokens.sql",
+      "sha256": "4fbaa06f0d83913bda22043341ed11dfaf39ebfe9fd3a976e5dcc5140c638fd2"
+    },
+    {
+      "file": "004_election_module.sql",
+      "sha256": "9748586127300b04307151889d49abba07c6a43cdac9a2efb512c870aa4b66ea"
+    },
+    {
+      "file": "005_pageant_module.sql",
+      "sha256": "c22675343e42ec9999fb1103f701b5547e8640a39f8018c05469d9679a78e6c9"
+    },
+    {
+      "file": "006_polling_module.sql",
+      "sha256": "e78908435491a8b01c885b8c742aad08972ea9d8c355166ef7e5d48bbb82ebde"
+    },
+    {
+      "file": "007_organization_logo.sql",
+      "sha256": "5a5202c4b544fcae285ffeeeffb86a07da2dbc801a56d656cefd0d5741803059"
+    },
+    {
+      "file": "008_admin_dashboard.sql",
+      "sha256": "bd0abb777ff1dbc3fe02af444d5e4e8a936c69000c6d6eba23ff0e97cb475bf6"
+    },
+    {
+      "file": "009_user_account_status.sql",
+      "sha256": "26125598d0d2e8043261af6e274fea46ddb3d048916dc0d2f1c8f714163b9c51"
+    },
+    {
+      "file": "010_notifications.sql",
+      "sha256": "cda4e272cfe4132ef6296a4247a936c1adfe99eb743a368a0cbca8281c4b3f9b"
+    },
+    {
+      "file": "011_rename_pageant_to_competition_scoring.sql",
+      "sha256": "7d55bce20d0c503c1f3cb3976f9778ccf63a46562a84fd6fd1f4b75d7d0eff7b"
+    },
+    {
+      "file": "013_election_enhancements.sql",
+      "sha256": "cc09ab24a796ac929d6da8e38298eebba11926ade652020fa89cfac0134ce654"
+    },
+    {
+      "file": "015_competition_scoring_foundation.sql",
+      "sha256": "b64bf73133665ca4e3213ae999169fb95b83c05698a78088e84d9712def3c459"
+    },
+    {
+      "file": "017_polling_question_type_registry.sql",
+      "sha256": "3f32098d5ee22b7773e8282bc87d0efdb121b2defbf44a44b7b25b939f41aa4b"
+    },
+    {
+      "file": "018_performance_indexes.sql",
+      "sha256": "f0518839bce2882851cb04b167a160fe30101c84961ef70535a43c2726e18350"
+    },
+    {
+      "file": "019_phase9_indexes_and_optimizations.sql",
+      "sha256": "0279d836453d285960168530a8d0e7928a962b8b19577d24c56391e3610ca623"
+    },
+    {
+      "file": "021_token_version.sql",
+      "sha256": "054164aed3175b5ad6562b16da6336071f0cd6e384494ba237143be562b47622"
+    },
+    {
+      "file": "022_invitation_is_new_account.sql",
+      "sha256": "c61b438153e12eb0110e4d940232287d62b30471e6a5a5b259d1dee8f2ef20bc"
+    },
+    {
+      "file": "023_competition_live_session.sql",
+      "sha256": "60d995653da8729a5cbffe4be028c43f1d502b0e1d0e2237448aa8e6dce9df8f"
+    },
+    {
+      "file": "027_polling_completion_time.sql",
+      "sha256": "0bf2e7cc84978a50c05e2713b96a8be7cd2829263888bf21468c5bf5b82b91df"
+    },
+    {
+      "file": "028_single_organization_per_organizer.sql",
+      "sha256": "1b6dc09d620aac6b83b7d834118d2dcb5bd5379847d3a3d0faee4fc2695c93ae"
+    },
+    {
+      "file": "029_event_participant_roles.sql",
+      "sha256": "a29be110276c7c21be5b5bff196748e35b8662c9e5d603278a09524a9aa1a4c4"
+    },
+    {
+      "file": "030_event_information_form_schema.sql",
+      "sha256": "986fd5638073a6093af80345795f889da8f7028fa352866ce1e812dde21f6307"
+    },
+    {
+      "file": "030_participant_info_fields.sql",
+      "sha256": "1a8c392f32571541c7f6e95ce7d21fb6e8b9ba14f50e32b6adb0f942894e400b"
+    },
+    {
+      "file": "031_organizer_onboarding_profile.sql",
+      "sha256": "6b1f180d665e9964bcd8e3c0bfc60d66aa53d381080c0db0158304434240d89d"
+    },
+    {
+      "file": "031_polling_image_support.sql",
+      "sha256": "9b57a46faaf4f26b5c5a6902c8d6e89d78ad101b9c8bd11e18bf12add3cc7681"
+    },
+    {
+      "file": "032_election_further_enhancements.sql",
+      "sha256": "35c73bd0a61598d8412f82a27a0a9353317c19125a1c2201c6dfb74c78d80f42"
+    },
+    {
+      "file": "033_fix_voter_registration_participants.sql",
+      "sha256": "ac3dd49a0eec5d8d5c0b08a707817f9aedf99458abce764cbb3e6f935e50a4f4"
+    },
+    {
+      "file": "034_event_drafts.sql",
+      "sha256": "5551c232e27de7624ba91e9435f3d7894fc066c31e100cea0a37e373c66eb7d9"
+    },
+    {
+      "file": "035_user_sessions.sql",
+      "sha256": "2b5fd489ff2b5a1e8c5112c333539650078c4244878e82f1522730631a832710"
+    },
+    {
+      "file": "036_event_archived_at.sql",
+      "sha256": "be0dfbfdef5fd455839bb2f6217e8c7c07e6bd64db17fdbdbc07e7ec46848cc5"
+    },
+    {
+      "file": "037_image_assets_schema.sql",
+      "sha256": "a3cde674bdf06e498d81435755b98810d8759372de582e5d7ff05f77345071de"
+    },
+    {
+      "file": "038_fix_competition_tables_event_id.sql",
+      "sha256": "bbfca2c3643793f3298b33c1a5434eeb3a2b9ebac466bfcc7e3536eabdbfd577"
+    },
+    {
+      "file": "038_competition_divisions.sql",
+      "sha256": "88ce4f5b6ae25f19aca31be57fd42054cd96407932973aec8f6746056e677813"
+    },
+    {
+      "file": "039_per_division_contestant_number.sql",
+      "sha256": "9bb3a39bf30db224685b950db49d40ef823c40af4c20cf066457dfed1266a83f"
+    },
+    {
+      "file": "040_reconcile_event_participants.sql",
+      "sha256": "1ef127ac9acf9b6c006b818c011e1bdc2d01cf53226cfadb41654e111d8da6a3"
+    },
+    {
+      "file": "041_unify_competition_judges.sql",
+      "sha256": "ff63a1c71da8dc9865249f052c49d98b4e277e7fd83c9a59269e9af524d4567c"
+    },
+    {
+      "file": "055_competition_performance_indexes.sql",
+      "sha256": "79cbc773381826db591b9bc1f42a41b03c5933eade56222dfe59b3ff859ab7cd"
+    },
+    {
+      "file": "057_competition_type.sql",
+      "sha256": "249bdbd0f3c15e13d354390e64905a9b1435e9a3e6d20df1c2a4f9356b0c04a8"
+    },
+    {
+      "file": "058_round_advancement.sql",
+      "sha256": "2a43b49b78118e6118da9f4b306d877299af80d5ce00e6e3dcd3698a0cfacf24"
+    },
+    {
+      "file": "059_election_cast_ballot_rpc.sql",
+      "sha256": "b74ee014b0ee250dd00cdb3a474ad8ad5a2e4a7954af601cf3b6d31a94c4d4a2"
+    },
+    {
+      "file": "059_stage_group.sql",
+      "sha256": "d74706093b642b070173623cd5a30740e96a922a3cdb9cb7e99789e05f128320"
+    },
+    {
+      "file": "060_poll_cast_response_rpc.sql",
+      "sha256": "820e8e84c07a731199bb7a6b79da0735b6470102cdd374c029b79f47e986bac0"
+    },
+    {
+      "file": "061_add_participant_id_to_ballots.sql",
+      "sha256": "d6c0efab5eb74cb038aa5d63f53763a39e1a543c8b5bf04ff8e4d1dd22cdc041"
+    },
+    {
+      "file": "062_validate_participant_id_fks.sql",
+      "sha256": "6cedcada450c624aa4a304bc849f00899ccee5b3fc6b2b444fb3e801f8dfaaab"
+    },
+    {
+      "file": "063_judge_assignment_scope_guard.sql",
+      "sha256": "30b65239927e14e69077282f7d95b873fbf24fedbd28dbbc6cba8318cc7678a5"
+    },
+    {
+      "file": "064_autofill_participant_id.sql",
+      "sha256": "4ba7cc2aba392f19ddeb8b760b349a219d401bc7fde7081bfa8e1f0b3208052b"
+    },
+    {
+      "file": "065_participant_id_not_null.sql",
+      "sha256": "88fdf8b060259e89eeb9018d1e752701128da2798efe76e25545e1171eb55566"
+    },
+    {
+      "file": "066_competition_awards.sql",
+      "sha256": "a4ad433c5945615c8f16fa609a1e392e8c057924a59f54b4c5035615f9f5d1a3"
+    },
+    {
+      "file": "067_award_selections.sql",
+      "sha256": "6eb687f10f59eff4102ff4c227754b9e9aef2bef8f51abd34b88a928944c78c9"
+    },
+    {
+      "file": "068_remove_competition_awards.sql",
+      "sha256": "477e9ba5c9cfad3e386ff401c6ac853dc06e84aa9489db01ad04f97ade911c1b"
+    },
+    {
+      "file": "071_minor_criteria.sql",
+      "sha256": "c7ea376a71a154f04a965766b93a85853cdecc8c78bbf1774f48b72eb2804779"
+    },
+    {
+      "file": "072_session_active_criteria.sql",
+      "sha256": "b861b70bbd4da2394714aeb48251817d9934c0101605da4f4818b8d1debf5c40"
+    },
+    {
+      "file": "073_session_locked_criteria.sql",
+      "sha256": "f1929f5e97a134d59ccfd34ff1ea9bdf919cf30f69dd5ee284e758146c447c85"
+    },
+    {
+      "file": "074_participant_type_composite_indexes.sql",
+      "sha256": "b03fbdaa3d9d2d76db828b99b4baf59485380c994cc01d78753ba02f1770532d"
+    },
+    {
+      "file": "075_participant_profiles.sql",
+      "sha256": "3803a3a974595d016b2ecd8c6e91d9cb0c6e40fd9c8aa0f8639d95e987d237b3"
+    },
+    {
+      "file": "076_organizer_scope.sql",
+      "sha256": "fafc4d1fc07edf9423df224c85caf4ee03e80549fc2525ff4a3855b570cf6417"
+    },
+    {
+      "file": "077_remove_user_session_metadata.sql",
+      "sha256": "8b1d2602aa071d579b993edf505068844991c9404c85aba8e152f80adccc6491"
+    },
+    {
+      "file": "078_election_ballot_sections.sql",
+      "sha256": "1202659b73ae11d3017cd361ae6589234e1d394ef4ef9838dc932fb8360c9553"
+    },
+    {
+      "file": "079_election_section_cast_ballot_rpc.sql",
+      "sha256": "8532bfcd61a31db4bf390a716371f7c1596508f9f7d5b542ca194d3ea3db994e"
+    },
+    {
+      "file": "080_competition_session_arrangement.sql",
+      "sha256": "a23cc9590ffcc86bf23ac12d29913f56ef44437e05a07497641adf914293c430"
+    },
+    {
+      "file": "080_election_groups.sql",
+      "sha256": "3cc4ff73ec0f9a5b1b5431c93a93d511afc33489f64c55b3b2913980b34d9524"
+    },
+    {
+      "file": "081_competition_deductions.sql",
+      "sha256": "f194708cb52e241bbe0ec8f5fafc86c3a666077699e5e7305548694b15585691"
+    },
+    {
+      "file": "082_competition_result_calculations.sql",
+      "sha256": "f0d1b201215682655ef3a4769e8ebb1c9640424d888d461cc893430816a80f24"
+    },
+    {
+      "file": "083_add_participant_user_role.sql",
+      "sha256": "37decfd17fe37a89064318c6a088274108a0775e6e49d590ce7e4ddc0da1aafa"
+    },
+    {
+      "file": "084_user_participant_type_memberships.sql",
+      "sha256": "0e65f8e7b4f0f6d9966cd1f6a90da34bd0a42a2c4e9896fc90681316d492664b"
+    },
+    {
+      "file": "085_convert_voter_role_to_participant.sql",
+      "sha256": "2bb8fee3b2fecb3e7fb55aaa2c56c6b5a9c95ad7a8f0bc64f0f83d2f0d55d7de"
+    },
+    {
+      "file": "086_drop_legacy_profile_type.sql",
+      "sha256": "007a760cf6a260c384d25776180823605a65765323c3ac86ed733ec07d0feba6"
+    },
+    {
+      "file": "087_competition_workflow.sql",
+      "sha256": "3604eacd9966b9e42cff7bd060f3d9e1fcac47b31ff460d733f9146e0a707412"
+    },
+    {
+      "file": "088_competition_operations.sql",
+      "sha256": "65219651f09c6eba8b4b272e059c8dce3a730ed046f16cc6a15ec4c7759c2cc0"
+    },
+    {
+      "file": "089_competition_verification.sql",
+      "sha256": "e0fbb37d4e5dd8cfce7100f931ced3fc56146411f8d17145352d98dfb69ef4f2"
+    },
+    {
+      "file": "090_competition_amendments.sql",
+      "sha256": "a406d98927617b48fbe00b7819b45983eb17dd44e63f015ccfab53e0964892d6"
+    },
+    {
+      "file": "091_competition_atomic_setup.sql",
+      "sha256": "2ddef04df22159acd0125b019264c9a1c33abc1fc089eb139d9859920114a5c6"
+    },
+    {
+      "file": "092_competition_input_invalidation.sql",
+      "sha256": "7fdf29bf562b374765cf61a2bef4d00e318dc482c6c36769a893f1ac5689e673"
+    },
+    {
+      "file": "093_competition_source_history.sql",
+      "sha256": "971108cb56fe535ab54fcc116ad12fb5e96a5b63069946c50a7ca6934bccc500"
+    },
+    {
+      "file": "094_competition_projection_reconciliation.sql",
+      "sha256": "7c42dbd466165165c0b15858df776da5b6818117c2985e2055ccff886a784ac1"
+    },
+    {
+      "file": "095_competition_criteria_publication_guard.sql",
+      "sha256": "1e6fbcfe72ce746f2c287848865db20362e62e7cc79dbf2184348b7f6e485eb6"
+    },
+    {
+      "file": "096_competition_participation_guards.sql",
+      "sha256": "b9837b3ca6078680925c5ceed477f8784ae3d6712124184a06ebaa47e9c3625d"
+    },
+    {
+      "file": "097_competition_round_progression.sql",
+      "sha256": "bbbee13ded9f4263e75f999aab80694ba69353229dcf0a6d6e024e7a3b21e5f9"
+    },
+    {
+      "file": "098_repair_event_participants_event_fk.sql",
+      "sha256": "57d1fce33f41c4e442daa50f80fa349461fe65da601115c11854f4930395b4d2"
+    },
+    {
+      "file": "099_competition_round_progression_upgrade.sql",
+      "sha256": "0651380609344f3de64a7e0c34940f134ad124d1e73acb2eb4efafdd8cb1f6d2"
+    },
+    {
+      "file": "100_competition_atomic_integrity.sql",
+      "sha256": "bbc40a2291a22de052ac9118d83a5e5d863237e9812d114227c5317add07e9c4"
+    },
+    {
+      "file": "101_competition_private_access.sql",
+      "sha256": "3cd96fbc44efd2322707956a97c31668add32d13285224efdd361a24971ea892"
+    },
+    {
+      "file": "102_competition_creation_idempotency.sql",
+      "sha256": "0baf3cdbd4c06fc6df6de3e825c2868766c1fa08294334dbf7269e98538e745c"
+    },
+    {
+      "file": "103_competition_child_identity.sql",
+      "sha256": "4c236303ac34287f968667db953c66ea34ab9d63f1124ad491ba77ced44c874d"
+    },
+    {
+      "file": "104_competition_scoped_rules.sql",
+      "sha256": "f45c91b094f3025297f2030c4ac351f1e37b0db8808721b47ee80e89657c52db"
+    },
+    {
+      "file": "105_competition_scoped_scoring.sql",
+      "sha256": "bea487c104be99b322a71de235c7d6d89d57f2599baa6a0aa84938d675f34ac9"
+    },
+    {
+      "file": "106_competition_scoped_tabulation.sql",
+      "sha256": "6eafe2468c43ce44d123c53b4aef1d74b291dc73cedac410f58a8aa3a88518ff"
+    },
+    {
+      "file": "107_competition_scoped_results.sql",
+      "sha256": "b5e5802e936f8c759546fba3d9fa0accf131a0d7ad07b4dd3cbde778ecc178e2"
+    },
+    {
+      "file": "108_competition_navigation_draft_tools.sql",
+      "sha256": "bdbcf6e432a22caef8488b14b69a83ebd40b27340d0dfbbd66ada3caf2594805"
+    }
+  ]
+}

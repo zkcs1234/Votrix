@@ -1,0 +1,903 @@
+VOTRIX: AN ONLINE POLL AND VOTING SYSTEM WITH INTEGRATED COMPETITION SCORING IN BISU CALAPE
+College of Technology
+Department of Computer Science
+BOHOL ISLAND STATE UNIVERSITY
+Calape
+ Campus, 
+Calape
+, Bohol
+ZAR KENNETH C. SAMIJON
+JENNIFER M. HALAWIG
+April 2026
+VOTRIX: AN ONLINE POLL AND VOTING SYSTEM WITH INTEGRATED COMPETITION SCORING IN BISU CALAPE
+_________________
+A Thesis Presented to the 
+Faculty of the College of Technology
+Department of Computer Science
+BOHOL ISLAND STATE UNIVERSITY
+Calape
+ Campus, 
+Calape
+, Bohol
+_________________
+In Partial Fulfillment
+of the Requirements for the Degree
+in Bachelor of Science in Computer Science
+ZAR KENNETH C. SAMIJON
+JENNIFER M. HALAWIG
+April 2026
+Chapter I
+INTRODUCTION
+Background of the Study
+Online polling and voting systems play a critical role in supporting democratic participation, organizational governance, and competitive evaluation in academic institutions. In many colleges and universities, the conduct of elections, student polls, and competition judging is still managed through manual or paper-based processes, which frequently result in delays in tallying, difficulties in maintaining the integrity of results, and vulnerabilities to human error and manipulation. These challenges undermine the credibility and efficiency of institutional decision-making processes, particularly in environments where accuracy, fairness, and transparency are paramount.
+According to the International Institute for Democracy and Electoral Assistance (IDEA, 2021), the adoption of digital voting and polling technologies in institutional settings significantly enhances the integrity and efficiency of electoral and evaluative processes. These systems leverage web-based platforms, structured ballot management, and real-time result computation to improve the accuracy of vote collection, reduce administrative bottlenecks, and strengthen the overall security of the voting process. By transitioning from manual to digital frameworks, institutions can minimize common vulnerabilities such as ballot tampering, double voting, and unauthorized access to results.
+Presently, at academic institutions such as Bohol Island State University - 
+Calape
+, voting and competition scoring are conducted manually through physical 
+balloting, handwritten tally sheets, and in-person evaluation by designated judges or officers. Voter and candidate records are often managed through printed forms or unstructured digital files, making it difficult to enforce eligibility rules, monitor participation, and accurately and promptly consolidate competition scores. The absence of a unified digital platform further exposes these processes to inconsistencies, delays, and disputes over results.
+In response to these institutional challenges, the system VOTRIX is designed to centralize voter registration, enforce eligibility and participation rules, and automate the processing of votes and competition scores. It introduces a structured digital workflow that encompasses administrative management, candidate or entry registration, voter authentication, secure ballot submission, and automated result computation and scoring. Furthermore, the system strengthens process integrity by implementing duplicate-vote-prevention mechanisms and role-based access controls for judges, administrators, and voters. Through these features, VOTRIX aims to improve the efficiency, accuracy, and transparency of institutional polling, elections, and competition evaluation at BISU 
+Calape
+.
+Objectives of the Study
+The main objective was to design and implement a system that conducts polls, elections, and competition judging faster, more transparently, and more organized through automation and proper enforcement of voting rules and eligibility requirements.
+Specifically, it was guided by the following specific objectives:
+To analyze the existing process of conducting polls, elections, and competition scoring in BISU 
+Calape
+, including voter registration, candidate entry, ballot management, and result tabulation and judging procedures.
+To develop a web-based online poll and voting system that streamlines voter and candidate registration, voter authentication, ballot submission, result computation, and competition score tabulation, while incorporating controls such as duplicate vote prevention and role-based access management.
+To evaluate the system in terms of usability and system acceptability, as well as efficiency, transparency, and accuracy in the conduct and monitoring of polls, elections, and competition scoring activities.
+To create a comprehensive user manual that guides users in effectively operating and navigating the web-based online poll and voting system with integrated competition scoring.
+Significance of the Study
+This study provides significant benefits to key stakeholders involved in implementing and managing event scoring and judging systems at Bohol Island State University - 
+Calape
+. Administrative staff, event coordinators, and judges benefit from improved operational efficiency through the automation of essential processes, including participant registration, judge credential management, scoring sheet generation, and real-time tabulation. Reducing manual procedures minimizes errors, improves scoring consistency, and accelerates result processing across various events, including pageants, dance competitions, intramurals, and 
+other institutional activities. Centralized data management and automated reporting also enhance transparency, accountability, and informed decision-making.
+Participants and students benefit from a more accessible, organized, and transparent competition process. The system promotes fairness through standardized judging criteria and reduces administrative challenges associated with manual scoring methods. Real-time score tracking and result visibility further improve participant confidence and trust in the integrity of the judging process.
+Future researchers may use this study as a reference in developing web-based event management and scoring systems. The study provides a scalable framework incorporating multi-event support, automated tabulation, dynamic scoring mechanisms, and real-time result aggregation. It also offers insights into system design, security considerations, and evaluation approaches that may support future innovations and adaptations in educational institutions and similar competitive environments.
+Scope and Limitation of the Study
+The study focused on developing a web-based polling and voting system, VOTRIX, designed for integrated competition scoring and electoral management at Bohol Island State University–
+Calape
+. The system covered the entire workflow of the polling and voting process, starting from voter registration through result publication. It included modules for voter authentication, eligibility verification, poll creation and management, real-time vote casting, automated competition scoring algorithms, vote counting, judge assignment, and comprehensive result 
+compilation and report generation. The system was designed to ensure that only verified and eligible voters could participate in elections and competitions, with strict enforcement of a one-vote-per-person rule. Each registered voter was limited to a single vote per designated election or competition. In addition, the system integrated duplicate-vote prevention mechanisms, automated ballot-number generation, real-time vote tracking (Pending Votes, Votes Submitted, and Results Processed), competition-scoring modules for weighted evaluation and candidate ranking, and report-generation features to support transparency and proper monitoring of election administration within the university organization.
+The study was limited to a web-based platform. It did not include a mobile application version or offline voting functionality; therefore, system access depended on internet connectivity and device compatibility. The system also relied on accurate data entry and authentication procedures performed by authorized personnel, such as administrators, organizers, election officers, and designated staff, and it did not automatically validate information from external national identification systems. Competition scoring was limited to arithmetic mean, weighted mean with user-defined weights, percentile ranking, ordinal ranking, and Likert scale aggregation methods, and did not include advanced statistical methods beyond these institutional approaches. All voting processes were strictly limited to poll management, vote recording, automated scoring, and results tracking within the VOTRIX environment. Formal declaration of results, official certification, and post-election audit procedures remained the responsibility of the designated election commission and university administration outside the system. 
+Furthermore, the scope of the study was limited to system testing, evaluation, and implementation in a controlled environment at BISU 
+Calape
+. It did not cover nationwide deployment, integration with the Commission on Elections (COMELEC) systems, or real-time networked voting across multiple geographic locations.
+Chapter II
+REVIEW OF RELATED LITERATURE
+Related Literature
+In recent years, the rapid advancement of web-based and digital technologies has profoundly transformed how organizations, institutions, and communities conduct structured evaluative processes, ranging from organizational elections and community opinion polling to judge-scored competitive events such as pageants, dance competitions, talent shows, and other performance-based contests. Traditional approaches that rely on paper ballots, manual score tallying, and handwritten tally sheets have proven increasingly inadequate in addressing the demands of accuracy, transparency, and efficiency that modern events require. This digital transformation reflects a broader movement to leverage information technology to support credible, real-time, and participatory decision-making across all scored and voted activities.
+Building on this, Darmawan (2021), in his peer-reviewed work published in the Asian Journal of Comparative Politics, conducted a semi-systematic review of 78 studies on electronic voting adoption across multiple countries from 2005 to 2020. The study established that electronic voting platforms are increasingly recognized as tools that reduce the costs and administrative burden of traditional voting processes while improving accessibility, participation rates, and the reliability of results. Darmawan further argued that the theoretical framing of e-voting has evolved beyond purely electoral applications, encompassing any structured decision-making process in which participants cast choices that must 
+be accurately counted and reported. This conceptual expansion is directly applicable to VOTRIX, which serves not only organizational elections and public polls but also competitive events that rely on public or panel-based voting to generate results.
+From a broader technological perspective, Jafar, Aziz, and Shukur (2021), in their open-access article published in MDPI Sensors, provided a comprehensive review of electronic voting systems and the principles that underpin their integrity. Their review established that any credible digital voting or evaluation system must satisfy four core properties: legitimacy, accuracy, safety, and convenience. The authors emphasized that these properties are not exclusive to electoral systems but extend to any digital platform designed to collect, process, and report evaluative inputs from multiple participants. In the context of competitive events such as beauty pageants or dance competitions, where judge inputs determine rankings and outcomes, the same standards of system integrity, tamper resistance, verifiable data processing, and transparent result generation must be upheld. Despite the growing theoretical consensus on these requirements, many existing platforms continue to fall short of meeting all four properties simultaneously, particularly in non-electoral competitive settings.
+In relation to the theoretical foundations of digital polling and public participation platforms, the United Nations Development 
+Programme
+ (UNDP, 2021) emphasized in its report on digital governance that inclusive and transparent digital participation systems must be designed with multi-stakeholder functionality accommodating the distinct roles of administrators, voters or judges, and 
+participants or candidates. The report further highlighted that the credibility of any digital decision-making process, whether a public opinion poll or a scored competition, is directly dependent on the system's capacity to enforce structured access controls, generate auditable result trails, and present outcomes in real time. These governance-oriented design principles form the conceptual foundation of VOTRIX, which supports role-differentiated access for event administrators, voters, and judges across multiple event types within a unified web-based environment.
+The Commission on Elections (COMELEC) of the Philippines (2022) has made significant strides in advancing the country's digital evaluation infrastructure by continuing to modernize automated election systems and promoting digital participation in both national and local governance processes. These institutional developments underscore the applicability of digital voting concepts to the Philippine context and demonstrate that the principles governing electronic result processing, including duplicate prevention, authenticated access, and real-time tabulation, are both legally recognized and operationally viable in local settings. In relation to VOTRIX, this institutional precedent underscores the need for a web-based platform that applies the same rigorous data management standards to formal elections, institutional competitions, school-based events, and organizational activities that require systematic scoring and the publication of verifiable results.
+In the specific context of multi-criteria evaluation and competition scoring theory, Cai and Xiang (2024), in their study titled "Multifactor and Multidimensional 
+Data Quality Analysis of Judge Scoring in Diving Competition," published in Frontiers in Psychology, examined the theoretical and methodological challenges associated with judge-based scoring in competitive events. The study demonstrated that competitions involving multiple judges scoring participants across several criteria are inherently prone to scoring inconsistencies, bias, and data-quality issues when managed manually or with fragmented tools. The authors proposed that structured digital evaluation systems capable of aggregating multi-judge scores, applying weighted criteria, and computing statistically reliable rankings are essential to ensuring the fairness and credibility of competitive results across domains such as sports, performing arts, and institutional pageantry.
+However, despite the recognized value of digital systems in improving evaluation processes, the study identified persistent limitations in their practical application to multi-event and multi-criteria scenarios. These include the absence of unified platforms capable of managing both popular-vote components and judge-scored segments, the lack of configurable scoring rubrics adaptable to different competition types such as pageants, dance, or talent events, and insufficient real-time result visualization tools that allow organizers and audiences to monitor competition standings as they develop. These challenges were largely attributed to the narrow design scope of most existing evaluation tools, which address either voting or scoring in isolation and rarely integrate both functions into a cohesive, end-to-end event management system. Addressing these limitations provides the primary justification for developing VOTRIX, which consolidates online polling, organizational voting, multi-criteria judge-based scoring, and 
+automated rank computation into a single, secure, and user-accessible web-based platform designed to serve the full spectrum of evaluative and competitive event management needs.
+Input
+1. Existing manual processes for elections, polls, pageants, dance, and judged events
+2. Candidate, voter, judge, and organizer profile data
+3. System requirements and user needs of event organizers and institutions
+4. Research gaps such as duplicate votes, manual score tallying, and no real-time monitoring
+5. Technological resources and web infrastructure
+6. Multi-event scoring criteria and judging rubrics from organizers 
+Process
+1. Analyze current workflows across event types and use cases
+2. Design system architecture, database, and multi-role modules
+3. Develop the VOTRIX system 
+4. Apply event rules: duplicate prevention, judge score validation, and rank computation
+5. Test system across all event types: elections, pageants, polls, and competitions
+6. Validate results, scoring accuracy, and user acceptance
+Output
+VOTRIX: An Online Poll and Voting System with Integrated Competition Scoring in BISU 
+Calape
+Outcome
+1. Faster and more transparent polls, elections, and events.
+2. Reduced manual workload for judges and organizers
+3. Real-time tracking of vote scores and competition standings
+4. Accurate automated ranking for pageants, dance, and all judged competitions.
+5. Fair, credible, and tamper-resistant event results for users
+Feedback, Review, Adjust, Upgrade & Remake
+Feedback, Review, Adjust, Upgrade & Remake
+Figure 1. Conceptual Framework
+Related Studies
+Cornelio et al. (2025) developed the MEMU Tabulation System, a digital platform for automating cultural contest scoring, email notifications, and e-certificate generation. Evaluated using ISO 25010, the system demonstrated excellent reliability and functionality. However, it was limited exclusively to event scoring and did not include any online voting, polling, or multi-role election management features. VOTRIX addresses these limitations by integrating online polling, secure electronic voting, and competition scoring into a unified web-based platform.
+Ramizares
+ and 
+Ramizares
+ (2025) introduced an Adaptive Multi-Event Tabulation System that automated score computation across multiple competition types using customizable event modules and responsive judge interfaces. The system addressed tabulation efficiency but did not incorporate secure online voting, public polling, or role-based participant authentication. VOTRIX addresses this gap through its combined voting, polling, and role-based management functionalities for elections and competitions.
+Reyes et al. (2025) developed 
+VoSys
+, a hybrid online voting platform for academic department elections. 
+VoSys
+ employed biometric authentication and digital ballot processing to improve election security and efficiency. The system was specialized for electoral management and lacked capabilities for competition scoring, event tabulation, or multi-event administration. VOTRIX addresses these shortcomings by integrating election management with competition scoring and automated tabulation features.
+Afable and 
+Quiloña
+ (2020) designed a Multi-User Automated Pageant Tabulation System for local government competitions, demonstrating faster and more accurate results than manual computation. The platform was limited to pageant judging and lacked online voting, public polling, and secure user authentication. Such limitations are overcome in VOTRIX through secure online elections, polling functionalities, and multi-role administrative access.
+Atanacio et al. (2024) evaluated 
+AutoBeaut
+, an automated judging system for beauty pageants used across five years of institutional events. Rated "Very Acceptable" under ISO 25010, 
+AutoBeaut
+ demonstrated long-term operational reliability. However, the system functioned solely as a standalone judging application and did not offer voting, polling, or integrated election management. VOTRIX addresses this deficiency through its comprehensive platform that combines voting, polling, and competition management capabilities.
+Alves and Pinto (2023) explored a Blockchain-Assisted Electronic Voting System for remote academic council meetings, emphasizing vote integrity through blockchain transparency. The system addressed secure digital voting but was limited to that domain and did not include competition scoring, polling, or multi-category event management. The proposed VOTRIX system addresses these limitations by unifying elections, polling, and competition scoring within a single platform.
+Hochbaum and Moreno-Centeno (2022) proposed a mathematical aggregation framework combining ordinal and cardinal evaluations for academic paper competitions. While significant as a conceptual contribution to scoring 
+fairness, the framework was purely theoretical and did not involve the development of a deployable web-based system with voting, polling, or real-time tabulation features. VOTRIX fills this gap by providing a practical web-based implementation with integrated voting, polling, and real-time tabulation functionalities.
+Salunke et al. (2025) developed the NextGen Voting System, which utilizes unique student identifiers and encrypted authentication to strengthen transparency in academic elections and prevent duplicate voting. The system was effective for its electoral purpose, but did not include competition scoring, automated ranking, or multi-event management functionality. These limitations are addressed in VOTRIX through integrated competition scoring, automated ranking, and centralized event administration features.
+The reviewed literature indicates a clear limitation in existing systems and studies: no single platform combines online polling, secure electronic voting, and automated competition scoring within a unified, web-based, multi-role environment. Each reviewed study addresses only one or two of these functional components separately. Systems focused on competition tabulation, such as MEMU, Adaptive Tabulation, and 
+AutoBeaut
+, provide reliable scoring mechanisms but do not incorporate electoral processes or audience participation features. Systems focused on electronic voting, such as 
+VoSys
+, the Blockchain Vote System, and the NextGen Voting System, offer secure ballot management but do not extend to competition judging, weighted scoring, or event tabulation. Theoretical frameworks, such as the aggregation methodology by Dorit S. Hochbaum and Esteban Moreno-Centeno (2022), provide important conceptual 
+contributions to scoring fairness but do not yield deployable systems that integrate voting and polling functionality.
+Furthermore, no reviewed study presented a system that simultaneously serves as an election management tool, a public polling platform, and a competition scoring engine within a single institutional environment. This multi-purpose integration is increasingly needed in educational institutions and organizations where school elections, pageants, and other scored events are conducted in proximity or even concurrently. Managing these events across separate, disconnected systems introduces administrative redundancy, data inconsistency, and limited transparency.
+The proposed Online Poll and Voting System with Integrated Competition Scoring directly addresses this gap by developing a unified web-based platform that combines secure, role-based electronic voting, real-time competition scoring with weighted criteria, and public polling. This approach eliminates the limitations of single-purpose platforms, reduces administrative overhead, and provides a transparent, accessible, and scalable solution for both electoral and competition management needs in academic and organizational contexts.
+Chapter III
+METHODOLOGY
+Research Design
+This study employed a descriptive and developmental research design. The descriptive aspect was used to analyze the existing manual process of conducting polls, elections, and competition scoring at Bohol Island State University – 
+Calape
+, while the developmental aspect guided the design, construction, and iterative refinement of the VOTRIX web application. The system was developed using an agile, incremental approach in which each module — election, competition scoring, and polling — was designed, implemented, and tested before being integrated into the complete platform.
+Project Development
+The development of VOTRIX followed a structured plan that covers both the documentation and the software development activities of the project. The project schedule, task assignments, and progress are presented through the Gantt charts, while the criteria used to evaluate the finished system are described under Project Evaluation.
+a. Gantt Chart
+The Gantt charts present the schedule of activities for the software development and the documentation phases of the project. Each entry indicates the task or activity, the member assigned, the progress, and the target start and 
+end dates. The charts remain editable so that the schedule can be updated as the project progresses.
+Table 1: Gantt Chart for Software Development
+Table 2: Gantt Chart for Documentation
+b. Project Evaluation
+The completed system was evaluated using the ISO/IEC 25010 software quality model, focusing on functional suitability, performance efficiency, usability, reliability, and security, together with the overall acceptability of the system. Selected respondents used the system and rated it through a structured questionnaire based on a four-point Likert scale, and the gathered responses were interpreted using the weighted mean.
+Requirement Analysis
+The requirement analysis identified the scope, stakeholders, and the functional, non-functional, technical, and data requirements that guided the development of the VOTRIX system.
+1. Define the Scope
+VOTRIX is a web-based platform that manages online elections, polling or surveys, and competition scoring for Bohol Island State University – 
+Calape
+. Its scope includes account and event management, participant invitation, secure ballot and score submission, duplicate-vote prevention, and the generation of analytics and reports. Hardware procurement and offline balloting are outside the scope of the system.
+2. Identify Stakeholders
+The primary stakeholders are the administrator, who manages organizer accounts and oversees the platform; the organizer, who creates and manages events; and the voter, who participates in an event as an election voter, a 
+competition judge, or a polling respondent, depending on the assigned participant type.
+3. Gather Functional Requirements
+The system must allow secure authentication and role-based access; creation and configuration of election, competition, and polling events; uploading of branding assets; invitation of participants; submission of votes, scores, or responses; prevention of duplicate submissions; and the generation of turnout, ranking, and result analytics.
+4. Gather Non-Functional Requirements
+The system must be secure, applying password hashing, token-based authentication, HTTP-only cookies, CSRF protection, role-based route protection, and rate limiting. It must also be usable, reliable, maintainable, and responsive across supported devices.
+5. Identify Technical Requirements
+The front end is built with React, Vite, and Tailwind CSS, with 
+Zustand
+, React Router, Axios, React Hook Form, Zod, and Framer Motion. The back end uses Node.js and Express, with JSON Web Tokens and 
+bcrypt
+ for authentication. Data is stored in a PostgreSQL database hosted on 
+Supabase
+, while 
+Cloudinary
+ handles media storage and Resend handles email delivery. A WebSocket channel provides real-time updates for live rankings, dashboard statistics, and live-session control.
+6. Identify Data Requirements
+The system maintains data for users, organizations, events, event participants, ballots and votes, poll questions and answers, contestants and candidates, criteria and scores, and the computed analytics. Universally unique identifiers (UUIDs) are used as primary keys, and the schema is managed through numbered SQL migrations.
+7. Requirements in Paragraph Form
+Taken together, the requirements describe a secure, role-based platform in which an administrator manages organizers, an organizer configures and operates election, competition, or polling events, and a voter participates according to the assigned participant type. The system enforces eligibility and event rules, prevents duplicate submissions, stores all records in a relational PostgreSQL database, and produces analytics for organizers and administrators, all delivered through a React front end communicating with an Express REST API over secure, cookie-based sessions.
+System Architecture
+VOTRIX follows a three-tier client–server architecture with an auxiliary real-time channel. The client tier is a React single-page application that renders the administrator, organizer, and voter/judge/respondent interfaces and communicates with the server exclusively over HTTPS REST calls carrying HTTP-only session cookies. The application tier is a Node.js and Express REST API that enforces authentication and authorization through a middleware chain — authenticate, authorize by role, 
+requireActiveAccount
+, 
+requirePasswordChanged
+, 
+requireProfileComplete
+, and 
+requireEventParticipant
+ — before delegating to a service layer that holds the business logic for the election, competition, and polling modules, including the shared scoring engine. The data tier is a PostgreSQL database hosted on 
+Supabase
+, accessed through service functions and, for the integrity-critical vote and poll submissions, through PL/
+pgSQL
+ stored procedures that make each submission a single atomic transaction. Two external services complete the architecture: 
+Cloudinary
+ for image storage (event banners, candidate and contestant photos, organization logos) and 
+Resend
+ for transactional email (organizer credentials, voter and judge invitations, password resets, and notifications). A WebSocket channel pushes live updates — vote tallies, competition rankings, live-session state, and dashboard statistics — to connected clients without polling. The client–server architecture of the system is shown in Figure 2.
+Figure 2. Client-Server Architecture of the VOTRIX System
+1. Design Specification
+The presentation layer is written in React with Vite and Tailwind CSS and uses 
+Zustand
+ for state management, React Router for navigation, Axios for HTTP calls, React Hook Form with Zod for form validation, and Framer Motion for micro-interactions. The application layer runs on Node.js and Express and secures every request through a chain of middleware that verifies the JSON Web Token session, checks the caller’s role and account status, enforces CSRF using a double-submit token, applies purpose-specific rate limits (authentication, voting, polling, judge scoring, CSV import, email, and file upload), and — for event routes — requires the caller to be a participant of the correct type. The data layer stores every entity 
+as a UUID-keyed relational row and evolves through numbered SQL migrations; the integrity-critical vote and poll paths call PL/
+pgSQL
+ functions (
+cast_election_ballot
+, 
+cast_poll_response
+) that combine the eligibility claim and the ballot or answer insert in one transaction so a mid-flight crash cannot leave a participant marked as voted with no ballot. 
+Cloudinary
+ and Resend are treated as loosely-coupled external services whose failures are recorded but do not abort the core write; the WebSocket layer emits events (vote-submitted, rankings-updated, session state, stats-updated) that are consumed by dashboards without any client polling.
+Database Schema
+The database is a strongly relational PostgreSQL schema managed through numbered SQL migrations, using UUID primary keys throughout and 
+updated_at
+ triggers on mutable tables. It is organized into five clusters: identity and core (users, organizations, events, 
+event_participants
+, invitations); the election module (positions, candidates, 
+election_votes
+); the competition-scoring module (
+competition_contestants
+, 
+competition_criteria
+, 
+competition_minor_criteria
+, 
+competition_categories
+, 
+competition_rounds
+, 
+competition_round_contestants
+, 
+competition_round_criteria
+, 
+competition_scores
+, 
+competition_judge_assignments
+, 
+competition_divisions
+, 
+competition_sessions
+, 
+competition_session_judge_scores
+, 
+competition_round_results
+); the polling module (
+poll_questions
+, 
+poll_options
+, 
+poll_submissions
+, 
+poll_answers
+, 
+poll_question_types
+, 
+system_poll_question_types
+); and the platform/infrastructure tables (
+audit_logs
+, notifications, 
+system_settings
+, 
+user_sessions
+, 
+password_reset_tokens
+, 
+event_drafts
+, 
+image_assets
+, 
+image_deletion_queue
+). The central hub is 
+event_participants
+: a single voter account is linked to an event with exactly one 
+participant_type
+ (ELECTION_VOTER, COMPETITION_JUDGE, or POLLING_RESPONDENT), and this row also carries the completion flags (
+has_voted
+, 
+has_scored
+, 
+has_responded
+), the participant’s name, and JSONB metadata (for example, the cohort a participant was enrolled through). A database trigger (
+fn_validate_participant_event_type
+) enforces that the participant type matches the event type. Each user row also carries the participant-profile fields used for admin-owned registration — 
+profile_type
+ (student or judge), 
+first_name
+, 
+last_name
+, 
+school_id
+, program, and 
+year_section
+ for students, a 
+profile_data
+ JSONB for judge details and judge-to-organizer assignment, and a scope JSONB that bounds an organizer to selected programs and year & sections; the managed list of valid programs and year & sections (the participant taxonomy) is stored as JSON in 
+system_settings
+. The complete database schema is shown per module in the entity-relationship diagrams in Figures 3.1 to 3.5, grouped into the core/identity, election, competition-scoring, polling, and platform clusters; tables shown in a lighter box marked “(external)” belong to another cluster and are repeated only to anchor the cross-module foreign keys.
+Figure 3.1. Database Schema — Core / Identity Tables
+Figure 3.2. Database Schema — Election Module Tables
+Figure 3.3. Database Schema — Competition Scoring Module Tables
+Figure 3.4. Database Schema — Polling Module Tables
+Figure 3.5. Database Schema — Platform / Infrastructure Tables
+Key integrity rules verified in the schema include a unique ballot guard on 
+election_votes
+ (
+event_id
+, 
+voter_id
+, 
+position_id
+, 
+candidate_id
+), a unique score guard on 
+competition_scores
+ (
+judge_id
+, 
+contestant_id
+, 
+criteria_id
+, 
+minor_criteria_id
+, 
+round_id
+), a unique poll answer guard (
+submission_id
+, 
+question_id
+), and a unique enrollment guard on 
+event_participants
+ (
+event_id
+, 
+user_id
+). A CHECK constraint requires that non-admin accounts have an email; a legacy username column is retained on admin rows, but authentication is unified — every role, the administrator included, signs in with an email and password, and the username field is no longer used by the login path.
+Use Case Diagrams
+VOTRIX defines three system roles — admin, organizer, and voter. Election voters, competition judges, and polling respondents are all voter accounts distinguished by the participant type assigned to them for a given event, so the use-case model has three authentication actors and three additional event-scoped participation sub-actors. To keep each diagram clear and readable, the use cases are presented per actor and participant type in Figures 4 to 9, and each meaningful operation is then given an individual use-case specification listing its actors, main flow, included and extended use cases, and error cases.
+1. Use Case Diagram for Authentication
+Authentication is shared by every actor. Logging in includes credential validation and session issuance; the forced first-login password change and the optional voter “skip” extend the login flow; password recovery is a separate pair of use cases available to email-based accounts (organizer and voter). The use cases for authentication are shown in Figure 4.
+Figure 4. Use Case Diagram for Authentication
+UC-A1 Log In. 
+Actors: Admin, Organizer, Voter. Main: Log In. Include: Validate Credentials, Issue Session. Extend: Change Password (when 
+must_change_password
+ is true), Skip Password Change (voter only). Errors: empty fields, invalid email or password, inactive, suspended, or archived account, rate limit exceeded.
+UC-A2 Change Password. 
+Actor: any. Main: Change Password. Include: Re-issue Session (a token-version bump invalidates old sessions). Errors: incorrect current password, weak new password.
+UC-A3 Request / Reset Password. 
+Actors: Organizer, Voter. Main: Request Password Reset 
+then
+ Reset Password with Token. Errors: unknown email (a generic success is returned to prevent enumeration), invalid, expired, or already-used token.
+UC-A4 Log Out. 
+Actor: any. Include: Revoke Session (token-version bump), Clear Cookies.
+2. Use Case Diagram for the Administrator
+The administrator owns all account registration in VOTRIX — organizer, voter (student), and judge accounts — manages the participant taxonomy (the valid programs and year & sections), sets system-wide policy, and monitors platform health. Administrators do not create or run election/competition/polling events themselves; that is the organizer’s domain. The administrator use cases are shown in Figure 5.
+Figure 5. Use Case Diagram for the Administrator
+UC-B1 Create Organizer Account. 
+Actor: Admin. Main: register an organizer with a complete profile (organization name and type, organizer name, position) and a scope — all-access, or scoped to selected programs and year & sections — through a single-add form or CSV import. Include: Validate Scope against the Participant Taxonomy, Generate Strong Password, Email Credentials via Resend, Write Audit Log. Extend: Assign Judges to this Organizer. Errors: duplicate email, validation error, out-of-taxonomy scope, email delivery failure.
+UC-B2 Update Organizer Status. 
+Main: set the account status to active, suspended, or archived. Include: Write Audit Log. Extend: Revoke Sessions on suspend or archive. Errors: invalid status value, organizer not found.
+UC-B3 Manage Sessions. 
+Include: List Active Sessions, 
+Revoke
+ a Single Session, or Revoke All Sessions for a User (each revoke forces logout through a token-version bump).
+UC-B4 Manage System Settings, Alert Configuration, and Archival Policy. 
+Include: Validate Payload, Persist to JSONB Settings Table, Write Audit Log. Errors: invalid payload.
+UC-B5 Register Voters and Judges. 
+Actor: Admin. Main: create student accounts (email, school ID, first and last name, program, year & section) and judge accounts (email, name, title, affiliation, expertise) through a single-add form or CSV import. Include: Validate against the Participant Taxonomy, De-duplicate by email and school ID, Generate Temporary Password, Email the New Account, Write Audit 
+Log. Errors: duplicate account, out-of-taxonomy program or section, email delivery failure.
+UC-B6 Manage Participant Taxonomy and Judge Assignment. 
+Actor: Admin. Main: maintain the managed lists of valid programs and year & sections that validate student registration and bound organizer scope, and assign specific judges to specific organizers. Include: Validate Payload, 
+Persist
+ to 
+system_settings
+, Write Audit Log.
+3. Use Case Diagram for the Organizer
+The organizer’s use cases are gated: Complete Organization Profile must succeed before any module use case is reachable, because the 
+requireProfileComplete
+ middleware blocks all module routes until the four required profile fields are saved. The three module clusters (election, competition, polling) share the same participant-management, invitation, and publish patterns. The organizer use cases are shown in Figure 6.
+Figure 6. Use Case Diagram for the Organizer
+UC-C1 Organizer Profile (Set by the Admin at Registration). 
+Note: the four required profile fields (organization name, organization type, organizer name, position) are now supplied by the administrator at registration, so onboarding is normally already complete and there is no separate organizer onboarding page. Errors: missing field — the 
+requireProfileComplete
+ gate nonetheless remains as a backend safeguard that keeps module routes locked until those fields are present.
+UC-C2 Create Election, Competition, or Polling Event. 
+Include: Persist Event as draft, Clear Persistent Draft, Write Audit. Extend: Upload Banner (
+Cloudinary
+).
+UC-C3 Manage Positions and Candidates (Election). 
+Include: Create, Read, Update, Delete. Errors: deletion is blocked once votes exist (HTTP 409).
+UC-C4 Manage Competition Structure. 
+Include: Manage Divisions, Categories, Rounds, Criteria, Minor Criteria, Contestants, and Scoring Configuration. Extend: Assign Round Contestants and Round Criteria.
+UC-C5 Manage Judges and Assignments. 
+Include: Invite Judge, Assign Scope (event, category, round, or division). Errors: cross-event scope guard prevents an assignment that belongs to a different event.
+UC-C6 Invite Participants by Cohort and Pick Judges. 
+Include: for elections and polls, Invite by Cohort (choose a program or a year & section from the organizer's scope, preview the matching count, and bulk-
+enrol
+ the matching students); for competitions, Pick Judges from the admin-assigned pool. A multi-role guard prevents a judge account from being enrolled as a voter, and every cohort, enrolled list, and analytic is bounded by the organizer's scope. Sending the invitation email is a separate, throttled step. Accounts themselves are created by the administrator, not the organizer.
+UC-C7 Publish Event. 
+Include: Validate Minimum Content (election: at least one position, one candidate, and one voter). Errors: missing content, already published. Note that publish only flips draft to scheduled; voting openness is then driven by the schedule.
+UC-C8 Run Live Competition Session. 
+Include: Start, Set Round, Set Active Criteria, Set / Advance Contestant, Pause / Resume, Finalize Round, Complete Session.
+UC-C9 View Rankings, Analytics, and Reports. 
+Include: Compute Weighted Rankings via the scoring engine, Aggregate Tallies, Export CSV.
+4. Use Case Diagram for the Election Voter
+An election voter is a voter account whose 
+participant_type
+ in an event is ELECTION_VOTER. The voter’s use cases center on ballot access, selection validation, and one-time, atomically recorded submission with duplicate prevention. The use cases are shown in Figure 7.
+Figure 7. Use Case Diagram for the Election Voter
+UC-D1 Cast Vote. 
+Actor: Election Voter. Main: Cast Vote. Include: Validate Selections (minimum and maximum per position, allow-skip rule, valid candidate for the position, no duplicate candidate), Nonce Replay Check, Prevent Duplicate Vote, Record Ballot atomically through the 
+cast_election_ballot
+ PL/
+pgSQL
+ RPC. Extend: View Results (only when the event’s 
+results_visibility
+ policy allows). Errors: voting not open, not started, or ended (403); invalid position or candidate (400); no 
+selection where a selection is required (400); already voted (409); stale nonce (400).
+5. Use Case Diagram for the Competition Judge
+A competition judge is a voter account whose 
+participant_type
+ in an event is COMPETITION_JUDGE. The judge’s use cases cover scoring within the assigned scope (division, category, or round) and, in the live-session mode, submitting per-round scores that follow the organizer’s active contestant. A judge whose sub-role is 
+score_reviewer
+ is read-only. The use cases are shown in Figure 8.
+Figure 8. Use Case Diagram for the Competition Judge
+UC-E1 Submit Scores (classic). 
+Actor: Judge. Include: Resolve Assigned Scope (allowed divisions, rounds, and categories), Validate every contestant × criteria cell, 
+Validate
+ each score against the event score scale, Lock the sheet (atomic 
+has_scored
+ FALSE→TRUE claim, then insert score rows). Errors: scoring not open, not assigned to the requested scope, reviewer read-only, incomplete grid, out-of-range score, duplicate or already-submitted (409).
+UC-E2 Live-Session Scoring. 
+Include: View the organizer-controlled active round, criteria, and contestant, Submit a per-contestant score row (lockable per round).
+6. Use Case Diagram for the Polling Respondent
+A polling respondent is a voter account whose 
+participant_type
+ in an event is POLLING_RESPONDENT. Respondents open the assigned poll, answer the questions, and submit — once, unless the organizer enabled multiple submissions for the poll. The use cases are shown in Figure 9.
+Figure 9. Use Case Diagram for the Polling Respondent
+UC-F1 Submit Poll Response. 
+Actor: Respondent. Include: Validate Required Answers against each question’s type and required flag, Record Submission and Answers atomically through the 
+cast_poll_response
+ RPC, Single-Submission Guard. Extend: Allow Multiple Submissions when the organizer enabled 
+poll_allow_multiple_submissions
+. Errors: poll closed or expired (403), already responded (409), missing required answer (400).
+Activity Diagrams
+Each activity diagram documents one operation from the actor’s first action through every validation and decision point to the recorded outcome. The flows below reflect the actual control paths in the VOTRIX services and middleware. Figures 10 to 22 present the activity diagrams.
+1. Activity Diagram for Login
+Login is a single unified flow for all three roles. After credential validation the system checks the account status, then branches on 
+must_change_password
+: an organizer or voter on first login is routed to a forced password change (a voter may instead choose to keep the temporary password), after which the session is re-issued and the user is redirected to the dashboard that matches their role. The flow is shown in Figure 10.
+Figure 10. Activity Diagram for Login
+2. Activity Diagram for Password Recovery
+To prevent account enumeration, the request step always reports a generic success regardless of whether the email exists; only a valid, unexpired, unused token permits an actual password change. The password-recovery flow is shown in Figure 11.
+Figure 11. Activity Diagram for Password Recovery (Forgot then Reset)
+3. Activity Diagram for Creating an Organizer Account (Admin)
+The administrator creates each organizer account manually; there is no public sign-up. The admin enters the full organizer profile (organization name and type, organizer name, position) and a scope — all-access, or scoped to selected programs and year & sections validated against the taxonomy — through a single-add form or a CSV import. A strong password is auto-generated, the account is created with 
+must_change_password
+ set, and the credentials are emailed through Resend. The flow is shown in Figure 12.
+Figure 12. Activity Diagram for Creating an Organizer Account
+4. Activity Diagram for Admin Participant Registration (Students and Judges)
+Because the administrator now owns account registration, students and judges are created centrally — through a single-add form or a CSV import that validates each program and year & section against the managed taxonomy, de-duplicates by email and school ID, issues a temporary password, and emails the new account. Organizer onboarding is no longer a separate step: the profile is set by the admin at registration, though the 
+requireProfileComplete
+ gate is retained as a backend safeguard. The flow is shown in Figure 13.
+Figure 13. Activity Diagram for Admin Participant Registration
+5. Activity Diagram for Creating an Election Event
+Creating an event captures the title, dates, and results-visibility policy, optionally uploads a banner to 
+Cloudinary
+, and persists the event in draft status. Voting is not yet enabled: the event must be published, after which the schedule-sync service reconciles the state (scheduled, active, completed) purely from 
+start_date
+ and 
+end_date
+. The flow is shown in Figure 14.
+Figure 14. Activity Diagram for Creating an Election Event
+6. Activity Diagram for Cohort Invitation and Judge Selection
+With account creation moved to the administrator, the organizer's task is to 
+enrol
+ existing people. For elections and polls the organizer invites by cohort — selecting a program or a year & section from within their scope, previewing the matching count, and bulk-enrolling the matching students (idempotently, and with a multi-role guard that blocks judge accounts). For competitions the organizer picks judges from the admin-assigned pool. Sending the invitation email is an optional, throttled step. The flow is shown in Figure 15.
+Figure 15. Activity Diagram for Cohort Invitation and Judge Selection
+7. Activity Diagram for Publishing an Election
+Publishing does not open voting; it releases the event from setup into the schedule-driven lifecycle. Minimum-content validation is enforced first: the event must have at least one position, one candidate, and one registered voter. The flow is shown in Figure 16.
+Figure 16. Activity Diagram for Publishing an Election
+8. Activity Diagram for Casting a Vote
+The vote-casting flow includes replay-protection through a single-use voting nonce, a schedule-based openness check, ballot validation, and an atomic database transaction that both locks the voter (
+has_voted
+ FALSE→TRUE) and records the ballot rows in one commit so a crash can never leave a voter marked as voted with no ballot. Duplicate prevention is enforced twice: by the atomic claim and by the unique constraint on 
+election_votes
+. The flow is shown in Figure 17.
+Figure 17. Activity Diagram for Casting a Vote
+9. Activity Diagram for Configuring Competition Structure and Scoring
+A competition is built as a hierarchy (optional divisions, optional categories, rounds, criteria, optional minor criteria) with a scoring configuration. The engine reports weight totals back to the organizer as feedback and normalizes legacy 
+round weights that do not sum to 100 so a score cannot exceed a single round’s value; a hard block that refuses to open scoring purely because weights do not equal 100% is not confirmed in the current code. Judge scope guards and the score-every-cell completeness rule are enforced at submission. The flow is shown in Figure 18.
+Figure 18. Activity Diagram for Competition Configuration
+10. Activity Diagram for Submitting Judge Scores (Classic)
+In the classic (non-live) path, judges enter every contestant × criterion score, and the submission is a one-shot lock: it validates scoring is open, the judge is active (not read-only reviewer), the grid is complete, every score falls inside the event score scale, and every score falls inside the judge’s assigned scope. Only if all checks pass does the atomic 
+has_scored
+ claim occur, followed by the insert of score rows and a WebSocket push of the recomputed rankings. The flow is shown in Figure 19.
+Figure 19. Activity Diagram for Judge Score Submission
+11. Activity Diagram for the Live Competition Session
+In a live session, the organizer drives what judges see; judges score the currently active contestant while the organizer navigates rounds and criteria. There is exactly one active session per event. When the round is complete, the organizer previews advancement and finalizes the round; the advancement rule (top-N, top-percent, threshold, or manual) is written to 
+competition_round_results
+ and the top contestants advance to the next round. The flow is shown in Figure 20.
+Figure 20. Activity Diagram for Live Session Control and Judge Live Scoring
+12. Activity Diagram for Submitting a Poll Response
+Poll submission validates required answers against each question’s type and, unless the organizer enabled multiple submissions, enforces a single-submission slot claim. Recording is atomic through the 
+cast_poll_response
+ RPC. The flow is shown in Figure 21.
+Figure 21. Activity Diagram for Poll Response Submission
+13. Activity Diagram for a Generic Managed Entity (Representative CRUD)
+The many organizer CRUD operations (positions, candidates, contestants, criteria, minor criteria, categories, rounds, divisions, judges, poll questions) share 
+one control pattern, shown once here to avoid a redundant figure per entity. Only the delete-guard differs by entity (for example, positions and candidates block deletion once votes exist). The flow is shown in Figure 22.
+Figure 22. Activity Diagram for Create/Update/Delete of a Managed Entity
+Sequence Diagrams
+Each sequence diagram shows the time-ordered messages between the actual VOTRIX components: the client (React UI), the Express API with its middleware chain, the service layer, the PostgreSQL database (including PL/
+pgSQL
+ RPCs), and the external 
+Cloudinary
+, Resend, and WebSocket services where used. Only components genuinely involved in each operation appear. Figures 23 to 32 present the sequence diagrams.
+1. Sequence Diagram for Login
+The login sequence shows the client submitting credentials to the API, the API delegating validation and 
+bcrypt
+ comparison to the auth service, the outcome being written to the audit log, and the API returning JSON Web Token cookies plus a CSRF token to the client. The interaction is shown in Figure 23.
+Figure 23. Sequence Diagram for Login
+2. Sequence Diagram for Password Recovery
+The password-recovery sequence covers both halves of the flow: the request half always returns a generic success to prevent user enumeration, while the reset half validates the token, hashes the new password with 
+bcrypt
+, and consumes the token. The interaction is shown in Figure 24.
+Figure 24. Sequence Diagram for Password Recovery
+3. Sequence Diagram for Creating an Organizer Account
+The create-organizer sequence traces the administrator’s request through the 
+authorize(
+ADMIN) middleware, into the user service that generates a strong password and inserts the account, and out to Resend for the credentials email. The admin-organizer service first validates the chosen scope against the participant taxonomy before the account is created. The interaction is shown in Figure 25.
+Figure 25. Sequence Diagram for Creating an Organizer Account
+4. Sequence Diagram for Creating an Event with Banner Upload
+The event-creation-with-banner sequence uploads the banner to 
+Cloudinary
+ first (returning a secure URL and public identifier), then records the image reference and persists the draft event, so the event workspace opens with the banner already attached. The interaction is shown in Figure 26.
+Figure 26. Sequence Diagram for Event Creation and Banner Upload
+5. Sequence Diagram for Participant Registration and Cohort Invitation
+The registration and invitation sequence spans both roles. First the administrator registers students (validating each program and year & section against the taxonomy, de-duplicating, and emailing the new account). Then the organizer invites a cohort: the cohort service returns the scope-filtered programs and sections with counts, and, on confirmation, bulk-
+enrols
+ the matching students as ELECTION_VOTER or POLLING_RESPONDENT and optionally sends a throttled invitation email. The interaction is shown in Figure 27.
+Figure 27. Sequence Diagram for Participant Registration and Cohort Invitation
+6. Sequence Diagram for Vote Submission
+The vote-submission sequence covers session and participant validation through the 
+requireEventParticipant
+ middleware, the schedule and nonce checks in the service layer, the atomic 
+cast_election_ballot
+ PL/
+pgSQL
+ RPC (which combines the 
+has_voted
+ claim and the ballot inserts in one transaction), the secret-ballot audit that stores only the selection count, and the WebSocket push that refreshes the organizer and admin dashboards. The interaction is shown in Figure 28.
+Figure 28. Sequence Diagram for Vote Submission
+7. Sequence Diagram for Judge Score Submission
+The judge-score-submission sequence resolves the judge’s assigned scope, validates every cell of the scoring grid, atomically claims the 
+has_scored
+ flag, inserts the score rows, and hands the fresh scores to the scoring engine which computes the weighted rankings and pushes them to organizer dashboards through the WebSocket. The interaction is shown in Figure 29.
+Figure 29. Sequence Diagram for Judge Score Submission
+8. Sequence Diagram for the Live Competition Session
+The live-session sequence has the organizer as the driver: they start the session (only one active session per event), set the active round and active criteria, and advance contestants. Judges receive the state over the WebSocket, submit per-contestant score rows to the JSONB session-score store, and see the 
+organizer’s progress in real time. The organizer previews advancement, finalizes each round (persisting results and advancing contestants), and completes the session. The interaction is shown in Figure 30.
+Figure 30. Sequence Diagram for Live Session (Organizer drives, Judge scores)
+9. Sequence Diagram for Poll Response Submission
+The poll-response sequence validates required answers by question type, then calls the 
+cast_poll_response
+ RPC, which claims the single-submission slot (unless multiple submissions are allowed) and inserts the submission and answers atomically. The interaction is shown in Figure 31.
+Figure 31. Sequence Diagram for Poll Response Submission
+10. Sequence Diagram for Ranking Computation
+The ranking-computation sequence shows how live rankings are produced on demand and on every score submission: the service loads contestants, criteria, minor criteria, rounds, categories, and scores plus the event’s scoring configuration, hands them to the scoring engine which computes the bottom-up weighted score and assigns standard competition (“1224”) ranks, and returns the ranked table with the weight totals used as feedback for the organizer. The interaction is shown in Figure 32.
+Figure 32. Sequence Diagram for Ranking Computation
+Competition Scoring Algorithm
+Because “integrated competition scoring” is a central claim of VOTRIX, this section states the exact weighted formula used by the scoring engine (backend/
+src
+/modules/scoring-engine.js). The engine composes each contestant’s final score bottom-up from the individual judge cells to the event total, with normalization at each level so scales, weights, and minor criteria on different bases can be combined without a single component dominating.
+1. Score Scales and Calculation Methods
+The score scale (
+scoreType
+) is one of range_1_10 (1–10), range_1_100 (1–100, the default), decimal (0–10), or 
+custom_range
+ with the organizer’s own minimum and maximum. Bounds are validated at submission by 
+isScoreInBounds
+ using the event scale as the single source of truth. The calculation method (
+calculationMethod
+) determines how the set of judge scores for one cell is reduced 
+to a single number: average, 
+weighted_average
+ (the default), sum, 
+highest_score
+, or 
+lowest_removal
+ (drops the configured lowest and highest scores, then averages the rest). The number of decimal places used for the final and intermediate values is set by 
+decimalPlaces
+ (0–6, default 2).
+2. Bottom-Up Computation
+Let J be the set of judges who scored a given cell. The engine composes the final score from the bottom up in four stages. First, each minor criterion is reduced across judges (default: average) and normalized to a percentage of its own maximum so minors on different scales can be combined: 
+minorPercent
+ = 
+( 
+reduce
+_J
+(score) / 
+minorMax
+ )
+ × 100. Second, each criterion is aggregated: with minors, the criterion value is the plain average of its minors’ percents (minors carry equal weight and have no individual percentage); without minors, the criterion value is simply 
+reduce_J
+(score). Third, each round’s value is computed as a weighted average across the round’s criteria, using each criterion’s percentage divided by the sum of criterion percentages in that round: 
+roundValue
+ = 
+Σ_over_round_criteria
+ [ 
+criterionValue
+ × 
+( 
+criterion
+.percentage
+ / Σ 
+criterion.percentage
+_in_
+round
+ )
+ ]. Fourth, when there are no categories, the final score is the sum over rounds of the round value multiplied by the round weight and a scale factor equal to 100 divided by the sum of round weights (in the legacy, non-scoped path, so weights that do not total 100 cannot inflate the result) or 1 in scoped mode. When categories are used, each category value is the sum over its rounds of 
+roundValue
+ × (
+round.weight
+ / 100), and the final score is the sum over categories of 
+categoryValue
+ × (
+category.weight
+ / 100), plus any event-wide rounds.
+3. Ranking and Tie Handling
+Contestants are sorted by final score in descending order and assigned standard competition ranks (“1224”): tied contestants share the same rank and the next distinct score resumes at its ordinal position. An optional deterministic tie-breaker (
+tieBreaker
+ = 
+highest_criterion
+) breaks ties by the contestant’s single highest per-criterion average. All numeric values are rounded to the configured decimal places. The generic “criterion × weight, then round × weight, then overall” description that appears in preliminary briefs is only approximately correct for the weighted-average path; the verified engine additionally performs minor-criterion percentage normalization, per-round criterion normalization in scoped mode, legacy round-weight normalization, category weighting, four alternate calculation methods, and 1224 tie-handling.
+4. Enforced and Reported Validations
+The engine enforces the following at submission time: ownership (
+assertOrganizerOwnsEvent
+), criterion percentage in the range 0–100 and category and round weight in the range 0–100 (database CHECK constraints), judge assignment scope belonging to the same event (scope guard, migration 063), a complete scoring grid (every contestant × criteria cell present, no duplicates), scores inside the event score scale, and scores inside the judge’s assigned scope. It reports—but does not hard-block—a criterion or round weight total that does not equal 100 percent; the engine normalizes these and surfaces the totals as feedback so the organizer can correct them. An explicit pre-scoring gate that blocks on “no judge assigned” or “no contestant” for competitions 
+(analogous to the election publish minimum-content gate) is not confirmed in the current code and can be added if required.
+System Previews
+This section lists the screens that make up the running VOTRIX system, grouped by area. Each page corresponds to a real route in frontend/
+src
+/pages/; screenshots should be captured from these routes and inserted below the corresponding label. Pages that were considered but are not implemented (OTP verification, public self-registration, a standalone voting-history page) are not included and should not be screenshotted.
+1. Authentication
+• Login (
+LoginPage
+)
+• Forced / First-login Password Change (
+ChangePasswordPage
+)
+• Forgot Password (
+ForgotPasswordPage
+)
+• Reset Password (
+ResetPasswordPage
+)
+[Insert screenshots for the pages listed above.]
+2. Administrator
+• Admin Dashboard (
+AdminDashboardPage
+)
+• User Management — Organizers, Voters & Judges (
+UserManagementPage
+) and Organizer Detail (
+OrganizerDetailPage
+)
+• Global Events (
+GlobalEventsPage
+)
+• Audit Logs (
+AuditLogsPage
+)
+• System Settings (
+SystemSettingsPage
+)
+• Alert Configuration (
+AlertConfigPage
+)
+• Archival Policy (
+ArchivalPolicyPage
+)
+• Session Management (
+SessionManagementPage
+)
+• Health Dashboard (
+HealthDashboardPage
+)
+[Insert screenshots for the pages listed above.]
+3. Organizer (general)
+• Organizer Dashboard (
+OrganizerDashboardPage
+)
+• Participant Taxonomy panel in System Settings (organizer onboarding page removed; the admin sets the organizer profile and scope at registration)
+[Insert screenshots for the pages listed above.]
+4. Organizer — Election
+• Election Dashboard, Events list, Event Form, Positions, Candidates, Voters, Analytics
+[Insert screenshots for the pages listed above.]
+5. Organizer — Competition
+• Competition Dashboard, Events list, Event Form (
+CompetitionEventFormPage
+), Workspace, Contestants, Criteria, Judges, Live Control, Rankings, Analytics
+[Insert screenshots for the pages listed above.]
+6. Organizer — Polling
+• Polling Dashboard, Events list, Event Form, Builder (questions), Respondents, Analytics
+[Insert screenshots for the pages listed above.]
+7. Organizer — Reports
+• Reports Overview, Election Report, Competition Report, Polling Report
+[Insert screenshots for the pages listed above.]
+8. Voter / Judge / Respondent
+• Voter Dashboard (
+VoterDashboardPage
+)
+• Election Event and Ballot (
+VoterEventPage
+)
+• Poll (
+VoterPollPage
+)
+• Judge Scoring (
+JudgeScoringPage
+)
+[Insert screenshots for the pages listed above.]
+Research Instrument
+The study used a structured survey questionnaire as its main research instrument. The questionnaire was adapted from the ISO/IEC 25010 software quality model and standard usability instruments, and it measured the respondents’ assessment of the system in terms of functional suitability, performance efficiency, usability, reliability, security, and overall acceptability. Each item was rated using a four-point Likert scale, and the responses were interpreted using the weighted mean and the corresponding scale ranges shown in Table 3.
+Research Environment and Respondents
+The study was conducted at Bohol Island State University – 
+Calape
+ Campus, where polls, elections, and competitions are regularly held. The respondents were selected through purposive sampling and included students, faculty or staff involved in conducting elections and competitions, and system administrators who evaluated the functionality and usability of the system. [The specific number of respondents may be finalized here.]
+Data Gathering Procedure
+After securing the necessary permissions, the researchers oriented the respondents on the purpose of the study and the use of the system. The 
+respondents then used the VOTRIX system to perform representative tasks (logging in, participating in a test election or competition or poll, and reviewing results) and afterward answered the evaluation questionnaire. The accomplished questionnaires were retrieved, tallied, and analyzed using the appropriate statistical treatment.
+Statistical Treatment
+The data gathered from the evaluation were analyzed using the weighted mean. The four-point Likert scale and its corresponding interpretation are presented in Table 3.
+Scale
+Range
+Verbal Interpretation
+4
+3.26 – 4.00
+Strongly Agree / Excellent
+3
+2.51 – 3.25
+Agree / Very Good
+2
+1.76 – 2.50
+Disagree / Fair
+1
+1.00 – 1.75
+Strongly Disagree / Poor
+Table 3: Four-Point Likert Scale and Interpretation
+Definition of Terms
+Administrator. 
+the highest-level user who manages user accounts (organizers, voters, and judges), the participant taxonomy, and platform policy. Administrators authenticate with an email and password (the same unified login used by organizers and voters) and cannot create or run events themselves.
+Organizer. 
+the user who creates and manages election, competition, or polling events. Organizer accounts are created by the administrator and require the four onboarding fields (organization name, organization type, organizer name, position) before any module route is unlocked.
+Voter (account level). 
+the participant-level user who casts a vote, scores a competition, or answers a poll, depending on the assigned participant type. A single voter account can hold different participant types across different events.
+Participant Type. 
+the event-specific role of a voter, namely ELECTION_VOTER, COMPETITION_JUDGE, or POLLING_RESPONDENT. The participant type is stored per event in 
+event_participants
+ and is enforced at request time by the 
+requireEventParticipant
+ middleware.
+Ballot. 
+the digital form through which a voter submits a vote in an election event. The ballot carries a single-use voting nonce to prevent replay.
+Voting Nonce. 
+a single-use token minted into 
+event_participants
+ when a voter opens a ballot; the server rejects a submitted ballot whose nonce does not match the current stored value.
+Duplicate-Vote Prevention. 
+the mechanism that ensures a participant can submit only one valid response per event. In VOTRIX it is enforced twice: by the atomic 
+has_voted
+ claim inside the 
+cast_election_ballot
+ RPC and by the unique constraint on 
+election_votes
+.
+Role-Based Access Control. 
+the security mechanism that restricts access to features and data based on the user’s role and, for event routes, the user’s participant type.
+Scoring Engine. 
+the shared module (scoring-engine.js) that computes weighted rankings from raw judge scores using the event’s scoring configuration.
+Live Competition Session. 
+a single active per-event session in which the organizer controls the current round, criteria, and contestant, and judges submit per-contestant scores that are pushed over the WebSocket in real time.
+Standard Competition Ranking (“1224”). 
+the ranking scheme in which tied contestants share the same rank and the next distinct score resumes at its ordinal position.
+Schedule-Driven Lifecycle. 
+the model in which event openness is derived from 
+start_date
+ and 
+end_date
+ plus the module’s enabled flag, rather than from a manual open / close toggle.
+Draft. 
+an autosaved in-progress event of one module (election, competition, or polling) per organizer, stored in 
+event_drafts
+ and cleared when the event is created.
+Audit Log. 
+the append-only record (
+audit_logs
+) of security- and event-relevant actions, written by 
+recordAudit
+ and 
+recordEventActivity
+. Vote records are audited as counts only, preserving secret-ballot confidentiality.
+REFERENCES
+Afable, S. M., & 
+Quiloña
+, J. D. G. (2020). 
+Multi-user automated pageant tabulation system
+. 
+International Journal of Engineering and Advanced Technology, 9
+(3), 733–736. 
+https://doi.org/10.35940/ijeat.B3833.029320
+Alves, J., & Pinto, A. (2023). 
+On the implementation of a blockchain-assisted electronic voting system for the academic council
+. Retrieved from 
+https://www.researchgate.net/
+Atanacio, M. L., & 
+Fucio
+, C. L. (2024). 
+Acceptability of 
+AutoBeaut
+: An automated judging system for beauty pageants throughout the five years of operation
+. 
+Journal of Innovative Technology Convergence, 6
+(1). 
+https://doi.org/10.69478/JITC2024v6n2a08
+Cai, W., & Xiang, R. (2024). 
+Multifactor and multidimensional data quality analysis of judge scoring in diving competition
+. 
+Frontiers in Psychology, 15
+, Article 1338405. 
+https://doi.org/10.3389/fpsyg.2024.1338405
+Commission on Elections (COMELEC). (2022). 
+Annual report 2022: Modernization of election systems and digital participation
+. Commission on Elections, Republic of the Philippines. 
+https://comelec.gov.ph
+Cornelio, B. L., 
+Borcelo
+, R. S., & 
+Siason
+, N. D. (2025). 
+Multiple events and multiple 
+users
+ tabulation system with e-certificate generation
+. 
+International Journal of Advanced Science Computing and Engineering, 7
+(1), 29–35. 
+https://doi.org/10.62527/ijasce.7.1.240
+Darmawan, I. (2021). 
+E-voting adoption in many countries: A literature review
+. 
+Asian Journal of Comparative Politics, 6
+(4), 482–504. 
+https://doi.org/10.1177/20578911211040584
+Hochbaum, D. S., & Moreno-Centeno, E. (2022). 
+Joint aggregation of cardinal and ordinal evaluations with an application to a student paper competition
+. 
+Production and Operations Management
+. 
+https://doi.org/10.1111/poms.13659
+International Institute for Democracy and Electoral Assistance. (2022). 
+Digital solutions for electoral management: Leveraging technology for transparent and efficient voting processes
+. IDEA Publications. 
+https://www.idea.int
+ISO/IEC 25010:2023. (2023). 
+Systems and software engineering — Systems and software Quality Requirements and Evaluation (
+SQuaRE
+) — Product quality model
+. International Organization for Standardization.
+Jafar, U., Aziz, M. J. A., & Shukur, Z. (2021). 
+Blockchain for an electronic voting system—Review and open research challenges
+. 
+Sensors, 21
+(17), Article 5874. 
+https://doi.org/10.3390/s21175874
+Ramizares
+, M. L., & 
+Ramizares
+, M. L. (2025). 
+Development of a web-based adaptive multi-event tabulation system
+. 
+International Journal for Multidisciplinary Research, 7
+(4). 
+https://doi.org/10.36948/ijfmr.2025.v07i04.54635
+Reyes, H. J., Refugia, L., Perona, M. L., et al. (2025). 
+VoSys
+: Implementation of an online voting system for the OLSHCO College department
+. Retrieved from 
+https://www.researchgate.net/
+Salunke, K. N., 
+Shewale
+, V. A., 
+Shigwan
+, A. S., et al. (2025). 
+NextGen voting system: A secure and efficient online student voting framework using unique student identifiers
+. Retrieved from 
+https://www.researchgate.net/
+United Nations Development 
+Programme
+ (UNDP). (2021). 
+Digital governance for sustainable development: Inclusive digital participation systems and multi-stakeholder frameworks
+. UNDP Global Policy Centre on Governance. 
+https://www.undp.org/publications/digital-governance-sustainable-development

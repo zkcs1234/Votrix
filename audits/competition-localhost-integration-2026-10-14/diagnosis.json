@@ -1,0 +1,299 @@
+{
+  "checkedAt": "2026-10-14T04:06:53.545Z",
+  "frontendFlags": [
+    {
+      "name": "VITE_COMPETITION_NATIVE_SETUP_ENABLED",
+      "present": false,
+      "value": null,
+      "enabled": false,
+      "source": "absent; default disabled",
+      "runningProcessIndependentlyVerified": false
+    },
+    {
+      "name": "VITE_COMPETITION_NATIVE_SCORING_ENABLED",
+      "present": false,
+      "value": null,
+      "enabled": false,
+      "source": "absent; default disabled",
+      "runningProcessIndependentlyVerified": false
+    },
+    {
+      "name": "VITE_COMPETITION_NATIVE_TABULATION_ENABLED",
+      "present": false,
+      "value": null,
+      "enabled": false,
+      "source": "absent; default disabled",
+      "runningProcessIndependentlyVerified": false
+    },
+    {
+      "name": "VITE_COMPETITION_NATIVE_RESULTS_ENABLED",
+      "present": false,
+      "value": null,
+      "enabled": false,
+      "source": "absent; default disabled",
+      "runningProcessIndependentlyVerified": false
+    }
+  ],
+  "backendFlags": [
+    {
+      "name": "COMPETITION_CHILD_CONTEXTS_ENABLED",
+      "present": false,
+      "value": null,
+      "enabled": false,
+      "source": "absent; default disabled",
+      "runningProcessIndependentlyVerified": false
+    },
+    {
+      "name": "COMPETITION_NATIVE_SETUP_ENABLED",
+      "present": false,
+      "value": null,
+      "enabled": false,
+      "source": "absent; default disabled",
+      "runningProcessIndependentlyVerified": false
+    },
+    {
+      "name": "COMPETITION_NATIVE_SCORING_ENABLED",
+      "present": false,
+      "value": null,
+      "enabled": false,
+      "source": "absent; default disabled",
+      "runningProcessIndependentlyVerified": false
+    },
+    {
+      "name": "COMPETITION_NATIVE_TABULATION_ENABLED",
+      "present": false,
+      "value": null,
+      "enabled": false,
+      "source": "absent; default disabled",
+      "runningProcessIndependentlyVerified": false
+    },
+    {
+      "name": "COMPETITION_NATIVE_RESULTS_ENABLED",
+      "present": false,
+      "value": null,
+      "enabled": false,
+      "source": "absent; default disabled",
+      "runningProcessIndependentlyVerified": false
+    },
+    {
+      "name": "COMPETITION_NATIVE_RATE_POLICY_ENABLED",
+      "present": false,
+      "value": null,
+      "enabled": false,
+      "source": "absent; default disabled",
+      "runningProcessIndependentlyVerified": false
+    }
+  ],
+  "listeners": [
+    {
+      "host": "127.0.0.1",
+      "port": 5173,
+      "listening": false,
+      "code": "ECONNREFUSED"
+    },
+    {
+      "host": "localhost",
+      "port": 5173,
+      "listening": true
+    },
+    {
+      "host": "127.0.0.1",
+      "port": 5174,
+      "listening": false,
+      "code": "ECONNREFUSED"
+    },
+    {
+      "host": "localhost",
+      "port": 5174,
+      "listening": false,
+      "code": "ECONNREFUSED"
+    },
+    {
+      "host": "127.0.0.1",
+      "port": 5175,
+      "listening": false,
+      "code": "ECONNREFUSED"
+    },
+    {
+      "host": "localhost",
+      "port": 5175,
+      "listening": false,
+      "code": "ECONNREFUSED"
+    },
+    {
+      "host": "127.0.0.1",
+      "port": 5176,
+      "listening": false,
+      "code": "ECONNREFUSED"
+    },
+    {
+      "host": "localhost",
+      "port": 5176,
+      "listening": false,
+      "code": "ECONNREFUSED"
+    },
+    {
+      "host": "127.0.0.1",
+      "port": 5000,
+      "listening": true
+    },
+    {
+      "host": "localhost",
+      "port": 5000,
+      "listening": true
+    },
+    {
+      "host": "127.0.0.1",
+      "port": 55439,
+      "listening": false,
+      "code": "ECONNREFUSED"
+    },
+    {
+      "host": "localhost",
+      "port": 55439,
+      "listening": false,
+      "code": "ECONNREFUSED"
+    }
+  ],
+  "vite": [
+    {
+      "url": "http://localhost:5173",
+      "status": 200,
+      "votrixNativeModule": true,
+      "servedFlags": [
+        {
+          "name": "VITE_COMPETITION_NATIVE_SETUP_ENABLED",
+          "value": null,
+          "enabled": false
+        },
+        {
+          "name": "VITE_COMPETITION_NATIVE_SCORING_ENABLED",
+          "value": null,
+          "enabled": false
+        },
+        {
+          "name": "VITE_COMPETITION_NATIVE_TABULATION_ENABLED",
+          "value": null,
+          "enabled": false
+        },
+        {
+          "name": "VITE_COMPETITION_NATIVE_RESULTS_ENABLED",
+          "value": null,
+          "enabled": false
+        }
+      ],
+      "flagInjectionParsed": true,
+      "authenticatedOrganizerRenderVerified": false
+    }
+  ],
+  "configuredApiOrigin": "http://localhost:5000",
+  "database": {
+    "classification": "HOSTED_PRODUCTION_SENSITIVE",
+    "writes": false
+  },
+  "hosted": {
+    "executed": true,
+    "directCatalogVerified": false,
+    "schemaStatus": 200,
+    "tables": [
+      {
+        "name": "competitions",
+        "restExposed": false
+      },
+      {
+        "name": "competition_entries",
+        "restExposed": false
+      },
+      {
+        "name": "competition_legacy_contexts",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_configurations",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_rounds",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_criteria",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_minors",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_judge_assignments",
+        "restExposed": false
+      }
+    ],
+    "rpcs": [
+      {
+        "name": "competition_create_child",
+        "restExposed": false
+      },
+      {
+        "name": "competition_native_foundation",
+        "restExposed": false
+      },
+      {
+        "name": "competition_save_native_configuration",
+        "restExposed": false
+      },
+      {
+        "name": "competition_freeze_native_rules",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_scoring_choices",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_live_view",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_score_write",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_tabulation_snapshot",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_official_calculate",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_confirm_qualification",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_owned_results",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_publication_action",
+        "restExposed": false
+      },
+      {
+        "name": "competition_child_judge_navigation",
+        "restExposed": false
+      }
+    ],
+    "childIdentityStatus": 404,
+    "childIdentityOperational": false,
+    "nativeBackendUsable": false,
+    "note": "GET-only REST exposure/zero-row capability check; not proof of SQL catalog or migration ledger. No event/score/account records requested."
+  },
+  "backendStarted": false,
+  "backendApiRequestsMade": false,
+  "realLoginVerified": false,
+  "eventContext": "NO_EVENT_CONTEXT: root module dashboard has no eventId",
+  "productConfigurationChanged": false,
+  "codeRootCause": "NativeSetupBoundary returns Legacy when VITE_COMPETITION_NATIVE_SETUP_ENABLED is not the string true",
+  "status": "PARTIALLY INTEGRATED: source routes connected, everyday localhost native workflow blocked",
+  "specifiedRoute": "http://localhost:5173/organizer/competition"
+}

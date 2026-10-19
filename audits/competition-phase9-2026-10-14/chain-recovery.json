@@ -1,0 +1,58 @@
+{
+  "passed": true,
+  "database": "votrix_phase9_chain_1791937331216",
+  "restored": "votrix_phase9_chain_1791937331216_restore",
+  "template": "votrix_repairs_1791835055235",
+  "productionTouched": false,
+  "forwardChain": [
+    {
+      "version": 103,
+      "file": "103_competition_child_identity.sql",
+      "sha256": "4c236303ac34287f968667db953c66ea34ab9d63f1124ad491ba77ced44c874d",
+      "milliseconds": 205.11439999999948
+    },
+    {
+      "version": 104,
+      "file": "104_competition_scoped_rules.sql",
+      "sha256": "f45c91b094f3025297f2030c4ac351f1e37b0db8808721b47ee80e89657c52db",
+      "milliseconds": 242.48140000000058
+    },
+    {
+      "version": 105,
+      "file": "105_competition_scoped_scoring.sql",
+      "sha256": "bea487c104be99b322a71de235c7d6d89d57f2599baa6a0aa84938d675f34ac9",
+      "milliseconds": 249.52510000000075
+    },
+    {
+      "version": 106,
+      "file": "106_competition_scoped_tabulation.sql",
+      "sha256": "6eafe2468c43ce44d123c53b4aef1d74b291dc73cedac410f58a8aa3a88518ff",
+      "milliseconds": 306.83770000000004
+    },
+    {
+      "version": 107,
+      "file": "107_competition_scoped_results.sql",
+      "sha256": "b5e5802e936f8c759546fba3d9fa0accf131a0d7ad07b4dd3cbde778ecc178e2",
+      "milliseconds": 173.47249999999985
+    },
+    {
+      "version": 108,
+      "file": "108_competition_navigation_draft_tools.sql",
+      "sha256": "bdbcf6e432a22caef8488b14b69a83ebd40b27340d0dfbbd66ada3caf2594805",
+      "milliseconds": 158.9844000000012
+    }
+  ],
+  "lastMigrationRerunMilliseconds": 172.4421000000002,
+  "originalTableCount": 25,
+  "historicalPreserved": true,
+  "templateUnchanged": true,
+  "localRestore": {
+    "passed": true,
+    "dumpMilliseconds": 736.2210000000014,
+    "restoreMilliseconds": 1814.0763000000006,
+    "wholeDatabaseDump": true,
+    "verified": "All original inventoried table hashes and competition catalog definitions/ACLs match",
+    "productionBackupValidated": false
+  },
+  "deployedMigrationLedgerVerified": false
+}

@@ -2,8 +2,8 @@ import { Link } from 'react-router-dom'
 import { Check } from 'lucide-react'
 import {
   EVENT_STAGES,
-  MODULE_BASE_PATH,
   getStageProgressStatus,
+  stagePath,
 } from '@/utils/eventStages'
 
 export default function EventStepper({
@@ -13,10 +13,11 @@ export default function EventStepper({
   completedKeys = [],
   readOnly = false,
   eventStatus = null,
+  onLocalStageSelect,
+  navigationDisabled = false,
 }) {
   const stages = EVENT_STAGES[module] ?? []
   const currentIndex = stages.findIndex((s) => s.key === currentKey)
-  const base = MODULE_BASE_PATH[module]
 
   if (!stages.length) return null
 
@@ -33,11 +34,9 @@ export default function EventStepper({
           })
           const isDone = status === 'Completed' && !isCurrent
           const isAvailable = status === 'Available'
-          const href = eventId && stage.path
-            ? eventId === 'new'
-              ? `${base}/new`
-              : `${base}/${eventId}/${stage.path}`
-            : null
+          const href = eventId ? stagePath(module, stage.key, eventId) : null
+          const canVisit = (href || onLocalStageSelect && completedKeys.includes(stage.key)) && !isCurrent && (eventId !== 'new' || isDone)
+          const localSelection = onLocalStageSelect && ['details', 'branding', 'type'].includes(stage.key)
 
           const circleClass = isCurrent
             ? 'border-v-primary bg-v-primary text-white ring-4 ring-v-primary-soft'
@@ -83,14 +82,16 @@ export default function EventStepper({
           return (
             <li
               key={stage.key}
-              className="flex min-w-[7.5rem] flex-1"
+              className="flex min-w-max flex-1 pr-4"
               aria-current={isCurrent ? 'step' : undefined}
             >
-              {href && !isCurrent ? (
+              {canVisit && localSelection ? <button type="button" disabled={navigationDisabled} onClick={() => onLocalStageSelect(stage.key)} className="flex flex-1 rounded-md text-left outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-v-primary focus-visible:ring-offset-2" aria-label={`${stage.label} - ${status}`}>{inner}</button> : canVisit ? (
                 <Link
                   to={href}
                   className="flex flex-1 rounded-md outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-v-primary focus-visible:ring-offset-2"
                   aria-label={`${stage.label} - ${status}`}
+                  aria-disabled={navigationDisabled || undefined}
+                  onClick={event => { if (navigationDisabled) event.preventDefault() }}
                 >
                   {inner}
                 </Link>

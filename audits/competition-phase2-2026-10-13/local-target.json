@@ -1,0 +1,9 @@
+{
+  "database": "votrix_child_1791877042044",
+  "template": "votrix_repairs_1791835055235",
+  "host": "127.0.0.1",
+  "port": 55439,
+  "dataDirectory": "C:/Github/Votrix/.tmp/competition-postgres-tests",
+  "disposable": true,
+  "createdAt": "2026-10-13T07:37:23.170Z"
+}

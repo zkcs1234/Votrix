@@ -223,6 +223,8 @@ export const unlockScore = asyncHandler(async (req, res) => {
     contestantId: req.body?.contestantId,
     judgeId: req.body?.judgeId || null,
     criteriaId: req.body?.criteriaId || null,
+    reason: req.body?.reason,
+    confirmed: req.body?.confirmed === true,
   })
   res.json({ success: true, ...result })
 })
@@ -236,7 +238,7 @@ export const getJudgeSessionView = asyncHandler(async (req, res) => {
   const view = await sessionService.getJudgeSessionView(req.params.eventId, req.user.id, {
     divisionId: req.query.divisionId || null,
   })
-  res.json({ success: true, ...view })
+  res.json({ success: true, ...view, viewerJudgeId:req.user.id })
 })
 
 /** POST /api/voter/competition/events/:eventId/session-score */

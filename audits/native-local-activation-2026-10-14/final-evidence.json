@@ -1,0 +1,84 @@
+{
+  "passed": true,
+  "database": "votrix_dev_1791952165826",
+  "backendIdentityVerified": true,
+  "backendNoCookieStatus": 401,
+  "frontendFlags": {
+    "VITE_COMPETITION_NATIVE_SETUP_ENABLED": "true",
+    "VITE_COMPETITION_NATIVE_SCORING_ENABLED": "true",
+    "VITE_COMPETITION_NATIVE_TABULATION_ENABLED": "true",
+    "VITE_COMPETITION_NATIVE_RESULTS_ENABLED": "true"
+  },
+  "postgrest": "real 16.4 loopback",
+  "mainBrowserGroups": 5,
+  "extendedBrowserGroups": 5,
+  "actualPublicAndDashboardNavigationVerified": true,
+  "privateFiles": [
+    {
+      "file": ".tmp/votrix-native-dev/accounts.json",
+      "status": 403
+    },
+    {
+      "file": "backend/.env",
+      "status": 403
+    }
+  ],
+  "methodExpectedValues": {
+    "weighted_average": [
+      85,
+      65
+    ],
+    "sum": [
+      170,
+      130
+    ],
+    "rank_based": [
+      2,
+      4
+    ],
+    "highest_score": [
+      90,
+      70
+    ],
+    "lowest_removal": [
+      90,
+      70
+    ],
+    "manual": [
+      null,
+      null
+    ]
+  },
+  "downloads": [
+    {
+      "file": "competition-ab23c851-b9b5-4b4c-b320-03155d1d387d-9f33dcf8-55ae-4a4e-a1ea-5e165fb12964-final.csv",
+      "bytes": 1742,
+      "rows": 2,
+      "sha256": "6d430e95470d57ad5076a370912c7cf615b9ba61099dcbb1950826bb9fe11aac"
+    },
+    {
+      "file": "competition-ab23c851-b9b5-4b4c-b320-03155d1d387d-9f33dcf8-55ae-4a4e-a1ea-5e165fb12964-judge.csv",
+      "bytes": 2387,
+      "rows": 2,
+      "sha256": "e68c28ad1bb231de67130eac54e39a292db44042281e75117b00f887c02c5fb4"
+    },
+    {
+      "file": "competition-ab23c851-b9b5-4b4c-b320-03155d1d387d-9f33dcf8-55ae-4a4e-a1ea-5e165fb12964-tabulation.csv",
+      "bytes": 13403,
+      "rows": 7,
+      "sha256": "bf9d1124501309fdab5ec814b7cdd0b5fc488e5c1a6dedbe3afa62428c081caa"
+    },
+    {
+      "file": "competition-ab23c851-b9b5-4b4c-b320-03155d1d387d-9f33dcf8-55ae-4a4e-a1ea-5e165fb12964-worksheets.csv",
+      "bytes": 4070,
+      "rows": 4,
+      "sha256": "1f609b6627b57dcdf5ef17bbd4946b108946e556ae2c933cd3d8996bf1726349"
+    }
+  ],
+  "protectedChecked": 75,
+  "protectedChanged": [],
+  "configurationChanged": [],
+  "migrations100through108Unchanged": true,
+  "anonymousPublishedResultStatus": 200,
+  "productionTouched": false
+}

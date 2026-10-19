@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, searchForWorkspaceRoot } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
@@ -10,6 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // browser globals don't know about it. Alias to a local const so the
 // linter is happy without changing runtime behavior.
 const env = process.env
+const apiProxyTarget = (env.VITE_API_URL?.startsWith('http') ? env.VITE_API_URL : 'http://localhost:5000').replace(/\/api\/?$/, '')
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -20,11 +21,13 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    fs: {allow:[searchForWorkspaceRoot(__dirname),path.resolve(__dirname,'../shared')]},
     proxy: {
       '/api': {
-        target: env.VITE_API_URL || 'http://localhost:5000',
+        target: apiProxyTarget,
         changeOrigin: true,
       },
+      '/ws': { target: apiProxyTarget, ws: true, changeOrigin: true },
     },
   },
   build: {},

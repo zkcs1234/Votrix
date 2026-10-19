@@ -1,0 +1,258 @@
+{
+  "phase": 9,
+  "completedAt": "2026-10-14T03:21:01.476Z",
+  "release": "NO-GO",
+  "backend": {
+    "filesPassed": 88,
+    "testsPassed": 664,
+    "filesSkipped": 1,
+    "testsSkipped": 3
+  },
+  "frontend": {
+    "filesPassed": 45,
+    "testsPassed": 314
+  },
+  "sql": {
+    "navigationRemovalGroups": 5,
+    "tabulationGroups": 13,
+    "publicationGroups": 8,
+    "preflightTables": 46,
+    "blockers": 0,
+    "migrationApproved": false
+  },
+  "browser": {
+    "basicGroups": 4,
+    "basicRequests": 867,
+    "extendedGroups": 6,
+    "extendedRequests": 579,
+    "methodsGroups": 4,
+    "methodsRequests": 1038,
+    "carryGroups": 3,
+    "carryRequests": 538,
+    "largeGroups": 1,
+    "largeRequests": 18,
+    "actualSavedCsvFiles": 4,
+    "hosted": false,
+    "syntheticJwtIssuance": true,
+    "loopbackPostgrestAdapter": true
+  },
+  "capacity": {
+    "passed": true,
+    "database": "votrix_hardening_1791937371081",
+    "entrants": 50,
+    "judges": 5,
+    "majors": 4,
+    "minorsPerMajor": 3,
+    "rawTargets": 3000,
+    "actualConcurrentRpcWrites": 20,
+    "concurrentBatchMilliseconds": 2183.5656000000017,
+    "writeWallMilliseconds": {
+      "min": 386.65840000000026,
+      "max": 2148.4630000000034,
+      "mean": 1328.3446949999998
+    },
+    "lockWaitTimeSeparated": false,
+    "tabulationPsqlWallMilliseconds": 439.84590000000026,
+    "calculationMilliseconds": 25.047899999990477,
+    "responseBytes": 1195480,
+    "csv": {
+      "milliseconds": 51.97520000000077,
+      "bytes": 2192564,
+      "heapUsedDelta": 10103576,
+      "rssDelta": 17731584,
+      "peakMemoryMeasured": false
+    },
+    "fullRosterHttpAutosaveTested": false,
+    "bulkSources": "Direct guarded local SQL fixture rows followed by actual submission RPCs",
+    "productionCapacityVerified": false
+  },
+  "memory": {
+    "passed": true,
+    "bytes": [
+      2192564,
+      2192564
+    ],
+    "milliseconds": 205.4526,
+    "before": {
+      "rss": 73936896,
+      "heapTotal": 18886656,
+      "heapUsed": 10216736,
+      "external": 4607824,
+      "arrayBuffers": 2583470
+    },
+    "after": {
+      "rss": 107081728,
+      "heapTotal": 54734848,
+      "heapUsed": 24075928,
+      "external": 4649793,
+      "arrayBuffers": 2583470
+    },
+    "rawTargets": 3000,
+    "processPeakWorkingSetBytes": 107282432,
+    "platform": "win32",
+    "outputsRetained": 2,
+    "includesRuntimeInputAndModules": true,
+    "simultaneousHttpExports": false,
+    "productionPeakVerified": false
+  },
+  "transport": {
+    "passed": true,
+    "roomRegistryProcesses": 2,
+    "actualHttpApiProcessesTested": false,
+    "crossProcessDeliveryMilliseconds": 64.10890000000006,
+    "scorePayloadRejected": true,
+    "unauthenticatedBrokerDenied": true,
+    "duplicateFrameSuppressed": true,
+    "brokerRestartReconciliation": true,
+    "queuedHintRecovery": true,
+    "transport": "Authenticated HMAC ws relay; loopback-only local test",
+    "productionTopologyVerified": false,
+    "externalInfrastructureProvisioned": false
+  },
+  "sourcePreservation": {
+    "checked": 772,
+    "changed": [
+      "backend/src/websocket/competition-hint-transport.js",
+      "backend/__tests__/modules/competition-hint-transport.test.js"
+    ],
+    "added": [
+      "backend/scripts/competition-phase9-inventory.mjs",
+      "backend/scripts/phase9-local-db.mjs",
+      "backend/scripts/phase9-postgrest-fixture.mjs",
+      "backend/scripts/test-competition-phase9-browser-carry.mjs",
+      "backend/scripts/test-competition-phase9-browser-extended.mjs",
+      "backend/scripts/test-competition-phase9-browser-large-roster.mjs",
+      "backend/scripts/test-competition-phase9-browser-methods.mjs",
+      "backend/scripts/test-competition-phase9-browser-suite.mjs",
+      "backend/scripts/test-competition-phase9-browser.mjs",
+      "backend/scripts/test-competition-phase9-capacity.mjs",
+      "backend/scripts/test-competition-phase9-database.mjs",
+      "backend/scripts/test-competition-phase9-export-memory.mjs",
+      "backend/scripts/test-competition-phase9-integrations.mjs",
+      "backend/scripts/test-competition-phase9-recovery.mjs",
+      "backend/scripts/test-competition-phase9-restore.mjs",
+      "backend/scripts/test-competition-phase9-transport.mjs"
+    ],
+    "protectedCount": 75,
+    "protectedChanged": []
+  },
+  "priorDocumentsAndMigrationsUnchanged": true,
+  "cluster": {
+    "original": "stopped",
+    "final": "stopped",
+    "statusExit": 3
+  },
+  "production": {
+    "requests": false,
+    "writes": false,
+    "migrations": false,
+    "deployments": false,
+    "flagsChanged": false,
+    "paidProvisioning": false,
+    "phase10Started": false
+  },
+  "gates": [
+    {
+      "gate": "Source/migration baseline",
+      "state": "PASSED",
+      "evidence": "772-file baseline; earlier user changes retained; migration/report hashes preserved"
+    },
+    {
+      "gate": "Backend regressions",
+      "state": "PASSED",
+      "evidence": "88 files/664 tests; one gated file/three assertions skipped"
+    },
+    {
+      "gate": "Frontend regressions",
+      "state": "PASSED",
+      "evidence": "45 files/314 tests"
+    },
+    {
+      "gate": "Local PostgreSQL guards",
+      "state": "PASSED",
+      "evidence": "5 new groups plus 13 tabulation/8 results; 46 tables/zero local preflight blockers"
+    },
+    {
+      "gate": "Local chain/restore",
+      "state": "PASSED",
+      "evidence": "103–108 once; final108 rerun; fresh whole/populated restores"
+    },
+    {
+      "gate": "Local browser acceptance",
+      "state": "PASSED",
+      "evidence": "5-child, extended, six methods, three carry paths, saved CSV and 50-entrant table; synthetic JWT/local adapter"
+    },
+    {
+      "gate": "Local relay delivery/recovery",
+      "state": "PASSED",
+      "evidence": "Two room processes plus bounded no-ready retry regression; hosted topology not represented"
+    },
+    {
+      "gate": "Production catalog/ledger",
+      "state": "BLOCKED",
+      "evidence": "No direct read-only target catalog/ledger access; exact deployed diff unavailable"
+    },
+    {
+      "gate": "Production backup/restore",
+      "state": "BLOCKED",
+      "evidence": "No confirmed complete backup, RPO/RTO or approved isolated production-backup restore"
+    },
+    {
+      "gate": "Hosted login/auth/PostgREST",
+      "state": "BLOCKED",
+      "evidence": "No approved isolated candidate/accounts"
+    },
+    {
+      "gate": "Representative distributed transport",
+      "state": "BLOCKED",
+      "evidence": "No actual topology/WSS/HA/monitoring/rotation acceptance"
+    },
+    {
+      "gate": "Distributed quotas/trusted ingress",
+      "state": "BLOCKED",
+      "evidence": "Process-local quota stores and unverified one-hop ingress boundary"
+    },
+    {
+      "gate": "Production capacity",
+      "state": "NOT TESTED",
+      "evidence": "No sustained hosted HTTP/DB pool/lock waits/network/export envelope"
+    },
+    {
+      "gate": "Hosted election/polling acceptance",
+      "state": "BLOCKED",
+      "evidence": "Regression suites and hashes pass locally; sparse fixture has no recovery/browser data for these modules"
+    },
+    {
+      "gate": "Release decision",
+      "state": "FAILED",
+      "evidence": "Required P0 gates unresolved; NO-GO"
+    }
+  ],
+  "testListeners": [
+    {
+      "port": 5057,
+      "state": "CLOSED",
+      "code": "ECONNREFUSED"
+    },
+    {
+      "port": 5059,
+      "state": "CLOSED",
+      "code": "ECONNREFUSED"
+    },
+    {
+      "port": 5177,
+      "state": "CLOSED",
+      "code": "ECONNREFUSED"
+    },
+    {
+      "port": 9337,
+      "state": "CLOSED",
+      "code": "ECONNREFUSED"
+    },
+    {
+      "port": 55439,
+      "state": "CLOSED",
+      "code": "ECONNREFUSED"
+    }
+  ]
+}

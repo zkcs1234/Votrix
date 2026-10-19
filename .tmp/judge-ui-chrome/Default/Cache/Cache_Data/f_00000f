@@ -1,0 +1,1022 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/routes/index.jsx");const lazy = __vite__cjsImport0_react["lazy"];const _jsxDEV = __vite__cjsImport2_react_jsxDevRuntime["jsxDEV"];import __vite__cjsImport0_react from "/node_modules/.vite/deps/react.js?v=6764d3bd";
+import { Navigate, useLocation, useParams } from "/node_modules/.vite/deps/react-router-dom.js?v=7182d63a";
+var _jsxFileName = "C:/Github/Votrix/frontend/src/routes/index.jsx";
+import __vite__cjsImport2_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=6764d3bd";
+var _s = $RefreshSig$(), _s2 = $RefreshSig$();
+// AuthLayout is the only framer-motion consumer; lazy-loading it keeps that
+// ~100 KB animation library out of the main bundle (loaded only on auth routes).
+const AuthLayout = lazy(_c = () => import("/src/layouts/AuthLayout.jsx"));
+_c2 = AuthLayout;
+import DashboardLayout from "/src/layouts/DashboardLayout.jsx";
+import ElectionLayout from "/src/layouts/ElectionLayout.jsx";
+import PageantLayout from "/src/layouts/PageantLayout.jsx";
+import PollingLayout from "/src/layouts/PollingLayout.jsx";
+import ReportsLayout from "/src/layouts/ReportsLayout.jsx";
+import ProtectedRoute from "/src/routes/ProtectedRoute.jsx";
+import GuestRoute from "/src/routes/GuestRoute.jsx";
+import { USER_ROLES } from "/src/utils/constants.js";
+const NotFoundPage = lazy(_c3 = () => import("/src/pages/NotFoundPage.jsx"));
+_c4 = NotFoundPage;
+const LoginPage = lazy(_c5 = () => import("/src/pages/auth/LoginPage.jsx"));
+_c6 = LoginPage;
+const ChangePasswordPage = lazy(_c7 = () => import("/src/pages/auth/ChangePasswordPage.jsx"));
+_c8 = ChangePasswordPage;
+const AdminDashboardPage = lazy(_c9 = () => import("/src/pages/admin/AdminDashboardPage.jsx"));
+_c10 = AdminDashboardPage;
+const UserManagementPage = lazy(_c11 = () => import("/src/pages/admin/UserManagementPage.jsx"));
+_c12 = UserManagementPage;
+const GlobalEventsPage = lazy(_c13 = () => import("/src/pages/admin/GlobalEventsPage.jsx"));
+_c14 = GlobalEventsPage;
+const SystemSettingsPage = lazy(_c15 = () => import("/src/pages/admin/SystemSettingsPage.jsx"));
+_c16 = SystemSettingsPage;
+const AuditLogsPage = lazy(_c17 = () => import("/src/pages/admin/AuditLogsPage.jsx"));
+_c18 = AuditLogsPage;
+const OrganizerDetailPage = lazy(_c19 = () => import("/src/pages/admin/OrganizerDetailPage.jsx"));
+_c20 = OrganizerDetailPage;
+const HealthDashboardPage = lazy(_c21 = () => import("/src/pages/admin/HealthDashboardPage.jsx"));
+_c22 = HealthDashboardPage;
+const AlertConfigPage = lazy(_c23 = () => import("/src/pages/admin/AlertConfigPage.jsx"));
+_c24 = AlertConfigPage;
+const ArchivalPolicyPage = lazy(_c25 = () => import("/src/pages/admin/ArchivalPolicyPage.jsx"));
+_c26 = ArchivalPolicyPage;
+const OrganizerDashboardPage = lazy(_c27 = () => import("/src/pages/organizer/OrganizerDashboardPage.jsx"));
+_c28 = OrganizerDashboardPage;
+const VoterDashboardPage = lazy(_c29 = () => import("/src/pages/voter/VoterDashboardPage.jsx"));
+_c30 = VoterDashboardPage;
+const VoterEventPage = lazy(_c31 = () => import("/src/pages/voter/VoterEventPage.jsx"));
+_c32 = VoterEventPage;
+const ForgotPasswordPage = lazy(_c33 = () => import("/src/pages/auth/ForgotPasswordPage.jsx"));
+_c34 = ForgotPasswordPage;
+const ResetPasswordPage = lazy(_c35 = () => import("/src/pages/auth/ResetPasswordPage.jsx"));
+_c36 = ResetPasswordPage;
+const ElectionDashboardPage = lazy(_c37 = () => import("/src/pages/organizer/election/ElectionDashboardPage.jsx"));
+_c38 = ElectionDashboardPage;
+const ElectionEventsPage = lazy(_c39 = () => import("/src/pages/organizer/election/ElectionEventsPage.jsx"));
+_c40 = ElectionEventsPage;
+const ElectionEventFormPage = lazy(_c41 = () => import("/src/pages/organizer/election/ElectionEventFormPage.jsx"));
+_c42 = ElectionEventFormPage;
+const ElectionPositionsPage = lazy(_c43 = () => import("/src/pages/organizer/election/ElectionPositionsPage.jsx"));
+_c44 = ElectionPositionsPage;
+const ElectionCandidatesPage = lazy(_c45 = () => import("/src/pages/organizer/election/ElectionCandidatesPage.jsx"));
+_c46 = ElectionCandidatesPage;
+const ElectionVotersPage = lazy(_c47 = () => import("/src/pages/organizer/election/ElectionVotersPage.jsx"));
+_c48 = ElectionVotersPage;
+const ElectionReviewPage = lazy(_c49 = () => import("/src/pages/organizer/election/ElectionReviewPage.jsx"));
+_c50 = ElectionReviewPage;
+const ElectionAnalyticsPage = lazy(_c51 = () => import("/src/pages/organizer/election/ElectionAnalyticsPage.jsx"));
+_c52 = ElectionAnalyticsPage;
+const CompetitionDashboardPage = lazy(_c53 = () => import("/src/pages/organizer/competition/CompetitionDashboardPage.jsx"));
+_c54 = CompetitionDashboardPage;
+const CompetitionEventsPage = lazy(_c55 = () => import("/src/pages/organizer/competition/CompetitionEventsPage.jsx"));
+_c56 = CompetitionEventsPage;
+const CompetitionEventFormPage = lazy(_c57 = () => import("/src/pages/organizer/competition/CompetitionEventFormPage.jsx"));
+_c58 = CompetitionEventFormPage;
+const CompetitionContestantsPage = lazy(_c59 = () => import("/src/pages/organizer/competition/CompetitionContestantsPage.jsx"));
+_c60 = CompetitionContestantsPage;
+const CompetitionJudgesPage = lazy(_c61 = () => import("/src/pages/organizer/competition/CompetitionJudgesPage.jsx"));
+_c62 = CompetitionJudgesPage;
+const CompetitionReviewPage = lazy(_c63 = () => import("/src/pages/organizer/competition/CompetitionReviewPage.jsx"));
+_c64 = CompetitionReviewPage;
+const CompetitionRankingsPage = lazy(_c65 = () => import("/src/pages/organizer/competition/CompetitionRankingsPage.jsx"));
+_c66 = CompetitionRankingsPage;
+const CompetitionTabulationPage = lazy(_c67 = () => import("/src/pages/organizer/competition/CompetitionTabulationPage.jsx"));
+_c68 = CompetitionTabulationPage;
+const CompetitionWorkspacePage = lazy(_c69 = () => import("/src/pages/organizer/competition/CompetitionWorkspacePage.jsx"));
+_c70 = CompetitionWorkspacePage;
+const CompetitionAnalyticsPage = lazy(_c71 = () => import("/src/pages/organizer/competition/CompetitionAnalyticsPage.jsx"));
+_c72 = CompetitionAnalyticsPage;
+const CompetitionLiveControlPage = lazy(_c73 = () => import("/src/pages/organizer/competition/CompetitionLiveControlPage.jsx"));
+_c74 = CompetitionLiveControlPage;
+const JudgeScoringPage = lazy(_c75 = () => import("/src/pages/voter/JudgeScoringPage.jsx"));
+_c76 = JudgeScoringPage;
+const PollingDashboardPage = lazy(_c77 = () => import("/src/pages/organizer/polling/PollingDashboardPage.jsx"));
+_c78 = PollingDashboardPage;
+const PollingEventsPage = lazy(_c79 = () => import("/src/pages/organizer/polling/PollingEventsPage.jsx"));
+_c80 = PollingEventsPage;
+const PollingEventFormPage = lazy(_c81 = () => import("/src/pages/organizer/polling/PollingEventFormPage.jsx"));
+_c82 = PollingEventFormPage;
+const PollingBuilderPage = lazy(_c83 = () => import("/src/pages/organizer/polling/PollingBuilderPage.jsx"));
+_c84 = PollingBuilderPage;
+const PollingRespondentsPage = lazy(_c85 = () => import("/src/pages/organizer/polling/PollingRespondentsPage.jsx"));
+_c86 = PollingRespondentsPage;
+const PollingReviewPage = lazy(_c87 = () => import("/src/pages/organizer/polling/PollingReviewPage.jsx"));
+_c88 = PollingReviewPage;
+const PollingAnalyticsPage = lazy(_c89 = () => import("/src/pages/organizer/polling/PollingAnalyticsPage.jsx"));
+_c90 = PollingAnalyticsPage;
+const VoterPollPage = lazy(_c91 = () => import("/src/pages/voter/VoterPollPage.jsx"));
+_c92 = VoterPollPage;
+const ReportsOverviewPage = lazy(_c93 = () => import("/src/pages/organizer/reports/ReportsOverviewPage.jsx"));
+_c94 = ReportsOverviewPage;
+const ElectionReportPage = lazy(_c95 = () => import("/src/pages/organizer/reports/ElectionReportPage.jsx"));
+_c96 = ElectionReportPage;
+const CompetitionReportPage = lazy(_c97 = () => import("/src/pages/organizer/reports/CompetitionReportPage.jsx"));
+_c98 = CompetitionReportPage;
+const PollingReportPage = lazy(_c99 = () => import("/src/pages/organizer/reports/PollingReportPage.jsx"));
+_c100 = PollingReportPage;
+// The per-event report is now a stage inside each module (so it carries the
+// stepper, stage footer and sidebar). Old standalone /organizer/reports/:module
+// links redirect to the canonical in-module route.
+function ReportRedirect({ module }) {
+	_s();
+	const { eventId } = useParams();
+	return /* @__PURE__ */ _jsxDEV(Navigate, {
+		to: `/organizer/${module}/events/${eventId}/report`,
+		replace: true
+	}, void 0, false, {
+		fileName: _jsxFileName,
+		lineNumber: 101,
+		columnNumber: 10
+	}, this);
+}
+_s(ReportRedirect, "2DtOgokhj4CBuNiepZNhzegCPbs=", false, function() {
+	return [useParams];
+});
+_c101 = ReportRedirect;
+function LegacyParticipantRedirect() {
+	_s2();
+	const location = useLocation();
+	const path = location.pathname.replace(/^\/voter(?=\/|$)/, "/participant");
+	return /* @__PURE__ */ _jsxDEV(Navigate, {
+		to: `${path}${location.search}${location.hash}`,
+		replace: true
+	}, void 0, false, {
+		fileName: _jsxFileName,
+		lineNumber: 107,
+		columnNumber: 10
+	}, this);
+}
+_s2(LegacyParticipantRedirect, "pkHmaVRPskBaU4tMJuJJpV42k1I=", false, function() {
+	return [useLocation];
+});
+_c102 = LegacyParticipantRedirect;
+export const routeConfig = [
+	(
+	// ROOT — Shows login for guests, redirects authenticated users to dashboard
+	{
+		path: "/",
+		element: /* @__PURE__ */ _jsxDEV(GuestRoute, { children: /* @__PURE__ */ _jsxDEV(AuthLayout, {}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 116,
+			columnNumber: 9
+		}, this) }, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 115,
+			columnNumber: 7
+		}, this),
+		children: [{
+			index: true,
+			element: /* @__PURE__ */ _jsxDEV(LoginPage, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 120,
+				columnNumber: 31
+			}, this)
+		}]
+	}),
+	(
+	// /login — alias for root (backward compatibility)
+	{
+		path: "/login",
+		element: /* @__PURE__ */ _jsxDEV(GuestRoute, { children: /* @__PURE__ */ _jsxDEV(AuthLayout, {}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 128,
+			columnNumber: 9
+		}, this) }, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 127,
+			columnNumber: 7
+		}, this),
+		children: [{
+			index: true,
+			element: /* @__PURE__ */ _jsxDEV(LoginPage, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 132,
+				columnNumber: 31
+			}, this)
+		}]
+	}),
+	{
+		path: "/forgot-password",
+		element: /* @__PURE__ */ _jsxDEV(GuestRoute, { children: /* @__PURE__ */ _jsxDEV(AuthLayout, {}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 139,
+			columnNumber: 9
+		}, this) }, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 138,
+			columnNumber: 7
+		}, this),
+		children: [{
+			index: true,
+			element: /* @__PURE__ */ _jsxDEV(ForgotPasswordPage, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 142,
+				columnNumber: 40
+			}, this)
+		}]
+	},
+	{
+		path: "/reset-password",
+		element: /* @__PURE__ */ _jsxDEV(GuestRoute, { children: /* @__PURE__ */ _jsxDEV(AuthLayout, {}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 148,
+			columnNumber: 9
+		}, this) }, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 147,
+			columnNumber: 7
+		}, this),
+		children: [{
+			index: true,
+			element: /* @__PURE__ */ _jsxDEV(ResetPasswordPage, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 151,
+				columnNumber: 40
+			}, this)
+		}]
+	},
+	{
+		path: "/change-password",
+		element: /* @__PURE__ */ _jsxDEV(ProtectedRoute, {
+			allowPasswordChange: true,
+			children: /* @__PURE__ */ _jsxDEV(AuthLayout, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 157,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 156,
+			columnNumber: 7
+		}, this),
+		children: [{
+			index: true,
+			element: /* @__PURE__ */ _jsxDEV(ChangePasswordPage, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 160,
+				columnNumber: 40
+			}, this)
+		}]
+	},
+	{
+		path: "/admin",
+		element: /* @__PURE__ */ _jsxDEV(ProtectedRoute, {
+			allowedRoles: [USER_ROLES.ADMIN],
+			children: /* @__PURE__ */ _jsxDEV(DashboardLayout, { title: "Admin" }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 167,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 166,
+			columnNumber: 7
+		}, this),
+		children: [
+			{
+				index: true,
+				element: /* @__PURE__ */ _jsxDEV(AdminDashboardPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 171,
+					columnNumber: 31
+				}, this)
+			},
+			{
+				path: "users",
+				element: /* @__PURE__ */ _jsxDEV(UserManagementPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 172,
+					columnNumber: 33
+				}, this)
+			},
+			(
+			// Legacy path — redirect to the renamed User Management area (plan D14).
+			{
+				path: "organizers",
+				element: /* @__PURE__ */ _jsxDEV(Navigate, {
+					to: "/admin/users",
+					replace: true
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 174,
+					columnNumber: 38
+				}, this)
+			}),
+			{
+				path: "organizers/:id",
+				element: /* @__PURE__ */ _jsxDEV(OrganizerDetailPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 175,
+					columnNumber: 42
+				}, this)
+			},
+			{
+				path: "events",
+				element: /* @__PURE__ */ _jsxDEV(GlobalEventsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 176,
+					columnNumber: 34
+				}, this)
+			},
+			{
+				path: "settings",
+				element: /* @__PURE__ */ _jsxDEV(SystemSettingsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 177,
+					columnNumber: 36
+				}, this)
+			},
+			{
+				path: "audit-logs",
+				element: /* @__PURE__ */ _jsxDEV(AuditLogsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 178,
+					columnNumber: 38
+				}, this)
+			},
+			{
+				path: "health",
+				element: /* @__PURE__ */ _jsxDEV(HealthDashboardPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 179,
+					columnNumber: 34
+				}, this)
+			},
+			{
+				path: "alerts",
+				element: /* @__PURE__ */ _jsxDEV(AlertConfigPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 180,
+					columnNumber: 34
+				}, this)
+			},
+			{
+				path: "archival",
+				element: /* @__PURE__ */ _jsxDEV(ArchivalPolicyPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 181,
+					columnNumber: 36
+				}, this)
+			}
+		]
+	},
+	{
+		path: "/organizer",
+		element: /* @__PURE__ */ _jsxDEV(ProtectedRoute, {
+			allowedRoles: [USER_ROLES.ORGANIZER],
+			children: /* @__PURE__ */ _jsxDEV(DashboardLayout, { title: "Organizer" }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 188,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 187,
+			columnNumber: 7
+		}, this),
+		children: [{
+			index: true,
+			element: /* @__PURE__ */ _jsxDEV(OrganizerDashboardPage, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 191,
+				columnNumber: 40
+			}, this)
+		}]
+	},
+	{
+		path: "/organizer/election",
+		element: /* @__PURE__ */ _jsxDEV(ProtectedRoute, {
+			allowedRoles: [USER_ROLES.ORGANIZER],
+			children: /* @__PURE__ */ _jsxDEV(ElectionLayout, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 197,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 196,
+			columnNumber: 7
+		}, this),
+		children: [
+			{
+				index: true,
+				element: /* @__PURE__ */ _jsxDEV(ElectionDashboardPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 201,
+					columnNumber: 31
+				}, this)
+			},
+			{
+				path: "events",
+				element: /* @__PURE__ */ _jsxDEV(ElectionEventsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 202,
+					columnNumber: 34
+				}, this)
+			},
+			{
+				path: "events/new",
+				element: /* @__PURE__ */ _jsxDEV(ElectionEventFormPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 203,
+					columnNumber: 38
+				}, this)
+			},
+			{
+				path: "events/:eventId/edit",
+				element: /* @__PURE__ */ _jsxDEV(ElectionEventFormPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 204,
+					columnNumber: 48
+				}, this)
+			},
+			{
+				path: "events/:eventId/branding",
+				element: /* @__PURE__ */ _jsxDEV(ElectionEventFormPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 205,
+					columnNumber: 52
+				}, this)
+			},
+			{
+				path: "events/:eventId/positions",
+				element: /* @__PURE__ */ _jsxDEV(ElectionPositionsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 206,
+					columnNumber: 53
+				}, this)
+			},
+			{
+				path: "events/:eventId/candidates",
+				element: /* @__PURE__ */ _jsxDEV(ElectionCandidatesPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 207,
+					columnNumber: 54
+				}, this)
+			},
+			{
+				path: "events/:eventId/review",
+				element: /* @__PURE__ */ _jsxDEV(ElectionReviewPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 208,
+					columnNumber: 50
+				}, this)
+			},
+			{
+				path: "events/:eventId/voters",
+				element: /* @__PURE__ */ _jsxDEV(ElectionVotersPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 209,
+					columnNumber: 50
+				}, this)
+			},
+			{
+				path: "events/:eventId/analytics",
+				element: /* @__PURE__ */ _jsxDEV(ElectionAnalyticsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 210,
+					columnNumber: 53
+				}, this)
+			},
+			{
+				path: "events/:eventId/report",
+				element: /* @__PURE__ */ _jsxDEV(ElectionReportPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 211,
+					columnNumber: 50
+				}, this)
+			}
+		]
+	},
+	{
+		path: "/organizer/competition",
+		element: /* @__PURE__ */ _jsxDEV(ProtectedRoute, {
+			allowedRoles: [USER_ROLES.ORGANIZER],
+			children: /* @__PURE__ */ _jsxDEV(PageantLayout, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 218,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 217,
+			columnNumber: 7
+		}, this),
+		children: [
+			{
+				index: true,
+				element: /* @__PURE__ */ _jsxDEV(CompetitionDashboardPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 222,
+					columnNumber: 31
+				}, this)
+			},
+			{
+				path: "events",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionEventsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 223,
+					columnNumber: 34
+				}, this)
+			},
+			{
+				path: "events/new",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionEventFormPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 224,
+					columnNumber: 38
+				}, this)
+			},
+			{
+				path: "events/:eventId/edit",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionEventFormPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 225,
+					columnNumber: 48
+				}, this)
+			},
+			{
+				path: "events/:eventId/branding",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionEventFormPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 226,
+					columnNumber: 52
+				}, this)
+			},
+			{
+				path: "events/:eventId/workspace",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionWorkspacePage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 227,
+					columnNumber: 53
+				}, this)
+			},
+			{
+				path: "events/:eventId/contestants",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionContestantsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 228,
+					columnNumber: 55
+				}, this)
+			},
+			{
+				path: "events/:eventId/judges",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionJudgesPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 229,
+					columnNumber: 50
+				}, this)
+			},
+			{
+				path: "events/:eventId/review",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionReviewPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 230,
+					columnNumber: 50
+				}, this)
+			},
+			{
+				path: "events/:eventId/rankings",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionRankingsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 231,
+					columnNumber: 52
+				}, this)
+			},
+			{
+				path: "events/:eventId/tabulation",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionTabulationPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 232,
+					columnNumber: 54
+				}, this)
+			},
+			{
+				path: "events/:eventId/analytics",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionAnalyticsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 233,
+					columnNumber: 47
+				}, this)
+			},
+			{
+				path: "events/:eventId/report",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionReportPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 234,
+					columnNumber: 50
+				}, this)
+			},
+			{
+				path: "events/:eventId/live",
+				element: /* @__PURE__ */ _jsxDEV(CompetitionLiveControlPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 235,
+					columnNumber: 48
+				}, this)
+			}
+		]
+	},
+	{
+		path: "/organizer/polling",
+		element: /* @__PURE__ */ _jsxDEV(ProtectedRoute, {
+			allowedRoles: [USER_ROLES.ORGANIZER],
+			children: /* @__PURE__ */ _jsxDEV(PollingLayout, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 242,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 241,
+			columnNumber: 7
+		}, this),
+		children: [
+			{
+				index: true,
+				element: /* @__PURE__ */ _jsxDEV(PollingDashboardPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 246,
+					columnNumber: 31
+				}, this)
+			},
+			{
+				path: "events",
+				element: /* @__PURE__ */ _jsxDEV(PollingEventsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 247,
+					columnNumber: 34
+				}, this)
+			},
+			{
+				path: "events/new",
+				element: /* @__PURE__ */ _jsxDEV(PollingEventFormPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 248,
+					columnNumber: 38
+				}, this)
+			},
+			{
+				path: "events/:eventId/edit",
+				element: /* @__PURE__ */ _jsxDEV(PollingEventFormPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 249,
+					columnNumber: 48
+				}, this)
+			},
+			{
+				path: "events/:eventId/branding",
+				element: /* @__PURE__ */ _jsxDEV(PollingEventFormPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 250,
+					columnNumber: 52
+				}, this)
+			},
+			{
+				path: "events/:eventId/settings",
+				element: /* @__PURE__ */ _jsxDEV(PollingEventFormPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 251,
+					columnNumber: 52
+				}, this)
+			},
+			{
+				path: "events/:eventId/builder",
+				element: /* @__PURE__ */ _jsxDEV(PollingBuilderPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 252,
+					columnNumber: 51
+				}, this)
+			},
+			{
+				path: "events/:eventId/review",
+				element: /* @__PURE__ */ _jsxDEV(PollingReviewPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 253,
+					columnNumber: 50
+				}, this)
+			},
+			{
+				path: "events/:eventId/respondents",
+				element: /* @__PURE__ */ _jsxDEV(PollingRespondentsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 254,
+					columnNumber: 55
+				}, this)
+			},
+			{
+				path: "events/:eventId/analytics",
+				element: /* @__PURE__ */ _jsxDEV(PollingAnalyticsPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 255,
+					columnNumber: 53
+				}, this)
+			},
+			{
+				path: "events/:eventId/report",
+				element: /* @__PURE__ */ _jsxDEV(PollingReportPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 256,
+					columnNumber: 50
+				}, this)
+			}
+		]
+	},
+	{
+		path: "/organizer/reports",
+		element: /* @__PURE__ */ _jsxDEV(ProtectedRoute, {
+			allowedRoles: [USER_ROLES.ORGANIZER],
+			children: /* @__PURE__ */ _jsxDEV(ReportsLayout, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 263,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 262,
+			columnNumber: 7
+		}, this),
+		children: [
+			{
+				index: true,
+				element: /* @__PURE__ */ _jsxDEV(ReportsOverviewPage, {}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 267,
+					columnNumber: 31
+				}, this)
+			},
+			{
+				path: "election/:eventId",
+				element: /* @__PURE__ */ _jsxDEV(ReportRedirect, { module: "election" }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 268,
+					columnNumber: 45
+				}, this)
+			},
+			{
+				path: "competition/:eventId",
+				element: /* @__PURE__ */ _jsxDEV(ReportRedirect, { module: "competition" }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 269,
+					columnNumber: 48
+				}, this)
+			},
+			{
+				path: "polling/:eventId",
+				element: /* @__PURE__ */ _jsxDEV(ReportRedirect, { module: "polling" }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 270,
+					columnNumber: 44
+				}, this)
+			}
+		]
+	},
+	{
+		path: "/participant",
+		element: /* @__PURE__ */ _jsxDEV(ProtectedRoute, {
+			allowedRoles: [USER_ROLES.PARTICIPANT],
+			children: /* @__PURE__ */ _jsxDEV(DashboardLayout, {
+				title: "Participant",
+				showSidebar: false
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 277,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 276,
+			columnNumber: 7
+		}, this),
+		children: [{
+			index: true,
+			element: /* @__PURE__ */ _jsxDEV(VoterDashboardPage, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 280,
+				columnNumber: 40
+			}, this)
+		}]
+	},
+	{
+		path: "/participant/events/:eventId",
+		element: /* @__PURE__ */ _jsxDEV(ProtectedRoute, {
+			allowedRoles: [USER_ROLES.PARTICIPANT],
+			children: /* @__PURE__ */ _jsxDEV(DashboardLayout, {
+				title: "Vote",
+				showSidebar: false
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 286,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 285,
+			columnNumber: 7
+		}, this),
+		children: [{
+			index: true,
+			element: /* @__PURE__ */ _jsxDEV(VoterEventPage, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 289,
+				columnNumber: 40
+			}, this)
+		}]
+	},
+	{
+		path: "/participant/polling/events/:eventId",
+		element: /* @__PURE__ */ _jsxDEV(ProtectedRoute, {
+			allowedRoles: [USER_ROLES.PARTICIPANT],
+			children: /* @__PURE__ */ _jsxDEV(DashboardLayout, {
+				title: "Poll",
+				showSidebar: false
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 295,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 294,
+			columnNumber: 7
+		}, this),
+		children: [{
+			index: true,
+			element: /* @__PURE__ */ _jsxDEV(VoterPollPage, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 298,
+				columnNumber: 40
+			}, this)
+		}]
+	},
+	{
+		path: "/participant/competition/events/:eventId/score",
+		element: /* @__PURE__ */ _jsxDEV(ProtectedRoute, {
+			allowedRoles: [USER_ROLES.PARTICIPANT],
+			children: /* @__PURE__ */ _jsxDEV(DashboardLayout, {
+				title: "Judge scoring",
+				showSidebar: false
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 304,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 303,
+			columnNumber: 7
+		}, this),
+		children: [{
+			index: true,
+			element: /* @__PURE__ */ _jsxDEV(JudgeScoringPage, {}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 307,
+				columnNumber: 40
+			}, this)
+		}]
+	},
+	{
+		path: "/voter/*",
+		element: /* @__PURE__ */ _jsxDEV(LegacyParticipantRedirect, {}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 309,
+			columnNumber: 32
+		}, this)
+	},
+	(
+	// Catch-all 404
+	{
+		path: "*",
+		element: /* @__PURE__ */ _jsxDEV(NotFoundPage, {}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 313,
+			columnNumber: 14
+		}, this)
+	})
+];
+var _c, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _c12, _c13, _c14, _c15, _c16, _c17, _c18, _c19, _c20, _c21, _c22, _c23, _c24, _c25, _c26, _c27, _c28, _c29, _c30, _c31, _c32, _c33, _c34, _c35, _c36, _c37, _c38, _c39, _c40, _c41, _c42, _c43, _c44, _c45, _c46, _c47, _c48, _c49, _c50, _c51, _c52, _c53, _c54, _c55, _c56, _c57, _c58, _c59, _c60, _c61, _c62, _c63, _c64, _c65, _c66, _c67, _c68, _c69, _c70, _c71, _c72, _c73, _c74, _c75, _c76, _c77, _c78, _c79, _c80, _c81, _c82, _c83, _c84, _c85, _c86, _c87, _c88, _c89, _c90, _c91, _c92, _c93, _c94, _c95, _c96, _c97, _c98, _c99, _c100, _c101, _c102;
+$RefreshReg$(_c, "AuthLayout$lazy");
+$RefreshReg$(_c2, "AuthLayout");
+$RefreshReg$(_c3, "NotFoundPage$lazy");
+$RefreshReg$(_c4, "NotFoundPage");
+$RefreshReg$(_c5, "LoginPage$lazy");
+$RefreshReg$(_c6, "LoginPage");
+$RefreshReg$(_c7, "ChangePasswordPage$lazy");
+$RefreshReg$(_c8, "ChangePasswordPage");
+$RefreshReg$(_c9, "AdminDashboardPage$lazy");
+$RefreshReg$(_c10, "AdminDashboardPage");
+$RefreshReg$(_c11, "UserManagementPage$lazy");
+$RefreshReg$(_c12, "UserManagementPage");
+$RefreshReg$(_c13, "GlobalEventsPage$lazy");
+$RefreshReg$(_c14, "GlobalEventsPage");
+$RefreshReg$(_c15, "SystemSettingsPage$lazy");
+$RefreshReg$(_c16, "SystemSettingsPage");
+$RefreshReg$(_c17, "AuditLogsPage$lazy");
+$RefreshReg$(_c18, "AuditLogsPage");
+$RefreshReg$(_c19, "OrganizerDetailPage$lazy");
+$RefreshReg$(_c20, "OrganizerDetailPage");
+$RefreshReg$(_c21, "HealthDashboardPage$lazy");
+$RefreshReg$(_c22, "HealthDashboardPage");
+$RefreshReg$(_c23, "AlertConfigPage$lazy");
+$RefreshReg$(_c24, "AlertConfigPage");
+$RefreshReg$(_c25, "ArchivalPolicyPage$lazy");
+$RefreshReg$(_c26, "ArchivalPolicyPage");
+$RefreshReg$(_c27, "OrganizerDashboardPage$lazy");
+$RefreshReg$(_c28, "OrganizerDashboardPage");
+$RefreshReg$(_c29, "VoterDashboardPage$lazy");
+$RefreshReg$(_c30, "VoterDashboardPage");
+$RefreshReg$(_c31, "VoterEventPage$lazy");
+$RefreshReg$(_c32, "VoterEventPage");
+$RefreshReg$(_c33, "ForgotPasswordPage$lazy");
+$RefreshReg$(_c34, "ForgotPasswordPage");
+$RefreshReg$(_c35, "ResetPasswordPage$lazy");
+$RefreshReg$(_c36, "ResetPasswordPage");
+$RefreshReg$(_c37, "ElectionDashboardPage$lazy");
+$RefreshReg$(_c38, "ElectionDashboardPage");
+$RefreshReg$(_c39, "ElectionEventsPage$lazy");
+$RefreshReg$(_c40, "ElectionEventsPage");
+$RefreshReg$(_c41, "ElectionEventFormPage$lazy");
+$RefreshReg$(_c42, "ElectionEventFormPage");
+$RefreshReg$(_c43, "ElectionPositionsPage$lazy");
+$RefreshReg$(_c44, "ElectionPositionsPage");
+$RefreshReg$(_c45, "ElectionCandidatesPage$lazy");
+$RefreshReg$(_c46, "ElectionCandidatesPage");
+$RefreshReg$(_c47, "ElectionVotersPage$lazy");
+$RefreshReg$(_c48, "ElectionVotersPage");
+$RefreshReg$(_c49, "ElectionReviewPage$lazy");
+$RefreshReg$(_c50, "ElectionReviewPage");
+$RefreshReg$(_c51, "ElectionAnalyticsPage$lazy");
+$RefreshReg$(_c52, "ElectionAnalyticsPage");
+$RefreshReg$(_c53, "CompetitionDashboardPage$lazy");
+$RefreshReg$(_c54, "CompetitionDashboardPage");
+$RefreshReg$(_c55, "CompetitionEventsPage$lazy");
+$RefreshReg$(_c56, "CompetitionEventsPage");
+$RefreshReg$(_c57, "CompetitionEventFormPage$lazy");
+$RefreshReg$(_c58, "CompetitionEventFormPage");
+$RefreshReg$(_c59, "CompetitionContestantsPage$lazy");
+$RefreshReg$(_c60, "CompetitionContestantsPage");
+$RefreshReg$(_c61, "CompetitionJudgesPage$lazy");
+$RefreshReg$(_c62, "CompetitionJudgesPage");
+$RefreshReg$(_c63, "CompetitionReviewPage$lazy");
+$RefreshReg$(_c64, "CompetitionReviewPage");
+$RefreshReg$(_c65, "CompetitionRankingsPage$lazy");
+$RefreshReg$(_c66, "CompetitionRankingsPage");
+$RefreshReg$(_c67, "CompetitionTabulationPage$lazy");
+$RefreshReg$(_c68, "CompetitionTabulationPage");
+$RefreshReg$(_c69, "CompetitionWorkspacePage$lazy");
+$RefreshReg$(_c70, "CompetitionWorkspacePage");
+$RefreshReg$(_c71, "CompetitionAnalyticsPage$lazy");
+$RefreshReg$(_c72, "CompetitionAnalyticsPage");
+$RefreshReg$(_c73, "CompetitionLiveControlPage$lazy");
+$RefreshReg$(_c74, "CompetitionLiveControlPage");
+$RefreshReg$(_c75, "JudgeScoringPage$lazy");
+$RefreshReg$(_c76, "JudgeScoringPage");
+$RefreshReg$(_c77, "PollingDashboardPage$lazy");
+$RefreshReg$(_c78, "PollingDashboardPage");
+$RefreshReg$(_c79, "PollingEventsPage$lazy");
+$RefreshReg$(_c80, "PollingEventsPage");
+$RefreshReg$(_c81, "PollingEventFormPage$lazy");
+$RefreshReg$(_c82, "PollingEventFormPage");
+$RefreshReg$(_c83, "PollingBuilderPage$lazy");
+$RefreshReg$(_c84, "PollingBuilderPage");
+$RefreshReg$(_c85, "PollingRespondentsPage$lazy");
+$RefreshReg$(_c86, "PollingRespondentsPage");
+$RefreshReg$(_c87, "PollingReviewPage$lazy");
+$RefreshReg$(_c88, "PollingReviewPage");
+$RefreshReg$(_c89, "PollingAnalyticsPage$lazy");
+$RefreshReg$(_c90, "PollingAnalyticsPage");
+$RefreshReg$(_c91, "VoterPollPage$lazy");
+$RefreshReg$(_c92, "VoterPollPage");
+$RefreshReg$(_c93, "ReportsOverviewPage$lazy");
+$RefreshReg$(_c94, "ReportsOverviewPage");
+$RefreshReg$(_c95, "ElectionReportPage$lazy");
+$RefreshReg$(_c96, "ElectionReportPage");
+$RefreshReg$(_c97, "CompetitionReportPage$lazy");
+$RefreshReg$(_c98, "CompetitionReportPage");
+$RefreshReg$(_c99, "PollingReportPage$lazy");
+$RefreshReg$(_c100, "PollingReportPage");
+$RefreshReg$(_c101, "ReportRedirect");
+$RefreshReg$(_c102, "LegacyParticipantRedirect");
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+import * as __vite_react_currentExports from "/src/routes/index.jsx";
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+
+  const currentExports = __vite_react_currentExports;
+  queueMicrotask(() => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Github/Votrix/frontend/src/routes/index.jsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Github/Votrix/frontend/src/routes/index.jsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+function $RefreshReg$(type, id) { return RefreshRuntime.register(type, "C:/Github/Votrix/frontend/src/routes/index.jsx" + ' ' + id); }
+function $RefreshSig$() { return RefreshRuntime.createSignatureFunctionForTransform(); }
+
+//# sourceMappingURL=data:application/json;base64,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Q0Usd0JBQUMsZ0JBQUQ7R0FBZ0IsY0FBYyxDQUFDLFdBQVcsV0FBVzthQUNuRCx3QkFBQyxpQkFBRDtJQUFpQixPQUFNO0lBQWdCLGFBQWE7R0FBUTs7Ozs7RUFDOUM7Ozs7O0VBRWxCLFVBQVUsQ0FBQztHQUFFLE9BQU87R0FBTSxTQUFTLHdCQUFDLGtCQUFELENBQW1COzs7OztFQUFFLENBQUM7Q0FDM0Q7Q0FDQTtFQUFFLE1BQU07RUFBWSxTQUFTLHdCQUFDLDJCQUFELENBQTRCOzs7OztDQUFFOzs7Q0FFM0Q7RUFDRSxNQUFNO0VBQ04sU0FBUyx3QkFBQyxjQUFELENBQWU7Ozs7O0NBQzFCO0FBQ0YiLCJuYW1lcyI6W10sInNvdXJjZXMiOlsiaW5kZXguanN4Il0sInZlcnNpb24iOjMsInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IGxhenkgfSBmcm9tICdyZWFjdCdcclxuaW1wb3J0IHsgTmF2aWdhdGUsIHVzZUxvY2F0aW9uLCB1c2VQYXJhbXMgfSBmcm9tICdyZWFjdC1yb3V0ZXItZG9tJ1xyXG4vLyBBdXRoTGF5b3V0IGlzIHRoZSBvbmx5IGZyYW1lci1tb3Rpb24gY29uc3VtZXI7IGxhenktbG9hZGluZyBpdCBrZWVwcyB0aGF0XHJcbi8vIH4xMDAgS0IgYW5pbWF0aW9uIGxpYnJhcnkgb3V0IG9mIHRoZSBtYWluIGJ1bmRsZSAobG9hZGVkIG9ubHkgb24gYXV0aCByb3V0ZXMpLlxyXG5jb25zdCBBdXRoTGF5b3V0ID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvbGF5b3V0cy9BdXRoTGF5b3V0JykpXHJcbmltcG9ydCBEYXNoYm9hcmRMYXlvdXQgZnJvbSAnQC9sYXlvdXRzL0Rhc2hib2FyZExheW91dCdcclxuaW1wb3J0IEVsZWN0aW9uTGF5b3V0IGZyb20gJ0AvbGF5b3V0cy9FbGVjdGlvbkxheW91dCdcclxuaW1wb3J0IFBhZ2VhbnRMYXlvdXQgZnJvbSAnQC9sYXlvdXRzL1BhZ2VhbnRMYXlvdXQnXHJcbmltcG9ydCBQb2xsaW5nTGF5b3V0IGZyb20gJ0AvbGF5b3V0cy9Qb2xsaW5nTGF5b3V0J1xyXG5pbXBvcnQgUmVwb3J0c0xheW91dCBmcm9tICdAL2xheW91dHMvUmVwb3J0c0xheW91dCdcclxuaW1wb3J0IFByb3RlY3RlZFJvdXRlIGZyb20gJ0Avcm91dGVzL1Byb3RlY3RlZFJvdXRlJ1xyXG5pbXBvcnQgR3Vlc3RSb3V0ZSBmcm9tICdAL3JvdXRlcy9HdWVzdFJvdXRlJ1xyXG5pbXBvcnQgeyBVU0VSX1JPTEVTIH0gZnJvbSAnQC91dGlscy9jb25zdGFudHMnXHJcblxyXG5jb25zdCBOb3RGb3VuZFBhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgnQC9wYWdlcy9Ob3RGb3VuZFBhZ2UnKSlcclxuY29uc3QgTG9naW5QYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvYXV0aC9Mb2dpblBhZ2UnKSlcclxuY29uc3QgQ2hhbmdlUGFzc3dvcmRQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvYXV0aC9DaGFuZ2VQYXNzd29yZFBhZ2UnKSlcclxuY29uc3QgQWRtaW5EYXNoYm9hcmRQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvYWRtaW4vQWRtaW5EYXNoYm9hcmRQYWdlJykpXHJcbmNvbnN0IFVzZXJNYW5hZ2VtZW50UGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL2FkbWluL1VzZXJNYW5hZ2VtZW50UGFnZScpKVxyXG5jb25zdCBHbG9iYWxFdmVudHNQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvYWRtaW4vR2xvYmFsRXZlbnRzUGFnZScpKVxyXG5jb25zdCBTeXN0ZW1TZXR0aW5nc1BhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgnQC9wYWdlcy9hZG1pbi9TeXN0ZW1TZXR0aW5nc1BhZ2UnKSlcclxuY29uc3QgQXVkaXRMb2dzUGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL2FkbWluL0F1ZGl0TG9nc1BhZ2UnKSlcclxuY29uc3QgT3JnYW5pemVyRGV0YWlsUGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL2FkbWluL09yZ2FuaXplckRldGFpbFBhZ2UnKSlcclxuY29uc3QgSGVhbHRoRGFzaGJvYXJkUGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL2FkbWluL0hlYWx0aERhc2hib2FyZFBhZ2UnKSlcclxuY29uc3QgQWxlcnRDb25maWdQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvYWRtaW4vQWxlcnRDb25maWdQYWdlJykpXHJcbmNvbnN0IEFyY2hpdmFsUG9saWN5UGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL2FkbWluL0FyY2hpdmFsUG9saWN5UGFnZScpKVxyXG5jb25zdCBPcmdhbml6ZXJEYXNoYm9hcmRQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvb3JnYW5pemVyL09yZ2FuaXplckRhc2hib2FyZFBhZ2UnKSlcclxuY29uc3QgVm90ZXJEYXNoYm9hcmRQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvdm90ZXIvVm90ZXJEYXNoYm9hcmRQYWdlJykpXHJcbmNvbnN0IFZvdGVyRXZlbnRQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvdm90ZXIvVm90ZXJFdmVudFBhZ2UnKSlcclxuXHJcbmNvbnN0IEZvcmdvdFBhc3N3b3JkUGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL2F1dGgvRm9yZ290UGFzc3dvcmRQYWdlJykpXHJcbmNvbnN0IFJlc2V0UGFzc3dvcmRQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvYXV0aC9SZXNldFBhc3N3b3JkUGFnZScpKVxyXG5cclxuY29uc3QgRWxlY3Rpb25EYXNoYm9hcmRQYWdlID0gbGF6eShcclxuICAoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvb3JnYW5pemVyL2VsZWN0aW9uL0VsZWN0aW9uRGFzaGJvYXJkUGFnZScpLFxyXG4pXHJcbmNvbnN0IEVsZWN0aW9uRXZlbnRzUGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL29yZ2FuaXplci9lbGVjdGlvbi9FbGVjdGlvbkV2ZW50c1BhZ2UnKSlcclxuY29uc3QgRWxlY3Rpb25FdmVudEZvcm1QYWdlID0gbGF6eShcclxuICAoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvb3JnYW5pemVyL2VsZWN0aW9uL0VsZWN0aW9uRXZlbnRGb3JtUGFnZScpLFxyXG4pXHJcbmNvbnN0IEVsZWN0aW9uUG9zaXRpb25zUGFnZSA9IGxhenkoXHJcbiAgKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL29yZ2FuaXplci9lbGVjdGlvbi9FbGVjdGlvblBvc2l0aW9uc1BhZ2UnKSxcclxuKVxyXG5jb25zdCBFbGVjdGlvbkNhbmRpZGF0ZXNQYWdlID0gbGF6eShcclxuICAoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvb3JnYW5pemVyL2VsZWN0aW9uL0VsZWN0aW9uQ2FuZGlkYXRlc1BhZ2UnKSxcclxuKVxyXG5jb25zdCBFbGVjdGlvblZvdGVyc1BhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvZWxlY3Rpb24vRWxlY3Rpb25Wb3RlcnNQYWdlJykpXHJcbmNvbnN0IEVsZWN0aW9uUmV2aWV3UGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL29yZ2FuaXplci9lbGVjdGlvbi9FbGVjdGlvblJldmlld1BhZ2UnKSlcclxuY29uc3QgRWxlY3Rpb25BbmFseXRpY3NQYWdlID0gbGF6eShcclxuICAoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvb3JnYW5pemVyL2VsZWN0aW9uL0VsZWN0aW9uQW5hbHl0aWNzUGFnZScpLFxyXG4pXHJcblxyXG5jb25zdCBDb21wZXRpdGlvbkRhc2hib2FyZFBhZ2UgPSBsYXp5KFxyXG4gICgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvY29tcGV0aXRpb24vQ29tcGV0aXRpb25EYXNoYm9hcmRQYWdlJyksXHJcbilcclxuY29uc3QgQ29tcGV0aXRpb25FdmVudHNQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvb3JnYW5pemVyL2NvbXBldGl0aW9uL0NvbXBldGl0aW9uRXZlbnRzUGFnZScpKVxyXG5jb25zdCBDb21wZXRpdGlvbkV2ZW50Rm9ybVBhZ2UgPSBsYXp5KFxyXG4gICgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvY29tcGV0aXRpb24vQ29tcGV0aXRpb25FdmVudEZvcm1QYWdlJyksXHJcbilcclxuY29uc3QgQ29tcGV0aXRpb25Db250ZXN0YW50c1BhZ2UgPSBsYXp5KFxyXG4gICgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvY29tcGV0aXRpb24vQ29tcGV0aXRpb25Db250ZXN0YW50c1BhZ2UnKSxcclxuKVxyXG5jb25zdCBDb21wZXRpdGlvbkp1ZGdlc1BhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvY29tcGV0aXRpb24vQ29tcGV0aXRpb25KdWRnZXNQYWdlJykpXHJcbmNvbnN0IENvbXBldGl0aW9uUmV2aWV3UGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL29yZ2FuaXplci9jb21wZXRpdGlvbi9Db21wZXRpdGlvblJldmlld1BhZ2UnKSlcclxuY29uc3QgQ29tcGV0aXRpb25SYW5raW5nc1BhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvY29tcGV0aXRpb24vQ29tcGV0aXRpb25SYW5raW5nc1BhZ2UnKSlcclxuY29uc3QgQ29tcGV0aXRpb25UYWJ1bGF0aW9uUGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL29yZ2FuaXplci9jb21wZXRpdGlvbi9Db21wZXRpdGlvblRhYnVsYXRpb25QYWdlJykpXHJcbmNvbnN0IENvbXBldGl0aW9uV29ya3NwYWNlUGFnZSA9IGxhenkoXHJcbiAgKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL29yZ2FuaXplci9jb21wZXRpdGlvbi9Db21wZXRpdGlvbldvcmtzcGFjZVBhZ2UnKSxcclxuKVxyXG5jb25zdCBDb21wZXRpdGlvbkFuYWx5dGljc1BhZ2UgPSBsYXp5KFxyXG4gICgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvY29tcGV0aXRpb24vQ29tcGV0aXRpb25BbmFseXRpY3NQYWdlJyksXHJcbilcclxuY29uc3QgQ29tcGV0aXRpb25MaXZlQ29udHJvbFBhZ2UgPSBsYXp5KFxyXG4gICgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvY29tcGV0aXRpb24vQ29tcGV0aXRpb25MaXZlQ29udHJvbFBhZ2UnKSxcclxuKVxyXG5jb25zdCBKdWRnZVNjb3JpbmdQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvdm90ZXIvSnVkZ2VTY29yaW5nUGFnZScpKVxyXG5cclxuY29uc3QgUG9sbGluZ0Rhc2hib2FyZFBhZ2UgPSBsYXp5KFxyXG4gICgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvcG9sbGluZy9Qb2xsaW5nRGFzaGJvYXJkUGFnZScpLFxyXG4pXHJcbmNvbnN0IFBvbGxpbmdFdmVudHNQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvb3JnYW5pemVyL3BvbGxpbmcvUG9sbGluZ0V2ZW50c1BhZ2UnKSlcclxuY29uc3QgUG9sbGluZ0V2ZW50Rm9ybVBhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvcG9sbGluZy9Qb2xsaW5nRXZlbnRGb3JtUGFnZScpKVxyXG5jb25zdCBQb2xsaW5nQnVpbGRlclBhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvcG9sbGluZy9Qb2xsaW5nQnVpbGRlclBhZ2UnKSlcclxuY29uc3QgUG9sbGluZ1Jlc3BvbmRlbnRzUGFnZSA9IGxhenkoXHJcbiAgKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL29yZ2FuaXplci9wb2xsaW5nL1BvbGxpbmdSZXNwb25kZW50c1BhZ2UnKSxcclxuKVxyXG5jb25zdCBQb2xsaW5nUmV2aWV3UGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL29yZ2FuaXplci9wb2xsaW5nL1BvbGxpbmdSZXZpZXdQYWdlJykpXHJcbmNvbnN0IFBvbGxpbmdBbmFseXRpY3NQYWdlID0gbGF6eSgoKSA9PiBpbXBvcnQoJ0AvcGFnZXMvb3JnYW5pemVyL3BvbGxpbmcvUG9sbGluZ0FuYWx5dGljc1BhZ2UnKSlcclxuY29uc3QgVm90ZXJQb2xsUGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL3ZvdGVyL1ZvdGVyUG9sbFBhZ2UnKSlcclxuXHJcbmNvbnN0IFJlcG9ydHNPdmVydmlld1BhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvcmVwb3J0cy9SZXBvcnRzT3ZlcnZpZXdQYWdlJykpXHJcbmNvbnN0IEVsZWN0aW9uUmVwb3J0UGFnZSA9IGxhenkoKCkgPT4gaW1wb3J0KCdAL3BhZ2VzL29yZ2FuaXplci9yZXBvcnRzL0VsZWN0aW9uUmVwb3J0UGFnZScpKVxyXG5jb25zdCBDb21wZXRpdGlvblJlcG9ydFBhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvcmVwb3J0cy9Db21wZXRpdGlvblJlcG9ydFBhZ2UnKSlcclxuY29uc3QgUG9sbGluZ1JlcG9ydFBhZ2UgPSBsYXp5KCgpID0+IGltcG9ydCgnQC9wYWdlcy9vcmdhbml6ZXIvcmVwb3J0cy9Qb2xsaW5nUmVwb3J0UGFnZScpKVxyXG5cclxuLy8gVGhlIHBlci1ldmVudCByZXBvcnQgaXMgbm93IGEgc3RhZ2UgaW5zaWRlIGVhY2ggbW9kdWxlIChzbyBpdCBjYXJyaWVzIHRoZVxyXG4vLyBzdGVwcGVyLCBzdGFnZSBmb290ZXIgYW5kIHNpZGViYXIpLiBPbGQgc3RhbmRhbG9uZSAvb3JnYW5pemVyL3JlcG9ydHMvOm1vZHVsZVxyXG4vLyBsaW5rcyByZWRpcmVjdCB0byB0aGUgY2Fub25pY2FsIGluLW1vZHVsZSByb3V0ZS5cclxuZnVuY3Rpb24gUmVwb3J0UmVkaXJlY3QoeyBtb2R1bGUgfSkge1xyXG4gIGNvbnN0IHsgZXZlbnRJZCB9ID0gdXNlUGFyYW1zKClcclxuICByZXR1cm4gPE5hdmlnYXRlIHRvPXtgL29yZ2FuaXplci8ke21vZHVsZX0vZXZlbnRzLyR7ZXZlbnRJZH0vcmVwb3J0YH0gcmVwbGFjZSAvPlxyXG59XHJcblxyXG5mdW5jdGlvbiBMZWdhY3lQYXJ0aWNpcGFudFJlZGlyZWN0KCkge1xyXG4gIGNvbnN0IGxvY2F0aW9uID0gdXNlTG9jYXRpb24oKVxyXG4gIGNvbnN0IHBhdGggPSBsb2NhdGlvbi5wYXRobmFtZS5yZXBsYWNlKC9eXFwvdm90ZXIoPz1cXC98JCkvLCAnL3BhcnRpY2lwYW50JylcclxuICByZXR1cm4gPE5hdmlnYXRlIHRvPXtgJHtwYXRofSR7bG9jYXRpb24uc2VhcmNofSR7bG9jYXRpb24uaGFzaH1gfSByZXBsYWNlIC8+XHJcbn1cclxuXHJcbmV4cG9ydCBjb25zdCByb3V0ZUNvbmZpZyA9IFtcclxuICAvLyBST09UIOKAlCBTaG93cyBsb2dpbiBmb3IgZ3Vlc3RzLCByZWRpcmVjdHMgYXV0aGVudGljYXRlZCB1c2VycyB0byBkYXNoYm9hcmRcclxuICB7XHJcbiAgICBwYXRoOiAnLycsXHJcbiAgICBlbGVtZW50OiAoXHJcbiAgICAgIDxHdWVzdFJvdXRlPlxyXG4gICAgICAgIDxBdXRoTGF5b3V0IC8+XHJcbiAgICAgIDwvR3Vlc3RSb3V0ZT5cclxuICAgICksXHJcbiAgICBjaGlsZHJlbjogW1xyXG4gICAgICB7IGluZGV4OiB0cnVlLCBlbGVtZW50OiA8TG9naW5QYWdlIC8+IH0sXHJcbiAgICBdLFxyXG4gIH0sXHJcbiAgLy8gL2xvZ2luIOKAlCBhbGlhcyBmb3Igcm9vdCAoYmFja3dhcmQgY29tcGF0aWJpbGl0eSlcclxuICB7XHJcbiAgICBwYXRoOiAnL2xvZ2luJyxcclxuICAgIGVsZW1lbnQ6IChcclxuICAgICAgPEd1ZXN0Um91dGU+XHJcbiAgICAgICAgPEF1dGhMYXlvdXQgLz5cclxuICAgICAgPC9HdWVzdFJvdXRlPlxyXG4gICAgKSxcclxuICAgIGNoaWxkcmVuOiBbXHJcbiAgICAgIHsgaW5kZXg6IHRydWUsIGVsZW1lbnQ6IDxMb2dpblBhZ2UgLz4gfSxcclxuICAgIF0sXHJcbiAgfSxcclxuICB7XHJcbiAgICBwYXRoOiAnL2ZvcmdvdC1wYXNzd29yZCcsXHJcbiAgICBlbGVtZW50OiAoXHJcbiAgICAgIDxHdWVzdFJvdXRlPlxyXG4gICAgICAgIDxBdXRoTGF5b3V0IC8+XHJcbiAgICAgIDwvR3Vlc3RSb3V0ZT5cclxuICAgICksXHJcbiAgICBjaGlsZHJlbjogW3sgaW5kZXg6IHRydWUsIGVsZW1lbnQ6IDxGb3Jnb3RQYXNzd29yZFBhZ2UgLz4gfV0sXHJcbiAgfSxcclxuICB7XHJcbiAgICBwYXRoOiAnL3Jlc2V0LXBhc3N3b3JkJyxcclxuICAgIGVsZW1lbnQ6IChcclxuICAgICAgPEd1ZXN0Um91dGU+XHJcbiAgICAgICAgPEF1dGhMYXlvdXQgLz5cclxuICAgICAgPC9HdWVzdFJvdXRlPlxyXG4gICAgKSxcclxuICAgIGNoaWxkcmVuOiBbeyBpbmRleDogdHJ1ZSwgZWxlbWVudDogPFJlc2V0UGFzc3dvcmRQYWdlIC8+IH1dLFxyXG4gIH0sXHJcbiAge1xyXG4gICAgcGF0aDogJy9jaGFuZ2UtcGFzc3dvcmQnLFxyXG4gICAgZWxlbWVudDogKFxyXG4gICAgICA8UHJvdGVjdGVkUm91dGUgYWxsb3dQYXNzd29yZENoYW5nZT5cclxuICAgICAgICA8QXV0aExheW91dCAvPlxyXG4gICAgICA8L1Byb3RlY3RlZFJvdXRlPlxyXG4gICAgKSxcclxuICAgIGNoaWxkcmVuOiBbeyBpbmRleDogdHJ1ZSwgZWxlbWVudDogPENoYW5nZVBhc3N3b3JkUGFnZSAvPiB9XSxcclxuICB9LFxyXG5cclxuICB7XHJcbiAgICBwYXRoOiAnL2FkbWluJyxcclxuICAgIGVsZW1lbnQ6IChcclxuICAgICAgPFByb3RlY3RlZFJvdXRlIGFsbG93ZWRSb2xlcz17W1VTRVJfUk9MRVMuQURNSU5dfT5cclxuICAgICAgICA8RGFzaGJvYXJkTGF5b3V0IHRpdGxlPVwiQWRtaW5cIiAvPlxyXG4gICAgICA8L1Byb3RlY3RlZFJvdXRlPlxyXG4gICAgKSxcclxuICAgIGNoaWxkcmVuOiBbXHJcbiAgICAgIHsgaW5kZXg6IHRydWUsIGVsZW1lbnQ6IDxBZG1pbkRhc2hib2FyZFBhZ2UgLz4gfSxcclxuICAgICAgeyBwYXRoOiAndXNlcnMnLCBlbGVtZW50OiA8VXNlck1hbmFnZW1lbnRQYWdlIC8+IH0sXHJcbiAgICAgIC8vIExlZ2FjeSBwYXRoIOKAlCByZWRpcmVjdCB0byB0aGUgcmVuYW1lZCBVc2VyIE1hbmFnZW1lbnQgYXJlYSAocGxhbiBEMTQpLlxyXG4gICAgICB7IHBhdGg6ICdvcmdhbml6ZXJzJywgZWxlbWVudDogPE5hdmlnYXRlIHRvPVwiL2FkbWluL3VzZXJzXCIgcmVwbGFjZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdvcmdhbml6ZXJzLzppZCcsIGVsZW1lbnQ6IDxPcmdhbml6ZXJEZXRhaWxQYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cycsIGVsZW1lbnQ6IDxHbG9iYWxFdmVudHNQYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ3NldHRpbmdzJywgZWxlbWVudDogPFN5c3RlbVNldHRpbmdzUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdhdWRpdC1sb2dzJywgZWxlbWVudDogPEF1ZGl0TG9nc1BhZ2UgLz4gfSxcclxuICAgICAgeyBwYXRoOiAnaGVhbHRoJywgZWxlbWVudDogPEhlYWx0aERhc2hib2FyZFBhZ2UgLz4gfSxcclxuICAgICAgeyBwYXRoOiAnYWxlcnRzJywgZWxlbWVudDogPEFsZXJ0Q29uZmlnUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdhcmNoaXZhbCcsIGVsZW1lbnQ6IDxBcmNoaXZhbFBvbGljeVBhZ2UgLz4gfSxcclxuICAgIF0sXHJcbiAgfSxcclxuICAgIHtcclxuICAgIHBhdGg6ICcvb3JnYW5pemVyJyxcclxuICAgIGVsZW1lbnQ6IChcclxuICAgICAgPFByb3RlY3RlZFJvdXRlIGFsbG93ZWRSb2xlcz17W1VTRVJfUk9MRVMuT1JHQU5JWkVSXX0+XHJcbiAgICAgICAgPERhc2hib2FyZExheW91dCB0aXRsZT1cIk9yZ2FuaXplclwiIC8+XHJcbiAgICAgIDwvUHJvdGVjdGVkUm91dGU+XHJcbiAgICApLFxyXG4gICAgY2hpbGRyZW46IFt7IGluZGV4OiB0cnVlLCBlbGVtZW50OiA8T3JnYW5pemVyRGFzaGJvYXJkUGFnZSAvPiB9XSxcclxuICB9LFxyXG4gIHtcclxuICAgIHBhdGg6ICcvb3JnYW5pemVyL2VsZWN0aW9uJyxcclxuICAgIGVsZW1lbnQ6IChcclxuICAgICAgPFByb3RlY3RlZFJvdXRlIGFsbG93ZWRSb2xlcz17W1VTRVJfUk9MRVMuT1JHQU5JWkVSXX0+XHJcbiAgICAgICAgPEVsZWN0aW9uTGF5b3V0IC8+XHJcbiAgICAgIDwvUHJvdGVjdGVkUm91dGU+XHJcbiAgICApLFxyXG4gICAgY2hpbGRyZW46IFtcclxuICAgICAgeyBpbmRleDogdHJ1ZSwgZWxlbWVudDogPEVsZWN0aW9uRGFzaGJvYXJkUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMnLCBlbGVtZW50OiA8RWxlY3Rpb25FdmVudHNQYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cy9uZXcnLCBlbGVtZW50OiA8RWxlY3Rpb25FdmVudEZvcm1QYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cy86ZXZlbnRJZC9lZGl0JywgZWxlbWVudDogPEVsZWN0aW9uRXZlbnRGb3JtUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMvOmV2ZW50SWQvYnJhbmRpbmcnLCBlbGVtZW50OiA8RWxlY3Rpb25FdmVudEZvcm1QYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cy86ZXZlbnRJZC9wb3NpdGlvbnMnLCBlbGVtZW50OiA8RWxlY3Rpb25Qb3NpdGlvbnNQYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cy86ZXZlbnRJZC9jYW5kaWRhdGVzJywgZWxlbWVudDogPEVsZWN0aW9uQ2FuZGlkYXRlc1BhZ2UgLz4gfSxcclxuICAgICAgeyBwYXRoOiAnZXZlbnRzLzpldmVudElkL3JldmlldycsIGVsZW1lbnQ6IDxFbGVjdGlvblJldmlld1BhZ2UgLz4gfSxcclxuICAgICAgeyBwYXRoOiAnZXZlbnRzLzpldmVudElkL3ZvdGVycycsIGVsZW1lbnQ6IDxFbGVjdGlvblZvdGVyc1BhZ2UgLz4gfSxcclxuICAgICAgeyBwYXRoOiAnZXZlbnRzLzpldmVudElkL2FuYWx5dGljcycsIGVsZW1lbnQ6IDxFbGVjdGlvbkFuYWx5dGljc1BhZ2UgLz4gfSxcclxuICAgICAgeyBwYXRoOiAnZXZlbnRzLzpldmVudElkL3JlcG9ydCcsIGVsZW1lbnQ6IDxFbGVjdGlvblJlcG9ydFBhZ2UgLz4gfSxcclxuICAgIF0sXHJcbiAgfSxcclxuICB7XHJcbiAgICBwYXRoOiAnL29yZ2FuaXplci9jb21wZXRpdGlvbicsXHJcbiAgICBlbGVtZW50OiAoXHJcbiAgICAgIDxQcm90ZWN0ZWRSb3V0ZSBhbGxvd2VkUm9sZXM9e1tVU0VSX1JPTEVTLk9SR0FOSVpFUl19PlxyXG4gICAgICAgIDxQYWdlYW50TGF5b3V0IC8+XHJcbiAgICAgIDwvUHJvdGVjdGVkUm91dGU+XHJcbiAgICApLFxyXG4gICAgY2hpbGRyZW46IFtcclxuICAgICAgeyBpbmRleDogdHJ1ZSwgZWxlbWVudDogPENvbXBldGl0aW9uRGFzaGJvYXJkUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMnLCBlbGVtZW50OiA8Q29tcGV0aXRpb25FdmVudHNQYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cy9uZXcnLCBlbGVtZW50OiA8Q29tcGV0aXRpb25FdmVudEZvcm1QYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cy86ZXZlbnRJZC9lZGl0JywgZWxlbWVudDogPENvbXBldGl0aW9uRXZlbnRGb3JtUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMvOmV2ZW50SWQvYnJhbmRpbmcnLCBlbGVtZW50OiA8Q29tcGV0aXRpb25FdmVudEZvcm1QYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cy86ZXZlbnRJZC93b3Jrc3BhY2UnLCBlbGVtZW50OiA8Q29tcGV0aXRpb25Xb3Jrc3BhY2VQYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cy86ZXZlbnRJZC9jb250ZXN0YW50cycsIGVsZW1lbnQ6IDxDb21wZXRpdGlvbkNvbnRlc3RhbnRzUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMvOmV2ZW50SWQvanVkZ2VzJywgZWxlbWVudDogPENvbXBldGl0aW9uSnVkZ2VzUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMvOmV2ZW50SWQvcmV2aWV3JywgZWxlbWVudDogPENvbXBldGl0aW9uUmV2aWV3UGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMvOmV2ZW50SWQvcmFua2luZ3MnLCBlbGVtZW50OiA8Q29tcGV0aXRpb25SYW5raW5nc1BhZ2UgLz4gfSxcclxuICAgICAgeyBwYXRoOiAnZXZlbnRzLzpldmVudElkL3RhYnVsYXRpb24nLCBlbGVtZW50OiA8Q29tcGV0aXRpb25UYWJ1bGF0aW9uUGFnZSAvPiB9LFxyXG57IHBhdGg6ICdldmVudHMvOmV2ZW50SWQvYW5hbHl0aWNzJywgZWxlbWVudDogPENvbXBldGl0aW9uQW5hbHl0aWNzUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMvOmV2ZW50SWQvcmVwb3J0JywgZWxlbWVudDogPENvbXBldGl0aW9uUmVwb3J0UGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMvOmV2ZW50SWQvbGl2ZScsIGVsZW1lbnQ6IDxDb21wZXRpdGlvbkxpdmVDb250cm9sUGFnZSAvPiB9LFxyXG4gICAgXSxcclxuICB9LFxyXG4gIHtcclxuICAgIHBhdGg6ICcvb3JnYW5pemVyL3BvbGxpbmcnLFxyXG4gICAgZWxlbWVudDogKFxyXG4gICAgICA8UHJvdGVjdGVkUm91dGUgYWxsb3dlZFJvbGVzPXtbVVNFUl9ST0xFUy5PUkdBTklaRVJdfT5cclxuICAgICAgICA8UG9sbGluZ0xheW91dCAvPlxyXG4gICAgICA8L1Byb3RlY3RlZFJvdXRlPlxyXG4gICAgKSxcclxuICAgIGNoaWxkcmVuOiBbXHJcbiAgICAgIHsgaW5kZXg6IHRydWUsIGVsZW1lbnQ6IDxQb2xsaW5nRGFzaGJvYXJkUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMnLCBlbGVtZW50OiA8UG9sbGluZ0V2ZW50c1BhZ2UgLz4gfSxcclxuICAgICAgeyBwYXRoOiAnZXZlbnRzL25ldycsIGVsZW1lbnQ6IDxQb2xsaW5nRXZlbnRGb3JtUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMvOmV2ZW50SWQvZWRpdCcsIGVsZW1lbnQ6IDxQb2xsaW5nRXZlbnRGb3JtUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMvOmV2ZW50SWQvYnJhbmRpbmcnLCBlbGVtZW50OiA8UG9sbGluZ0V2ZW50Rm9ybVBhZ2UgLz4gfSxcclxuICAgICAgeyBwYXRoOiAnZXZlbnRzLzpldmVudElkL3NldHRpbmdzJywgZWxlbWVudDogPFBvbGxpbmdFdmVudEZvcm1QYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cy86ZXZlbnRJZC9idWlsZGVyJywgZWxlbWVudDogPFBvbGxpbmdCdWlsZGVyUGFnZSAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdldmVudHMvOmV2ZW50SWQvcmV2aWV3JywgZWxlbWVudDogPFBvbGxpbmdSZXZpZXdQYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cy86ZXZlbnRJZC9yZXNwb25kZW50cycsIGVsZW1lbnQ6IDxQb2xsaW5nUmVzcG9uZGVudHNQYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2V2ZW50cy86ZXZlbnRJZC9hbmFseXRpY3MnLCBlbGVtZW50OiA8UG9sbGluZ0FuYWx5dGljc1BhZ2UgLz4gfSxcclxuICAgICAgeyBwYXRoOiAnZXZlbnRzLzpldmVudElkL3JlcG9ydCcsIGVsZW1lbnQ6IDxQb2xsaW5nUmVwb3J0UGFnZSAvPiB9LFxyXG4gICAgXSxcclxuICB9LFxyXG4gIHtcclxuICAgIHBhdGg6ICcvb3JnYW5pemVyL3JlcG9ydHMnLFxyXG4gICAgZWxlbWVudDogKFxyXG4gICAgICA8UHJvdGVjdGVkUm91dGUgYWxsb3dlZFJvbGVzPXtbVVNFUl9ST0xFUy5PUkdBTklaRVJdfT5cclxuICAgICAgICA8UmVwb3J0c0xheW91dCAvPlxyXG4gICAgICA8L1Byb3RlY3RlZFJvdXRlPlxyXG4gICAgKSxcclxuICAgIGNoaWxkcmVuOiBbXHJcbiAgICAgIHsgaW5kZXg6IHRydWUsIGVsZW1lbnQ6IDxSZXBvcnRzT3ZlcnZpZXdQYWdlIC8+IH0sXHJcbiAgICAgIHsgcGF0aDogJ2VsZWN0aW9uLzpldmVudElkJywgZWxlbWVudDogPFJlcG9ydFJlZGlyZWN0IG1vZHVsZT1cImVsZWN0aW9uXCIgLz4gfSxcclxuICAgICAgeyBwYXRoOiAnY29tcGV0aXRpb24vOmV2ZW50SWQnLCBlbGVtZW50OiA8UmVwb3J0UmVkaXJlY3QgbW9kdWxlPVwiY29tcGV0aXRpb25cIiAvPiB9LFxyXG4gICAgICB7IHBhdGg6ICdwb2xsaW5nLzpldmVudElkJywgZWxlbWVudDogPFJlcG9ydFJlZGlyZWN0IG1vZHVsZT1cInBvbGxpbmdcIiAvPiB9LFxyXG4gICAgXSxcclxuICB9LFxyXG4gIHtcclxuICAgIHBhdGg6ICcvcGFydGljaXBhbnQnLFxyXG4gICAgZWxlbWVudDogKFxyXG4gICAgICA8UHJvdGVjdGVkUm91dGUgYWxsb3dlZFJvbGVzPXtbVVNFUl9ST0xFUy5QQVJUSUNJUEFOVF19PlxyXG4gICAgICAgIDxEYXNoYm9hcmRMYXlvdXQgdGl0bGU9XCJQYXJ0aWNpcGFudFwiIHNob3dTaWRlYmFyPXtmYWxzZX0gLz5cclxuICAgICAgPC9Qcm90ZWN0ZWRSb3V0ZT5cclxuICAgICksXHJcbiAgICBjaGlsZHJlbjogW3sgaW5kZXg6IHRydWUsIGVsZW1lbnQ6IDxWb3RlckRhc2hib2FyZFBhZ2UgLz4gfV0sXHJcbiAgfSxcclxuICB7XHJcbiAgICBwYXRoOiAnL3BhcnRpY2lwYW50L2V2ZW50cy86ZXZlbnRJZCcsXHJcbiAgICBlbGVtZW50OiAoXHJcbiAgICAgIDxQcm90ZWN0ZWRSb3V0ZSBhbGxvd2VkUm9sZXM9e1tVU0VSX1JPTEVTLlBBUlRJQ0lQQU5UXX0+XHJcbiAgICAgICAgPERhc2hib2FyZExheW91dCB0aXRsZT1cIlZvdGVcIiBzaG93U2lkZWJhcj17ZmFsc2V9IC8+XHJcbiAgICAgIDwvUHJvdGVjdGVkUm91dGU+XHJcbiAgICApLFxyXG4gICAgY2hpbGRyZW46IFt7IGluZGV4OiB0cnVlLCBlbGVtZW50OiA8Vm90ZXJFdmVudFBhZ2UgLz4gfV0sXHJcbiAgfSxcclxuICB7XHJcbiAgICBwYXRoOiAnL3BhcnRpY2lwYW50L3BvbGxpbmcvZXZlbnRzLzpldmVudElkJyxcclxuICAgIGVsZW1lbnQ6IChcclxuICAgICAgPFByb3RlY3RlZFJvdXRlIGFsbG93ZWRSb2xlcz17W1VTRVJfUk9MRVMuUEFSVElDSVBBTlRdfT5cclxuICAgICAgICA8RGFzaGJvYXJkTGF5b3V0IHRpdGxlPVwiUG9sbFwiIHNob3dTaWRlYmFyPXtmYWxzZX0gLz5cclxuICAgICAgPC9Qcm90ZWN0ZWRSb3V0ZT5cclxuICAgICksXHJcbiAgICBjaGlsZHJlbjogW3sgaW5kZXg6IHRydWUsIGVsZW1lbnQ6IDxWb3RlclBvbGxQYWdlIC8+IH1dLFxyXG4gIH0sXHJcbiAge1xyXG4gICAgcGF0aDogJy9wYXJ0aWNpcGFudC9jb21wZXRpdGlvbi9ldmVudHMvOmV2ZW50SWQvc2NvcmUnLFxyXG4gICAgZWxlbWVudDogKFxyXG4gICAgICA8UHJvdGVjdGVkUm91dGUgYWxsb3dlZFJvbGVzPXtbVVNFUl9ST0xFUy5QQVJUSUNJUEFOVF19PlxyXG4gICAgICAgIDxEYXNoYm9hcmRMYXlvdXQgdGl0bGU9XCJKdWRnZSBzY29yaW5nXCIgc2hvd1NpZGViYXI9e2ZhbHNlfSAvPlxyXG4gICAgICA8L1Byb3RlY3RlZFJvdXRlPlxyXG4gICAgKSxcclxuICAgIGNoaWxkcmVuOiBbeyBpbmRleDogdHJ1ZSwgZWxlbWVudDogPEp1ZGdlU2NvcmluZ1BhZ2UgLz4gfV0sXHJcbiAgfSxcclxuICB7IHBhdGg6ICcvdm90ZXIvKicsIGVsZW1lbnQ6IDxMZWdhY3lQYXJ0aWNpcGFudFJlZGlyZWN0IC8+IH0sXHJcbiAgLy8gQ2F0Y2gtYWxsIDQwNFxyXG4gIHtcclxuICAgIHBhdGg6ICcqJyxcclxuICAgIGVsZW1lbnQ6IDxOb3RGb3VuZFBhZ2UgLz4sXHJcbiAgfSxcclxuXVxyXG4iXX0=

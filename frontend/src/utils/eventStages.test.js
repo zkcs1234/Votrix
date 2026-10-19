@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getStageProgressStatus } from './eventStages'
+import { getStageProgressStatus, stagePath } from './eventStages'
 
 describe('getStageProgressStatus', () => {
   it.each(['election', 'competition', 'polling'])(
@@ -41,5 +41,10 @@ describe('getStageProgressStatus', () => {
         completedKeys: ['branding'],
       }),
     ).toBe('Completed')
+  })
+  it.each(['election', 'competition', 'polling'])('uses mounted create routes for %s and requires an ID for saved setup', module => {
+    expect(stagePath(module, 'details', 'new')).toBe(`/organizer/${module}/events/new`)
+    expect(stagePath(module, 'branding', 'new')).toBe(`/organizer/${module}/events/new/branding`)
+    expect(stagePath(module, module === 'competition' ? 'workspace' : module === 'election' ? 'positions' : 'builder', 'new')).toBeNull()
   })
 })

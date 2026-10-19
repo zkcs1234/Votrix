@@ -1,4 +1,10 @@
+import { workflowService } from '@/services/competition-workflow.service'
+import {NativeResultsBoundary} from '@/components/organizer/competition/NativeResultsWorkspace'
 import { useParams } from 'react-router-dom'
+import { useRef, useState } from 'react'
+import Button from '@/components/ui/Button'
+import { getErrorMessage } from '@/utils/getErrorMessage'
+import useCompetitionSync from '@/hooks/useCompetitionSync'
 import {
   AnalyticsSection,
   AnalyticsStatsGrid,
@@ -28,14 +34,21 @@ import {
 } from '@/components/ui/Skeleton'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
-export default function CompetitionReportPage() {
+export default function CompetitionReportPage(){const {eventId}=useParams();return <NativeResultsBoundary eventId={eventId} Legacy={LegacyCompetitionReportPage}/>}
+function LegacyCompetitionReportPage() {
   const { eventId } = useParams()
-  const { report, loading, refresh, lastUpdated } = useModuleAnalytics({
+  const { report, loading, refresh, lastUpdated, error, reportError } = useModuleAnalytics({
     moduleId: 'competition',
     eventId,
-    pollIntervalMs: 15_000,
+    pollIntervalMs: 0,
   })
   const showLoader = useDelayedLoading(loading, 300)
+  const [exportError, setExportError] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const exportBusy = useRef(false)
+  useCompetitionSync(eventId, refresh)
+  const loadError = reportError ?? (!report ? error : null)
+  const numericLabel = value => value == null ? 'Incomplete' : Number(value).toFixed(2)
 
   if (loading && !showLoader) return null
   if (loading || showLoader) {
@@ -47,7 +60,7 @@ export default function CompetitionReportPage() {
       </div>
     )
   }
-  if (!report) return null
+  if (!report) return <div role="alert" className="v-card p-5 space-y-3"><p className="v-error-text">{getErrorMessage(loadError, 'The report is not available yet. Retry loading the saved competition.')}</p><Button variant="secondary" onClick={refresh}>Retry report</Button></div>
 
   const rankings = report.rankings ?? []
   const categoryResults = buildCompetitionCategoryResults(report)
@@ -57,8 +70,17 @@ export default function CompetitionReportPage() {
   const handleExportCsv = () => {
     downloadCsv(`competition-rankings-${eventId}.csv`, buildCompetitionReportCsvRows(report))
   }
-  const handleExportExcel = () => {
-    downloadExcel(`competition-report-${eventId}`, buildCompetitionReportSheets(report))
+  const handleExportExcel = async () => {
+    if (exportBusy.current) return
+    exportBusy.current = true; setExporting(true); setExportError('')
+    try {
+      let data
+      try { ({data}=await workflowService.exportExcel(eventId)) }
+      catch(failure){if(failure.response?.status===409){downloadExcel(`competition-report-${eventId}`,buildCompetitionReportSheets(report));return}throw failure}
+      const url=URL.createObjectURL(data),link=document.createElement('a')
+      link.href=url;link.download=`competition-report-${eventId}.xlsx`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
+    } catch (failure) { setExportError(getErrorMessage(failure, 'Could not download the competition workbook. Retry the export.')) }
+    finally { exportBusy.current = false; setExporting(false) }
   }
   const handleExportJson = () => {
     downloadJson(`competition-report-${eventId}.json`, report)
@@ -87,6 +109,9 @@ export default function CompetitionReportPage() {
         />
       }
     >
+      {loadError && <div role="alert" className="v-card p-4 space-y-2"><p className="v-error-text">{getErrorMessage(loadError, 'Could not refresh the report. Showing the last saved view.')}</p><Button variant="secondary" onClick={refresh}>Retry report</Button></div>}
+      {exporting && <p role="status" className="v-caption">Preparing workbook…</p>}
+      {exportError && <p role="alert" className="v-error-text">{exportError}</p>}
       <TurnoutReport
         title="Judge scoring turnout"
         stats={report.judgeTurnout}
@@ -103,7 +128,7 @@ export default function CompetitionReportPage() {
         <RankingList
           items={contestantPerformance}
           emptyMessage="No rankings yet."
-          valueFormatter={(v) => Number(v ?? 0).toFixed(2)}
+          valueFormatter={(v) => report.tabulationMethod==='manual'?'Manual official decision':numericLabel(v)}
           metaFormatter={(meta) => meta}
         />
       </AnalyticsSection>
@@ -134,7 +159,7 @@ export default function CompetitionReportPage() {
                           #{standing.contestantNumber} {standing.contestantName}
                         </td>
                         <td className="px-3 py-3 text-right text-v-text-muted">
-                          {Number(standing.score ?? 0).toFixed(2)}
+                          {report.tabulationMethod === 'manual' ? 'Manual official decision' : numericLabel(standing.score)}
                         </td>
                         <td className="px-3 py-3 text-right text-v-text-muted">
                           {standing.qualified === undefined ? '—' : standing.qualified ? 'Yes' : 'No'}
@@ -173,7 +198,7 @@ export default function CompetitionReportPage() {
                         : '—'}
                     </td>
                     <td className="px-3 py-3 text-right text-v-text-muted">
-                      {division.winner ? Number(division.winner.finalScore ?? 0).toFixed(2) : '—'}
+                      {division.winner ? report.tabulationMethod === 'manual' ? 'Manual official decision' : numericLabel(division.winner.finalScore) : '—'}
                     </td>
                   </tr>
                 ))}
@@ -216,7 +241,7 @@ export default function CompetitionReportPage() {
             showRank={false}
             variant="compact"
             emptyMessage="No round data."
-            valueFormatter={(v) => v ?? 0}
+            valueFormatter={(v) => v == null ? 'Incomplete' : v}
           />
         </AnalyticsSection>
       )}

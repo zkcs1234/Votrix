@@ -1,0 +1,26 @@
+from pathlib import Path
+
+p = Path('frontend/src/pages/organizer/competition/CompetitionWorkspacePage.test.jsx')
+s = p.read_text(encoding='utf-8')
+s = s.replace('What is the name of this round?', 'Round name')
+s = s.replace("fireEvent.click(screen.getByRole('radio', { name: /^Combine with other rounds/ }))", "fireEvent.change(screen.getByLabelText('How are scores used?'), { target: { value: 'weighted' } })")
+s = s.replace("fireEvent.click(screen.getByRole('radio', { name: /^Select qualifiers/ }))", "fireEvent.change(screen.getByLabelText('Round purpose'), { target: { value: 'qualification' } })")
+s = s.replace("fireEvent.click(screen.getByRole('radio', { name: /^Determine final winners/ }))", "fireEvent.change(screen.getByLabelText('Round purpose'), { target: { value: 'final' } })")
+s = s.replace("name: 'Configure Scoring Criteria'", "name: /^Configure criteria for/ ")
+s = s.replace("getByText('Scoring Round · Independent scoring')", "getByText('Independent · 0 criteria')")
+s = s.replace("expect(screen.getByRole('button', { name: 'Create Another Round' })).toBeInTheDocument()", "expect(screen.getByRole('form', { name: 'Create Round' })).toBeInTheDocument()")
+s = s.replace("name: 'More Settings'", "name: /^Settings for/ ")
+s = s.replace("name: 'Configure advancement'", "name: 'Advancement & Elimination'")
+s = s.replace("name: 'Configure progression'", "name: 'Next Round / Back to Zero'")
+s = s.replace("name: 'Configure penalties'", "name: 'Deductions & Penalties'")
+s = s.replace('/Disabled. Define permitted deductions/', '/Disabled until permitted rules/')
+s = s.replace("getByText('Special Award Round · Independent award scoring')", "getByText('Independent award · 0 criteria')")
+s = s.replace("fireEvent.click(screen.getByRole('button', { name: 'Edit Round' }))", "openActions('Edit')")
+s = s.replace("expect(screen.getByRole('button', { name: 'Edit Round' })).toBeDisabled()\n  expect(screen.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled()", "expect(screen.getByRole('button', { name: /^More actions for/ })).toBeDisabled()")
+s = s.replace("name: 'Open Live Control'", "name: 'Stage Lineup & Live Scoring'")
+s = s.replace("fireEvent.click(within(second).getByRole('button', { name: /^Settings for/  }))", "openActions('Reorder', second)")
+s = s.replace("fireEvent.click(within(second).getByRole('button', { name: 'Delete', exact: true }))", "fireEvent.click(screen.getByRole('button', { name: 'Done' }))\n  openActions('Delete', second)")
+marker = '\nfunction selectCombined(weight) {'
+assert s.count(marker) == 1
+s = s.replace(marker, "\nfunction openActions(action, card = null) {\n  fireEvent.click((card ? within(card) : screen).getByRole('button', { name: /^More actions for/ }))\n  fireEvent.click(screen.getByRole('menuitem', { name: action, exact: true }))\n}\nfunction selectCombined(weight) {", 1)
+p.write_text(s, encoding='utf-8')

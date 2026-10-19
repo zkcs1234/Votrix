@@ -1,0 +1,138 @@
+{
+  "error": "Timeout location.pathname.startsWith('/organizer')||location.pathname.startsWith('/participant') / VOTRIX\n\nEVERY VOTE COUNTS\n\nSign in to VOTRIX\n\nEnter your email and password to access your account.\n\nEmail\nPassword\nRemember me\nForgot password?\n\nToo many login attempts. Please try again later.\n\nSign in",
+  "scenarios": [],
+  "network": [
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/notifications/unread-count",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/organizer/analytics",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/organizer/analytics",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/organizer/dashboard",
+      "status": 200
+    },
+    {
+      "session": "518C4B6A97D496577F7FD5852202A806",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "518C4B6A97D496577F7FD5852202A806",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "518C4B6A97D496577F7FD5852202A806",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "518C4B6A97D496577F7FD5852202A806",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/organizer/dashboard",
+      "status": 200
+    },
+    {
+      "session": "518C4B6A97D496577F7FD5852202A806",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "518C4B6A97D496577F7FD5852202A806",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/organizer/election/events",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/organizer/competition/events",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/organizer/polling/events",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/organizer/election/events",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/organizer/competition/events",
+      "status": 200
+    },
+    {
+      "session": "6CDEF6FC71B68B82CEF0CFB9B2149053",
+      "path": "/api/organizer/polling/events",
+      "status": 200
+    },
+    {
+      "session": "518C4B6A97D496577F7FD5852202A806",
+      "path": "/api/auth/login",
+      "status": 429
+    }
+  ],
+  "database": "votrix_dev_1791952165826",
+  "productionTouched": false
+}

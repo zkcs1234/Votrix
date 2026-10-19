@@ -1,0 +1,71 @@
+{
+  "backend": {
+    "SUPABASE_URL": {
+      "present": true,
+      "placeholder": false
+    },
+    "SUPABASE_SERVICE_ROLE_KEY": {
+      "present": true,
+      "placeholder": false
+    },
+    "JWT_ACCESS_SECRET": {
+      "present": true,
+      "placeholder": false
+    },
+    "JWT_REFRESH_SECRET": {
+      "present": true,
+      "placeholder": false
+    },
+    "CSRF_SECRET": {
+      "present": true,
+      "placeholder": false
+    },
+    "RESEND_API_KEY": {
+      "present": true,
+      "placeholder": false
+    },
+    "CLOUDINARY_CLOUD_NAME": {
+      "present": true,
+      "placeholder": false
+    },
+    "CLOUDINARY_API_KEY": {
+      "present": true,
+      "placeholder": false
+    },
+    "CLOUDINARY_API_SECRET": {
+      "present": true,
+      "placeholder": false
+    },
+    "FRONTEND_URL": {
+      "present": false,
+      "placeholder": false
+    },
+    "CLIENT_URL": {
+      "present": true,
+      "placeholder": false
+    },
+    "VITE_API_URL": {
+      "present": false,
+      "placeholder": false
+    },
+    "VITE_WS_URL": {
+      "present": false,
+      "placeholder": false
+    },
+    "NODE_ENV": {
+      "value": "development"
+    },
+    "LOCK_PARTICIPANTS_ON_ACTIVE": {
+      "value": "false"
+    }
+  },
+  "frontend": {
+    "VITE_API_URL": {
+      "present": true,
+      "placeholder": false
+    },
+    "VITE_LOCK_PARTICIPANTS_ON_ACTIVE": {
+      "value": "false"
+    }
+  }
+}

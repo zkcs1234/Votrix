@@ -91,3 +91,6 @@ ehthumbs.db
 # This folder is intentionally excluded from production pushes.
 # ───────────────────────────────────────────────────────────────
 archive/
+
+# Isolated native development cluster, binaries and synthetic credentials.
+.tmp/votrix-native-dev/

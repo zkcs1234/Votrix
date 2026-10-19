@@ -1,0 +1,128 @@
+export const EVENT_STAGES = {
+  election: [
+    { key: 'details', label: 'Details', path: 'edit' },
+    { key: 'branding', label: 'Branding', path: 'branding' },
+    { key: 'positions', label: 'Positions', path: 'positions' },
+    { key: 'candidates', label: 'Candidates', path: 'candidates' },
+    { key: 'voters', label: 'Voters', path: 'voters' },
+    // Publishing is the final setup gate. Setup locks on publish; the voter
+    // roster is completed before this stage and locks once voting is active.
+    { key: 'review', label: 'Review & Publish', path: 'review' },
+    { key: 'analytics', label: 'Analytics', path: 'analytics' },
+    { key: 'report', label: 'Report', path: 'report' },
+  ],
+  // Order mirrors the regrouped sidebar (Setup → Run → Results) so the stepper
+  // and its footer next/prev walk the same round-first workflow.
+  competition: [
+    // Create
+    { key: 'details', label: 'Details', path: 'edit' },
+    { key: 'branding', label: 'Branding', path: 'branding' },
+    // Setup — Structure & Scoring holds rounds, criteria (with minor criteria +
+    // score types), divisions and scoring rules; Contestants are added then
+    // assigned to rounds on their own page; Judges are added + assigned.
+    { key: 'workspace', label: 'Structure & Scoring', path: 'workspace' },
+    { key: 'contestants', label: 'Contestants', path: 'contestants' },
+    { key: 'judges', label: 'Judges', path: 'judges' },
+    // Publishing happens here, before scoring goes live. Setup (structure,
+    // contestants) locks on publish; Judges stays editable through `scheduled`.
+    { key: 'review', label: 'Review & Publish', path: 'review' },
+    // Run
+    { key: 'live', label: 'Live Control', path: 'live' },
+    // Results
+    { key: 'tabulation', label: 'Tabulation', path: 'tabulation' },
+    { key: 'rankings', label: 'Rankings', path: 'rankings' },
+    { key: 'analytics', label: 'Analytics', path: 'analytics' },
+    { key: 'report', label: 'Report', path: 'report' },
+  ],
+  polling: [
+    { key: 'details', label: 'Details', path: 'edit' },
+    { key: 'branding', label: 'Branding', path: 'branding' },
+    { key: 'settings', label: 'Settings', path: 'settings' },
+    { key: 'builder', label: 'Builder', path: 'builder' },
+    { key: 'respondents', label: 'Respondents', path: 'respondents' },
+    // Publishing is the final setup gate. Setup locks on publish; the
+    // respondent roster is completed before this stage.
+    { key: 'review', label: 'Review & Publish', path: 'review' },
+    { key: 'analytics', label: 'Analytics', path: 'analytics' },
+    { key: 'report', label: 'Report', path: 'report' },
+  ],
+}
+
+export const MODULE_BASE_PATH = {
+  election: '/organizer/election/events',
+  competition: '/organizer/competition/events',
+  polling: '/organizer/polling/events',
+}
+
+const SETUP_STAGE_KEYS = {
+  election: new Set(['details', 'branding', 'positions', 'candidates', 'voters', 'review']),
+  competition: new Set(['details', 'branding', 'workspace', 'contestants', 'judges', 'review']),
+  polling: new Set(['details', 'branding', 'settings', 'builder', 'respondents', 'review']),
+}
+
+export function getStageProgressStatus(
+  module,
+  stageKey,
+  { currentKey, completedKeys = [], eventStatus, readOnly = false } = {},
+) {
+  if (stageKey === currentKey) return readOnly ? 'Viewing' : 'Current stage'
+  if (completedKeys.includes(stageKey)) return 'Completed'
+
+  const isPublished = eventStatus != null && eventStatus !== 'draft'
+  if (isPublished && SETUP_STAGE_KEYS[module]?.has(stageKey)) return 'Completed'
+  if (isPublished) return 'Available'
+
+  return 'Not started'
+}
+
+export function stagePath(module, stageKey, eventId) {
+  const base = MODULE_BASE_PATH[module]
+  if (!base) return null
+  const stages = EVENT_STAGES[module] ?? []
+  const stage = stages.find((s) => s.key === stageKey)
+  if (!stage) return null
+  if (stage.path === null) return null
+  if (eventId === 'new') {
+    const persisted = stages.find((s) => s.path !== null && s.path !== 'edit')
+    return `${base}/new/${persisted?.path ?? stage.path}`
+  }
+  return `${base}/${eventId}/${stage.path}`
+}
+
+export function getStageIndex(module, stageKey) {
+  return (EVENT_STAGES[module] ?? []).findIndex((s) => s.key === stageKey)
+}
+
+/**
+ * Derive the current stage key from a URL pathname.
+ * Matches the `path` property of each stage definition.
+ * Returns null if no stage matches.
+ */
+export function stageKeyFromPath(module, pathname) {
+  const stages = EVENT_STAGES[module] ?? []
+  for (const stage of stages) {
+    if (!stage.path) continue
+    if (pathname.includes(`/${stage.path}`)) {
+      return stage.key
+    }
+  }
+  // Fallback to checking if this is a "new" route
+  if (pathname.endsWith('/new')) {
+    return 'details'
+  }
+  return null
+}
+
+export function getNextStage(module, stageKey) {
+  const stages = EVENT_STAGES[module] ?? []
+  const idx = stages.findIndex((s) => s.key === stageKey)
+  if (idx === -1 || idx + 1 >= stages.length) return null
+  return stages[idx + 1]
+}
+
+export function getPrevStage(module, stageKey) {
+  const stages = EVENT_STAGES[module] ?? []
+  const idx = stages.findIndex((s) => s.key === stageKey)
+  if (idx <= 0) return null
+  return stages[idx - 1]
+}

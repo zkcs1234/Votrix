@@ -1,0 +1,17 @@
+import {readFileSync,writeFileSync} from 'node:fs'
+let original=readFileSync('backend/scripts/test-competition-phase9-browser-extended.mjs','utf8'),s=original.slice(0,original.indexOf(' const dashboard='))
+s=s.replace("title='Browser acceptance fixture'","title='Capacity fixture'").replaceAll('browser-integration.json','capacity.json')
+s+=`
+ const live=await tab(owner,'live'),sheet=await tab(judge,'judge');await wait(sheet,\`document.querySelectorAll('tr[data-contestant-id]').length===50\`)
+ const initial=await evaluate(sheet,\`({rows:document.querySelectorAll('tr[data-contestant-id]').length,targets:document.querySelectorAll('input[type="number"]').length,locked:document.querySelectorAll('[data-complete="true"]').length,enabled:document.querySelectorAll('input[type="number"]:not(:disabled)').length})\`);assert.equal(initial.targets,600);assert.equal(initial.enabled,0);assert.equal(initial.locked,50)
+ await evaluate(live,\`(()=>{const n=[...document.querySelectorAll('label')].find(l=>l.textContent.trim().startsWith('Reason')).querySelector('input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,'Large roster authorized correction');n.dispatchEvent(new Event('input',{bubbles:true}));const select=document.querySelector('select:not([aria-label])');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(select,\${JSON.stringify(judge)});select.dispatchEvent(new Event('change',{bubbles:true}))})()\`)
+ const historyBefore=array('competition_child_submissions').length;await click(live,'Confirm audited reopen');await wait(sheet,\`document.body.innerText.includes('paused')\`);await click(live,'Resume');await wait(sheet,\`document.querySelectorAll('input[type="number"]:not(:disabled)').length===600\`)
+ const started=performance.now();await evaluate(sheet,\`(()=>{const n=document.querySelector('input[type="number"]:not(:disabled)');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,'86');n.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('.v-judge-table-wrapper')?.scrollTo({top:2000,left:1000});})()\`);await click(sheet,'Lock');await wait(sheet,\`document.body.innerText.includes('Locked')\`)
+ assert.equal(array('competition_child_submissions').length,historyBefore);assert.equal(array('competition_child_submission_heads',\`judge_id='\${judge}'\`).length,0)
+ const locked=array('competition_child_score_drafts',\`judge_id='\${judge}' AND locked\`);assert.equal(locked.length,1);assert.ok(Object.values(locked[0].scores).includes(86));scenarios.push('Actual 50-entrant/600-input judge table renders locked sources, audited correction opens all targets, first draft and major lock persist without rebuilding submission completion')
+ const screenshot=await call('Page.captureScreenshot',{format:'png'},sheet);writeFileSync(path.join(out,'browser-large-roster.png'),Buffer.from(screenshot.data,'base64'))
+ assert.deepEqual(JSON.parse(sql(\`BEGIN TRANSACTION READ ONLY;\${catalog}ROLLBACK;\`,template)),source)
+ writeFileSync(path.join(out,'browser-large-roster.json'),JSON.stringify({passed:true,database,scenarios,initial,firstEditLockMilliseconds:performance.now()-started,requestCount:requests.length,fullRosterHttpAutosave:false,hosted:false,syntheticJwtIssuance:true,localPostgrestAdapter:true},null,2));console.log('PASS actual large-roster judge table and correction/edit/lock')
+`
+s+=original.slice(original.indexOf('}finally{'))
+writeFileSync('backend/scripts/test-competition-phase9-browser-large-roster.mjs',s,{flag:'wx'})

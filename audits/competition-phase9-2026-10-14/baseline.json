@@ -1,0 +1,264 @@
+{
+  "capturedAt": "2026-10-14T00:08:37.470Z",
+  "files": 772,
+  "documents": {
+    "audits/competition-phase1-2026-10-13/PHASE_1.md": {
+      "sha256": "58976568301adc49291bb76344c95c24e8e8f2c671c8491e03205a92a77f6248",
+      "characters": 16869,
+      "headings": [
+        "# Phase 1 — Legacy Compatibility and Database Migration Preflight",
+        "## Scope and result",
+        "## Files added",
+        "## Database observations",
+        "### Configured Supabase database",
+        "### Existing local PostgreSQL test database",
+        "## Migration compatibility and dependency order",
+        "## Historical calculation compatibility contract",
+        "## Future legacy-to-child-competition mapping",
+        "## Verification",
+        "## Running the inspection",
+        "## Remaining risks and next phase"
+      ]
+    },
+    "audits/competition-phase2-2026-10-13/PHASE_2.md": {
+      "sha256": "e6e83487685241d252dfdd1113e13e6615542b8cba9e1f1e77460dadc790a70d",
+      "characters": 18244,
+      "headings": [
+        "# Phase 2 — Child Competition Identity and Explicit Entry Participation",
+        "## A. Implementation summary",
+        "## B. Files changed",
+        "### Added",
+        "### Modified",
+        "## C. Database changes",
+        "### Child competition",
+        "### Participation",
+        "### Legacy provenance",
+        "### Transactional operations and access",
+        "## D. Legacy mapping",
+        "## New API contracts",
+        "## E. Tests and verification",
+        "### Backend",
+        "### Frontend",
+        "### Actual PostgreSQL",
+        "## F. Database safety and rollback",
+        "## G. Remaining risks and limitations",
+        "## H. Phase 3 dependencies"
+      ]
+    },
+    "audits/competition-phase3-2026-10-13/PHASE_3.md": {
+      "sha256": "fc20ca389279965281499e3354bcc4a3fdc852b3b54ebd41552f0c2b332b36ca",
+      "characters": 18912,
+      "headings": [
+        "# Phase 3 — Competition-Scoped Configuration, Rules, Permissions and Revisions",
+        "## A. Implementation summary",
+        "## B. Files changed",
+        "### Added",
+        "### Modified",
+        "## C. Database migration and relationships",
+        "## D. Configuration, freezing and revision behavior",
+        "### Configuration contract",
+        "### Revisions",
+        "## E. Judge assignment and permission behavior",
+        "## API surface",
+        "## F. Legacy compatibility and preservation",
+        "## G. PostgreSQL integration results",
+        "## H. Backend/frontend verification",
+        "## I. Safety, remaining risks and deployment blockers",
+        "## J. Phase 4 dependencies"
+      ]
+    },
+    "audits/competition-phase4-2026-10-13/PHASE_4.md": {
+      "sha256": "c7029412e6b8e2e88b9b9219f2af0204fe29329efdfe6f51f8c1e8d788ab4641",
+      "characters": 19024,
+      "headings": [
+        "# Phase 4 — Competition-Scoped Judge Scoring and Live Control",
+        "## A. Implementation summary",
+        "## B. Files changed",
+        "## C. Database migrations and relationships",
+        "## D. Judge scoring and Live Control behavior",
+        "## E. Real-time synchronization design",
+        "## F. Authorization and integrity controls",
+        "## G. Actual PostgreSQL integration results",
+        "## H. Backend/frontend test results",
+        "## I. Historical compatibility and production deployment status",
+        "## J. Remaining risks and Phase 5 dependencies"
+      ]
+    },
+    "audits/competition-phase5-2026-10-13/PHASE_5.md": {
+      "sha256": "24fea94ba1807ec94e4e7d610d50133f00aa748023565eef9815c0034d573591",
+      "characters": 21805,
+      "headings": [
+        "# Phase 5 — Competition-Scoped Official Tabulation, Verification and Qualification",
+        "## A. Implementation summary",
+        "## B. Files changed",
+        "## C. Database migrations and relationships",
+        "## D. Judge worksheet visibility rules",
+        "## E. Calculation methods and deduction behavior",
+        "## F. Verification and finalization workflow",
+        "## G. Qualification and carry-forward behavior",
+        "## H. Actual PostgreSQL integration results",
+        "## I. Backend/frontend verification",
+        "## J. Historical preservation and production deployment status",
+        "## K. Remaining risks and Phase 6 dependencies"
+      ]
+    },
+    "audits/competition-phase6-2026-10-13/PHASE_6.md": {
+      "sha256": "e1750681e94df87195f06d15bcab19ec222c9b7d9f33129630050a0bf69daa05",
+      "characters": 20802,
+      "headings": [
+        "# Phase 6 — Official Results, Controlled Publication, Analytics and CSV",
+        "## A. Implementation summary",
+        "## B. Files changed",
+        "## C. Database migrations and relationships",
+        "## D. Official Results behavior",
+        "## E. Publication workflow and privacy",
+        "## F. Analytics implementation",
+        "## G. CSV formats and evidence",
+        "## H. Real-time synchronization",
+        "## I. PostgreSQL integration results",
+        "## J. Backend/frontend results",
+        "## K. Historical compatibility and deployment status",
+        "## L. Remaining risks and Phase 7 dependencies"
+      ]
+    },
+    "audits/competition-phase7-2026-10-13/PHASE_7.md": {
+      "sha256": "5d63ab547919596f811d9ee1b965f7f0c429ccfa79b2efa4da6ea2754d70d909",
+      "characters": 30151,
+      "headings": [
+        "# Phase 7 — Deployment Readiness, Integration, Security and Recovery",
+        "## A. Architecture and integration audit",
+        "## B. Files changed",
+        "## C. Complete workflow results",
+        "## D. Deployed catalog comparison",
+        "## E. Migration readiness",
+        "## F. Backup and restore",
+        "## G. Multi-instance delivery",
+        "## H. Security and privacy",
+        "## I. UI findings",
+        "## J. Measured performance",
+        "## K. Flags and rollback",
+        "## L. Final verification status",
+        "## M. Remaining blockers by severity",
+        "## N. Exact remediation requirements",
+        "## O. Release recommendation"
+      ]
+    },
+    "audits/competition-phase8-2026-10-14/PHASE_8.md": {
+      "sha256": "d4f66b16b8f35f854db17beb5ecf2de5c00bd97def20b6766ec19dffa84a2719",
+      "characters": 19651,
+      "headings": [
+        "# Phase 8 — Local Remediation, Integration Hardening and Release Preparation",
+        "## A. Phase 7 findings addressed",
+        "## B. Exact files changed",
+        "## C. Judge dashboard",
+        "## D. Rate policy and measured acceptance",
+        "## E. Shared hints",
+        "## F. Browser integration",
+        "## G. Setup UX",
+        "## H. Capacity and exports",
+        "## I. Database and recovery",
+        "## J. Security and preservation",
+        "## K. Verification",
+        "## L. Remaining blockers",
+        "## M. Release recommendation"
+      ]
+    },
+    "audits/competition-phase8-2026-10-14/RELEASE_REQUIREMENTS.md": {
+      "sha256": "081f1ebbd367b89c92bbab42607aa2a6676990516a15839825dcb3f82484b44d"
+    },
+    "audits/competition-phase7-2026-10-13/DEPLOYMENT_REQUIREMENTS.md": {
+      "sha256": "8f663f8e539a12c22518b08f2b43c26d0c04882f89b19a9b1488c3f8f0f8328d"
+    },
+    "audits/competition-phase7-2026-10-13/RECOVERY_RUNBOOK.md": {
+      "sha256": "c996eb4b25de8f2e245f6713d62bd7d244ab941d34b298e0265c2a75be5187e2"
+    }
+  },
+  "migrations": [
+    {
+      "file": "backend/src/database/migrations/100_competition_atomic_integrity.sql",
+      "sha256": "bbc40a2291a22de052ac9118d83a5e5d863237e9812d114227c5317add07e9c4",
+      "bytes": 17087
+    },
+    {
+      "file": "backend/src/database/migrations/101_competition_private_access.sql",
+      "sha256": "3cd96fbc44efd2322707956a97c31668add32d13285224efdd361a24971ea892",
+      "bytes": 2005
+    },
+    {
+      "file": "backend/src/database/migrations/102_competition_creation_idempotency.sql",
+      "sha256": "0baf3cdbd4c06fc6df6de3e825c2868766c1fa08294334dbf7269e98538e745c",
+      "bytes": 3348
+    },
+    {
+      "file": "backend/src/database/migrations/103_competition_child_identity.sql",
+      "sha256": "4c236303ac34287f968667db953c66ea34ab9d63f1124ad491ba77ced44c874d",
+      "bytes": 11360
+    },
+    {
+      "file": "backend/src/database/migrations/104_competition_scoped_rules.sql",
+      "sha256": "f45c91b094f3025297f2030c4ac351f1e37b0db8808721b47ee80e89657c52db",
+      "bytes": 35659
+    },
+    {
+      "file": "backend/src/database/migrations/105_competition_scoped_scoring.sql",
+      "sha256": "bea487c104be99b322a71de235c7d6d89d57f2599baa6a0aa84938d675f34ac9",
+      "bytes": 27342
+    },
+    {
+      "file": "backend/src/database/migrations/106_competition_scoped_tabulation.sql",
+      "sha256": "6eafe2468c43ce44d123c53b4aef1d74b291dc73cedac410f58a8aa3a88518ff",
+      "bytes": 48972
+    },
+    {
+      "file": "backend/src/database/migrations/107_competition_scoped_results.sql",
+      "sha256": "b5e5802e936f8c759546fba3d9fa0accf131a0d7ad07b4dd3cbde778ecc178e2",
+      "bytes": 17288
+    },
+    {
+      "file": "backend/src/database/migrations/108_competition_navigation_draft_tools.sql",
+      "sha256": "bdbcf6e432a22caef8488b14b69a83ebd40b27340d0dfbbd66ada3caf2594805",
+      "bytes": 4147
+    }
+  ],
+  "flagIdentifiers": [
+    "COMPETITION_CAPACITY",
+    "COMPETITION_CATEGORIES",
+    "COMPETITION_CHILD_CONTEXTS_ENABLED",
+    "COMPETITION_CRITERION",
+    "COMPETITION_DASHBOARD_KEY",
+    "COMPETITION_DEDUCTION_CRITERION",
+    "COMPETITION_DIVISIONS",
+    "COMPETITION_EVENTS",
+    "COMPETITION_EVENT_REQUIRED",
+    "COMPETITION_FLEXIBLE_ARCHITECTURE_PLAN",
+    "COMPETITION_HINT_BROKER_BIND",
+    "COMPETITION_HINT_BROKER_PORT",
+    "COMPETITION_HINT_BROKER_SECRET",
+    "COMPETITION_HINT_BROKER_URL",
+    "COMPETITION_JUDGE",
+    "COMPETITION_JUDGES",
+    "COMPETITION_JUDGE_ASSIGNMENTS",
+    "COMPETITION_JUDGE_MEMBERSHIP",
+    "COMPETITION_NATIVE_RATE_POLICY_ENABLED",
+    "COMPETITION_NATIVE_RESULTS_ENABLED",
+    "COMPETITION_NATIVE_SCORING_ENABLED",
+    "COMPETITION_NATIVE_SETUP_ENABLED",
+    "COMPETITION_NATIVE_TABULATION_ENABLED",
+    "COMPETITION_REQUIRED",
+    "COMPETITION_ROUNDS",
+    "COMPETITION_ROUND_CONTESTANTS",
+    "COMPETITION_ROUND_CRITERIA",
+    "COMPETITION_ROUND_ENTRY",
+    "COMPETITION_ROUND_RESULTS",
+    "COMPETITION_SCORING",
+    "COMPETITION_SCORING_EVENT_TYPES",
+    "COMPETITION_TABLES",
+    "COMPETITION_TYPES",
+    "VITE_COMPETITION_NATIVE_RESULTS_ENABLED",
+    "VITE_COMPETITION_NATIVE_SCORING_ENABLED",
+    "VITE_COMPETITION_NATIVE_SETUP_ENABLED",
+    "VITE_COMPETITION_NATIVE_TABULATION_ENABLED"
+  ],
+  "release": "NO-GO",
+  "productionAccessUnconfirmed": true
+}

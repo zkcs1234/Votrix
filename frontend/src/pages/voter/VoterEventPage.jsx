@@ -272,6 +272,13 @@ export default function VoterEventPage() {
     return <BallotSubmittedScreen ballot={ballot} eventId={eventId} />
   }
 
+  if (ballot && !ballot.sections?.length) {
+    return <div className="v-card-md text-center">
+      <p className="v-body-text">No eligible election groups are available for you in this event.</p>
+      <Link to="/participant" className="v-btn-tertiary mt-4 inline-block">Back to dashboard</Link>
+    </div>
+  }
+
   if (!ballot?.votingOpen) {
     return (
       <div className="mx-auto max-w-lg v-card-md text-center">

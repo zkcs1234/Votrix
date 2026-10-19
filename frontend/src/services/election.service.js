@@ -34,6 +34,14 @@ export const electionService = {
     return api.get(`${base}/events/${eventId}/sections`)
   },
 
+  getGroupEligibility(eventId, groupId) {
+    return api.get(`${base}/events/${eventId}/sections/${groupId}/eligibility`)
+  },
+
+  setGroupEligibility(eventId, groupId, payload) {
+    return api.put(`${base}/events/${eventId}/sections/${groupId}/eligibility`, payload)
+  },
+
   createBallotSection(eventId, payload) {
     return api.post(`${base}/events/${eventId}/sections`, payload)
   },

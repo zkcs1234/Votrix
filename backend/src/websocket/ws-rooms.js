@@ -31,3 +31,4 @@ export function broadcast(roomName, payload) {
 export function getRoomSize(roomName) {
   return rooms.get(roomName)?.size ?? 0
 }
+export function reconcileNativeUserRooms(){for(const room of rooms.keys())if(room.startsWith('user:'))broadcast(room,{type:'competition:native-transport-recovered',data:{},ts:Date.now()})}

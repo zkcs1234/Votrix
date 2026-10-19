@@ -1,0 +1,9 @@
+{
+  "database": "votrix_dev_1791952165826",
+  "verified": true,
+  "migration": "109_competition_full_foundation_compatibility.sql",
+  "sha256": "b60ac64eb4862fda6518d3ade280a41d04bac4f1aa6c08cc9080ac2679f2b744",
+  "localOnlyEnumAddition": "event_status.archived",
+  "rowUpdates": false,
+  "productionTouched": false
+}

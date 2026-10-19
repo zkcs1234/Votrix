@@ -56,6 +56,16 @@ export const listBallotSections = asyncHandler(async (req, res) => {
   res.json({ success: true, sections })
 })
 
+export const getGroupEligibility = asyncHandler(async (req, res) => {
+  const eligibility = await electionService.getElectionGroupEligibility(req.params.eventId, req.user.id, req.params.sectionId)
+  res.json({ success: true, eligibility })
+})
+
+export const setGroupEligibility = asyncHandler(async (req, res) => {
+  const eligibility = await electionService.setElectionGroupEligibility(req.params.eventId, req.user.id, req.params.sectionId, req.body)
+  res.json({ success: true, eligibility })
+})
+
 export const createBallotSection = asyncHandler(async (req, res) => {
   const payload = validateElectionBallotSection(req.body)
   const section = await electionService.createElectionBallotSection(

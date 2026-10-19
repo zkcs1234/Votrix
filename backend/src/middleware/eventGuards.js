@@ -29,6 +29,12 @@ function isExemptPath(originalUrl) {
   return EVENT_DUPLICATE_RE.test(path) || path.includes('/session/')
 }
 
+function isCompetitionResultOperation(req, event) {
+  if (!['pageant', 'competition_scoring'].includes(event?.event_type) || event.status !== EVENT_STATUS.COMPLETED) return false
+  const path = (req.originalUrl || '').split('?')[0]
+  return /\/events\/[^/]+\/(tabulation|deductions|workflow)(\/|$)/.test(path) || /\/events\/[^/]+\/competitions\/[^/]+\/(tabulation|results)(\/|$)/.test(path)
+}
+
 /**
  * Blocks mutating requests (POST/PATCH/PUT/DELETE) on an event whose status is
  * completed or cancelled. Mount on event-scoped organizer routers with a path
@@ -50,7 +56,7 @@ export async function requireEditableEvent(req, _res, next) {
       )
     }
 
-    if (isExemptPath(req.originalUrl)) return next()
+    if (isExemptPath(req.originalUrl) || isCompetitionResultOperation(req, event)) return next()
 
     if (
       event &&

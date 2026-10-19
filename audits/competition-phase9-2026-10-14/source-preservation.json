@@ -1,0 +1,27 @@
+{
+  "checked": 772,
+  "changed": [
+    "backend/src/websocket/competition-hint-transport.js",
+    "backend/__tests__/modules/competition-hint-transport.test.js"
+  ],
+  "added": [
+    "backend/scripts/competition-phase9-inventory.mjs",
+    "backend/scripts/phase9-local-db.mjs",
+    "backend/scripts/phase9-postgrest-fixture.mjs",
+    "backend/scripts/test-competition-phase9-browser-carry.mjs",
+    "backend/scripts/test-competition-phase9-browser-extended.mjs",
+    "backend/scripts/test-competition-phase9-browser-large-roster.mjs",
+    "backend/scripts/test-competition-phase9-browser-methods.mjs",
+    "backend/scripts/test-competition-phase9-browser-suite.mjs",
+    "backend/scripts/test-competition-phase9-browser.mjs",
+    "backend/scripts/test-competition-phase9-capacity.mjs",
+    "backend/scripts/test-competition-phase9-database.mjs",
+    "backend/scripts/test-competition-phase9-export-memory.mjs",
+    "backend/scripts/test-competition-phase9-integrations.mjs",
+    "backend/scripts/test-competition-phase9-recovery.mjs",
+    "backend/scripts/test-competition-phase9-restore.mjs",
+    "backend/scripts/test-competition-phase9-transport.mjs"
+  ],
+  "protectedCount": 75,
+  "protectedChanged": []
+}

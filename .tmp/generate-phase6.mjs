@@ -1,0 +1,10 @@
+import {readFileSync,writeFileSync} from 'node:fs'
+let s=readFileSync('backend/scripts/test-competition-native-tabulation.mjs','utf8')
+s=s.slice(0,s.indexOf('const a=make();'))
+s=s.replaceAll('competition-phase5-2026-10-13','competition-phase6-2026-10-13')
+s=s.replace("template='votrix_scoring_1791886877034'","template='votrix_tabulation_1791894228454'")
+s=s.replace('database=`votrix_tabulation_','database=`votrix_publication_')
+s=s.replace('audits/competition-phase4-2026-10-13/native-preflight-complete.json','audits/competition-phase5-2026-10-13/native-preflight-complete.json')
+s=s.replace('106_competition_scoped_tabulation.sql','107_competition_scoped_results.sql')
+s=s.replace('106 installation/rerun preserve all 39','107 installation/rerun preserve all 45')
+writeFileSync('backend/scripts/test-competition-native-results.mjs',s)

@@ -1,0 +1,10 @@
+import {readFileSync,writeFileSync} from 'node:fs'
+import {createHash} from 'node:crypto'
+const out='audits/competition-localhost-integration-2026-10-14/',before=JSON.parse(readFileSync('audits/competition-phase10-2026-10-14/source-before.json')),phase10=JSON.parse(readFileSync('audits/competition-phase10-2026-10-14/configuration-before.json'))
+const changed=Object.keys(before).filter(f=>!readFileSync(f).equals(readFileSync(f))||createHash('sha256').update(readFileSync(f)).digest('hex')!==before[f])
+const protectedPaths=Object.keys(before).filter(p=>/election|polling|scoring-engine|competition-calculation|CompetitionScoringForm|useJudgeScoreDrafts|csv-export/.test(p)),protectedChanged=protectedPaths.filter(f=>createHash('sha256').update(readFileSync(f)).digest('hex')!==before[f])
+const configurationChanged=Object.keys(phase10).filter(f=>createHash('sha256').update(readFileSync(f)).digest('hex')!==phase10[f]);if(protectedChanged.length||configurationChanged.length)throw Error('Unexpected preservation change')
+writeFileSync(out+'preservation.json',JSON.stringify({baseline:'Phase10 pre-edit source snapshot',checked:Object.keys(before).length,changed,protectedCount:protectedPaths.length,protectedChanged,configurationChanged},null,2))
+const diagnosis=JSON.parse(readFileSync(out+'diagnosis.json'));diagnosis.specifiedRoute='http://localhost:5173/organizer/competition';diagnosis.eventContext='NO_EVENT_CONTEXT: root module dashboard has no eventId';diagnosis.status='PARTIALLY INTEGRATED: source routes connected, everyday localhost native workflow blocked';writeFileSync(out+'diagnosis.json',JSON.stringify(diagnosis,null,2))
+const script='backend/scripts/diagnose-native-competition-ui.mjs';let s=readFileSync(script,'utf8');s=s.replace(/eventContext:'[^']*'/,"eventContext:'NO_EVENT_CONTEXT: module landing route has no eventId'").replace(/status:'PARTIALLY INTEGRATED[^']*'/,"status:'PARTIALLY INTEGRATED: source routes connected, configured workflow blocked'");writeFileSync(script,s)
+console.log(JSON.stringify({changed,protectedChanged,configurationChanged,status:diagnosis.status}))

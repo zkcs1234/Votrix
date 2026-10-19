@@ -1,0 +1,50 @@
+-- Isolated test fixture only. Never run against the application database.
+\set ON_ERROR_STOP on
+BEGIN;
+DO $$
+DECLARE owner_id uuid:='11000000-0000-0000-0000-000000000001';
+ event_id uuid:='22000000-0000-0000-0000-000000000001';
+ test_round uuid:='33000000-0000-0000-0000-000000000001';
+ parent_id uuid:='55000000-0000-0000-0000-000000000001';
+ minor_id uuid:='66000000-0000-0000-0000-000000000001';
+ version_id uuid:='77000000-0000-0000-0000-000000000001';
+ source jsonb; snapshot jsonb; rejected boolean;
+BEGIN
+ INSERT INTO users(id,role) VALUES(owner_id,'organizer');
+ INSERT INTO organizations(id,organizer_id) VALUES(event_id,owner_id);
+ INSERT INTO events(id,organization_id) VALUES(event_id,event_id);
+ INSERT INTO competition_rounds(id,event_id,name) VALUES(test_round,event_id,'Final');
+ INSERT INTO competition_criteria(id,event_id,name,percentage,min_score,max_score) VALUES(parent_id,event_id,'Quality',100,1,100);
+ INSERT INTO competition_minor_criteria(id,criteria_id,event_id,name,score_type,is_active) VALUES(minor_id,parent_id,event_id,'Technique','decimal',true);
+ INSERT INTO competition_round_criteria(round_id,criteria_id) VALUES(test_round,parent_id);
+ source:=competition_criteria_source(event_id);
+ IF source->'minors'->0->>'isActive'<>'true' OR source->'rounds'->0->'criteriaIds'<>jsonb_build_array(parent_id) THEN RAISE EXCEPTION 'Invalid canonical criteria source'; END IF;
+ snapshot:=jsonb_build_object('criteriaSource',source,'scoringConfig','{"confirmed":true,"calculationMethod":"weighted_average"}'::jsonb);
+ UPDATE competition_minor_criteria SET is_active=false WHERE id=minor_id;
+ rejected:=false;
+ BEGIN PERFORM competition_publish_rules(event_id,owner_id,version_id,snapshot);
+ EXCEPTION WHEN OTHERS THEN rejected:=SQLERRM LIKE 'CRITERIA_SETUP_CHANGED_REFRESH%'; END;
+ IF NOT rejected OR EXISTS(SELECT 1 FROM competition_rule_versions WHERE id=version_id) THEN RAISE EXCEPTION 'Stale minor change published'; END IF;
+ IF (SELECT status FROM events WHERE id=event_id)<>'draft' THEN RAISE EXCEPTION 'Rejected publication changed status'; END IF;
+ UPDATE competition_minor_criteria SET is_active=true WHERE id=minor_id;
+ UPDATE competition_criteria SET percentage=80 WHERE id=parent_id;
+ rejected:=false;
+ BEGIN PERFORM competition_publish_rules(event_id,owner_id,version_id,snapshot);
+ EXCEPTION WHEN OTHERS THEN rejected:=SQLERRM LIKE 'CRITERIA_SETUP_CHANGED_REFRESH%'; END;
+ IF NOT rejected THEN RAISE EXCEPTION 'Stale weight change published'; END IF;
+ UPDATE competition_criteria SET percentage=100 WHERE id=parent_id;
+ DELETE FROM competition_round_criteria rc WHERE rc.round_id=test_round AND rc.criteria_id=parent_id;
+ rejected:=false;
+ BEGIN PERFORM competition_publish_rules(event_id,owner_id,version_id,snapshot);
+ EXCEPTION WHEN OTHERS THEN rejected:=SQLERRM LIKE 'CRITERIA_SETUP_CHANGED_REFRESH%'; END;
+ IF NOT rejected THEN RAISE EXCEPTION 'Stale membership change published'; END IF;
+ INSERT INTO competition_round_criteria(round_id,criteria_id) VALUES(test_round,parent_id);
+ PERFORM competition_publish_rules(event_id,owner_id,version_id,snapshot);
+ IF (SELECT status FROM events WHERE id=event_id)<>'scheduled' OR (SELECT count(*) FROM competition_rule_versions WHERE id=version_id)<>1 THEN RAISE EXCEPTION 'Valid publication failed'; END IF;
+ rejected:=false;
+ BEGIN UPDATE competition_criteria SET percentage=80 WHERE id=parent_id;
+ EXCEPTION WHEN OTHERS THEN rejected:=SQLERRM='OFFICIAL_SETUP_FROZEN'; END;
+ IF NOT rejected THEN RAISE EXCEPTION 'Published criteria remained editable'; END IF;
+ RAISE NOTICE 'PASS: minor, weight, and membership conflicts rejected atomically; valid publication and frozen setup preserved';
+END $$;
+ROLLBACK;

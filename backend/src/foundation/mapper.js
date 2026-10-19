@@ -51,6 +51,9 @@ export function mapEvent(row) {
     eventType: row.event_type,
     // Phase 1: optional competition sub-type label (display/template only).
     competitionType: row.competition_type ?? null,
+    competitionCreatedAt: row.competition_created_at ?? null,
+    officialRulesId: row.official_rules_id ?? null,
+    competitionLifecycle: row.competition_lifecycle ?? null,
     // voting_enabled and results_visibility are present on election events
     // and on the events table generally — map them so callers don't have to
     // reach into raw DB rows.

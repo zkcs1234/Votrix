@@ -1,0 +1,33 @@
+{
+  "phase": 8,
+  "releaseRecommendation": "NO-GO",
+  "productionReady": false,
+  "blockers": {
+    "deployedCatalogLedger": "BLOCKED",
+    "productionBackupRestore": "BLOCKED",
+    "hostedAuthenticationAcceptance": "BLOCKED",
+    "representativeMultiInstanceDelivery": "BLOCKED",
+    "distributedRateCounters": "NOT_TESTED",
+    "productionCapacityPeakMemory": "NOT_TESTED"
+  },
+  "localFixesVerified": true,
+  "localTransportTestPassed": true,
+  "productionTransportVerified": false,
+  "productionRecoveryVerified": false,
+  "productionAuthVerified": false,
+  "operationalRateGate": "COMPETITION_NATIVE_RATE_POLICY_ENABLED",
+  "optionalRelay": [
+    "COMPETITION_HINT_BROKER_URL",
+    "COMPETITION_HINT_BROKER_SECRET"
+  ],
+  "forwardOrder": [
+    103,
+    104,
+    105,
+    106,
+    107,
+    108
+  ],
+  "activationAuthorized": false,
+  "deploymentAuthorized": false
+}

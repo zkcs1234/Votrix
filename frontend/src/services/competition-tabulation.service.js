@@ -25,8 +25,8 @@ export const competitionTabulationService = {
     return api.get(`${BASE}/events/${eventId}/tabulation/${calculationId}`)
   },
 
-  getLatestCalculation(eventId) {
-    return api.get(`${BASE}/events/${eventId}/tabulation/latest`)
+  getLatestCalculation(eventId, roundId=null) {
+    return api.get(`${BASE}/events/${eventId}/tabulation/latest`,{params:roundId?{roundId}:undefined})
   },
 
   finalize(eventId, calculationId) {

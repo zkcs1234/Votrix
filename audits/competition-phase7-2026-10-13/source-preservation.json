@@ -1,0 +1,32 @@
+{
+  "checked": 639,
+  "changed": [
+    "backend/src/routes/competition-child.routes.js",
+    "backend/src/routes/pageant-judge.routes.js",
+    "backend/src/services/competition-native-scoring.service.js",
+    "frontend/src/components/organizer/competition/NativeResultsWorkspace.jsx",
+    "frontend/src/components/organizer/competition/NativeTabulationWorkspace.jsx",
+    "frontend/src/components/voter/competition/NativeCompetitionWorkspace.jsx",
+    "frontend/src/pages/organizer/competition/CompetitionContestantsPage.jsx",
+    "frontend/src/pages/organizer/competition/CompetitionJudgesPage.jsx",
+    "frontend/src/pages/organizer/competition/CompetitionReviewPage.jsx",
+    "frontend/src/pages/organizer/competition/CompetitionWorkspacePage.jsx",
+    "frontend/src/pages/organizer/reports/CompetitionReportPage.jsx",
+    "frontend/src/pages/public/NativeCompetitionResultsPage.jsx",
+    "frontend/src/pages/public/NativeCompetitionResultsPage.test.jsx",
+    "frontend/src/services/competition-native.service.js"
+  ],
+  "added": [
+    "backend/scripts/test-competition-phase7-browser.mjs",
+    "backend/scripts/test-competition-phase7-integrations.mjs",
+    "backend/scripts/test-competition-phase7-performance.mjs",
+    "backend/scripts/test-competition-phase7-populated-restore.mjs",
+    "backend/scripts/test-competition-phase7-recovery.mjs",
+    "backend/scripts/test-competition-phase7-transport.mjs",
+    "frontend/src/components/organizer/competition/NativeCompetitionBoundaries.test.jsx",
+    "frontend/src/components/organizer/competition/NativeSetupWorkspace.jsx",
+    "frontend/src/components/organizer/competition/NativeSetupWorkspace.test.jsx"
+  ],
+  "protectedCount": 68,
+  "protectedChanged": []
+}

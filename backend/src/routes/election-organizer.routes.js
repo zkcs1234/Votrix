@@ -22,6 +22,8 @@ router.get('/events/:eventId/sections', ctrl.listBallotSections)
 router.post('/events/:eventId/sections', ctrl.createBallotSection)
 router.patch('/events/:eventId/sections/:sectionId', ctrl.updateBallotSection)
 router.delete('/events/:eventId/sections/:sectionId', ctrl.deleteBallotSection)
+router.get('/events/:eventId/sections/:sectionId/eligibility', ctrl.getGroupEligibility)
+router.put('/events/:eventId/sections/:sectionId/eligibility', ctrl.setGroupEligibility)
 router.get('/events/:eventId/sections/:sectionId/positions', ctrl.listPositions)
 router.post('/events/:eventId/sections/:sectionId/positions', ctrl.createPosition)
 

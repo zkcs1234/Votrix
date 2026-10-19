@@ -5,10 +5,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { electionService } from '@/services/election.service'
 import { electionEventSchemaStep1, isoToLocalInput, localInputToIso } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import CalendarCard from '@/components/ui/CalendarCard'
+import DateTimeInput from '@/components/ui/DateTimeInput'
+import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
-import EventStepper from '@/components/ui/EventStepper'
-import StageFooter from '@/components/ui/StageFooter'
+import { getNextStage, stagePath } from '@/utils/eventStages'
+import SaveStatus from '@/components/ui/SaveStatus'
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
@@ -66,7 +67,7 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   // existing event whose setup is locked (scheduled/active/…) is read-only.
   const readOnly = !isNew && isSetupLocked(eventStatus)
 
-  const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
+  const { markComplete, reset: resetProgress } = useEventProgress(
     'election',
     eventId,
   )
@@ -108,7 +109,7 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
 
   const formValues = watch()
   const resultsVisibility = formValues.resultsVisibility ?? 'public'
-  const startDateValue = formValues.startDate ?? ''
+
 
   const buildDraftSnapshot = useCallback((data = getValues(), draftStep = step, currentBanner = banner) => ({
     step: draftStep,
@@ -344,19 +345,17 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
 
   if (loading) return <p className="v-caption">Loading...</p>
 
-  const stepperEventId = isNew ? 'new' : eventId
-
   return (
     <div className="space-y-6">
       <>
-          <EventStepper
-            module="election"
-            currentKey={step}
-            eventId={stepperEventId}
-            completedKeys={completedKeys}
-            readOnly={readOnly}
-            eventStatus={eventStatus}
-          />
+          <div className="flex flex-wrap items-center gap-2 text-sm text-v-text-subtle" aria-label="Event steps">
+            {["details","branding"].map((key, index) => (
+              <span key={key} aria-current={step === key ? 'step' : undefined} className={step === key ? 'font-medium text-v-primary' : ''}>
+                {index > 0 && <span aria-hidden="true"> → </span>}
+                Step {index + 1}: {key[0].toUpperCase() + key.slice(1)}
+              </span>
+            ))}
+          </div>
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="election" />}
 
@@ -364,7 +363,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             <header>
               <h2 className="v-page-title mb-2">{isNew ? 'Create election event' : readOnly ? 'View election event' : 'Edit election event'}</h2>
               <p className="v-helper-text">
-                Fill out the event basics, branding, and optional information form. Use the stepper or sidebar
+                Fill out the event basics and branding. Use the sidebar
                 to jump between sections.
               </p>
             </header>
@@ -403,7 +402,7 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
               <p className={HELPER_TEXT}>Optional description for voters</p>
             </div>
 
-            <div className="v-date-row">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
                   Start Date and Time <span className="text-v-danger">*</span>
@@ -412,11 +411,8 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                   control={control}
                   name="startDate"
                   render={({ field }) => (
-                    <CalendarCard
+                    <DateTimeInput
                       id="startDate"
-                      required
-                      defaultHour={0}
-                      defaultMinute={0}
                       hasError={Boolean(errors.startDate)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
@@ -436,13 +432,10 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
                   control={control}
                   name="endDate"
                   render={({ field }) => (
-                    <CalendarCard
+                    <DateTimeInput
                       id="endDate"
-                      required
-                      defaultHour={23}
-                      defaultMinute={59}
+                      showShortcuts={false}
                       hasError={Boolean(errors.endDate)}
-                      min={startDateValue || undefined}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
@@ -501,38 +494,30 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
         </fieldset>
       </Card>
 
-        {!readOnly && step === 'details' && (
-            <StageFooter
-              module="election"
-              currentKey="details"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleNext}
-              nextLabel="Next: Branding"
-              backLabel={null}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
-        )}
-        
-        {!readOnly && step === 'branding' && (
-            <StageFooter
-              module="election"
-              currentKey="branding"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleNextBranding}
-              nextLabel={isNew ? 'Create & continue' : 'Next: Positions'}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
-        )}
-
-        {/* Read-only events keep a plain Back/Next footer so you can still page
-            through the stages to view them — just without the save actions. */}
-        {readOnly && (
-          <StageFooter module="election" currentKey={step} eventId={eventId} />
-        )}
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-v-border pt-4">
+          <div className="flex items-center gap-3">
+            {step !== 'details' && (
+              <Button type="button" variant="secondary" disabled={saving} onClick={() => { setError(null); setStep(step === 'settings' ? 'branding' : 'details') }}>
+                Back: {step === 'settings' ? 'Branding' : 'Details'}
+              </Button>
+            )}
+            {!readOnly && <SaveStatus status={saveStatus} lastSavedAt={lastSavedAt} />}
+          </div>
+          {readOnly ? (
+            <Button type="button" onClick={() => {
+              if (step === 'details') setStep('branding')
+              
+              else {
+                const next = getNextStage('election', step)
+                if (next) navigate(stagePath('election', next.key, eventId))
+              }
+            }}>Next</Button>
+          ) : (
+            <Button type="button" disabled={saving} onClick={step === 'details' ? handleNext : handleNextBranding}>
+              {saving ? 'Saving...' : step === 'details' ? 'Next: Branding' : isNew ? 'Create & continue' : 'Next: Positions'}
+            </Button>
+          )}
+        </div>
           </div>
         </>
 

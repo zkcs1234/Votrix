@@ -1,0 +1,285 @@
+{
+  "database": "votrix_child_1791877042044",
+  "isolated": true,
+  "migration": "103_competition_child_identity.sql",
+  "migrationRerunPassed": true,
+  "explicitLegacyMappingExecutedLocally": true,
+  "historicalBefore": [
+    {
+      "count": 7,
+      "digest": "d54ba8726627c9048dec99a5a4660291",
+      "table_name": "competition_advancement_decisions"
+    },
+    {
+      "count": 4,
+      "digest": "e00ca6bc012ee97af5ea984f03534ebd",
+      "table_name": "competition_categories"
+    },
+    {
+      "count": 39,
+      "digest": "cb2e5e8c771901e3bd1b93791efad4a5",
+      "table_name": "competition_contestants"
+    },
+    {
+      "count": 1,
+      "digest": "bca345be0608382d3707fd9370fe32e8",
+      "table_name": "competition_create_requests"
+    },
+    {
+      "count": 10,
+      "digest": "735d751d28c3ec3d287ad09629c718b6",
+      "table_name": "competition_criteria"
+    },
+    {
+      "count": 39,
+      "digest": "3d5d344c83701c849a3710aff0f162fb",
+      "table_name": "competition_criterion_lock_history"
+    },
+    {
+      "count": 1,
+      "digest": "3ceba5002a763e275c57133567552e37",
+      "table_name": "competition_deductions"
+    },
+    {
+      "count": 11,
+      "digest": "362bd16b9dfbc19d863433923aeb6fed",
+      "table_name": "competition_divisions"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_eligibility_decisions"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_judge_assignments"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_judge_drafts"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_lineups"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_minor_criteria"
+    },
+    {
+      "count": 11,
+      "digest": "56e511f87008833eb9a0606eafbd0eb8",
+      "table_name": "competition_result_calculations"
+    },
+    {
+      "count": 53,
+      "digest": "d6ada74b13ec219c70d3f9234875c4d5",
+      "table_name": "competition_round_contestants"
+    },
+    {
+      "count": 18,
+      "digest": "085a30ff09c399e26a437942344e57ca",
+      "table_name": "competition_round_criteria"
+    },
+    {
+      "count": 15,
+      "digest": "5afdc0f082247fa6d9ee97534b4098a3",
+      "table_name": "competition_round_submissions"
+    },
+    {
+      "count": 22,
+      "digest": "ee32bc338e85333bee9fc5283b157796",
+      "table_name": "competition_rounds"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_rule_amendments"
+    },
+    {
+      "count": 10,
+      "digest": "09157ec3fe05aa74b762c04e45d178fa",
+      "table_name": "competition_rule_versions"
+    },
+    {
+      "count": 38,
+      "digest": "98d8cdc68bc23d6b15924382b3788bef",
+      "table_name": "competition_scores"
+    },
+    {
+      "count": 38,
+      "digest": "fc78bc048ea9bcfab35787fdbeeb40c4",
+      "table_name": "competition_session_judge_scores"
+    },
+    {
+      "count": 9,
+      "digest": "40fbdee75f0061d36bf907aca74ea9c6",
+      "table_name": "competition_sessions"
+    },
+    {
+      "count": 19,
+      "digest": "532cd93b695496989bbe9bd3a5dc7c60",
+      "table_name": "event_participants"
+    },
+    {
+      "count": 13,
+      "digest": "a9e2ff4c62a2af4e15a96efcd32dc2d4",
+      "table_name": "events"
+    }
+  ],
+  "historicalAfter": [
+    {
+      "count": 7,
+      "digest": "d54ba8726627c9048dec99a5a4660291",
+      "table_name": "competition_advancement_decisions"
+    },
+    {
+      "count": 4,
+      "digest": "e00ca6bc012ee97af5ea984f03534ebd",
+      "table_name": "competition_categories"
+    },
+    {
+      "count": 39,
+      "digest": "cb2e5e8c771901e3bd1b93791efad4a5",
+      "table_name": "competition_contestants"
+    },
+    {
+      "count": 1,
+      "digest": "bca345be0608382d3707fd9370fe32e8",
+      "table_name": "competition_create_requests"
+    },
+    {
+      "count": 10,
+      "digest": "735d751d28c3ec3d287ad09629c718b6",
+      "table_name": "competition_criteria"
+    },
+    {
+      "count": 39,
+      "digest": "3d5d344c83701c849a3710aff0f162fb",
+      "table_name": "competition_criterion_lock_history"
+    },
+    {
+      "count": 1,
+      "digest": "3ceba5002a763e275c57133567552e37",
+      "table_name": "competition_deductions"
+    },
+    {
+      "count": 11,
+      "digest": "362bd16b9dfbc19d863433923aeb6fed",
+      "table_name": "competition_divisions"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_eligibility_decisions"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_judge_assignments"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_judge_drafts"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_lineups"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_minor_criteria"
+    },
+    {
+      "count": 11,
+      "digest": "56e511f87008833eb9a0606eafbd0eb8",
+      "table_name": "competition_result_calculations"
+    },
+    {
+      "count": 53,
+      "digest": "d6ada74b13ec219c70d3f9234875c4d5",
+      "table_name": "competition_round_contestants"
+    },
+    {
+      "count": 18,
+      "digest": "085a30ff09c399e26a437942344e57ca",
+      "table_name": "competition_round_criteria"
+    },
+    {
+      "count": 15,
+      "digest": "5afdc0f082247fa6d9ee97534b4098a3",
+      "table_name": "competition_round_submissions"
+    },
+    {
+      "count": 22,
+      "digest": "ee32bc338e85333bee9fc5283b157796",
+      "table_name": "competition_rounds"
+    },
+    {
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "table_name": "competition_rule_amendments"
+    },
+    {
+      "count": 10,
+      "digest": "09157ec3fe05aa74b762c04e45d178fa",
+      "table_name": "competition_rule_versions"
+    },
+    {
+      "count": 38,
+      "digest": "98d8cdc68bc23d6b15924382b3788bef",
+      "table_name": "competition_scores"
+    },
+    {
+      "count": 38,
+      "digest": "fc78bc048ea9bcfab35787fdbeeb40c4",
+      "table_name": "competition_session_judge_scores"
+    },
+    {
+      "count": 9,
+      "digest": "40fbdee75f0061d36bf907aca74ea9c6",
+      "table_name": "competition_sessions"
+    },
+    {
+      "count": 19,
+      "digest": "532cd93b695496989bbe9bd3a5dc7c60",
+      "table_name": "event_participants"
+    },
+    {
+      "count": 13,
+      "digest": "a9e2ff4c62a2af4e15a96efcd32dc2d4",
+      "table_name": "events"
+    }
+  ],
+  "historicalUnchanged": true,
+  "scenariosPassed": 19,
+  "scenarios": [
+    "isolated fresh clone verified against current Phase 1 catalog, constraints, triggers, permissions and definitions",
+    "migration 103 changes no historical scores, locks, submissions, rules, deductions or finalized/published payloads",
+    "explicit legacy mapping reuses every master entry without changing event/contestant/judge or history records",
+    "migration rerun and mapping rerun retain stable child and participation IDs",
+    "one event/one native competition creation is stable under request retry",
+    "new draft identity invalidates a concurrently reviewed legacy publication through existing revision checks",
+    "five independent identities exist without implicit enrollment",
+    "same master entry has distinct participation identity and numbering in two competitions",
+    "idempotent membership retry and duplicate membership/number constraints verified",
+    "foreign keys, immutable association identity and cross-event checks reject direct and RPC writes",
+    "child names, authenticated ownership and retry payload conflicts are enforced",
+    "actual concurrent PostgreSQL requests create one same-entry membership and distinct automatic numbers",
+    "legacy per-division duplicate display numbers preserved while participation numbers are independent",
+    "legacy mapping is explicit and never assigns an existing native child arbitrarily",
+    "existing authorized draft master removal cascades only its participation and leaves other members intact",
+    "election and polling cannot receive child competitions or legacy mappings",
+    "child setup mutations freeze with the existing parent lifecycle",
+    "new tables and mutating RPCs deny direct anonymous/authenticated database access",
+    "transaction rollback and end-to-end old-data fingerprints preserve finalized results, rules, scores, locks and separate submissions"
+  ],
+  "supabaseMutations": 0
+}

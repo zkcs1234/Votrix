@@ -1,0 +1,19 @@
+#original-judge-score-sheet { width: min(96vw, 90rem); max-width: 90rem; padding: 1.1rem; color: var(--v-text); }
+.v-original-sheet-header { background: #0d2444; color: #fff; border-radius: .65rem; padding: 1.1rem; line-height: 1.6; }
+.v-original-sheet-header p { margin: .2rem 0; overflow-wrap: anywhere; }
+.v-original-sheet-header small { display: block; color: #c8d8ef; font-size: .72rem; overflow-wrap: anywhere; }
+.v-original-sheet-status { float: right; background: #064b49; color: #72f0b4; border-radius: 1rem; padding: .15rem .7rem; margin: 0 0 .5rem .75rem; font-size: .8rem; }
+.v-original-sheet-title { font-size: 1rem; font-weight: 650; margin: 1rem 0 .6rem; }
+.v-original-sheet-scroll { max-width: 100%; overflow: auto; max-height: 52vh; border: 1px solid var(--v-border); }
+.v-original-sheet-scroll:focus-visible { outline: 2px solid var(--v-primary); outline-offset: 2px; }
+.v-original-sheet-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .78rem; line-height: 1.45; }
+.v-original-sheet-table th, .v-original-sheet-table td { border-right: 1px solid var(--v-border); border-bottom: 1px solid var(--v-border); padding: .6rem .7rem; }
+.v-original-sheet-table thead th { background: #173766; color: #fff; text-align: center; min-width: 7rem; font-weight: 600; }
+.v-original-sheet-table thead small { display: block; color: #d5e3f7; font-weight: 400; font-size: .68rem; }
+.v-original-sheet-table tbody td { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v-original-sheet-table tbody th { text-align: left; min-width: 12rem; font-weight: 500; }
+.v-original-sheet-table tbody tr:nth-child(even) { background: var(--v-surface-elevated); }
+.v-original-sheet-subtotal { font-weight: 650; }
+.v-original-sheet-note, .v-original-sheet-message, .v-original-sheet-deductions { font-size: .78rem; color: var(--v-text-muted); line-height: 1.6; margin-top: .8rem; }
+.v-original-sheet-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+@media (max-width: 640px) { #original-judge-score-sheet { padding: .75rem; } .v-original-sheet-status { float: none; display: inline-block; margin: 0 0 .5rem; } }

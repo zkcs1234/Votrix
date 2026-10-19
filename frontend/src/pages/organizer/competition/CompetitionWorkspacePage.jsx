@@ -1,7 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { NativeSetupBoundary } from '@/components/organizer/competition/NativeSetupWorkspace'
+import CompetitionRulesEditor from '@/components/organizer/competition/CompetitionRulesEditor'
+import CompetitionRoundsTab from '@/components/organizer/competition/CompetitionRoundsTab'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, CircleHelp } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import useCriteriaSave from '@/hooks/useCriteriaSave'
+import { criteriaProgressState } from '@/components/organizer/competition/CriteriaProgress'
+import { evaluateCriteriaReadiness } from '../../../../../shared/competition-criteria-readiness.js'
 
 import { pageantService } from '@/services/pageant.service'
 import { useToast } from '@/hooks/useToast'
@@ -13,6 +19,7 @@ import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import useEventStatus from '@/hooks/useEventStatus'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 import { stagePath } from '@/utils/eventStages'
+import useCompetitionSync from '@/hooks/useCompetitionSync'
 
 // The Structure & Scoring workspace walks through its tabs like the event form's
 // stages: Rounds → Criteria → Divisions → Scoring rules → (Continue to Contestants).
@@ -29,27 +36,74 @@ const WORKSPACE_TABS = ['rounds', 'criteria', 'divisions', 'scoring', 'structure
 // Phase 4 — Competition Scoring Foundation workspace.
 // Single page that exposes the dynamic structure of an event:
 // categories, rounds, criteria, contestants, judges, and scoring config.
-export default function CompetitionWorkspacePage() {
+export default function CompetitionWorkspacePage() { return <NativeSetupBoundary Legacy={LegacyCompetitionWorkspacePage}/> }
+function LegacyCompetitionWorkspacePage() {
   const { eventId } = useParams()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { status, setupLocked, loading: statusLoading } = useEventStatus(pageantService, eventId)
   const [foundation, setFoundation] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState(() => {
-    const t = searchParams.get('tab')
-    return WORKSPACE_TABS.includes(t) ? t : 'rounds'
+  const [loadError, setLoadError] = useState('')
+  const [roundCount, setRoundCount] = useState(0)
+  const [scoringState, setScoringState] = useState({ dirty: false, saving: false, saved: false, confirmed: false, pendingReviewer: false, error: false, locked: false })
+  const requestRef = useRef(0)
+  const latestLoad = useRef(null)
+  const [footerHeight, setFooterHeight] = useState(144)
+  const requestedTab = searchParams.get('tab')
+  const activeTab = WORKSPACE_TABS.includes(requestedTab) ? requestedTab : 'rounds'
+  const setActiveTab = tab => setSearchParams(current => {
+    const next = new URLSearchParams(current)
+    next.set('tab', tab)
+    next.delete('section')
+    return next
   })
+  const configureCriteria = roundId => setSearchParams(current => {
+    const next = new URLSearchParams(current)
+    next.set('tab', 'criteria')
+    if (roundId) next.set('roundId', roundId)
+    else next.delete('roundId')
+    next.delete('section')
+    return next
+  })
+  const configureDeductions = roundId => setSearchParams(current => {
+    const next = new URLSearchParams(current)
+    next.set('tab', 'scoring'); next.set('roundId', roundId); next.set('section', 'deductions')
+    return next
+  })
+  const load = useCallback(() => {
+    const request = ++requestRef.current
+    const promise = (async () => { try {
+      const { data } = await pageantService.getFoundation(eventId)
+      if (request !== requestRef.current) return latestLoad.current
+      setFoundation(data.foundation); setRoundCount(data.foundation.rounds?.length ?? 0); setLoadError('')
+      return data.foundation
+    } catch (error) {
+      if (request !== requestRef.current) return latestLoad.current
+      if (request === requestRef.current) setLoadError(getErrorMessage(error))
+      throw error
+    } finally { if (request === requestRef.current) setLoading(false) }
+    })()
+    latestLoad.current = promise
+    return promise
+  }, [eventId])
+  const { save: saveCriteria, state: criteriaSaveState, recover: recoverCriteriaSave } = useCriteriaSave(load)
+  const progress = useMemo(() => criteriaProgressState(foundation?.criteriaReadiness ?? evaluateCriteriaReadiness(foundation ?? {}), criteriaSaveState, loadError), [foundation, criteriaSaveState, loadError])
+  const selectedRoundParam = searchParams.get('roundId')
 
-  const load = () => {
-    pageantService
-      .getFoundation(eventId)
-      .then(({ data }) => setFoundation(data.foundation))
-      .finally(() => setLoading(false))
+  const handleTabKey = (event, tabId) => {
+    if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    const index = WORKSPACE_TAB_FLOW.indexOf(tabId)
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? WORKSPACE_TAB_FLOW.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + WORKSPACE_TAB_FLOW.length) % WORKSPACE_TAB_FLOW.length
+    setActiveTab(WORKSPACE_TAB_FLOW[next])
+    document.getElementById(`workspace-tab-${WORKSPACE_TAB_FLOW[next]}`)?.focus()
   }
 
   useEffect(() => {
-    load()
-  }, [eventId])
+    void load().catch(() => {})
+  }, [load, activeTab, selectedRoundParam])
+  useCompetitionSync(eventId, load)
 
   if (loading) {
     return (
@@ -58,20 +112,39 @@ export default function CompetitionWorkspacePage() {
       </div>
     )
   }
+  if (!foundation) return <div className="v-card space-y-3 p-5"><p role="alert" className="v-error-text">{loadError || 'Could not load Structure & Scoring.'}</p><Button onClick={() => { setLoading(true); void load().catch(() => {}) }}>Retry</Button></div>
+  const readOnly = setupLocked || statusLoading || Boolean(foundation.event?.official_rules_id ?? foundation.event?.officialRulesId) || Boolean(foundation.event?.status && foundation.event.status !== 'draft') || Boolean(loadError)
+  const setupSteps = [
+    { id: 'rounds', label: 'Rounds', detail: `${roundCount} configured`, ready: roundCount > 0 },
+    { id: 'criteria', label: 'Criteria', detail: `${foundation.criteria?.length ?? 0} added`, ready: Boolean(progress.allReady) },
+    { id: 'divisions', label: 'Divisions', detail: foundation.divisions?.length ? `${foundation.divisions.length} added` : 'Optional', ready: true },
+    { id: 'scoring', label: 'Scoring rules', detail: foundation.scoringConfig?.calculationMethod && foundation.scoringConfig.calculationMethod !== 'undecided' ? 'Method selected' : 'Needs setup', ready: Boolean(foundation.scoringConfig?.calculationMethod && foundation.scoringConfig.calculationMethod !== 'undecided') },
+  ]
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-v-text">
-            {foundation?.event?.title ?? 'Structure & Scoring'}
+    <div className="space-y-5" style={['criteria', 'scoring'].includes(activeTab) ? { paddingBottom: footerHeight + 16 } : undefined}>
+      <div className="rounded-2xl border border-v-border bg-v-surface-elevated/50 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-v-primary">Step 5 · Structure &amp; scoring</p>
+          <h2 className="text-2xl font-semibold tracking-tight text-v-text">
+            {activeTab === 'rounds' ? 'Competition Rounds' : activeTab === 'criteria' ? 'Scoring Criteria' : activeTab === 'scoring' ? 'Official Scoring Rules' : 'Structure & Scoring'}
           </h2>
-          <p className="mt-1 text-sm text-v-text-subtle">
-            Define the <strong>rounds</strong> (the weighted, judged segments), plus divisions and
-            scoring rules. Contestants and criteria are assigned to rounds on their own pages.
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-v-text-subtle">
+            {activeTab === 'rounds' ? 'Create and manage the judging stages of your competition.' : activeTab === 'criteria' ? 'Configure what judges will score in each competition round.' : activeTab === 'scoring' ? "Choose how judges' scores will be calculated, reviewed, and used to determine winners." : 'Set up judging rounds, scoring criteria, divisions, and scoring rules for your competition.'}
           </p>
+          </div>
+          <div className="hidden items-center gap-2 text-xs text-v-text-subtle sm:flex"><CircleHelp className="h-4 w-4" />Complete each section before reviewing the event.</div>
         </div>
-        <div className="flex flex-wrap gap-2 text-sm">
+        <div className="mt-5 grid gap-2 sm:grid-cols-4">
+          {setupSteps.map(step => <button key={step.id} type="button" onClick={() => setActiveTab(step.id)} className={`rounded-xl border p-3 text-left transition ${activeTab === step.id ? 'border-v-primary bg-v-primary-soft/40 ring-1 ring-v-primary' : 'border-v-border bg-v-surface hover:border-v-primary/50'}`}>
+            <span className="flex items-center gap-2 text-xs font-semibold text-v-text"><span className={step.ready ? 'text-v-success' : 'text-v-text-subtle'}>{step.ready ? <CheckCircle2 className="h-4 w-4" /> : <span className="flex h-4 w-4 items-center justify-center rounded-full border border-current text-[9px]">{setupSteps.indexOf(step) + 1}</span>}</span>{step.label}</span>
+            <span className="mt-1 block text-[11px] text-v-text-subtle">{step.detail}</span>
+          </button>)}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {activeTab !== 'rounds' && <div className="flex flex-wrap items-center gap-2 text-sm">
           <SubNav to={`/organizer/competition/events/${eventId}/contestants`}>
             Contestants
           </SubNav>
@@ -79,11 +152,11 @@ export default function CompetitionWorkspacePage() {
           <SubNav to={`/organizer/competition/events/${eventId}/rankings`}>
             Rankings
           </SubNav>
-        </div>
+        </div>}
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-b border-v-border text-sm">
-        <div className="flex gap-2">
+      <div className="min-w-0 overflow-x-auto overflow-y-hidden border-b border-v-border text-sm">
+        <div className="flex w-max min-w-full gap-2" role="tablist" aria-label="Structure and scoring">
           {/* Categories (grouping rounds into weighted buckets) are hidden for now —
               rounds already carry their own weight. The tab/StructureTab and the
               backend/engine are left intact so the feature can be re-enabled later. */}
@@ -95,7 +168,13 @@ export default function CompetitionWorkspacePage() {
           ].map((tab) => (
             <button
               key={tab.id}
+              id={`workspace-tab-${tab.id}`}
               type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`workspace-panel-${tab.id}`}
+              tabIndex={activeTab === tab.id || (activeTab === 'structure' && tab.id === 'rounds') ? 0 : -1}
+              onKeyDown={event => handleTabKey(event, tab.id)}
               onClick={() => setActiveTab(tab.id)}
               className={`-mb-px border-b-2 px-3 py-2 ${
                 activeTab === tab.id
@@ -110,29 +189,48 @@ export default function CompetitionWorkspacePage() {
       </div>
 
       {!statusLoading && setupLocked && (
-        <ReadOnlyEventBanner status={status} noun="competition" />
+        <ReadOnlyEventBanner status={status} noun="competition" frozen={Boolean(foundation.event?.official_rules_id ?? foundation.event?.officialRulesId)} />
       )}
 
-      <TypeHint type={foundation?.event?.competition_type} />
-      <SetupReadiness foundation={foundation} />
+      {activeTab !== 'rounds' && activeTab !== 'criteria' && activeTab !== 'scoring' && <TypeHint type={foundation?.event?.competition_type} />}
+      {activeTab === 'criteria' && loadError && !criteriaSaveState.error && <div role="alert" className="v-card space-y-2 p-3"><p className="text-sm text-v-text-muted">{loadError}</p><Button variant="secondary" onClick={() => { void load().catch(() => {}) }}>Reload saved criteria</Button></div>}
+      {activeTab !== 'criteria' && loadError && <div role="alert" className="v-card space-y-2 p-3"><p className="v-error-text">{loadError}</p><Button variant="secondary" onClick={() => { void load().catch(() => {}) }}>Reload saved setup</Button></div>}
 
-      {activeTab === 'structure' && <StructureTab foundation={foundation} reload={load} />}
-      {activeTab === 'divisions' && <DivisionsTab foundation={foundation} reload={load} />}
-      {activeTab === 'rounds' && <RoundsTab foundation={foundation} reload={load} />}
+      <div role="tabpanel" id={`workspace-panel-${activeTab}`} aria-labelledby={activeTab === 'structure' ? undefined : `workspace-tab-${activeTab}`} aria-label={activeTab === 'structure' ? 'Categories' : undefined}>
+      {activeTab === 'structure' && <StructureTab foundation={foundation} reload={load} readOnly={readOnly} />}
+      {activeTab === 'divisions' && <DivisionsTab foundation={foundation} reload={load} readOnly={readOnly} />}
+      {activeTab === 'rounds' && <CompetitionRoundsTab key={eventId} eventId={eventId} foundation={foundation} reload={load}
+        initialRoundId={selectedRoundParam} initialSection={searchParams.get('section')}
+        readOnly={readOnly} onConfigureCriteria={configureCriteria} onConfigureDeductions={configureDeductions} onCountChange={setRoundCount} />}
       {activeTab === 'criteria' && (
-        <CriteriaManager eventId={eventId} foundation={foundation} reload={load} />
+        <CriteriaManager key={eventId} eventId={eventId} foundation={foundation} initialRoundId={selectedRoundParam} onRoundChange={configureCriteria}
+          progress={progress} saveCriteria={saveCriteria} saveState={criteriaSaveState} recoverSave={recoverCriteriaSave} readOnly={readOnly} />
       )}
-      {activeTab === 'scoring' && <ScoringTab foundation={foundation} reload={load} />}
+      <div hidden={activeTab !== 'scoring'}><CompetitionRulesEditor key={eventId} foundation={foundation} reload={load} eventId={eventId} readOnly={readOnly} initialSection={searchParams.get('section')} onStateChange={setScoringState} /></div>
+      </div>
 
-      <WorkspaceStageFooter eventId={eventId} activeTab={activeTab} setActiveTab={setActiveTab} />
+      <WorkspaceStageFooter eventId={eventId} activeTab={activeTab} setActiveTab={setActiveTab} criteriaReady={progress.allReady} incompleteScopes={progress.scopes.filter(scope => !scope.ready)} onHeightChange={setFooterHeight} scoringState={scoringState} />
     </div>
   )
 }
 
-// Sticky stage footer mirroring the event form's StageFooter, but stepping
-// through the workspace's own tabs. Portals into the shared #stage-footer-portal.
-function WorkspaceStageFooter({ eventId, activeTab, setActiveTab }) {
+// Keep workspace navigation in document flow so it never covers forms/cards.
+function WorkspaceStageFooter({ eventId, activeTab, setActiveTab, criteriaReady, incompleteScopes, onHeightChange, scoringState }) {
   const idx = WORKSPACE_TAB_FLOW.indexOf(activeTab)
+  const footerRef = useRef(null)
+  const criteriaTab = activeTab === 'criteria'
+  const sticky = criteriaTab || activeTab === 'scoring'
+  const scoringBlocked = activeTab === 'scoring' && !scoringState.locked && (!scoringState.saved || scoringState.dirty || scoringState.saving || scoringState.error)
+  const responsive = sticky || activeTab === 'scoring'
+  useEffect(() => {
+    if (!sticky || !footerRef.current) return
+    const measure = () => onHeightChange(footerRef.current?.getBoundingClientRect().height ?? 144)
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(footerRef.current)
+    return () => observer.disconnect()
+  }, [sticky, onHeightChange])
 
   let back
   let next
@@ -150,7 +248,7 @@ function WorkspaceStageFooter({ eventId, activeTab, setActiveTab }) {
           }
     next =
       idx >= WORKSPACE_TAB_FLOW.length - 1
-        ? { label: 'Continue to Contestants', href: `/organizer/competition/events/${eventId}/contestants` }
+        ? { label: 'Continue to Contestants & Entries', href: `/organizer/competition/events/${eventId}/contestants` }
         : {
             label: `Continue to ${WORKSPACE_TAB_LABEL[WORKSPACE_TAB_FLOW[idx + 1]]}`,
             onClick: () => setActiveTab(WORKSPACE_TAB_FLOW[idx + 1]),
@@ -158,9 +256,11 @@ function WorkspaceStageFooter({ eventId, activeTab, setActiveTab }) {
   }
 
   const content = (
-    <div className="z-40 border-t border-v-border bg-v-surface shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-      <div className="mx-auto flex w-full items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3 md:px-8">
-        <div className="flex items-center gap-3">
+    <div ref={footerRef} data-workspace-footer className="v-rounds z-40 border-t border-v-border bg-v-surface shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+      {criteriaTab && !criteriaReady && <p id="criteria-footer-requirements" className="px-4 pt-2 text-xs text-v-text-muted sm:px-6 md:px-8">Complete scoring criteria{incompleteScopes.length ? ` in ${incompleteScopes.map(scope => scope.name).join(', ')}` : ''} before continuing.</p>}
+      {activeTab === 'scoring' && !scoringState.locked && <p id="scoring-footer-requirements" className="px-4 pt-2 text-xs text-v-text-muted sm:px-6 md:px-8">{scoringBlocked ? 'Save the current scoring settings, or Save Draft, before continuing.' : !scoringState.confirmed ? 'Draft saved — this step remains incomplete. Confirm the official rules before Review & Publish.' : scoringState.pendingReviewer ? 'Confirmed settings saved. Assign the reviewer in Judges before Review & Publish.' : 'Scoring settings saved. Continue to add contestants.'}</p>}
+      <div className="mx-auto flex w-full flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3 md:px-8">
+        <div className={responsive ? 'flex w-full items-center gap-3 sm:w-auto' : 'flex items-center gap-3'}>
           {back.href ? (
             <Link to={back.href}>
               <Button type="button" variant="secondary">
@@ -169,22 +269,22 @@ function WorkspaceStageFooter({ eventId, activeTab, setActiveTab }) {
               </Button>
             </Link>
           ) : (
-            <Button type="button" variant="secondary" onClick={back.onClick}>
+            <Button type="button" variant="secondary" onClick={back.onClick} className={responsive ? 'w-full sm:w-auto' : ''}>
               <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
               {back.label}
             </Button>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          {next.href ? (
-            <Link to={next.href}>
-              <Button type="button">
+        <div className={responsive ? 'flex w-full items-center gap-3 sm:w-auto' : 'flex items-center gap-3'}>
+          {next.href && scoringBlocked ? <Button type="button" disabled className="w-full sm:w-auto" aria-describedby="scoring-footer-requirements">{next.label}<ArrowRight className="h-4 w-4" aria-hidden /></Button> : next.href ? (
+            <Link to={next.href} className={responsive ? 'w-full sm:w-auto' : ''}>
+              <Button type="button" className={responsive ? 'w-full sm:w-auto' : ''}>
                 {next.label}
                 <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
               </Button>
             </Link>
           ) : (
-            <Button type="button" onClick={next.onClick}>
+            <Button type="button" onClick={next.onClick} className={sticky ? 'w-full sm:w-auto' : ''} disabled={criteriaTab && !criteriaReady} aria-describedby={criteriaTab && !criteriaReady ? 'criteria-footer-requirements' : undefined}>
               {next.label}
               <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
             </Button>
@@ -194,8 +294,8 @@ function WorkspaceStageFooter({ eventId, activeTab, setActiveTab }) {
     </div>
   )
 
-  const target = typeof document !== 'undefined' ? document.getElementById('stage-footer-portal') : null
-  return target ? createPortal(content, target) : content
+  const portalTarget = sticky && document.getElementById('stage-footer-portal')
+  return portalTarget ? createPortal(content, portalTarget) : <div className={sticky ? 'sticky bottom-0 z-40' : 'pt-1'}>{content}</div>
 }
 
 function SubNav({ to, children }) {
@@ -212,7 +312,7 @@ function SubNav({ to, children }) {
 // ---------------------------------------------------------------------------
 // Tabs
 // ---------------------------------------------------------------------------
-function StructureTab({ foundation, reload }) {
+function StructureTab({ foundation, reload, readOnly }) {
   const { eventId } = useParams()
   const divisionsEnabled = foundation?.event?.divisions_enabled
   const divisions = foundation?.divisions ?? []
@@ -221,6 +321,8 @@ function StructureTab({ foundation, reload }) {
   const [weight, setWeight] = useState(0)
   const [divisionId, setDivisionId] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const busyRef = useRef(false)
 
   const totalWeight = useMemo(
     () => (foundation?.categories ?? []).reduce((s, c) => s + Number(c.weight), 0),
@@ -229,7 +331,11 @@ function StructureTab({ foundation, reload }) {
 
   const submit = async (e) => {
     e.preventDefault()
+    if (readOnly || busyRef.current) return
+    if (!name.trim() || !Number.isFinite(Number(weight)) || Number(weight) < 0 || Number(weight) > 100) { setError('Enter a category name and a weight between 0 and 100.'); return }
+    busyRef.current = true
     setSaving(true)
+    setError('')
     try {
       await pageantService.createCategory(eventId, { 
         name, 
@@ -239,14 +345,18 @@ function StructureTab({ foundation, reload }) {
       setName('')
       setWeight(0)
       setDivisionId('')
-      reload()
+      await reload()
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not save category'))
     } finally {
+      busyRef.current = false
       setSaving(false)
     }
   }
 
   return (
-    <div className="space-y-6">
+    <fieldset disabled={readOnly || saving} className="space-y-6 border-0 p-0 min-w-0">
+      {error && <p role="alert" className="v-error-text">{error}</p>}
       <div className="rounded-lg border border-v-border bg-v-surface-elevated/50 px-4 py-2.5 text-xs text-v-text-muted">
         <strong>Advanced.</strong> Categories group rounds into higher-level weighted buckets (e.g. a
         “Talent” category holding a prelim and a final round). Most competitions don&apos;t need this —
@@ -314,7 +424,7 @@ function StructureTab({ foundation, reload }) {
 
       <ul className="space-y-2">
         {(foundation?.categories ?? []).map((cat) => (
-          <CategoryRow key={cat.id} cat={cat} eventId={eventId} reload={reload} divisionsEnabled={divisionsEnabled} divisions={divisions} />
+          <CategoryRow key={cat.id} cat={cat} eventId={eventId} reload={reload} divisionsEnabled={divisionsEnabled} divisions={divisions} readOnly={readOnly || saving} />
         ))}
         {!foundation?.categories?.length && (
           <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
@@ -322,12 +432,15 @@ function StructureTab({ foundation, reload }) {
           </li>
         )}
       </ul>
-    </div>
+    </fieldset>
   )
 }
 
-function CategoryRow({ cat, eventId, reload, divisionsEnabled, divisions }) {
+function CategoryRow({ cat, eventId, reload, divisionsEnabled, divisions, readOnly }) {
   const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const busyRef = useRef(false)
   const [draft, setDraft] = useState({
     name: cat.name,
     weight: cat.weight,
@@ -336,26 +449,37 @@ function CategoryRow({ cat, eventId, reload, divisionsEnabled, divisions }) {
   })
 
   const save = async () => {
-    await pageantService.updateCategory(eventId, cat.id, {
+    if (readOnly || busyRef.current) return
+    if (!draft.name.trim() || !Number.isFinite(Number(draft.weight)) || Number(draft.weight) < 0 || Number(draft.weight) > 100) { setError('Enter a category name and a weight between 0 and 100.'); return }
+    busyRef.current = true
+    setBusy(true); setError('')
+    try { await pageantService.updateCategory(eventId, cat.id, {
       name: draft.name,
       weight: Number(draft.weight),
       divisionId: draft.divisionId || null,
       isActive: draft.isActive,
     })
     setEditing(false)
-    reload()
+    await reload()
+    } catch (err) { setError(getErrorMessage(err, 'Could not save category')) }
+    finally { busyRef.current = false; setBusy(false) }
   }
 
   const remove = async () => {
+    if (readOnly || busyRef.current) return
     if (!confirm('Delete this category?')) return
-    await pageantService.deleteCategory(eventId, cat.id)
-    reload()
+    setBusy(true); setError('')
+    busyRef.current = true
+    try { await pageantService.deleteCategory(eventId, cat.id); await reload() }
+    catch (err) { setError(getErrorMessage(err, 'Could not delete category')) }
+    finally { busyRef.current = false; setBusy(false) }
   }
 
   const divisionName = cat.divisionId ? divisions.find(d => d.id === cat.divisionId)?.name : null
 
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-v-border px-4 py-3">
+      {error && <p role="alert" className="v-error-text w-full">{error}</p>}
       {editing ? (
         <div className="flex w-full flex-wrap items-end gap-2">
           <input
@@ -391,7 +515,7 @@ function CategoryRow({ cat, eventId, reload, divisionsEnabled, divisions }) {
             Active
           </label>
           <div className="ml-auto flex gap-2">
-            <button type="button" onClick={save} className="text-v-success text-sm">
+            <button type="button" onClick={save} disabled={readOnly || busy} className="text-v-success text-sm">
               Save
             </button>
             <button
@@ -419,434 +543,16 @@ function CategoryRow({ cat, eventId, reload, divisionsEnabled, divisions }) {
             )}
           </div>
           <div className="flex gap-2 text-sm">
-            <button type="button" onClick={() => setEditing(true)} className="text-v-text-muted">
+            <button type="button" onClick={() => setEditing(true)} disabled={readOnly || busy} className="text-v-text-muted">
               Edit
             </button>
-            <button type="button" onClick={remove} className="text-v-danger">
+            <button type="button" onClick={remove} disabled={readOnly || busy} className="text-v-danger">
               Delete
             </button>
           </div>
         </>
       )}
     </li>
-  )
-}
-
-// #5 — a short label for a round's elimination rule, so it's visible on the row
-// (previously buried inside the assignment expander). Returns null when the round
-// keeps everyone, so only eliminating rounds get a badge.
-function advancementLabel(round) {
-  const v = round.advancementValue
-  const policy = round.scorePolicy === 'cumulative' ? ' · cumulative' : ''
-  switch (round.advancementType) {
-    case 'top_n':
-      return `Top ${v ?? '?'} advance${policy}`
-    case 'top_percent':
-      return `Top ${v ?? '?'}% advance${policy}`
-    case 'threshold':
-      return `Score ≥ ${v ?? '?'} advances${policy}`
-    case 'manual':
-      return `Manual pick${policy}`
-    default:
-      return null
-  }
-}
-
-function RoundsTab({ foundation, reload }) {
-  const { eventId } = useParams()
-  const { error: toastError } = useToast()
-  const divisionsEnabled = foundation?.event?.divisions_enabled
-  const divisions = foundation?.divisions ?? []
-  // Categories are hidden by default; only surface the round→category picker for
-  // events that already have categories from before.
-  const hasCategories = (foundation?.categories ?? []).length > 0
-
-  const [name, setName] = useState('')
-  const [weight, setWeight] = useState(0)
-  const [categoryId, setCategoryId] = useState('')
-  const [divisionId, setDivisionId] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [expandedRoundId, setExpandedRoundId] = useState(null)
-
-  const totalWeight = useMemo(
-    () => (foundation?.rounds ?? []).reduce((s, r) => s + Number(r.weight), 0),
-    [foundation],
-  )
-  // §1: round weight budget across the event.
-  const remaining = Math.max(0, 100 - totalWeight)
-  const isFull = remaining <= 0.01
-
-  const submit = async (e) => {
-    e.preventDefault()
-    if (Number(weight) > remaining + 0.01) {
-      toastError(`Only ${remaining.toFixed(2)}% of round weight left. Lower the weight to add this round.`)
-      return
-    }
-    setSaving(true)
-    try {
-      await pageantService.createRound(eventId, {
-        name,
-        weight: Number(weight),
-        categoryId: categoryId || null,
-        divisionId: divisionId || null,
-      })
-      setName('')
-      setWeight(0)
-      setCategoryId('')
-      setDivisionId('')
-      reload()
-    } catch (err) {
-      toastError(getErrorMessage(err))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const toggleOpen = async (round) => {
-    await pageantService.updateRound(eventId, round.id, { isOpen: !round.isOpen })
-    reload()
-  }
-
-  return (
-    <div className="space-y-6">
-      <form
-        onSubmit={submit}
-        className={`grid gap-4 v-card p-6 ${
-          divisionsEnabled && hasCategories
-            ? 'sm:grid-cols-[1fr_120px_1fr_1fr_auto]'
-            : divisionsEnabled || hasCategories
-              ? 'sm:grid-cols-[1fr_120px_1fr_auto]'
-              : 'sm:grid-cols-[1fr_120px_auto]'
-        }`}
-      >
-        <div>
-          <label className={LABEL_CLASS}>Round name</label>
-          <input
-            className={INPUT_CLASS}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Preliminary, Final"
-            required
-          />
-        </div>
-        <div>
-          <label className={LABEL_CLASS}>Weight %</label>
-          <input
-            type="number"
-            step="0.01"
-            className={INPUT_CLASS}
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            min={0}
-            max={remaining || 100}
-            disabled={isFull}
-          />
-        </div>
-        {hasCategories && (
-          <div>
-            <label className={LABEL_CLASS}>Category (optional)</label>
-            <select
-              className={INPUT_CLASS}
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-            >
-              <option value="">— Event-wide —</option>
-              {(foundation?.categories ?? []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {divisionsEnabled && (
-          <div>
-            <label className={LABEL_CLASS}>Division (optional)</label>
-            <select
-              className={INPUT_CLASS}
-              value={divisionId}
-              onChange={(e) => setDivisionId(e.target.value)}
-            >
-              <option value="">— Event-wide —</option>
-              {divisions.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        <div className="flex items-end">
-          <button
-            type="submit"
-            disabled={saving || isFull}
-            title={isFull ? 'Round weights already total 100%' : undefined}
-            className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-60"
-          >
-            {isFull ? 'Full (100%)' : 'Add round'}
-          </button>
-        </div>
-      </form>
-
-      <p
-        className={`text-sm ${
-          Math.abs(totalWeight - 100) < 0.01 ? 'text-v-success' : 'text-amber-400'
-        }`}
-      >
-        Round weight total: {totalWeight.toFixed(2)}% (must equal 100%)
-      </p>
-
-      <ul className="space-y-3">
-        {(foundation?.rounds ?? []).map((round) => {
-          const divisionName = round.division_id ? divisions.find(d => d.id === round.division_id)?.name : null
-
-          return (
-            <li
-              key={round.id}
-              className="rounded-xl border border-v-border bg-v-surface"
-            >
-              {/* Round header row */}
-              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                <div className="flex flex-wrap items-start gap-2">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-v-text">{round.name}</p>
-                      {(() => {
-                        const label = advancementLabel(round)
-                        return label ? (
-                          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-300">
-                            {label}
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-v-surface-elevated px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-v-text-subtle">
-                            No elimination
-                          </span>
-                        )
-                      })()}
-                      {round.finalizedAt && (
-                        <span className="rounded-full bg-v-success/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-v-success">
-                          Finalized
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-v-text-subtle mt-0.5">
-                      {round.weight}% · {round.contestantIds?.length ?? 0} contestants ·{' '}
-                      {round.criteriaIds?.length ?? 0} criteria
-                      {round.categoryId
-                        ? ` · ${foundation?.categories?.find((c) => c.id === round.categoryId)?.name ?? 'Category'}`
-                        : ''}
-                    </p>
-                  </div>
-                  {divisionsEnabled && divisionName && (
-                    <span className="rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium text-v-primary uppercase tracking-wide">
-                      {divisionName}
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-2 text-sm">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedRoundId(expandedRoundId === round.id ? null : round.id)}
-                    className="rounded-lg border border-v-border px-3 py-1 text-xs text-v-text-muted hover:bg-v-surface-elevated"
-                  >
-                    {expandedRoundId === round.id ? 'Hide assignments' : 'Assign contestants & criteria'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleOpen(round)}
-                    className={round.isOpen ? 'text-v-success' : 'text-v-text-muted'}
-                  >
-                    {round.isOpen ? 'Open' : 'Closed'}
-                  </button>
-                  <button
-                    type="button"
-                    className="text-v-danger"
-                    onClick={async () => {
-                      if (confirm('Delete this round?')) {
-                        await pageantService.deleteRound(eventId, round.id)
-                        reload()
-                      }
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-
-              {/* Expanded assignment panel */}
-            {expandedRoundId === round.id && (
-              <RoundAssignmentPanel
-                eventId={eventId}
-                round={round}
-                allContestants={foundation?.contestants ?? []}
-                allCriteria={foundation?.criteria ?? []}
-                reload={reload}
-              />
-            )}
-          </li>
-        )})}
-        {!foundation?.rounds?.length && (
-          <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
-            No rounds yet. Rounds are optional — add them to stage the competition.
-          </li>
-        )}
-      </ul>
-    </div>
-  )
-}
-
-function RoundAssignmentPanel({ eventId, round, allContestants, allCriteria, reload }) {
-  const { success, error: toastError } = useToast()
-  const assignedContestantIds = new Set(round.contestantIds ?? [])
-  const assignedCriteriaIds = new Set(round.criteriaIds ?? [])
-
-  // Read-only per-round summary. The actual assignment now lives on the
-  // Contestants page (contestants → round) and the Criteria page (criteria →
-  // round), so a round only DEFINES itself here.
-  const assignedCritTotal = allCriteria
-    .filter((cr) => assignedCriteriaIds.has(cr.id))
-    .reduce((s, cr) => s + Number(cr.percentage ?? 0), 0)
-  const critComplete = assignedCriteriaIds.size > 0 && Math.abs(assignedCritTotal - 100) < 0.1
-
-  // Phase 6 — per-round advancement/elimination + score policy.
-  const [advType, setAdvType] = useState(round.advancementType ?? 'none')
-  const [advValue, setAdvValue] = useState(round.advancementValue ?? '')
-  const [scorePolicy, setScorePolicy] = useState(round.scorePolicy ?? 'independent')
-  const [savingAdv, setSavingAdv] = useState(false)
-  const isFinalized = Boolean(round.finalizedAt)
-  const needsValue = advType === 'top_n' || advType === 'top_percent' || advType === 'threshold'
-
-  const saveAdvancement = async () => {
-    setSavingAdv(true)
-    try {
-      // Send the full round (the update validator resets unspecified fields).
-      await pageantService.updateRound(eventId, round.id, {
-        name: round.name,
-        description: round.description ?? null,
-        weight: round.weight,
-        displayOrder: round.displayOrder,
-        categoryId: round.categoryId ?? null,
-        divisionId: round.divisionId ?? null,
-        isOpen: round.isOpen,
-        advancementType: advType,
-        advancementValue: needsValue && advValue !== '' ? Number(advValue) : null,
-        scorePolicy,
-      })
-      reload()
-      success('Advancement settings saved')
-    } catch (err) {
-      toastError(getErrorMessage(err))
-    } finally {
-      setSavingAdv(false)
-    }
-  }
-
-  return (
-    <div className="border-t border-v-border px-4 pb-4 pt-3 space-y-4">
-      {/* Read-only summary — assignment moved to the Contestants & Criteria pages. */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border border-v-border bg-v-surface px-3 py-2">
-          <p className="text-[11px] uppercase tracking-wider text-v-text-muted">Contestants</p>
-          <p className="text-sm text-v-text">
-            {assignedContestantIds.size} assigned{' '}
-            <span className="text-xs text-v-text-subtle">/ {allContestants.length} total</span>
-          </p>
-          <p className="mt-0.5 text-[11px] text-v-text-subtle">
-            Assign on the <strong>Contestants</strong> page.
-          </p>
-        </div>
-        <div className="rounded-lg border border-v-border bg-v-surface px-3 py-2">
-          <p className="text-[11px] uppercase tracking-wider text-v-text-muted">Criteria</p>
-          <p className={`text-sm ${critComplete ? 'text-v-success' : 'text-v-text'}`}>
-            {assignedCriteriaIds.size
-              ? `${assignedCritTotal.toFixed(0)}% ${critComplete ? '✓' : '/ 100%'}`
-              : 'None yet'}
-          </p>
-          <p className="mt-0.5 text-[11px] text-v-text-subtle">
-            Configure in the <strong>Criteria</strong> tab.
-          </p>
-        </div>
-      </div>
-
-      {/* Phase 6 — advancement / elimination + score policy */}
-      <div className="rounded-lg border border-v-border bg-v-surface-elevated/40 p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-medium uppercase tracking-wider text-v-text-muted">
-            Advancement & scoring
-          </p>
-          {isFinalized && (
-            <span className="rounded bg-v-success/10 px-1.5 py-0.5 text-[10px] font-medium text-v-success">
-              Finalized
-            </span>
-          )}
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-[11px] text-v-text-muted" title="Applies when deciding who advances. The final event ranking always combines rounds by their weights.">
-              Score policy (advancement)
-            </label>
-            <select
-              className="w-full rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text disabled:opacity-50"
-              value={scorePolicy}
-              disabled={isFinalized}
-              onChange={(e) => setScorePolicy(e.target.value)}
-            >
-              <option value="independent">Independent — this round only</option>
-              <option value="cumulative">Cumulative — carry prior rounds</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-[11px] text-v-text-muted">Advancement</label>
-            <select
-              className="w-full rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text disabled:opacity-50"
-              value={advType}
-              disabled={isFinalized}
-              onChange={(e) => setAdvType(e.target.value)}
-            >
-              <option value="none">None (no elimination)</option>
-              <option value="top_n">Top N advance</option>
-              <option value="top_percent">Top % advance</option>
-              <option value="threshold">Score threshold</option>
-              <option value="manual">Manual pick</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-[11px] text-v-text-muted">
-              {advType === 'top_n' ? 'N' : advType === 'top_percent' ? 'Percent' : advType === 'threshold' ? 'Min score' : 'Value'}
-            </label>
-            <input
-              type="number"
-              className="w-full rounded-lg border border-v-border bg-v-surface px-2 py-1.5 text-sm text-v-text disabled:opacity-50"
-              value={advValue}
-              disabled={isFinalized || !needsValue}
-              onChange={(e) => setAdvValue(e.target.value)}
-              placeholder={needsValue ? '' : '—'}
-            />
-          </div>
-        </div>
-        {/* Phase 4 (W5): explain what advancement does and where it runs. */}
-        <p className="mt-2 text-[11px] leading-relaxed text-v-text-subtle">
-          {advType === 'none' && 'No elimination — every contestant stays for the next round.'}
-          {advType === 'top_n' && 'The top N by score advance to the next round (per division when divisions are on).'}
-          {advType === 'top_percent' && 'The top N% by score advance to the next round.'}
-          {advType === 'threshold' && 'Contestants scoring at or above this value advance.'}
-          {advType === 'manual' && 'You pick who advances by hand when finalizing.'}
-          {' '}You set the rule here; you <strong>run</strong> it later from{' '}
-          <strong>Live Control → “Finalize round &amp; advance”</strong>, where you can review and override
-          the qualifiers before confirming.
-        </p>
-        <div className="mt-2 flex justify-end">
-          <button
-            type="button"
-            disabled={savingAdv || isFinalized}
-            onClick={saveAdvancement}
-            className="rounded-lg bg-v-primary px-3 py-1.5 text-xs font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
-          >
-            {savingAdv ? 'Saving...' : 'Save settings'}
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -875,176 +581,7 @@ function TypeHint({ type }) {
   )
 }
 
-// Phase 4 (W1/W3/W4) — progressive readiness so the organizer sees what's
-// missing DURING setup, not only when they hit Start. Mirrors the backend
-// pre-flight (contestants ≥1, active judges ≥1, criteria total 100% — per round
-// when rounds carry their own criteria, else event-wide).
-function SetupReadiness({ foundation }) {
-  if (!foundation) return null
-  const contestants = foundation.contestants ?? []
-  const judges = (foundation.judges ?? []).filter((j) => j.isActive !== false)
-  const criteria = foundation.criteria ?? []
-  const rounds = foundation.rounds ?? []
-  const usesRoundCriteria = rounds.some((r) => (r.criteriaIds ?? []).length > 0)
-
-  let criteriaOk
-  if (usesRoundCriteria) {
-    criteriaOk = rounds.every((r) => {
-      const ids = r.criteriaIds ?? []
-      if (!ids.length) return true
-      const total = criteria
-        .filter((c) => ids.includes(c.id))
-        .reduce((s, c) => s + Number(c.percentage ?? 0), 0)
-      return Math.abs(total - 100) < 0.1
-    })
-  } else {
-    const total = criteria.reduce((s, c) => s + Number(c.percentage ?? 0), 0)
-    criteriaOk = criteria.length > 0 && Math.abs(total - 100) < 0.1
-  }
-
-  const checks = [
-    { label: 'At least one contestant', ok: contestants.length > 0 },
-    { label: 'At least one active judge', ok: judges.length > 0 },
-    {
-      label: usesRoundCriteria ? "Each round's criteria total 100%" : 'Criteria total 100%',
-      ok: criteriaOk,
-    },
-  ]
-  const allOk = checks.every((c) => c.ok)
-
-  return (
-    <div
-      className={`rounded-lg border px-4 py-3 ${
-        allOk ? 'border-v-success/30 bg-v-success-bg' : 'border-v-border bg-v-surface'
-      }`}
-    >
-      <p className={`mb-2 text-xs font-semibold ${allOk ? 'text-v-success' : 'text-v-text-muted'}`}>
-        {allOk ? '✓ Ready to open scoring' : 'Setup checklist'}
-      </p>
-      <ul className="grid gap-1 sm:grid-cols-3">
-        {checks.map((c) => (
-          <li key={c.label} className="flex items-center gap-1.5 text-xs">
-            <span className={c.ok ? 'text-v-success' : 'text-amber-400'}>{c.ok ? '✓' : '○'}</span>
-            <span className={c.ok ? 'text-v-text-muted' : 'text-v-text'}>{c.label}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-function ScoringTab({ foundation, reload }) {
-  const { eventId } = useParams()
-  const config = foundation?.scoringConfig ?? {}
-  // Score type / range is no longer set here — it lives on each MINOR criterion
-  // (Criteria tab), the single source of truth. This tab owns only how scores
-  // COMBINE. The stored scoreType is preserved as a fallback via the backend's
-  // partial merge (setScoringConfig), so we simply don't send it.
-  const [decimalPlaces, setDecimalPlaces] = useState(config.decimalPlaces ?? 2)
-  const [dropHighest, setDropHighest] = useState(config.dropHighest ?? 0)
-  const [dropLowest, setDropLowest] = useState(config.dropLowest ?? 0)
-  const [includeOverallRanking, setIncludeOverallRanking] = useState(config.includeOverallRanking ?? false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
-  const [saved, setSaved] = useState(false)
-
-  const save = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    setSaved(false)
-    try {
-      await pageantService.setScoringConfig(eventId, {
-        decimalPlaces: Number(decimalPlaces),
-        dropHighest: Number(dropHighest),
-        dropLowest: Number(dropLowest),
-        includeOverallRanking: Boolean(includeOverallRanking),
-      })
-      setSaved(true)
-      reload()
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save config')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <form onSubmit={save} className="grid gap-4 v-card p-6 sm:grid-cols-2">
-      <div className="sm:col-span-2 rounded-lg border border-v-border bg-v-surface-elevated/50 px-4 py-2.5 text-xs text-v-text-muted">
-        These rules control how judges&apos; scores <strong>combine</strong> into a result. The{' '}
-        <strong>score type / range</strong> a judge types is set per <strong>minor criterion</strong>{' '}
-        in the <strong>Criteria</strong> tab.
-      </div>
-      <div>
-        <label className={LABEL_CLASS}>Decimal places</label>
-        <input
-          type="number"
-          min={0}
-          max={6}
-          className={INPUT_CLASS}
-          value={decimalPlaces}
-          onChange={(e) => setDecimalPlaces(e.target.value)}
-        />
-      </div>
-      <div>
-        <label className={LABEL_CLASS}>Drop highest N</label>
-        <input
-          type="number"
-          min={0}
-          className={INPUT_CLASS}
-          value={dropHighest}
-          onChange={(e) => setDropHighest(e.target.value)}
-        />
-      </div>
-      <div>
-        <label className={LABEL_CLASS}>Drop lowest N</label>
-        <input
-          type="number"
-          min={0}
-          className={INPUT_CLASS}
-          value={dropLowest}
-          onChange={(e) => setDropLowest(e.target.value)}
-        />
-      </div>
-      
-      {foundation?.event?.divisions_enabled && (
-        <div className="sm:col-span-2 v-card p-4 border border-v-primary/30">
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={Boolean(includeOverallRanking)}
-              onChange={(e) => setIncludeOverallRanking(e.target.checked)}
-              disabled={saving}
-            />
-            <div>
-              <span className="block font-medium text-v-text">Enable Overall Rankings</span>
-              <span className="text-sm text-v-text-subtle">
-                When divisions are enabled, this displays a combined ranking of all contestants alongside division rankings.
-              </span>
-            </div>
-          </label>
-        </div>
-      )}
-
-      <div className="sm:col-span-2 flex items-center justify-between">
-        <div>
-          {error && <p className="text-sm text-v-danger">{error}</p>}
-          {saved && <p className="text-sm text-v-success">Saved.</p>}
-        </div>
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-60"
-        >
-          Save scoring config
-        </button>
-      </div>
-    </form>
-  )
-}
-
-function DivisionsTab({ foundation, reload }) {
+function DivisionsTab({ foundation, reload, readOnly }) {
   const { eventId } = useParams()
   const divisionsEnabled = foundation?.event?.divisions_enabled ?? false
   const divisions = foundation?.divisions ?? []
@@ -1052,42 +589,52 @@ function DivisionsTab({ foundation, reload }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const busyRef = useRef(false)
+
+  const mutate = async operation => {
+    if (readOnly || busyRef.current) return
+    busyRef.current = true; setSaving(true); setError('')
+    try { await operation(); await reload() }
+    catch (err) { setError(getErrorMessage(err, 'Could not save division changes')) }
+    finally { busyRef.current = false; setSaving(false) }
+  }
 
   const toggleEnabled = async () => {
-    setSaving(true)
-    try {
-      await pageantService.setDivisionsEnabled(eventId, !divisionsEnabled)
-      reload()
-    } finally {
-      setSaving(false)
-    }
+    await mutate(() => pageantService.setDivisionsEnabled(eventId, !divisionsEnabled))
   }
 
   const submit = async (e) => {
     e.preventDefault()
-    setSaving(true)
-    try {
+    if (!name.trim()) { setError('Enter a division name.'); return }
+    await mutate(async () => {
       await pageantService.createDivision(eventId, { name, description })
       setName('')
       setDescription('')
-      reload()
-    } finally {
-      setSaving(false)
-    }
+    })
+  }
+  const move = async (index, delta) => {
+    const destination = index + delta
+    if (destination < 0 || destination >= divisions.length) return
+    const divisionIds = divisions.map(item => item.id)
+    ;[divisionIds[index], divisionIds[destination]] = [divisionIds[destination], divisionIds[index]]
+    await mutate(() => pageantService.reorderDivisions(eventId, divisionIds))
   }
 
   return (
     <div className="space-y-6">
+      {error && <p role="alert" className="v-error-text">{error}</p>}
+      <fieldset disabled={readOnly || saving} className="space-y-6 border-0 p-0 min-w-0">
       <div className="v-card p-6 flex flex-wrap items-center justify-between gap-4 border border-v-primary/30 bg-v-primary/5">
         <div>
           <h3 className="text-lg font-semibold text-v-text">Enable Divisions</h3>
           <p className="text-sm text-v-text-subtle mt-1">
-            Group contestants by category (e.g., Male, Female, Junior, Senior) to compute separate rankings.
+            Group contestants by division (e.g., Men, Women, Junior, Senior). Separate ranking is selected independently in Scoring rules.
           </p>
         </div>
         <button
           onClick={toggleEnabled}
-          disabled={saving}
+          disabled={readOnly || saving}
           className={`px-4 py-2 rounded-lg text-sm font-medium ${
             divisionsEnabled 
               ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' 
@@ -1102,8 +649,9 @@ function DivisionsTab({ foundation, reload }) {
         <>
           <form onSubmit={submit} className="grid gap-4 v-card p-6 sm:grid-cols-[1fr_2fr_auto]">
             <div>
-              <label className={LABEL_CLASS}>Division name</label>
+              <label className={LABEL_CLASS} htmlFor="division-name">Division name</label>
               <input
+                id="division-name"
                 className={INPUT_CLASS}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -1112,8 +660,9 @@ function DivisionsTab({ foundation, reload }) {
               />
             </div>
             <div>
-              <label className={LABEL_CLASS}>Description (Optional)</label>
+              <label className={LABEL_CLASS} htmlFor="division-description">Description (Optional)</label>
               <input
+                id="division-description"
                 className={INPUT_CLASS}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -1132,8 +681,8 @@ function DivisionsTab({ foundation, reload }) {
           </form>
 
           <ul className="space-y-2">
-            {divisions.map((div) => (
-              <DivisionRow key={div.id} division={div} eventId={eventId} reload={reload} />
+            {divisions.map((div, index) => (
+              <li key={div.id} className="list-none"><DivisionRow division={div} eventId={eventId} reload={reload} readOnly={readOnly || saving}/><div className="flex gap-3 mb-3">{[-1,1].map(delta=><button key={delta} type="button" className="v-caption underline disabled:opacity-50" disabled={readOnly || saving || index + delta < 0 || index + delta >= divisions.length} aria-label={`Move ${div.name} ${delta < 0 ? 'earlier' : 'later'}`} onClick={() => move(index, delta)}>{delta<0?'Move division earlier':'Move division later'}</button>)}</div></li>
             ))}
             {divisions.length === 0 && (
               <li className="rounded-lg border border-dashed border-v-border px-4 py-6 text-center text-sm text-v-text-subtle">
@@ -1143,37 +692,47 @@ function DivisionsTab({ foundation, reload }) {
           </ul>
         </>
       )}
+      </fieldset>
     </div>
   )
 }
 
-function DivisionRow({ division, eventId, reload }) {
+function DivisionRow({ division, eventId, reload, readOnly }) {
   const { success, error: toastError } = useToast()
   const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const busyRef = useRef(false)
   const [draft, setDraft] = useState({
     name: division.name,
     description: division.description || '',
-    isActive: division.isActive,
+    rowColor: division.rowColor ?? division.row_color ?? (division.name?.toLowerCase()==='male'?'#DCEBFA':division.name?.toLowerCase()==='female'?'#F7DCEC':'#FFFFFF'),
+    isActive: division.isActive ?? division.is_active,
   })
 
   const save = async () => {
-    await pageantService.updateDivision(eventId, division.id, draft)
-    setEditing(false)
-    reload()
+    if (readOnly || busyRef.current) return
+    if (!draft.name.trim()) { setError('Enter a division name.'); return }
+    busyRef.current = true; setBusy(true); setError('')
+    try { await pageantService.updateDivision(eventId, division.id, draft); setEditing(false); await reload(); success('Division saved') }
+    catch (err) { setError(getErrorMessage(err, 'Could not save division')) }
+    finally { busyRef.current = false; setBusy(false) }
   }
 
   const remove = async () => {
+    if (readOnly || busyRef.current) return
     if (!window.confirm('Delete this division? This will only work if it has no data associated with it.')) return
+    busyRef.current = true; setBusy(true); setError('')
     try {
       await pageantService.deleteDivision(eventId, division.id)
-      reload()
+      await reload()
       success('Division deleted')
     } catch (err) {
       if (err.response?.status === 409) {
         if (window.confirm('This division contains data and cannot be deleted. Deactivate it instead?')) {
           try {
             await pageantService.updateDivision(eventId, division.id, { isActive: false })
-            reload()
+            await reload()
             success('Division deactivated')
           } catch (deactivateErr) {
             toastError(getErrorMessage(deactivateErr))
@@ -1182,12 +741,12 @@ function DivisionRow({ division, eventId, reload }) {
       } else {
         toastError(getErrorMessage(err))
       }
-    }
+    } finally { busyRef.current = false; setBusy(false) }
   }
 
   if (editing) {
     return (
-      <li className="flex items-end gap-3 rounded-lg border border-v-border bg-v-surface p-4">
+      <div className="space-y-2"><fieldset disabled={readOnly || busy} className="flex flex-wrap items-end gap-3 rounded-lg border border-v-border bg-v-surface p-4">
         <div className="flex-1">
           <label className="text-xs text-v-text-subtle mb-1 block">Name</label>
           <input
@@ -1203,6 +762,7 @@ function DivisionRow({ division, eventId, reload }) {
             value={draft.description}
             onChange={(e) => setDraft({ ...draft, description: e.target.value })}
           />
+          <label className="v-caption">Division row color<input type="color" value={draft.rowColor} onChange={e=>setDraft({...draft,rowColor:e.target.value})}/></label>
         </div>
         <label className="flex items-center gap-2 pb-2">
           <input
@@ -1224,12 +784,13 @@ function DivisionRow({ division, eventId, reload }) {
         >
           Cancel
         </button>
-      </li>
+      </fieldset>{error && <p role="alert" className="v-error-text">{error}</p>}</div>
     )
   }
 
   return (
-    <li className="flex items-center justify-between rounded-lg border border-v-border bg-v-surface p-4">
+    <div className="flex items-center justify-between rounded-lg border border-v-border bg-v-surface p-4">
+      {error && <p role="alert" className="v-error-text">{error}</p>}
       <div className={!division.isActive ? 'opacity-50' : ''}>
         <div className="flex items-center gap-2">
           <span className="font-medium text-v-text">{division.name}</span>
@@ -1244,17 +805,19 @@ function DivisionRow({ division, eventId, reload }) {
       <div className="flex gap-2">
         <button
           onClick={() => setEditing(true)}
+          disabled={readOnly || busy}
           className="rounded-lg px-3 py-1.5 text-sm text-v-primary hover:bg-v-primary/10"
         >
           Edit
         </button>
         <button
           onClick={remove}
+          disabled={readOnly || busy}
           className="rounded-lg px-3 py-1.5 text-sm text-red-400 hover:bg-red-400/10"
         >
           Delete
         </button>
       </div>
-    </li>
+    </div>
   )
 }

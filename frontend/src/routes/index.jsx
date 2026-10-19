@@ -1,4 +1,6 @@
+import CompetitionCategoriesPage from '@/pages/organizer/competition/CompetitionCategoriesPage'
 import { lazy } from 'react'
+const NativeCompetitionResultsPage=lazy(()=>import('@/pages/public/NativeCompetitionResultsPage'))
 import { Navigate, useLocation, useParams } from 'react-router-dom'
 // AuthLayout is the only framer-motion consumer; lazy-loading it keeps that
 // ~100 KB animation library out of the main bundle (loaded only on auth routes).
@@ -109,6 +111,7 @@ function LegacyParticipantRedirect() {
 }
 
 export const routeConfig = [
+  {path:'/competition/events/:eventId/competitions/:competitionId/results',element:<NativeCompetitionResultsPage/>},
   // ROOT — Shows login for guests, redirects authenticated users to dashboard
   {
     path: '/',
@@ -226,12 +229,15 @@ export const routeConfig = [
       { path: 'events/new', element: <CompetitionEventFormPage /> },
       { path: 'events/:eventId/edit', element: <CompetitionEventFormPage /> },
       { path: 'events/:eventId/branding', element: <CompetitionEventFormPage /> },
+      { path: 'events/:eventId/type', element: <CompetitionCategoriesPage typeOnly /> },
+      { path: 'events/:eventId/categories', element: <CompetitionCategoriesPage /> },
       { path: 'events/:eventId/workspace', element: <CompetitionWorkspacePage /> },
       { path: 'events/:eventId/contestants', element: <CompetitionContestantsPage /> },
       { path: 'events/:eventId/judges', element: <CompetitionJudgesPage /> },
       { path: 'events/:eventId/review', element: <CompetitionReviewPage /> },
       { path: 'events/:eventId/rankings', element: <CompetitionRankingsPage /> },
       { path: 'events/:eventId/tabulation', element: <CompetitionTabulationPage /> },
+      { path: 'events/:eventId/tabulation/:section', element: <CompetitionTabulationPage /> },
 { path: 'events/:eventId/analytics', element: <CompetitionAnalyticsPage /> },
       { path: 'events/:eventId/report', element: <CompetitionReportPage /> },
       { path: 'events/:eventId/live', element: <CompetitionLiveControlPage /> },

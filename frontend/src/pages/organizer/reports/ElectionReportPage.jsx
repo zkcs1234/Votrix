@@ -186,7 +186,7 @@ export default function ElectionReportPage() {
       {positionSummaries.map((position) => (
         <AnalyticsSection
           key={position.positionId}
-          title={position.positionName}
+          title={[position.ballotSectionName, position.positionName].filter(Boolean).join(' · ')}
           meta={`${position.totalVotes ?? 0} votes`}
           description={
             position.leader

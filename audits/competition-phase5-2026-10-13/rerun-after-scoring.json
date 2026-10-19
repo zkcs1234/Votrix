@@ -1,0 +1,33 @@
+{
+  "database": "votrix_tabulation_1791894228454",
+  "preserved": true,
+  "before": {
+    "competitions": "fc675a672eae97f40551c0d76a51fe9f",
+    "competition_child_sessions": "b927402726b36a23a505b044166e32b1",
+    "competition_child_submissions": "9e0c234ecc0bb4e427c743d06f6f3992",
+    "competition_child_submission_heads": "4a0ab6403da8f4a5346572836710c142",
+    "competition_child_score_drafts": "066103886f177f58a9ef7ca32aef3268",
+    "competition_child_scoring_audit": "0cdf85a12fb6e3bf5a77c669fcd4277f",
+    "competition_child_calculations": "3629899d7fa793a3a0d954f5ae595a5b",
+    "competition_child_calculation_transitions": "89fb2a2c5104e87ff539a13d8e5c6fe3",
+    "competition_child_deduction_decisions": "554c1d0c736ed96b696e0ecf01df0685",
+    "competition_child_deduction_reviews": "b6c014a2e65a14428f478cde38ac5113",
+    "competition_child_qualifications": "7231365c27de36343704e0a5e9f97528",
+    "competition_child_review_policies": "d96c7e27aa5dc9168ae7ad187500ceb4"
+  },
+  "after": {
+    "competitions": "fc675a672eae97f40551c0d76a51fe9f",
+    "competition_child_sessions": "b927402726b36a23a505b044166e32b1",
+    "competition_child_submissions": "9e0c234ecc0bb4e427c743d06f6f3992",
+    "competition_child_submission_heads": "4a0ab6403da8f4a5346572836710c142",
+    "competition_child_score_drafts": "066103886f177f58a9ef7ca32aef3268",
+    "competition_child_scoring_audit": "0cdf85a12fb6e3bf5a77c669fcd4277f",
+    "competition_child_calculations": "3629899d7fa793a3a0d954f5ae595a5b",
+    "competition_child_calculation_transitions": "89fb2a2c5104e87ff539a13d8e5c6fe3",
+    "competition_child_deduction_decisions": "554c1d0c736ed96b696e0ecf01df0685",
+    "competition_child_deduction_reviews": "b6c014a2e65a14428f478cde38ac5113",
+    "competition_child_qualifications": "7231365c27de36343704e0a5e9f97528",
+    "competition_child_review_policies": "d96c7e27aa5dc9168ae7ad187500ceb4"
+  },
+  "productionTouched": false
+}

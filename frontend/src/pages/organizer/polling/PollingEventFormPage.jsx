@@ -10,10 +10,11 @@ import {
   localInputToIso,
 } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import CalendarCard from '@/components/ui/CalendarCard'
+import DateTimeInput from '@/components/ui/DateTimeInput'
+import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
-import EventStepper from '@/components/ui/EventStepper'
-import StageFooter from '@/components/ui/StageFooter'
+import { getNextStage, stagePath } from '@/utils/eventStages'
+import SaveStatus from '@/components/ui/SaveStatus'
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
@@ -54,7 +55,7 @@ const { eventId } = useParams()
   // existing poll whose setup is locked (scheduled/active/…) is read-only.
   const readOnly = !isNew && isSetupLocked(eventStatus)
 
-  const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
+  const { markComplete, reset: resetProgress } = useEventProgress(
     'polling',
     eventId,
   )
@@ -96,7 +97,7 @@ const { eventId } = useParams()
   })
 
   const formValues = watch()
-  const startDateValue = formValues.startDate ?? ''
+
 
   const buildDraftSnapshot = useCallback((data = getValues(), draftStep = step, currentBanner = banner) => ({
     step: draftStep,
@@ -369,19 +370,17 @@ useEffect(() => {
 
   if (loading) return <p className="v-caption">Loading...</p>
 
-const stepperEventId = isNew ? 'new' : eventId
-
   return (
     <div className="space-y-6">
       <>
-          <EventStepper
-            module="polling"
-            currentKey={step}
-            eventId={stepperEventId}
-            completedKeys={completedKeys}
-            readOnly={readOnly}
-            eventStatus={eventStatus}
-          />
+          <div className="flex flex-wrap items-center gap-2 text-sm text-v-text-subtle" aria-label="Event steps">
+            {["details","branding","settings"].map((key, index) => (
+              <span key={key} aria-current={step === key ? 'step' : undefined} className={step === key ? 'font-medium text-v-primary' : ''}>
+                {index > 0 && <span aria-hidden="true"> → </span>}
+                Step {index + 1}: {key[0].toUpperCase() + key.slice(1)}
+              </span>
+            ))}
+          </div>
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="poll" />}
 
@@ -391,7 +390,7 @@ const stepperEventId = isNew ? 'new' : eventId
                 {isNew ? 'Create poll' : 'Poll settings'}
               </h2>
               <p className="v-helper-text">
-                Fill out the poll basics, branding, and settings. Use the stepper or sidebar
+                Fill out the poll basics, branding, and settings. Use the sidebar
                 to jump between sections.
               </p>
             </header>
@@ -429,7 +428,7 @@ const stepperEventId = isNew ? 'new' : eventId
               {errors.description && <p className="v-error-text">{errors.description.message}</p>}
             </div>
 
-            <div className="v-date-row">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="v-form-field">
                 <label className={LABEL_CLASS} htmlFor="startDate">
                   Start Date and Time <span className="text-v-danger">*</span>
@@ -438,11 +437,8 @@ const stepperEventId = isNew ? 'new' : eventId
                   control={control}
                   name="startDate"
                   render={({ field }) => (
-                    <CalendarCard
+                    <DateTimeInput
                       id="startDate"
-                      required
-                      defaultHour={0}
-                      defaultMinute={0}
                       hasError={Boolean(errors.startDate)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
@@ -461,13 +457,9 @@ const stepperEventId = isNew ? 'new' : eventId
                   control={control}
                   name="endDate"
                   render={({ field }) => (
-                    <CalendarCard
+                    <DateTimeInput
                       id="endDate"
-                      required
-                      defaultHour={23}
-                      defaultMinute={59}
                       hasError={Boolean(errors.endDate)}
-                      min={startDateValue || undefined}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
@@ -527,50 +519,30 @@ const stepperEventId = isNew ? 'new' : eventId
         </fieldset>
       </Card>
 
-        {!readOnly && step === 'details' && (
-            <StageFooter
-              module="polling"
-              currentKey="details"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleNextDetails}
-              nextLabel="Next: Branding"
-              backLabel={null}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
-        )}
-        
-        {!readOnly && step === 'branding' && (
-            <StageFooter
-              module="polling"
-              currentKey="branding"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleNextBranding}
-              nextLabel={isNew ? 'Save & continue' : 'Next: Settings'}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
-        )}
-        
-        {!readOnly && step === 'settings' && (
-            <StageFooter
-              module="polling"
-              currentKey="settings"
-              eventId={stepperEventId}
-              saving={saving}
-              onNext={handleSaveSettings}
-              nextLabel={isNew ? 'Create & continue' : 'Next: Builder'}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
-            />
-        )}
-
-        {/* Read-only polls keep a plain Back/Next footer for viewing. */}
-        {readOnly && (
-          <StageFooter module="polling" currentKey={step} eventId={eventId} />
-        )}
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-v-border pt-4">
+          <div className="flex items-center gap-3">
+            {step !== 'details' && (
+              <Button type="button" variant="secondary" disabled={saving} onClick={() => { setError(null); setStep(step === 'settings' ? 'branding' : 'details') }}>
+                Back: {step === 'settings' ? 'Branding' : 'Details'}
+              </Button>
+            )}
+            {!readOnly && <SaveStatus status={saveStatus} lastSavedAt={lastSavedAt} />}
+          </div>
+          {readOnly ? (
+            <Button type="button" onClick={() => {
+              if (step === 'details') setStep('branding')
+              else if (step === 'branding') setStep('settings')
+              else {
+                const next = getNextStage('polling', step)
+                if (next) navigate(stagePath('polling', next.key, eventId))
+              }
+            }}>Next</Button>
+          ) : (
+            <Button type="button" disabled={saving} onClick={step === 'details' ? handleNextDetails : step === 'branding' ? handleNextBranding : handleSaveSettings}>
+              {saving ? 'Saving...' : step === 'details' ? 'Next: Branding' : step === 'branding' ? 'Next: Settings' : isNew ? 'Create & continue' : 'Next: Builder'}
+            </Button>
+          )}
+        </div>
           </div>
         </>
 

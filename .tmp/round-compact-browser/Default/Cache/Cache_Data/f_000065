@@ -1,0 +1,180 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/ui/Modal.jsx");const useEffect = __vite__cjsImport0_react["useEffect"]; const useRef = __vite__cjsImport0_react["useRef"]; const useCallback = __vite__cjsImport0_react["useCallback"];const createPortal = __vite__cjsImport1_reactDom["createPortal"];const _jsxDEV = __vite__cjsImport3_react_jsxDevRuntime["jsxDEV"];import __vite__cjsImport0_react from "/node_modules/.vite/deps/react.js?v=664ab6fe";
+import __vite__cjsImport1_reactDom from "/node_modules/.vite/deps/react-dom.js?v=664ab6fe";
+import { X } from "/node_modules/.vite/deps/lucide-react.js?v=3d4ffac3";
+var _jsxFileName = "C:/Github/Votrix/frontend/src/components/ui/Modal.jsx";
+import __vite__cjsImport3_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=664ab6fe";
+var _s = $RefreshSig$();
+const FOCUSABLE = "a[href], button:not(:disabled), textarea:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex=\"-1\"])";
+/**
+* Accessible modal dialog. Handles what the ad-hoc `fixed inset-0` overlays did
+* not: focus trap, Escape-to-close, backdrop click, body scroll-lock, restoring
+* focus to the trigger on close, and the correct dialog ARIA roles.
+*
+* @param {object} props
+* @param {boolean} props.open
+* @param {() => void} props.onClose
+* @param {string} [props.title]           Rendered as the dialog heading + aria-label.
+* @param {React.ReactNode} props.children
+* @param {string} [props.size]            'sm' | 'md' | 'lg' (default 'md')
+* @param {boolean} [props.closeOnBackdrop] Default true.
+* @param {string} [props.variant] 'modal' (default) or a viewport-height 'drawer'.
+* @param {React.ReactNode} [props.footer] Dialog footer outside its scroll body.
+* @param {object} [props.restoreFocusRef] Optional originating trigger ref.
+*/
+export default function Modal({ open, onClose, title, children, size = "md", closeOnBackdrop = true, variant = "modal", footer, restoreFocusRef, closeDisabled = false, id }) {
+	_s();
+	const dialogRef = useRef(null);
+	const previouslyFocused = useRef(null);
+	const handleKeyDown = useCallback((e) => {
+		if (e.key === "Escape") {
+			e.stopPropagation();
+			if (!closeDisabled) onClose?.();
+			return;
+		}
+		if (e.key !== "Tab") return;
+		// Focus trap: keep Tab / Shift+Tab inside the dialog.
+		const focusable = dialogRef.current?.querySelectorAll(FOCUSABLE);
+		if (!focusable || focusable.length === 0) {
+			e.preventDefault();
+			dialogRef.current?.focus();
+			return;
+		}
+		const first = focusable[0];
+		const last = focusable[focusable.length - 1];
+		if (e.shiftKey && document.activeElement === first) {
+			e.preventDefault();
+			last.focus();
+		} else if (!e.shiftKey && document.activeElement === last) {
+			e.preventDefault();
+			first.focus();
+		}
+	}, [onClose, closeDisabled]);
+	useEffect(() => {
+		if (!open) return undefined;
+		previouslyFocused.current = restoreFocusRef?.current ?? document.activeElement;
+		const { body } = document;
+		const prevOverflow = body.style.overflow;
+		body.style.overflow = "hidden";
+		// Move focus into the dialog once it mounts.
+		const focusTarget = (variant === "drawer" ? dialogRef.current?.querySelector("[data-modal-autofocus]:not(:disabled)") : null) ?? dialogRef.current?.querySelector(FOCUSABLE) ?? dialogRef.current;
+		focusTarget?.focus?.();
+		return () => {
+			body.style.overflow = prevOverflow;
+			// Restore focus to whatever opened the modal.
+			if (previouslyFocused.current instanceof HTMLElement) {
+				previouslyFocused.current.focus();
+			}
+		};
+	}, [
+		open,
+		variant,
+		restoreFocusRef
+	]);
+	if (!open) return null;
+	const maxWidth = size === "lg" ? "max-w-3xl" : size === "sm" ? "max-w-md" : "max-w-2xl";
+	return createPortal(/* @__PURE__ */ _jsxDEV("div", {
+		className: variant === "drawer" ? "fixed inset-0 z-50 flex justify-end bg-black/40" : "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4",
+		onMouseDown: (e) => {
+			// Only close when the backdrop itself is pressed, not the dialog.
+			if (closeOnBackdrop && e.target === e.currentTarget) onClose?.();
+		},
+		onKeyDown: handleKeyDown,
+		children: /* @__PURE__ */ _jsxDEV("div", {
+			ref: dialogRef,
+			id,
+			tabIndex: -1,
+			role: "dialog",
+			"aria-modal": "true",
+			"aria-label": title || undefined,
+			className: variant === "drawer" ? "v-rounds flex h-dvh w-full min-w-0 flex-col bg-v-surface shadow-xl sm:max-w-lg sm:border-l sm:border-v-border" : `w-full ${maxWidth} max-h-[85vh] overflow-auto rounded-lg bg-v-surface p-6 shadow-xl`,
+			children: [
+				title && /* @__PURE__ */ _jsxDEV("div", {
+					className: variant === "drawer" ? "flex shrink-0 items-center justify-between gap-3 border-b border-v-border px-5 py-4" : "mb-4 flex items-start justify-between gap-4",
+					children: [/* @__PURE__ */ _jsxDEV("h3", {
+						className: variant === "drawer" ? "min-w-0 break-words text-base font-semibold text-v-text" : "v-page-title",
+						children: title
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 114,
+						columnNumber: 13
+					}, this), /* @__PURE__ */ _jsxDEV("button", {
+						type: "button",
+						onClick: onClose,
+						"aria-label": "Close",
+						disabled: closeDisabled,
+						className: variant === "drawer" ? "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-v-text-muted transition hover:bg-v-surface-elevated hover:text-v-text disabled:opacity-50" : "rounded-md p-1 text-v-text-muted transition hover:bg-v-surface-elevated hover:text-v-text",
+						children: /* @__PURE__ */ _jsxDEV(X, {
+							className: "h-5 w-5",
+							strokeWidth: 2
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 122,
+							columnNumber: 15
+						}, this)
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 115,
+						columnNumber: 13
+					}, this)]
+				}, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 113,
+					columnNumber: 11
+				}, this),
+				variant === "drawer" ? /* @__PURE__ */ _jsxDEV("div", {
+					"data-drawer-content": true,
+					className: "min-h-0 flex-1 overflow-y-auto overscroll-contain p-5",
+					children
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 126,
+					columnNumber: 33
+				}, this) : children,
+				footer && /* @__PURE__ */ _jsxDEV("div", {
+					className: "shrink-0 border-t border-v-border px-5 py-4",
+					children: footer
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 127,
+					columnNumber: 20
+				}, this)
+			]
+		}, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 103,
+			columnNumber: 7
+		}, this)
+	}, void 0, false, {
+		fileName: _jsxFileName,
+		lineNumber: 95,
+		columnNumber: 5
+	}, this), document.body);
+}
+_s(Modal, "W2CCpXBwRNXTCJXmhUCEnYFUms4=");
+_c = Modal;
+var _c;
+$RefreshReg$(_c, "Modal");
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+import * as __vite_react_currentExports from "/src/components/ui/Modal.jsx";
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+
+  const currentExports = __vite_react_currentExports;
+  queueMicrotask(() => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Github/Votrix/frontend/src/components/ui/Modal.jsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Github/Votrix/frontend/src/components/ui/Modal.jsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+function $RefreshReg$(type, id) { return RefreshRuntime.register(type, "C:/Github/Votrix/frontend/src/components/ui/Modal.jsx" + ' ' + id); }
+function $RefreshSig$() { return RefreshRuntime.createSignatureFunctionForTransform(); }
+
+//# sourceMappingURL=data:application/json;base64,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QVUsd0JBQUMsT0FBRDtLQUFLLFdBQVU7ZUFBK0M7SUFBWTs7Ozs7R0FDbEY7Ozs7OztDQUNGOzs7O1dBQ0wsU0FBUyxJQUNYO0FBQ0YiLCJuYW1lcyI6W10sInNvdXJjZXMiOlsiTW9kYWwuanN4Il0sInZlcnNpb24iOjMsInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IHVzZUVmZmVjdCwgdXNlUmVmLCB1c2VDYWxsYmFjayB9IGZyb20gJ3JlYWN0J1xyXG5pbXBvcnQgeyBjcmVhdGVQb3J0YWwgfSBmcm9tICdyZWFjdC1kb20nXHJcbmltcG9ydCB7IFggfSBmcm9tICdsdWNpZGUtcmVhY3QnXHJcblxyXG5jb25zdCBGT0NVU0FCTEUgPVxyXG4gICdhW2hyZWZdLCBidXR0b246bm90KDpkaXNhYmxlZCksIHRleHRhcmVhOm5vdCg6ZGlzYWJsZWQpLCBpbnB1dDpub3QoOmRpc2FibGVkKSwgc2VsZWN0Om5vdCg6ZGlzYWJsZWQpLCBbdGFiaW5kZXhdOm5vdChbdGFiaW5kZXg9XCItMVwiXSknXHJcblxyXG4vKipcclxuICogQWNjZXNzaWJsZSBtb2RhbCBkaWFsb2cuIEhhbmRsZXMgd2hhdCB0aGUgYWQtaG9jIGBmaXhlZCBpbnNldC0wYCBvdmVybGF5cyBkaWRcclxuICogbm90OiBmb2N1cyB0cmFwLCBFc2NhcGUtdG8tY2xvc2UsIGJhY2tkcm9wIGNsaWNrLCBib2R5IHNjcm9sbC1sb2NrLCByZXN0b3JpbmdcclxuICogZm9jdXMgdG8gdGhlIHRyaWdnZXIgb24gY2xvc2UsIGFuZCB0aGUgY29ycmVjdCBkaWFsb2cgQVJJQSByb2xlcy5cclxuICpcclxuICogQHBhcmFtIHtvYmplY3R9IHByb3BzXHJcbiAqIEBwYXJhbSB7Ym9vbGVhbn0gcHJvcHMub3BlblxyXG4gKiBAcGFyYW0geygpID0+IHZvaWR9IHByb3BzLm9uQ2xvc2VcclxuICogQHBhcmFtIHtzdHJpbmd9IFtwcm9wcy50aXRsZV0gICAgICAgICAgIFJlbmRlcmVkIGFzIHRoZSBkaWFsb2cgaGVhZGluZyArIGFyaWEtbGFiZWwuXHJcbiAqIEBwYXJhbSB7UmVhY3QuUmVhY3ROb2RlfSBwcm9wcy5jaGlsZHJlblxyXG4gKiBAcGFyYW0ge3N0cmluZ30gW3Byb3BzLnNpemVdICAgICAgICAgICAgJ3NtJyB8ICdtZCcgfCAnbGcnIChkZWZhdWx0ICdtZCcpXHJcbiAqIEBwYXJhbSB7Ym9vbGVhbn0gW3Byb3BzLmNsb3NlT25CYWNrZHJvcF0gRGVmYXVsdCB0cnVlLlxyXG4gKiBAcGFyYW0ge3N0cmluZ30gW3Byb3BzLnZhcmlhbnRdICdtb2RhbCcgKGRlZmF1bHQpIG9yIGEgdmlld3BvcnQtaGVpZ2h0ICdkcmF3ZXInLlxyXG4gKiBAcGFyYW0ge1JlYWN0LlJlYWN0Tm9kZX0gW3Byb3BzLmZvb3Rlcl0gRGlhbG9nIGZvb3RlciBvdXRzaWRlIGl0cyBzY3JvbGwgYm9keS5cclxuICogQHBhcmFtIHtvYmplY3R9IFtwcm9wcy5yZXN0b3JlRm9jdXNSZWZdIE9wdGlvbmFsIG9yaWdpbmF0aW5nIHRyaWdnZXIgcmVmLlxyXG4gKi9cclxuZXhwb3J0IGRlZmF1bHQgZnVuY3Rpb24gTW9kYWwoe1xyXG4gIG9wZW4sXHJcbiAgb25DbG9zZSxcclxuICB0aXRsZSxcclxuICBjaGlsZHJlbixcclxuICBzaXplID0gJ21kJyxcclxuICBjbG9zZU9uQmFja2Ryb3AgPSB0cnVlLFxyXG4gIHZhcmlhbnQgPSAnbW9kYWwnLFxyXG4gIGZvb3RlcixcclxuICByZXN0b3JlRm9jdXNSZWYsXHJcbiAgY2xvc2VEaXNhYmxlZCA9IGZhbHNlLFxyXG4gIGlkLFxyXG59KSB7XHJcbiAgY29uc3QgZGlhbG9nUmVmID0gdXNlUmVmKG51bGwpXHJcbiAgY29uc3QgcHJldmlvdXNseUZvY3VzZWQgPSB1c2VSZWYobnVsbClcclxuXHJcbiAgY29uc3QgaGFuZGxlS2V5RG93biA9IHVzZUNhbGxiYWNrKFxyXG4gICAgKGUpID0+IHtcclxuICAgICAgaWYgKGUua2V5ID09PSAnRXNjYXBlJykge1xyXG4gICAgICAgIGUuc3RvcFByb3BhZ2F0aW9uKClcclxuICAgICAgICBpZiAoIWNsb3NlRGlzYWJsZWQpIG9uQ2xvc2U/LigpXHJcbiAgICAgICAgcmV0dXJuXHJcbiAgICAgIH1cclxuICAgICAgaWYgKGUua2V5ICE9PSAnVGFiJykgcmV0dXJuXHJcbiAgICAgIC8vIEZvY3VzIHRyYXA6IGtlZXAgVGFiIC8gU2hpZnQrVGFiIGluc2lkZSB0aGUgZGlhbG9nLlxyXG4gICAgICBjb25zdCBmb2N1c2FibGUgPSBkaWFsb2dSZWYuY3VycmVudD8ucXVlcnlTZWxlY3RvckFsbChGT0NVU0FCTEUpXHJcbiAgICAgIGlmICghZm9jdXNhYmxlIHx8IGZvY3VzYWJsZS5sZW5ndGggPT09IDApIHtcclxuICAgICAgICBlLnByZXZlbnREZWZhdWx0KClcclxuICAgICAgICBkaWFsb2dSZWYuY3VycmVudD8uZm9jdXMoKVxyXG4gICAgICAgIHJldHVyblxyXG4gICAgICB9XHJcbiAgICAgIGNvbnN0IGZpcnN0ID0gZm9jdXNhYmxlWzBdXHJcbiAgICAgIGNvbnN0IGxhc3QgPSBmb2N1c2FibGVbZm9jdXNhYmxlLmxlbmd0aCAtIDFdXHJcbiAgICAgIGlmIChlLnNoaWZ0S2V5ICYmIGRvY3VtZW50LmFjdGl2ZUVsZW1lbnQgPT09IGZpcnN0KSB7XHJcbiAgICAgICAgZS5wcmV2ZW50RGVmYXVsdCgpXHJcbiAgICAgICAgbGFzdC5mb2N1cygpXHJcbiAgICAgIH0gZWxzZSBpZiAoIWUuc2hpZnRLZXkgJiYgZG9jdW1lbnQuYWN0aXZlRWxlbWVudCA9PT0gbGFzdCkge1xyXG4gICAgICAgIGUucHJldmVudERlZmF1bHQoKVxyXG4gICAgICAgIGZpcnN0LmZvY3VzKClcclxuICAgICAgfVxyXG4gICAgfSxcclxuICAgIFtvbkNsb3NlLCBjbG9zZURpc2FibGVkXSxcclxuICApXHJcblxyXG4gIHVzZUVmZmVjdCgoKSA9PiB7XHJcbiAgICBpZiAoIW9wZW4pIHJldHVybiB1bmRlZmluZWRcclxuXHJcbiAgICBwcmV2aW91c2x5Rm9jdXNlZC5jdXJyZW50ID0gcmVzdG9yZUZvY3VzUmVmPy5jdXJyZW50ID8/IGRvY3VtZW50LmFjdGl2ZUVsZW1lbnRcclxuICAgIGNvbnN0IHsgYm9keSB9ID0gZG9jdW1lbnRcclxuICAgIGNvbnN0IHByZXZPdmVyZmxvdyA9IGJvZHkuc3R5bGUub3ZlcmZsb3dcclxuICAgIGJvZHkuc3R5bGUub3ZlcmZsb3cgPSAnaGlkZGVuJ1xyXG5cclxuICAgIC8vIE1vdmUgZm9jdXMgaW50byB0aGUgZGlhbG9nIG9uY2UgaXQgbW91bnRzLlxyXG4gICAgY29uc3QgZm9jdXNUYXJnZXQgPSAodmFyaWFudCA9PT0gJ2RyYXdlcicgPyBkaWFsb2dSZWYuY3VycmVudD8ucXVlcnlTZWxlY3RvcignW2RhdGEtbW9kYWwtYXV0b2ZvY3VzXTpub3QoOmRpc2FibGVkKScpIDogbnVsbClcclxuICAgICAgPz8gZGlhbG9nUmVmLmN1cnJlbnQ/LnF1ZXJ5U2VsZWN0b3IoRk9DVVNBQkxFKSA/PyBkaWFsb2dSZWYuY3VycmVudFxyXG4gICAgZm9jdXNUYXJnZXQ/LmZvY3VzPy4oKVxyXG5cclxuICAgIHJldHVybiAoKSA9PiB7XHJcbiAgICAgIGJvZHkuc3R5bGUub3ZlcmZsb3cgPSBwcmV2T3ZlcmZsb3dcclxuICAgICAgLy8gUmVzdG9yZSBmb2N1cyB0byB3aGF0ZXZlciBvcGVuZWQgdGhlIG1vZGFsLlxyXG4gICAgICBpZiAocHJldmlvdXNseUZvY3VzZWQuY3VycmVudCBpbnN0YW5jZW9mIEhUTUxFbGVtZW50KSB7XHJcbiAgICAgICAgcHJldmlvdXNseUZvY3VzZWQuY3VycmVudC5mb2N1cygpXHJcbiAgICAgIH1cclxuICAgIH1cclxuICB9LCBbb3BlbiwgdmFyaWFudCwgcmVzdG9yZUZvY3VzUmVmXSlcclxuXHJcbiAgaWYgKCFvcGVuKSByZXR1cm4gbnVsbFxyXG5cclxuICBjb25zdCBtYXhXaWR0aCA9IHNpemUgPT09ICdsZycgPyAnbWF4LXctM3hsJyA6IHNpemUgPT09ICdzbScgPyAnbWF4LXctbWQnIDogJ21heC13LTJ4bCdcclxuXHJcbiAgcmV0dXJuIGNyZWF0ZVBvcnRhbChcclxuICAgIDxkaXZcclxuICAgICAgY2xhc3NOYW1lPXt2YXJpYW50ID09PSAnZHJhd2VyJyA/ICdmaXhlZCBpbnNldC0wIHotNTAgZmxleCBqdXN0aWZ5LWVuZCBiZy1ibGFjay80MCcgOiAnZml4ZWQgaW5zZXQtMCB6LTUwIGZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktY2VudGVyIGJnLWJsYWNrLzUwIHAtNCd9XHJcbiAgICAgIG9uTW91c2VEb3duPXsoZSkgPT4ge1xyXG4gICAgICAgIC8vIE9ubHkgY2xvc2Ugd2hlbiB0aGUgYmFja2Ryb3AgaXRzZWxmIGlzIHByZXNzZWQsIG5vdCB0aGUgZGlhbG9nLlxyXG4gICAgICAgIGlmIChjbG9zZU9uQmFja2Ryb3AgJiYgZS50YXJnZXQgPT09IGUuY3VycmVudFRhcmdldCkgb25DbG9zZT8uKClcclxuICAgICAgfX1cclxuICAgICAgb25LZXlEb3duPXtoYW5kbGVLZXlEb3dufVxyXG4gICAgPlxyXG4gICAgICA8ZGl2XHJcbiAgICAgICAgcmVmPXtkaWFsb2dSZWZ9XHJcbiAgICAgICAgaWQ9e2lkfVxyXG4gICAgICAgIHRhYkluZGV4PXstMX1cclxuICAgICAgICByb2xlPVwiZGlhbG9nXCJcclxuICAgICAgICBhcmlhLW1vZGFsPVwidHJ1ZVwiXHJcbiAgICAgICAgYXJpYS1sYWJlbD17dGl0bGUgfHwgdW5kZWZpbmVkfVxyXG4gICAgICAgIGNsYXNzTmFtZT17dmFyaWFudCA9PT0gJ2RyYXdlcicgPyAndi1yb3VuZHMgZmxleCBoLWR2aCB3LWZ1bGwgbWluLXctMCBmbGV4LWNvbCBiZy12LXN1cmZhY2Ugc2hhZG93LXhsIHNtOm1heC13LWxnIHNtOmJvcmRlci1sIHNtOmJvcmRlci12LWJvcmRlcicgOiBgdy1mdWxsICR7bWF4V2lkdGh9IG1heC1oLVs4NXZoXSBvdmVyZmxvdy1hdXRvIHJvdW5kZWQtbGcgYmctdi1zdXJmYWNlIHAtNiBzaGFkb3cteGxgfVxyXG4gICAgICA+XHJcbiAgICAgICAge3RpdGxlICYmIChcclxuICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPXt2YXJpYW50ID09PSAnZHJhd2VyJyA/ICdmbGV4IHNocmluay0wIGl0ZW1zLWNlbnRlciBqdXN0aWZ5LWJldHdlZW4gZ2FwLTMgYm9yZGVyLWIgYm9yZGVyLXYtYm9yZGVyIHB4LTUgcHktNCcgOiAnbWItNCBmbGV4IGl0ZW1zLXN0YXJ0IGp1c3RpZnktYmV0d2VlbiBnYXAtNCd9PlxyXG4gICAgICAgICAgICA8aDMgY2xhc3NOYW1lPXt2YXJpYW50ID09PSAnZHJhd2VyJyA/ICdtaW4tdy0wIGJyZWFrLXdvcmRzIHRleHQtYmFzZSBmb250LXNlbWlib2xkIHRleHQtdi10ZXh0JyA6ICd2LXBhZ2UtdGl0bGUnfT57dGl0bGV9PC9oMz5cclxuICAgICAgICAgICAgPGJ1dHRvblxyXG4gICAgICAgICAgICAgIHR5cGU9XCJidXR0b25cIlxyXG4gICAgICAgICAgICAgIG9uQ2xpY2s9e29uQ2xvc2V9XHJcbiAgICAgICAgICAgICAgYXJpYS1sYWJlbD1cIkNsb3NlXCJcclxuICAgICAgICAgICAgICBkaXNhYmxlZD17Y2xvc2VEaXNhYmxlZH1cclxuICAgICAgICAgICAgICBjbGFzc05hbWU9e3ZhcmlhbnQgPT09ICdkcmF3ZXInID8gJ2lubGluZS1mbGV4IGgtMTAgdy0xMCBzaHJpbmstMCBpdGVtcy1jZW50ZXIganVzdGlmeS1jZW50ZXIgcm91bmRlZC1tZCB0ZXh0LXYtdGV4dC1tdXRlZCB0cmFuc2l0aW9uIGhvdmVyOmJnLXYtc3VyZmFjZS1lbGV2YXRlZCBob3Zlcjp0ZXh0LXYtdGV4dCBkaXNhYmxlZDpvcGFjaXR5LTUwJyA6ICdyb3VuZGVkLW1kIHAtMSB0ZXh0LXYtdGV4dC1tdXRlZCB0cmFuc2l0aW9uIGhvdmVyOmJnLXYtc3VyZmFjZS1lbGV2YXRlZCBob3Zlcjp0ZXh0LXYtdGV4dCd9XHJcbiAgICAgICAgICAgID5cclxuICAgICAgICAgICAgICA8WCBjbGFzc05hbWU9XCJoLTUgdy01XCIgc3Ryb2tlV2lkdGg9ezJ9IC8+XHJcbiAgICAgICAgICAgIDwvYnV0dG9uPlxyXG4gICAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgKX1cclxuICAgICAgICB7dmFyaWFudCA9PT0gJ2RyYXdlcicgPyA8ZGl2IGRhdGEtZHJhd2VyLWNvbnRlbnQgY2xhc3NOYW1lPVwibWluLWgtMCBmbGV4LTEgb3ZlcmZsb3cteS1hdXRvIG92ZXJzY3JvbGwtY29udGFpbiBwLTVcIj57Y2hpbGRyZW59PC9kaXY+IDogY2hpbGRyZW59XHJcbiAgICAgICAge2Zvb3RlciAmJiA8ZGl2IGNsYXNzTmFtZT1cInNocmluay0wIGJvcmRlci10IGJvcmRlci12LWJvcmRlciBweC01IHB5LTRcIj57Zm9vdGVyfTwvZGl2Pn1cclxuICAgICAgPC9kaXY+XHJcbiAgICA8L2Rpdj4sXHJcbiAgICBkb2N1bWVudC5ib2R5LFxyXG4gIClcclxufVxyXG4iXX0=

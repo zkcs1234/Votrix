@@ -11,10 +11,10 @@ export default function StageFooter({
   eventId,
   saving = false,
   onNext,
+  onBack,
   nextLabel,
   backLabel,
   showSidebarHint = true,
-  nextPath,
   nextDisabled = false,
   saveStatus = 'idle',
   lastSavedAt = null,
@@ -22,8 +22,7 @@ export default function StageFooter({
   const next = getNextStage(module, currentKey)
   const prev = getPrevStage(module, currentKey)
 
-  const defaultNextHref = next ? stagePath(module, next.key, eventId) : null
-  const nextHref = nextPath ?? defaultNextHref
+  const nextHref = next ? stagePath(module, next.key, eventId) : null
   const prevHref = prev ? stagePath(module, prev.key, eventId) : null
 
   const content = (
@@ -31,7 +30,10 @@ export default function StageFooter({
       <div className="mx-auto flex w-full items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3 md:px-8">
         <div className="flex items-center gap-3">
         {prevHref ? (
-          <Link to={prevHref}>
+          onBack ? <Button type="button" variant="secondary" disabled={saving} onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
+            {backLabel ?? `Back: ${prev.label}`}
+          </Button> : <Link to={prevHref} aria-disabled={saving || undefined} onClick={event => { if (saving) event.preventDefault() }}>
             <Button type="button" variant="secondary" disabled={saving}>
               <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
               {backLabel ?? `Back: ${prev.label}`}
@@ -51,15 +53,15 @@ export default function StageFooter({
           <SaveStatus status={saveStatus} lastSavedAt={lastSavedAt} />
         )}
 
-        {nextHref ? (
+        {nextHref || onNext ? (
           onNext ? (
             <Button type="button" onClick={onNext} disabled={saving || nextDisabled}>
               {saving ? 'Saving...' : nextLabel ?? `Next: ${next.label}`}
               <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
             </Button>
           ) : (
-            <Link to={nextHref}>
-              <Button type="button" disabled={saving}>
+            <Link to={nextHref} aria-disabled={saving || nextDisabled || undefined} onClick={event => { if (saving || nextDisabled) event.preventDefault() }}>
+              <Button type="button" disabled={saving || nextDisabled}>
                 {nextLabel ?? `Next: ${next.label}`}
                 <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
               </Button>

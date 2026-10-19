@@ -55,7 +55,9 @@ export const exportPageantReport = asyncHandler(async (req, res) => {
 
 export const exportCompetitionReport = asyncHandler(async (req, res) => {
   const format = resolveFormat(req.query.format)
-  const exportData = await reportsService.getCompetitionReportExport(req.params.eventId, req.user.id)
+  const exportData = await reportsService.getCompetitionReportExport(req.params.eventId, req.user.id, {
+    divisionId: req.query.divisionId || null,
+  })
   return sendExport(res, { format, ...exportData })
 })
 

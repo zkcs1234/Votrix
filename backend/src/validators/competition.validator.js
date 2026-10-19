@@ -1,4 +1,5 @@
 import { ApiError } from '../utils/ApiError.js'
+import {progressionIssues} from '../../../shared/competition-progression-validation.js'
 import {
   SCORE_TYPES,
   CALCULATION_METHODS,
@@ -62,6 +63,7 @@ export function validateCompetitionEvent(body, isCreate = false) {
 }
 
 export function validateContestant(body) {
+  if (body.entryType !== undefined && !['individual','duo','group','other'].includes(body.entryType)) throw new ApiError(400, 'Choose a supported entry type')
   if (!body?.name?.trim()) throw new ApiError(400, 'Contestant name is required')
   const num = Number(body.contestantNumber)
   if (!Number.isInteger(num) || num < 1) {
@@ -69,32 +71,38 @@ export function validateContestant(body) {
   }
   return {
     name: body.name.trim(),
-    photo: body.photo || null,
+    ...(body.photo !== undefined ? {photo:body.photo || null} : {}),
     contestantNumber: num,
-    divisionId: body.divisionId || null,
+    ...(body.divisionId !== undefined ? {divisionId:body.divisionId || null} : {}),
+    ...(body.entryType !== undefined ? {entryType:body.entryType} : {}),
+    ...(body.entryLabel !== undefined ? {entryLabel:String(body.entryLabel).trim()} : {}),
   }
 }
 
-export function validateCriteria(body) {
-  if (!body?.name?.trim()) throw new ApiError(400, 'Criteria name is required')
-  const percentage = Number(body.percentage)
+export function validateCriteria(body, isCreate = true) {
+  if ((isCreate || body?.name !== undefined) && !body?.name?.trim()) throw new ApiError(400, 'Criteria name is required')
+  const percentage = Number(body.percentage ?? 0)
   const minScore = Number(body.minScore ?? 0)
   const maxScore = Number(body.maxScore ?? 100)
 
-  if (percentage < 0 || percentage > 100) {
+  if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
     throw new ApiError(400, 'Percentage must be between 0 and 100')
   }
-  if (maxScore < minScore) {
+  if (!Number.isFinite(minScore) || !Number.isFinite(maxScore) || maxScore < minScore) {
     throw new ApiError(400, 'maxScore must be >= minScore')
   }
 
-  return { 
-    name: body.name.trim(), 
-    percentage, 
-    minScore, 
+  const payload = {
+    name: body.name?.trim(),
+    percentage,
+    minScore,
     maxScore,
     divisionId: body.divisionId || null,
   }
+  if (body.isActive !== undefined) payload.isActive = Boolean(body.isActive)
+  if (body.displayOrder !== undefined) {const n=Number(body.displayOrder);if(!Number.isInteger(n)||n<0)throw new ApiError(400,'Criterion order must be a nonnegative integer');payload.displayOrder=n}
+  if (!isCreate) for (const key of Object.keys(payload)) if (body[key] === undefined) delete payload[key]
+  return payload
 }
 
 // Minor criteria carry NO percentage (equal weight within their criterion) and
@@ -173,35 +181,37 @@ export const validatePageantEvent = validateCompetitionEvent
 // ---------------------------------------------------------------------------
 // Phase 4 — Categories
 // ---------------------------------------------------------------------------
-export function validateCategory(body) {
-  if (!body?.name?.trim()) throw new ApiError(400, 'Category name is required')
+export function validateCategory(body, isCreate = true) {
+  if ((isCreate || body?.name !== undefined) && !body?.name?.trim()) throw new ApiError(400, 'Category name is required')
   const weight = Number(body.weight ?? 0)
   if (Number.isNaN(weight) || weight < 0 || weight > 100) {
     throw new ApiError(400, 'Category weight must be between 0 and 100')
   }
   const displayOrder = body.displayOrder !== undefined ? Number(body.displayOrder) : 0
-  return {
-    name: body.name.trim(),
+  const payload = {
+    name: body.name?.trim(),
     description: body.description?.trim() || null,
     displayOrder: Number.isInteger(displayOrder) ? displayOrder : 0,
     weight,
     isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
     divisionId: body.divisionId || null,
   }
+  if (!isCreate) for (const key of Object.keys(payload)) if (body[key] === undefined) delete payload[key]
+  return payload
 }
 
 // ---------------------------------------------------------------------------
 // Phase 4 — Rounds
 // ---------------------------------------------------------------------------
-export function validateRound(body) {
-  if (!body?.name?.trim()) throw new ApiError(400, 'Round name is required')
+export function validateRound(body, isCreate = true) {
+  if ((isCreate || body?.name !== undefined) && !body?.name?.trim()) throw new ApiError(400, 'Round name is required')
   const weight = Number(body.weight ?? 0)
   if (Number.isNaN(weight) || weight < 0 || weight > 100) {
     throw new ApiError(400, 'Round weight must be between 0 and 100')
   }
   const displayOrder = body.displayOrder !== undefined ? Number(body.displayOrder) : 0
   const payload = {
-    name: body.name.trim(),
+    name: body.name?.trim(),
     description: body.description?.trim() || null,
     categoryId: body.categoryId || null,
     divisionId: body.divisionId || null,
@@ -224,6 +234,7 @@ export function validateRound(body) {
     payload.advancementType = body.advancementType
   }
   if (body.advancementValue !== undefined) {
+    if(body.advancementValue!==null&&body.advancementValue!==''&&(typeof body.advancementValue==='boolean'||!Number.isFinite(Number(body.advancementValue))))throw new ApiError(400,'advancementValue must be a finite numeric value')
     payload.advancementValue =
       body.advancementValue === null || body.advancementValue === ''
         ? null
@@ -239,6 +250,18 @@ export function validateRound(body) {
     payload.scorePolicy = body.scorePolicy
   }
 
+  if (!isCreate) {
+    for (const key of Object.keys(payload)) if (body[key] === undefined) delete payload[key]
+  }
+  for (const key of ['purpose', 'progression', 'nextRoundId', 'judgingSettings']) {
+    if (body[key] !== undefined) payload[key] = body[key]
+  }
+  if (payload.purpose && !['qualification', 'final', 'regular', 'special'].includes(payload.purpose)) throw new ApiError(400, 'Invalid round purpose')
+  if (payload.progression && !['back_to_zero', 'carry_forward', 'weighted'].includes(payload.progression)) throw new ApiError(400, 'Invalid scoring relationship')
+  if(isCreate||(body.advancementType!==undefined&&body.advancementValue!==undefined)){
+    const issues=progressionIssues({...payload,nextRoundId:null})
+    if(issues.length)throw new ApiError(400,issues.join(' '))
+  }
   return payload
 }
 
@@ -246,6 +269,7 @@ export function validateRound(body) {
 // Phase 5 — Scoring configuration
 // ---------------------------------------------------------------------------
 export function validateScoringConfig(body) {
+  if (body?.deductionMode !== undefined || body?.deductionRules?.some?.(rule => rule?.appliedBy !== undefined)) throw new ApiError(400, 'Configure round deduction responsibility through the competition Rounds & Scoring setup')
   if (!body || typeof body !== 'object') {
     throw new ApiError(400, 'scoring config is required')
   }
@@ -263,7 +287,7 @@ export function validateScoringConfig(body) {
   }
 
   if (body.calculationMethod !== undefined) {
-    if (!Object.values(CALCULATION_METHODS).includes(body.calculationMethod)) {
+    if (![...Object.values(CALCULATION_METHODS),'manual','undecided'].includes(body.calculationMethod)) {
       throw new ApiError(
         400,
         `calculationMethod must be one of: ${Object.values(CALCULATION_METHODS).join(', ')}`,
@@ -306,6 +330,31 @@ export function validateScoringConfig(body) {
     config.dropLowest = n
   }
 
+  for (const key of ['confirmed', 'perDivision', 'independentApproval']) {
+    if (body[key] === undefined) continue
+    if (typeof body[key] !== 'boolean') throw new ApiError(400, `${key} must be true or false`)
+    config[key] = body[key]
+  }
+  if (body.tiePolicy !== undefined) {
+    if (!['shared', 'highest_criterion'].includes(body.tiePolicy)) throw new ApiError(400, 'Choose a supported tie policy')
+    config.tiePolicy = body.tiePolicy
+  }
+  for (const key of ['verifierId', 'finalRoundId']) {
+    if (body[key] === undefined) continue
+    if (body[key] !== null && typeof body[key] !== 'string') throw new ApiError(400, `${key} must be an identifier or null`)
+    config[key] = body[key]?.trim() || null
+  }
+  if (body.manualBasis !== undefined) {
+    if (typeof body.manualBasis !== 'string') throw new ApiError(400, 'Describe the manual result procedure in text')
+    config.manualBasis = body.manualBasis.trim()
+  }
+  if (body.deductionRules !== undefined) {
+    if (!Array.isArray(body.deductionRules) || body.deductionRules.some(rule => !rule || typeof rule !== 'object' || Array.isArray(rule))) throw new ApiError(400, 'Penalty rules must be a list of rule records')
+    if (body.deductionRules.some(rule => !rule.id || typeof rule.id !== 'string') || new Set(body.deductionRules.map(rule => rule.id)).size !== body.deductionRules.length) throw new ApiError(400, 'Penalty rules require unique identifiers')
+    if (body.deductionRules.some(rule => !['points', 'placements'].includes(rule.units))) throw new ApiError(400, 'Penalty units must be points or placements')
+    config.deductionRules = body.deductionRules
+  }
+
   // Division support: includeOverallRanking flag
   if (body.includeOverallRanking !== undefined) {
     config.includeOverallRanking = Boolean(body.includeOverallRanking)
@@ -326,16 +375,18 @@ export function validateScoringConfig(body) {
 // ---------------------------------------------------------------------------
 // Phase 6 — Judge permission roles and assignments
 // ---------------------------------------------------------------------------
-export function validateJudgeRole(body) {
+export function validateJudgeRole(body, isCreate = true) {
   const role = body?.role
   if (role !== undefined && !Object.values(JUDGE_ROLES).includes(role)) {
     throw new ApiError(400, `Invalid role. Must be one of: ${Object.values(JUDGE_ROLES).join(', ')}`)
   }
-  return {
+  const payload = {
     role: role ?? JUDGE_ROLES.JUDGE,
     displayName: body?.displayName?.trim() || null,
     isActive: body?.isActive !== undefined ? Boolean(body.isActive) : true,
   }
+  if (!isCreate) for (const key of Object.keys(payload)) if (body[key] === undefined) delete payload[key]
+  return payload
 }
 
 export function validateAssignment(body) {
@@ -351,15 +402,18 @@ export function validateAssignment(body) {
 // ---------------------------------------------------------------------------
 // Division validators
 // ---------------------------------------------------------------------------
-export function validateDivision(body) {
-  if (!body?.name?.trim()) throw new ApiError(400, 'Division name is required')
+export function validateDivision(body, isCreate = true) {
+  if ((isCreate || body?.name !== undefined) && !body?.name?.trim()) throw new ApiError(400, 'Division name is required')
   const displayOrder = body.displayOrder !== undefined ? Number(body.displayOrder) : 0
-  return {
-    name: body.name.trim(),
+  const payload = {
+    name: body.name?.trim(),
+    ...(body.rowColor !== undefined ? {rowColor:/^#[0-9a-f]{6}$/i.test(body.rowColor)?body.rowColor:null}:{}),
     description: body.description?.trim() || null,
     displayOrder: Number.isInteger(displayOrder) ? displayOrder : 0,
     isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
   }
+  if (!isCreate) for (const key of Object.keys(payload)) if (body[key] === undefined) delete payload[key]
+  return payload
 }
 
 export function validateDivisionsToggle(body) {

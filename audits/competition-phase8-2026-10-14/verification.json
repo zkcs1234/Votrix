@@ -1,0 +1,162 @@
+{
+  "phase": 8,
+  "completedAt": "2026-10-14T00:05:52.679Z",
+  "releaseRecommendation": "NO-GO",
+  "backend": {
+    "filesPassed": 88,
+    "testsPassed": 663,
+    "filesSkipped": 1,
+    "testsSkipped": 3
+  },
+  "frontend": {
+    "filesPassed": 45,
+    "testsPassed": 314
+  },
+  "postgres": {
+    "navigationRemoval": true,
+    "tabulationGroups": 13,
+    "resultsGroups": 8,
+    "sourceTemplateUnchanged": true,
+    "preflightBlockers": 0,
+    "restorePassed": true
+  },
+  "browser": {
+    "basicGroups": 4,
+    "basicApplicationRequests": 867,
+    "extendedGroups": 6,
+    "extendedApplicationRequests": 579,
+    "actualExpressMiddleware": true,
+    "actualControllersServices": true,
+    "syntheticSignedJwtIssuance": true,
+    "hostedPostgrest": false,
+    "hostedPasswordLogin": false
+  },
+  "transport": {
+    "passed": true,
+    "roomRegistryProcesses": 2,
+    "actualHttpApiProcessesTested": false,
+    "crossProcessDeliveryMilliseconds": 65.06479999999999,
+    "scorePayloadRejected": true,
+    "unauthenticatedBrokerDenied": true,
+    "duplicateFrameSuppressed": true,
+    "brokerRestartReconciliation": true,
+    "queuedHintRecovery": true,
+    "transport": "Authenticated HMAC ws relay; loopback-only local test",
+    "productionTopologyVerified": false,
+    "externalInfrastructureProvisioned": false
+  },
+  "capacity": {
+    "passed": true,
+    "database": "votrix_hardening_1791930231077",
+    "entrants": 50,
+    "judges": 5,
+    "majors": 4,
+    "minorsPerMajor": 3,
+    "rawTargets": 3000,
+    "actualConcurrentRpcWrites": 20,
+    "concurrentBatchMilliseconds": 1874.7416000000012,
+    "writeWallMilliseconds": {
+      "min": 358.3666999999987,
+      "max": 1672.8877999999968,
+      "mean": 1035.9070549999997
+    },
+    "lockWaitTimeSeparated": false,
+    "tabulationPsqlWallMilliseconds": 384.8767000000007,
+    "calculationMilliseconds": 26.086300000002666,
+    "responseBytes": 1195468,
+    "csv": {
+      "milliseconds": 48.87109999999666,
+      "bytes": 2191364,
+      "heapUsedDelta": 10024416,
+      "rssDelta": 18264064,
+      "peakMemoryMeasured": false
+    },
+    "fullRosterHttpAutosaveTested": false,
+    "bulkSources": "Direct guarded local SQL fixture rows followed by actual submission RPCs",
+    "productionCapacityVerified": false
+  },
+  "sourcePreservation": {
+    "checked": 649,
+    "changed": [
+      "backend/src/app.js",
+      "backend/src/middleware/rateLimiter.js",
+      "backend/src/modules/competition-legacy-preflight.js",
+      "backend/src/routes/competition-child.routes.js",
+      "backend/src/routes/competition-public-results.routes.js",
+      "backend/src/routes/pageant-judge.routes.js",
+      "backend/src/server.js",
+      "backend/src/services/competition-native-results.service.js",
+      "backend/src/services/competition-native-scoring.service.js",
+      "backend/src/services/competition-native.service.js",
+      "backend/src/services/pageant.service.js",
+      "backend/src/services/voter.service.js",
+      "backend/src/websocket/ws-emitter.js",
+      "backend/src/websocket/ws-rooms.js",
+      "frontend/src/components/organizer/competition/NativeCompetitionBoundaries.test.jsx",
+      "frontend/src/components/organizer/competition/NativeSetupWorkspace.jsx",
+      "frontend/src/components/organizer/competition/NativeSetupWorkspace.test.jsx",
+      "frontend/src/components/organizer/competition/NativeTabulationWorkspace.jsx",
+      "frontend/src/components/ui/EventStepper.jsx",
+      "frontend/src/components/ui/ModuleStageLayout.jsx",
+      "frontend/src/components/voter/competition/NativeCompetitionWorkspace.jsx",
+      "frontend/src/components/voter/competition/NativeCompetitionWorkspace.test.jsx",
+      "frontend/src/hooks/useCompetitionSync.js",
+      "frontend/src/pages/voter/VoterDashboardPage.jsx",
+      "frontend/src/services/api.js",
+      "frontend/src/services/competition-native.service.js"
+    ],
+    "added": [
+      "backend/src/database/migrations/108_competition_navigation_draft_tools.sql",
+      "backend/src/middleware/competition-rate-policy.js",
+      "backend/src/modules/competition-capacity.js",
+      "backend/src/websocket/competition-hint-transport.js",
+      "backend/scripts/competition-hint-broker.mjs",
+      "backend/scripts/phase8-local-db.mjs",
+      "backend/scripts/phase8-postgrest-fixture.mjs",
+      "backend/scripts/test-competition-phase8-browser-extended.mjs",
+      "backend/scripts/test-competition-phase8-browser.mjs",
+      "backend/scripts/test-competition-phase8-capacity.mjs",
+      "backend/scripts/test-competition-phase8-database.mjs",
+      "backend/scripts/test-competition-phase8-integrations.mjs",
+      "backend/scripts/test-competition-phase8-restore.mjs",
+      "backend/scripts/test-competition-phase8-transport.mjs",
+      "frontend/src/utils/competitionRetry.js",
+      "frontend/src/utils/competitionRetry.test.js"
+    ],
+    "protectedCount": 68,
+    "protectedChanged": []
+  },
+  "checks": {
+    "nativeAndDefaultBuilds": true,
+    "targetedEslint": true,
+    "syntax": true,
+    "gitDiffCheck": true
+  },
+  "workspaceCluster": {
+    "port": 55439,
+    "originalState": "stopped",
+    "finalState": "stopped",
+    "statusExit": 3
+  },
+  "production": {
+    "writes": false,
+    "migrations": false,
+    "deployments": false,
+    "flagsChanged": false,
+    "paidInfrastructureProvisioned": false,
+    "phase9Started": false
+  },
+  "blockers": {
+    "deployedCatalogLedger": "BLOCKED",
+    "productionBackupRestore": "BLOCKED",
+    "hostedAuthenticationAcceptance": "BLOCKED",
+    "representativeMultiInstanceDelivery": "BLOCKED",
+    "distributedRateCounters": "NOT_TESTED",
+    "productionCapacityPeakMemory": "NOT_TESTED"
+  },
+  "readOnlySupabase": {
+    "tables": 27,
+    "catalogBlockers": 1,
+    "migrationApproved": false
+  }
+}

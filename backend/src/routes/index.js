@@ -20,6 +20,7 @@ router.get('/', publicApiLimiter, (_req, res) => {
 })
 
 router.use('/health', healthRoutes)
+router.use('/public/competition',competitionPublicResultsRoutes)
 router.use('/auth', authRoutes)
 router.use('/admin', adminRoutes)
 router.use('/organizer', organizerRoutes)

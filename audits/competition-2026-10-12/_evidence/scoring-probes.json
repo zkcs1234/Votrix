@@ -1,0 +1,206 @@
+﻿{
+  "numeric": {
+    "weighted_average": {
+      "results": [
+        {
+          "id": "A",
+          "score": 89.33,
+          "rank": 1
+        },
+        {
+          "id": "B",
+          "score": 83.33,
+          "rank": 2
+        },
+        {
+          "id": "C",
+          "score": 70,
+          "rank": 3
+        }
+      ],
+      "A": [
+        90,
+        86,
+        92
+      ]
+    },
+    "sum": {
+      "results": [
+        {
+          "id": "A",
+          "score": 268,
+          "rank": 1
+        },
+        {
+          "id": "B",
+          "score": 250,
+          "rank": 2
+        },
+        {
+          "id": "C",
+          "score": 210,
+          "rank": 3
+        }
+      ],
+      "A": [
+        90,
+        86,
+        92
+      ]
+    },
+    "highest_score": {
+      "results": [
+        {
+          "id": "A",
+          "score": 92,
+          "rank": 1
+        },
+        {
+          "id": "B",
+          "score": 90,
+          "rank": 2
+        },
+        {
+          "id": "C",
+          "score": 70,
+          "rank": 3
+        }
+      ],
+      "A": [
+        90,
+        86,
+        92
+      ]
+    },
+    "lowest_removal": {
+      "results": [
+        {
+          "id": "A",
+          "score": 90,
+          "rank": 1
+        },
+        {
+          "id": "B",
+          "score": 80,
+          "rank": 2
+        },
+        {
+          "id": "C",
+          "score": 70,
+          "rank": 3
+        }
+      ],
+      "A": [
+        90,
+        86,
+        92
+      ]
+    },
+    "rank_based": {
+      "results": [
+        {
+          "id": "A",
+          "score": 4,
+          "rank": 1
+        },
+        {
+          "id": "B",
+          "score": 5,
+          "rank": 2
+        },
+        {
+          "id": "C",
+          "score": 9,
+          "rank": 3
+        }
+      ],
+      "A": [
+        90,
+        86,
+        92
+      ]
+    }
+  },
+  "ties": [
+    {
+      "id": "A",
+      "score": 90,
+      "rank": 1
+    },
+    {
+      "id": "B",
+      "score": 90,
+      "rank": 1
+    },
+    {
+      "id": "C",
+      "score": 80,
+      "rank": 3
+    }
+  ],
+  "top1IncludesTie": [
+    "A",
+    "B"
+  ],
+  "weightedNonFinalistIncluded": {
+    "ready": true,
+    "results": [
+      {
+        "id": "B",
+        "score": 36,
+        "rank": 1,
+        "rounds": [
+          "Preliminary"
+        ]
+      },
+      {
+        "id": "A",
+        "score": 34,
+        "rank": 2,
+        "rounds": [
+          "Preliminary",
+          "Final"
+        ]
+      }
+    ]
+  },
+  "missingPanel": {
+    "ready": false,
+    "scores": [
+      null,
+      null,
+      null
+    ]
+  },
+  "divided": [
+    {
+      "id": "A",
+      "division": "Men",
+      "rank": 1
+    },
+    {
+      "id": "B",
+      "division": "Men",
+      "rank": 2
+    },
+    {
+      "id": "C",
+      "division": "Women",
+      "rank": 1
+    }
+  ],
+  "precision": [
+    {
+      "id": "A",
+      "score": 89.34
+    },
+    {
+      "id": "B",
+      "score": 89.33
+    },
+    {
+      "id": "C",
+      "score": 70
+    }
+  ]
+}

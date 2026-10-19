@@ -26,7 +26,7 @@ export const createCategory = asyncHandler(async (req, res) => {
 })
 
 export const updateCategory = asyncHandler(async (req, res) => {
-  const payload = validateCategory(req.body)
+  const payload = validateCategory(req.body, false)
   const category = await competitionService.updateCategory(
     req.params.eventId,
     req.user.id,
@@ -56,7 +56,7 @@ export const createRound = asyncHandler(async (req, res) => {
 })
 
 export const updateRound = asyncHandler(async (req, res) => {
-  const payload = validateRound(req.body)
+  const payload = validateRound(req.body, false)
   const round = await competitionService.updateRound(
     req.params.eventId,
     req.user.id,
@@ -154,7 +154,7 @@ export const pickJudges = asyncHandler(async (req, res) => {
 
 
 export const updateJudgeV2 = asyncHandler(async (req, res) => {
-  const rolePayload = validateJudgeRole(req.body)
+  const rolePayload = validateJudgeRole(req.body,false)
   const judge = await competitionService.updateCompetitionJudge(
     req.params.eventId,
     req.user.id,
@@ -235,8 +235,13 @@ export const createDivision = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, division })
 })
 
+export const reorderDivisions = asyncHandler(async (req, res) => {
+  const divisions = await divisionService.reorderDivisions(req.params.eventId, req.user.id, req.body.divisionIds)
+  res.json({ success: true, divisions })
+})
+
 export const updateDivision = asyncHandler(async (req, res) => {
-  const payload = validateDivision(req.body)
+  const payload = validateDivision(req.body, false)
   const division = await divisionService.updateDivision(
     req.params.eventId,
     req.params.divisionId,

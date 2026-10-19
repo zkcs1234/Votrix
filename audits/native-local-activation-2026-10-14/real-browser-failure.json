@@ -1,0 +1,53 @@
+{
+  "error": "Timeout location.pathname.startsWith('/organizer')||location.pathname.startsWith('/participant') / VOTRIX\n\nEVERY VOTE COUNTS\n\nSign in to VOTRIX\n\nEnter your email and password to access your account.\n\nEmail\nPassword\nRemember me\nForgot password?\nSign in",
+  "scenarios": [],
+  "network": [
+    {
+      "session": "4F80F6BCB28CC0042716A2481482BAC1",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "4F80F6BCB28CC0042716A2481482BAC1",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "4F80F6BCB28CC0042716A2481482BAC1",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "4F80F6BCB28CC0042716A2481482BAC1",
+      "path": "/api/auth/refresh",
+      "status": 401
+    },
+    {
+      "session": "4F80F6BCB28CC0042716A2481482BAC1",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "session": "4F80F6BCB28CC0042716A2481482BAC1",
+      "path": "/api/auth/login",
+      "status": 204
+    },
+    {
+      "session": "4F80F6BCB28CC0042716A2481482BAC1",
+      "path": "/api/auth/login",
+      "status": 429
+    },
+    {
+      "session": "4F80F6BCB28CC0042716A2481482BAC1",
+      "path": "/api/auth/refresh",
+      "status": 204
+    },
+    {
+      "session": "4F80F6BCB28CC0042716A2481482BAC1",
+      "path": "/api/auth/refresh",
+      "status": 429
+    }
+  ],
+  "database": "votrix_dev_1791952165826",
+  "productionTouched": false
+}
