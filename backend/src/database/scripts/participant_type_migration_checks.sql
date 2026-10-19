@@ -8,10 +8,15 @@ GROUP BY role, profile_type
 ORDER BY role::text, profile_type;
 
 -- Membership totals and accounts per participant type.
-SELECT participant_type, is_active, COUNT(*) AS membership_count,
-       COUNT(DISTINCT user_id) AS account_count
+SELECT
+    participant_type,
+    is_active,
+    COUNT(*) AS membership_count,
+    COUNT(DISTINCT user_id) AS account_count
 FROM user_participant_types
-GROUP BY participant_type, is_active
+GROUP BY
+    participant_type,
+    is_active
 ORDER BY participant_type, is_active;
 
 -- Existing event participants without an active matching pool membership.

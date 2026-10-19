@@ -16,6 +16,7 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 import { downloadBlob, downloadCsv } from '@/utils/csvDownload'
+import CsvImportResults from '@/components/admin/CsvImportResults'
 
 const STATUS_CONFIG = {
   active: { tone: 'success', label: 'Active' },
@@ -157,7 +158,7 @@ export default function OrganizerManagementPage() {
     try {
       const { data } = await adminService.registerOrganizersCsv(csvPreview.data)
       toastSuccess(`Registered ${data.succeeded} of ${data.total}${data.failed ? ` (${data.failed} failed)` : ''}`)
-      setCsvPreview(null)
+      setCsvPreview((current) => current ? { ...current, importResult: data } : current)
       await fetchOrganizers()
     } catch (err) {
       toastError(getErrorMessage(err, 'Registration failed'))
@@ -456,7 +457,15 @@ export default function OrganizerManagementPage() {
       />
 
       {csvPreview && (
-        <Modal open onClose={() => setCsvPreview(null)} title="Review & Register organizers" size="lg">
+        <Modal open onClose={() => setCsvPreview(null)} title={csvPreview.importResult ? 'Organizer import results' : 'Review & Register organizers'} size="lg">
+          {csvPreview.importResult ? (
+            <CsvImportResults
+              result={csvPreview.importResult}
+              filename="organizer-import-results.csv"
+              onDone={() => setCsvPreview(null)}
+            />
+          ) : (
+            <>
           {csvPreview.errors?.length > 0 && (
             <div className="mb-4 rounded-lg border border-v-danger/30 bg-v-danger/10 p-3">
               <p className="v-error-text mb-2 font-semibold">{csvPreview.errors.length} row error(s) — these will be skipped</p>
@@ -499,6 +508,8 @@ export default function OrganizerManagementPage() {
               Register {csvPreview.data?.length ?? 0}
             </Button>
           </div>
+            </>
+          )}
         </Modal>
       )}
     </div>

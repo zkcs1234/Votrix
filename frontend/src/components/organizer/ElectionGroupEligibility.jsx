@@ -58,7 +58,7 @@ export default function ElectionGroupEligibility({ eventId, locked }) {
   return (
     <section className="v-card space-y-4 p-5" aria-labelledby="group-eligibility-title">
       <h2 id="group-eligibility-title" className="v-section-title">Election Group Eligibility</h2>
-      <p className="v-caption">Choose which enrolled voters can vote in each group. Event invitations and voting restrictions still apply.</p>
+      <p className="v-caption">Choose which enrolled voters can access each group ballot. Position program rules can narrow this group, but cannot add voters excluded here.</p>
       {error && <p role="alert" className="v-error-text">{error}</p>}
       {!groups.length && !loading ? <p className="v-caption">Create an election group in the Position Builder first.</p> : (
         <>

@@ -6,8 +6,20 @@ import {
   validatePosition,
   validateCandidate,
 } from '../../src/validators/election.validator.js'
+import { isPositionProgramEligible } from '../../src/utils/electionGroups.js'
 
 describe('election.validator', () => {
+  describe('position program eligibility', () => {
+    test('allows all programs for unrestricted positions', () => {
+      expect(isPositionProgramEligible({ eligiblePrograms: [] }, 'BSCS')).toBe(true)
+    })
+
+    test('matches selected programs without case sensitivity', () => {
+      expect(isPositionProgramEligible({ eligible_programs: ['BSCS'] }, 'bscs')).toBe(true)
+      expect(isPositionProgramEligible({ eligible_programs: ['BSCS'] }, 'BSIT')).toBe(false)
+    })
+  })
+
   describe('validateBallot', () => {
     test('returns normalized selections', () => {
       const result = validateBallot({ selections: { 'pos-1': ['c-1', 'c-2'] } })
@@ -57,6 +69,25 @@ describe('election.validator', () => {
       const result = validatePosition({ name: 'President' })
       expect(result.maxVote).toBe(1)
       expect(result.numberOfWinners).toBe(1)
+      expect(result.eligiblePrograms).toEqual([])
+    })
+
+    test('normalizes selected programs and supports partial eligibility updates', () => {
+      expect(validatePosition({
+        name: 'BSCS Representative',
+        eligiblePrograms: [' BSCS ', 'BSCS'],
+      }).eligiblePrograms).toEqual(['BSCS'])
+      expect(validatePosition({ eligiblePrograms: ['BSCS'] }, { partial: true })).toEqual({
+        eligiblePrograms: ['BSCS'],
+      })
+      expect(validatePosition({ displayOrder: 2 }, { partial: true })).toEqual({
+        displayOrder: 2,
+      })
+    })
+
+    test('rejects malformed selected-program eligibility', () => {
+      expect(() => validatePosition({ name: 'Rep', eligiblePrograms: 'BSCS' })).toThrow(ApiError)
+      expect(() => validatePosition({ name: 'Rep', eligiblePrograms: [''] })).toThrow(ApiError)
     })
   })
 

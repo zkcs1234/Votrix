@@ -31,6 +31,7 @@ router.get('/events/:eventId/positions', ctrl.listPositions)
 router.post('/events/:eventId/positions', ctrl.createPosition)
 router.patch('/events/:eventId/positions/:positionId', ctrl.updatePosition)
 router.delete('/events/:eventId/positions/:positionId', ctrl.deletePosition)
+router.get('/events/:eventId/position-eligibility', ctrl.getPositionEligibilitySummary)
 
 router.get('/events/:eventId/candidates', ctrl.listCandidates)
 router.post('/events/:eventId/positions/:positionId/candidates', ctrl.createCandidate)

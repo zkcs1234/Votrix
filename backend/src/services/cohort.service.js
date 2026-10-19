@@ -1,12 +1,14 @@
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, ACCOUNT_STATUS } from '../utils/constants.js'
+import { DB_TABLES, ACCOUNT_STATUS, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { assertParticipantsEditable } from '../utils/eventLifecycle.js'
 import { registerParticipant, resolveParticipantType } from './participant.service.js'
 import { sendVoterInvitationEmailRegistered } from './mailer.service.js'
+import { createNotificationsForUsers } from './notification.service.js'
 import { recordEventActivity } from '../foundation/activity.js'
 import { getOrganizerScope, filterCohortsForScope, areCohortValuesInScope } from './organizer-scope.service.js'
+import { getEmailQuotaSettings } from './emailGuard.js'
 
 // Phase 5 of VOTER_PROFILE_AND_ADMIN_REGISTRATION_PLAN.md.
 // Organizers no longer create voter/respondent accounts. Instead they invite
@@ -134,11 +136,52 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
   const enrolledSet = new Set((existing ?? []).map((r) => r.user_id))
 
   const toEnroll = matchingAccounts.filter((s) => !enrolledSet.has(s.id))
+  if (notify) {
+    const { bulkBatchLimit } = getEmailQuotaSettings()
+    if (toEnroll.length > bulkBatchLimit) {
+      throw new ApiError(400, `Cohort invite exceeds the email batch limit of ${bulkBatchLimit} recipients`)
+    }
+  }
 
   let enrolled = 0
   for (const student of toEnroll) {
     await registerParticipant(eventId, student.id, { participantType })
     enrolled += 1
+  }
+
+  if (toEnroll.length) {
+    const actionUrl = COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
+      ? `/participant/competition/events/${event.id}/score`
+      : event.event_type === 'polling'
+        ? `/participant/polling/events/${event.id}`
+        : `/participant/events/${event.id}`
+
+    try {
+      await createNotificationsForUsers(
+        toEnroll.map((student) => student.id),
+        {
+          type: 'voter.invitation.registered',
+          title: `You're invited to ${event.title}`,
+          message: `You've been added to ${event.title}. Sign in to review your participation details.`,
+          actionUrl,
+          entity: 'events',
+          entityId: event.id,
+          metadata: { eventType: event.event_type },
+        },
+      )
+    } catch (error) {
+      console.error('[cohort] failed to create participant invite notifications:', error.message)
+    }
+  }
+
+  const emailSummary = {
+    requested: notify ? toEnroll.length : 0,
+    sent: 0,
+    skipped: 0,
+    duplicate: 0,
+    quotaBlocked: 0,
+    failed: 0,
+    results: [],
   }
 
   let notified = 0
@@ -151,8 +194,37 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
           eventTitle: event.title,
           eventType: event.event_type,
         })
-        if (result?.sent) notified += 1
-      } catch {
+
+        if (result?.sent) {
+          notified += 1
+          emailSummary.sent += 1
+          emailSummary.results.push({ email: student.email, status: 'sent', reason: null })
+          continue
+        }
+
+        if (result?.skipped) {
+          emailSummary.skipped += 1
+          if (result.duplicate) emailSummary.duplicate += 1
+          if (result.quotaType) emailSummary.quotaBlocked += 1
+          emailSummary.results.push({
+            email: student.email,
+            status: 'skipped',
+            reason: result.reason || 'Email delivery skipped',
+            duplicate: Boolean(result.duplicate),
+            quotaType: result.quotaType || null,
+          })
+          continue
+        }
+
+        emailSummary.failed += 1
+        emailSummary.results.push({ email: student.email, status: 'failed', reason: result?.error || 'Email delivery failed' })
+      } catch (error) {
+        emailSummary.failed += 1
+        emailSummary.results.push({
+          email: student.email,
+          status: 'failed',
+          reason: error?.message || 'Email delivery failed',
+        })
         // Best-effort — never fail the enrollment because of an email error.
       }
     }
@@ -163,7 +235,14 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
     action: 'participant.invite_cohort',
     userId: organizerId,
     module: event.event_type,
-    details: { cohortType, values, enrolled, alreadyEnrolled: enrolledSet.size, notified },
+    details: {
+      cohortType,
+      values,
+      enrolled,
+      alreadyEnrolled: enrolledSet.size,
+      notified,
+      emailSummary,
+    },
   })
 
   return {
@@ -171,6 +250,16 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
     enrolled,
     alreadyEnrolled: enrolledSet.size,
     notified,
+    emailSummary,
+    summary: {
+      requested: emailSummary.requested,
+      sent: emailSummary.sent,
+      skipped: emailSummary.skipped,
+      duplicate: emailSummary.duplicate,
+      quotaBlocked: emailSummary.quotaBlocked,
+      failed: emailSummary.failed,
+      results: emailSummary.results,
+    },
   }
 }
 

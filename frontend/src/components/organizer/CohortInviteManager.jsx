@@ -24,6 +24,7 @@ export default function CohortInviteManager({ eventId, service, participantLabel
   const [notify, setNotify] = useState(false)
   const [inviting, setInviting] = useState(false)
   const [removingId, setRemovingId] = useState(null)
+  const [inviteSummary, setInviteSummary] = useState(null)
   const [error, setError] = useState(null)
   const { success, error: toastError } = useToast()
 
@@ -82,10 +83,18 @@ export default function CohortInviteManager({ eventId, service, participantLabel
         values: [...selected],
         notify,
       })
+
+      const summary = data?.emailSummary || data?.summary || null
+      setInviteSummary(summary)
+
+      const emailSummaryText = notify && summary
+        ? ` • ${summary.sent ?? 0} sent${summary.failed ? `, ${summary.failed} failed` : ''}${summary.skipped ? `, ${summary.skipped} skipped` : ''}`
+        : ''
+
       success(
         `Enrolled ${data.enrolled} ${participantLabel}` +
           (data.alreadyEnrolled ? ` (${data.alreadyEnrolled} already enrolled)` : '') +
-          (notify ? ` · ${data.notified} emailed` : ''),
+          (notify ? ` · ${data.notified ?? summary?.sent ?? 0} emailed${emailSummaryText}` : ''),
       )
       setSelected(new Set())
       await load()
@@ -203,6 +212,44 @@ export default function CohortInviteManager({ eventId, service, participantLabel
       )}
 
       {error && <FormAlert variant="error">{error}</FormAlert>}
+
+      {inviteSummary && notify && (
+        <Card>
+          <div className="space-y-4 p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="v-section-title-sm">Bulk invite status</h3>
+                <p className="v-caption mt-1">Summary for the most recent cohort email dispatch.</p>
+              </div>
+              <span className="rounded-full bg-v-primary/10 px-2.5 py-1 text-xs font-semibold text-v-primary">
+                {inviteSummary.sent ?? 0} sent
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="rounded-lg border border-v-border bg-v-surface p-3">
+                <div className="v-caption">Sent</div>
+                <div className="mt-1 text-xl font-semibold text-v-text">{inviteSummary.sent ?? 0}</div>
+              </div>
+              <div className="rounded-lg border border-v-border bg-v-surface p-3">
+                <div className="v-caption">Skipped</div>
+                <div className="mt-1 text-xl font-semibold text-v-text">{inviteSummary.skipped ?? 0}</div>
+              </div>
+              <div className="rounded-lg border border-v-border bg-v-surface p-3">
+                <div className="v-caption">Duplicates</div>
+                <div className="mt-1 text-xl font-semibold text-v-text">{inviteSummary.duplicate ?? 0}</div>
+              </div>
+              <div className="rounded-lg border border-v-border bg-v-surface p-3">
+                <div className="v-caption">Quota blocked</div>
+                <div className="mt-1 text-xl font-semibold text-v-text">{inviteSummary.quotaBlocked ?? 0}</div>
+              </div>
+              <div className="rounded-lg border border-v-border bg-v-surface p-3">
+                <div className="v-caption">Failed</div>
+                <div className="mt-1 text-xl font-semibold text-v-text">{inviteSummary.failed ?? 0}</div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card padding="sm">
         <div className="flex items-center gap-2 px-4 pt-4">

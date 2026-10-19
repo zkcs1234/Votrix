@@ -3,13 +3,17 @@ import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import CohortInviteManager from '@/components/organizer/CohortInviteManager'
 import ElectionGroupEligibility from '@/components/organizer/ElectionGroupEligibility'
+import ElectionPositionEligibilitySummary from '@/components/organizer/ElectionPositionEligibilitySummary'
 import { isParticipantsLocked } from '@/utils/constants'
+import { useAuth } from '@/hooks/useAuth'
 
 // Phase 5: organizers no longer register or CSV-import voters. Voter accounts
 // are created by the admin; here the organizer invites existing students by
 // cohort (program or year & section) to vote in this election.
 export default function ElectionVotersPage() {
   const { eventId } = useParams()
+  const { user } = useAuth()
+  const canManagePositionEligibility = user?.scope?.scopeType !== 'scoped'
   const [eventStatus, setEventStatus] = useState(null)
 
   useEffect(() => {
@@ -40,6 +44,7 @@ export default function ElectionVotersPage() {
         participantLabel="voters"
         rosterLocked={isParticipantsLocked(eventStatus)}
       />
+      {canManagePositionEligibility && <ElectionPositionEligibilitySummary eventId={eventId} />}
       <ElectionGroupEligibility eventId={eventId} locked={isParticipantsLocked(eventStatus)} />
     </div>
   )

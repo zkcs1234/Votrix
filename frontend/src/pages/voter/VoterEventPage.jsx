@@ -21,6 +21,7 @@ function validateSelections(positions, selections) {
     if (count > 0) hasAtLeastOneVote = true
 
     if (count === 0) {
+      if (position.allowSkip) continue
       return `Please vote for ${position.name}.`
     }
     if (count < position.minVote) {
@@ -125,12 +126,16 @@ export default function VoterEventPage() {
     if (!ballot?.ballotSectionId) return
     try {
       const saved = localStorage.getItem(draftKey)
-      setSelections(saved ? JSON.parse(saved) : {})
+      const parsed = saved ? JSON.parse(saved) : {}
+      const eligiblePositionIds = new Set((ballot.positions ?? []).map((position) => position.id))
+      setSelections(Object.fromEntries(
+        Object.entries(parsed).filter(([positionId]) => eligiblePositionIds.has(positionId)),
+      ))
     } catch {
       setSelections({})
     }
     setLoadedDraftKey(draftKey)
-  }, [ballot?.ballotSectionId, draftKey])
+  }, [ballot?.ballotSectionId, ballot?.positions, draftKey])
 
   useEffect(() => {
     if (!ballot?.ballotSectionId || loadedDraftKey !== draftKey) return
@@ -230,6 +235,29 @@ export default function VoterEventPage() {
         )
       }
     } catch (err) {
+      const isAlreadySubmitted =
+        err.response?.status === 409 &&
+        (err.response?.data?.message?.toLowerCase().includes('already submitted') ||
+          err.response?.data?.message?.toLowerCase().includes('not the next'))
+
+      if (isAlreadySubmitted) {
+        try {
+          localStorage.removeItem(draftKey)
+          const { data: nextBallot } = await electionService.getBallot(eventId)
+          setBallot(nextBallot)
+          setSelections({})
+          setIsReviewing(false)
+          if (nextBallot.hasVoted) {
+            setDone(true)
+          } else {
+            setSectionNotice('Ballot section recorded. Loading next section...')
+          }
+          return
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+
       setError(err.response?.data?.message || 'Failed to submit ballot')
       setIsReviewing(false)
     } finally {
@@ -251,7 +279,7 @@ export default function VoterEventPage() {
 
   if (ballot && !ballot.sections?.length) {
     return <div className="v-card-md text-center">
-      <p className="v-body-text">No eligible election groups are available for you in this event.</p>
+      <p className="v-body-text">No positions are available for you in this election.</p>
       <Link to="/participant" className="v-btn-tertiary mt-4 inline-block">Back to dashboard</Link>
     </div>
   }
@@ -340,13 +368,15 @@ export default function VoterEventPage() {
                   const selectedCandidates = position.candidates.filter((c) =>
                     selectedCandidateIds.includes(c.id),
                   )
-                  const isUnanswered = selectedCandidates.length === 0
+                  const isUnanswered = selectedCandidates.length === 0 && !position.allowSkip
 
                   return (
                     <div key={position.id} className="rounded-xl border border-v-border p-4 bg-v-surface-elevated">
                       <p className="font-medium text-v-text text-sm">{position.name}</p>
                       {isUnanswered ? (
                         <p className="mt-1 text-xs text-v-danger font-medium">No selection</p>
+                      ) : selectedCandidates.length === 0 ? (
+                        <p className="mt-1 text-xs text-v-text-subtle">No selection (optional)</p>
                       ) : (
                         <ul className="mt-2 space-y-1">
                           {selectedCandidates.map((cand) => (

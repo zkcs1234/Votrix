@@ -99,13 +99,18 @@ export const globalLimiter = createLimiter({
     return userId ? `u:${userId}` : `ip:${getClientIp(req)}`
   },
   skip: (req) => {
-    if(req.competitionRatePolicyApplied===true)return true
+    // Never throttle health probes, trusted webhook traffic, or requests with
+    // dedicated rate policies.
     const path = req.path || req.originalUrl
-    // Token refresh has a dedicated limiter and must remain available when
-    // ordinary API traffic exhausts the shared global IP budget.
-    if (req.method === 'POST' && path === '/api/auth/refresh') return true
-    // Never throttle health probes
-    return path === '/api/health' || path === '/health'
+    return (
+      req.competitionRatePolicyApplied === true ||
+      path === '/api/health' ||
+      path === '/health' ||
+      path === '/api/auth/refresh' ||
+      path === '/auth/refresh' ||
+      path.startsWith('/api/webhooks') ||
+      path.startsWith('/webhooks')
+    )
   },
   message: stdMessage('Too many requests. Please slow down.'),
 })

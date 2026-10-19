@@ -14,3 +14,10 @@ export function eligibleGroups(groups, assignments, participantId) {
   const allowed = new Set(assignments.filter((row) => row.participant_id === participantId).map((row) => row.ballot_section_id))
   return groups.filter((group) => group.eligibility_mode === 'all' || group.eligibility_mode == null || allowed.has(group.id))
 }
+
+export function isPositionProgramEligible(position, program) {
+  const eligiblePrograms = position.eligible_programs ?? position.eligiblePrograms ?? []
+  return !eligiblePrograms.length || eligiblePrograms.some(
+    (eligibleProgram) => eligibleProgram.trim().toLowerCase() === String(program ?? '').trim().toLowerCase(),
+  )
+}

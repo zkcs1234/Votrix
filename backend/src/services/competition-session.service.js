@@ -1513,11 +1513,15 @@ async function legacySubmitJudgeSessionScore(eventId, judgeId, { scores, contest
     throw new ApiError(400, 'Active contestant is not in the current round')
   }
 
-  // #4 contestant gate: if the organizer has opened a subset, reject scores for
-  // any contestant not currently open (empty/null gate = all open).
+  // #4 contestant gate: if the organizer has opened a subset, allow contestants in that subset,
+  // or allow in-flight submissions if the contestant is in the active round's order
+  // (grace window so a judge finishing scores is not rejected when the stage advances).
   const openGate = Array.isArray(session.activeContestantIds) ? session.activeContestantIds : null
   if (openGate && !openGate.includes(targetContestantId)) {
-    throw new ApiError(400, 'This contestant is not open for scoring yet')
+    const isContestantInRound = session.contestantOrder.includes(targetContestantId)
+    if (!isContestantInRound) {
+      throw new ApiError(400, 'This contestant is not open for scoring yet')
+    }
   }
 
   // Phase 6: a finalized round is locked — no further score edits allowed.
@@ -1640,7 +1644,39 @@ async function legacySubmitJudgeSessionScore(eventId, judgeId, { scores, contest
         judge_id: judgeId,
         ...rowPayload,
       })
-    if (error) throw new ApiError(500, error.message)
+
+    if (error) {
+      if (error.code === '23505') {
+        // Concurrency conflict: row was created concurrently by another criteria submission.
+        // Fetch the winner's row and merge atomically.
+        const { data: latest } = await getClient()
+          .from('competition_session_judge_scores')
+          .select('id, scores, locked_criteria')
+          .eq('session_id', session.id)
+          .eq('judge_id', judgeId)
+          .eq('round_id', session.currentRoundId)
+          .eq('contestant_id', targetContestantId)
+          .maybeSingle()
+
+        if (latest) {
+          const reMergedScores = { ...(latest.scores ?? {}), ...scoreMap }
+          const reMergedLocked = [...new Set([...(latest.locked_criteria ?? []), ...submittedCriteriaIds])]
+          const reFullyLocked = roundCriteriaIds.length > 0 && roundCriteriaIds.every((id) => reMergedLocked.includes(id))
+          const { error: reErr } = await getClient()
+            .from('competition_session_judge_scores')
+            .update({
+              scores: reMergedScores,
+              locked_criteria: reMergedLocked,
+              is_locked: reFullyLocked,
+              locked_at: reFullyLocked ? now : null,
+            })
+            .eq('id', latest.id)
+          if (reErr) throw new ApiError(500, reErr.message)
+        }
+      } else {
+        throw new ApiError(500, error.message)
+      }
+    }
   }
 
   // Phase 3 (§7.1): mirror ONLY the newly submitted criteria into the ranking

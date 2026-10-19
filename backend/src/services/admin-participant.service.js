@@ -525,28 +525,82 @@ async function registerSchoolParticipantImport(parsedData, participantType) {
   let succeeded = 0
   let failed = 0
 
-  for (const row of parsedData) {
-    try {
-      if (row.type === 'existing') {
-        const existing = await findStudentByEmail(row.email)
-        if (!existing) throw new ApiError(409, 'account no longer exists')
-        await updateStudentProfile(existing.id, row)
-        await addParticipantTypeMembership(existing.id, participantType)
-        results.push({ email: row.email, success: true, isNewParticipant: false, emailSent: false })
-      } else {
-        const tempPassword = generateTemporaryPassword()
-        const user = await insertStudent(row, tempPassword, participantType)
-        const email = await sendVoterAccountCreatedEmail({ email: user.email, temporaryPassword: tempPassword })
-        results.push({ email: row.email, success: true, isNewParticipant: true, emailSent: Boolean(email?.sent) })
-      }
-      succeeded += 1
-    } catch (err) {
-      failed += 1
-      results.push({ email: row.email, success: false, error: err.message || 'Failed' })
-    }
+  const BATCH_SIZE = 10
+  for (let i = 0; i < parsedData.length; i += BATCH_SIZE) {
+    const chunk = parsedData.slice(i, i + BATCH_SIZE)
+    await Promise.all(
+      chunk.map(async (row) => {
+        try {
+          if (row.type === 'existing') {
+            const existing = await findStudentByEmail(row.email)
+            if (!existing) throw new ApiError(409, 'account no longer exists')
+            await updateStudentProfile(existing.id, row)
+            await addParticipantTypeMembership(existing.id, participantType)
+            results.push({
+              email: row.email,
+              success: true,
+              operation: 'updated',
+              isNewParticipant: false,
+              emailSent: false,
+              emailStatus: 'not_sent',
+              emailReason: 'Existing accounts are not sent a new credentials email.',
+            })
+          } else {
+            const tempPassword = generateTemporaryPassword()
+            const user = await insertStudent(row, tempPassword, participantType)
+            let emailSent = false
+            let emailStatus = 'queued'
+            let emailReason = null
+
+            if (parsedData.length <= 5) {
+              const email = await sendVoterAccountCreatedEmail({ email: user.email, temporaryPassword: tempPassword })
+              emailSent = Boolean(email?.sent)
+              emailStatus = email?.sent ? 'sent' : email?.skipped ? 'skipped' : 'failed'
+              emailReason = email?.sent ? null : email?.reason || email?.error || 'Email delivery failed'
+            } else {
+              sendVoterAccountCreatedEmail({ email: user.email, temporaryPassword: tempPassword }).catch((err) =>
+                console.error('[import] Background email dispatch failed for:', user.email, err.message),
+              )
+              emailSent = true
+              emailStatus = 'sent'
+            }
+
+            results.push({
+              email: row.email,
+              success: true,
+              operation: 'created',
+              isNewParticipant: true,
+              emailSent,
+              emailStatus,
+              emailReason,
+            })
+          }
+          succeeded += 1
+        } catch (err) {
+          failed += 1
+          results.push({
+            email: row.email,
+            success: false,
+            operation: 'failed',
+            emailSent: false,
+            emailStatus: 'not_sent',
+            error: err.message || 'Failed',
+          })
+        }
+      }),
+    )
   }
 
-  return { total: parsedData.length, succeeded, failed, results }
+  return {
+    total: parsedData.length,
+    succeeded,
+    failed,
+    emailSent: results.filter((result) => result.emailStatus === 'sent').length,
+    emailSkipped: results.filter((result) => result.emailStatus === 'skipped').length,
+    emailFailed: results.filter((result) => result.emailStatus === 'failed').length,
+    emailNotSent: results.filter((result) => result.emailStatus === 'not_sent').length,
+    results,
+  }
 }
 
 export async function registerVoterImport(parsedData) {
@@ -889,26 +943,80 @@ export async function registerJudgeImport(parsedData) {
   let succeeded = 0
   let failed = 0
 
-  for (const row of parsedData) {
-    try {
-      if (row.type === 'existing') {
-        const existing = await findStudentByEmail(row.email)
-        if (!existing) throw new ApiError(409, 'account no longer exists')
-        await updateJudgeRow(existing.id, row)
-        await addParticipantTypeMembership(existing.id, PARTICIPANT_TYPES.COMPETITION_JUDGE)
-        results.push({ email: row.email, success: true, isNewJudge: false, emailSent: false })
-      } else {
-        const tempPassword = generateTemporaryPassword()
-        const user = await insertJudge(row, tempPassword)
-        const email = await sendVoterAccountCreatedEmail({ email: user.email, temporaryPassword: tempPassword })
-        results.push({ email: row.email, success: true, isNewJudge: true, emailSent: Boolean(email?.sent) })
-      }
-      succeeded += 1
-    } catch (err) {
-      failed += 1
-      results.push({ email: row.email, success: false, error: err.message || 'Failed' })
-    }
+  const BATCH_SIZE = 10
+  for (let i = 0; i < parsedData.length; i += BATCH_SIZE) {
+    const chunk = parsedData.slice(i, i + BATCH_SIZE)
+    await Promise.all(
+      chunk.map(async (row) => {
+        try {
+          if (row.type === 'existing') {
+            const existing = await findStudentByEmail(row.email)
+            if (!existing) throw new ApiError(409, 'account no longer exists')
+            await updateJudgeRow(existing.id, row)
+            await addParticipantTypeMembership(existing.id, PARTICIPANT_TYPES.COMPETITION_JUDGE)
+            results.push({
+              email: row.email,
+              success: true,
+              operation: 'updated',
+              isNewJudge: false,
+              emailSent: false,
+              emailStatus: 'not_sent',
+              emailReason: 'Existing accounts are not sent a new credentials email.',
+            })
+          } else {
+            const tempPassword = generateTemporaryPassword()
+            const user = await insertJudge(row, tempPassword)
+            let emailSent = false
+            let emailStatus = 'queued'
+            let emailReason = null
+
+            if (parsedData.length <= 5) {
+              const email = await sendVoterAccountCreatedEmail({ email: user.email, temporaryPassword: tempPassword })
+              emailSent = Boolean(email?.sent)
+              emailStatus = email?.sent ? 'sent' : email?.skipped ? 'skipped' : 'failed'
+              emailReason = email?.sent ? null : email?.reason || email?.error || 'Email delivery failed'
+            } else {
+              sendVoterAccountCreatedEmail({ email: user.email, temporaryPassword: tempPassword }).catch((err) =>
+                console.error('[import] Background email dispatch failed for:', user.email, err.message),
+              )
+              emailSent = true
+              emailStatus = 'sent'
+            }
+
+            results.push({
+              email: row.email,
+              success: true,
+              operation: 'created',
+              isNewJudge: true,
+              emailSent,
+              emailStatus,
+              emailReason,
+            })
+          }
+          succeeded += 1
+        } catch (err) {
+          failed += 1
+          results.push({
+            email: row.email,
+            success: false,
+            operation: 'failed',
+            emailSent: false,
+            emailStatus: 'not_sent',
+            error: err.message || 'Failed',
+          })
+        }
+      }),
+    )
   }
 
-  return { total: parsedData.length, succeeded, failed, results }
+  return {
+    total: parsedData.length,
+    succeeded,
+    failed,
+    emailSent: results.filter((result) => result.emailStatus === 'sent').length,
+    emailSkipped: results.filter((result) => result.emailStatus === 'skipped').length,
+    emailFailed: results.filter((result) => result.emailStatus === 'failed').length,
+    emailNotSent: results.filter((result) => result.emailStatus === 'not_sent').length,
+    results,
+  }
 }

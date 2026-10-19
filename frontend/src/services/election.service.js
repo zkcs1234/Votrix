@@ -72,6 +72,10 @@ export const electionService = {
     return api.patch(`${base}/events/${eventId}/positions/${positionId}`, payload)
   },
 
+  getPositionEligibilitySummary(eventId) {
+    return api.get(`${base}/events/${eventId}/position-eligibility`)
+  },
+
   deletePosition(eventId, positionId) {
     return api.delete(`${base}/events/${eventId}/positions/${positionId}`)
   },

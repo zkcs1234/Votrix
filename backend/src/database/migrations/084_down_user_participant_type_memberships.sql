@@ -54,15 +54,14 @@ WHERE u.role::text IN ('voter', 'participant')
 
 DROP INDEX IF EXISTS uq_users_school_id_participant;
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_users_school_id_student
-  ON users (lower(school_id))
-  WHERE profile_type = 'student' AND school_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_school_id_student ON users (lower(school_id))
+WHERE
+    profile_type = 'student'
+    AND school_id IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_users_profile_type_program
-  ON users (profile_type, program);
+CREATE INDEX IF NOT EXISTS idx_users_profile_type_program ON users (profile_type, program);
 
-CREATE INDEX IF NOT EXISTS idx_users_profile_type_year_section
-  ON users (profile_type, year_section);
+CREATE INDEX IF NOT EXISTS idx_users_profile_type_year_section ON users (profile_type, year_section);
 
 DROP TABLE user_participant_types;
 

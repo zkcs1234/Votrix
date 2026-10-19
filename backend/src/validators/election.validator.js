@@ -68,37 +68,53 @@ export function validateUpdateEvent(body) {
   return payload
 }
 
-export function validatePosition(body) {
-  if (!body?.name?.trim()) throw new ApiError(400, 'Position name is required')
-  const allowSkip = Boolean(body.allowSkip)
-  const maxVote = Number(body.maxVote ?? 1)
+export function validatePosition(body, { partial = false } = {}) {
+  const payload = {}
 
-  // minVote removed – default is 1. Validation now only ensures maxVote is positive.
-  if (Number.isNaN(maxVote) || maxVote < 1) {
-    throw new ApiError(400, 'Invalid maxVote value')
+  if (!partial || body?.name !== undefined) {
+    if (typeof body?.name !== 'string' || !body.name.trim()) throw new ApiError(400, 'Position name is required')
+    payload.name = body.name.trim()
+  }
+  if (body?.description !== undefined) payload.description = body.description?.trim() || null
+
+  if (!partial || body?.maxVote !== undefined) {
+    const maxVote = Number(body?.maxVote ?? 1)
+    // minVote removed – default is 1. Validation ensures maxVote is positive.
+    if (!Number.isInteger(maxVote) || maxVote < 1) throw new ApiError(400, 'Invalid maxVote value')
+    payload.maxVote = maxVote
   }
 
-  const numberOfWinners = Number(body.numberOfWinners ?? 1)
-  if (!Number.isInteger(numberOfWinners) || numberOfWinners < 1) {
-    throw new ApiError(400, 'Number of winners must be a positive integer')
+  if (!partial || body?.numberOfWinners !== undefined) {
+    const numberOfWinners = Number(body?.numberOfWinners ?? 1)
+    if (!Number.isInteger(numberOfWinners) || numberOfWinners < 1) {
+      throw new ApiError(400, 'Number of winners must be a positive integer')
+    }
+    payload.numberOfWinners = numberOfWinners
   }
 
-  let displayOrder
-  if (body.displayOrder !== undefined && body.displayOrder !== null && body.displayOrder !== '') {
-    displayOrder = Number(body.displayOrder)
+  if (body?.displayOrder !== undefined && body.displayOrder !== null && body.displayOrder !== '') {
+    const displayOrder = Number(body.displayOrder)
     if (!Number.isInteger(displayOrder) || displayOrder < 0) {
       throw new ApiError(400, 'Display order must be a non-negative integer')
     }
+    payload.displayOrder = displayOrder
+  }
+  if (!partial || body?.allowSkip !== undefined) payload.allowSkip = Boolean(body?.allowSkip)
+
+  if (!partial || body?.eligiblePrograms !== undefined) {
+    if (body?.eligiblePrograms !== undefined && !Array.isArray(body.eligiblePrograms)) {
+      throw new ApiError(400, 'Eligible programs must be an array')
+    }
+    const programs = (body?.eligiblePrograms ?? []).map((program) => {
+      if (typeof program !== 'string' || !program.trim()) {
+        throw new ApiError(400, 'Eligible program values must be non-empty strings')
+      }
+      return program.trim()
+    })
+    payload.eligiblePrograms = [...new Set(programs)]
   }
 
-  return {
-    name: body.name.trim(),
-    description: body.description?.trim() || null,
-    maxVote,
-    numberOfWinners,
-    displayOrder,
-    allowSkip,
-  }
+  return payload
 }
 
 export function validateElectionBallotSection(body, { partial = false } = {}) {

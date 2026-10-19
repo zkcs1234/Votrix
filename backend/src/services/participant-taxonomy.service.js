@@ -18,12 +18,18 @@ const TAXONOMY_DESCRIPTION =
 
 // Trim, drop blanks, de-duplicate case-insensitively (keeping the first spelling
 // seen), and sort. Keeps the stored lists clean regardless of input order/case.
-function normalizeList(list) {
+export function normalizeParticipantSection(value) {
+  const normalized = String(value ?? '').trim()
+  const match = normalized.match(/^(\d+)\s*-?\s*([a-z])$/i)
+  return match ? `${match[1]}-${match[2].toUpperCase()}` : normalized
+}
+
+function normalizeList(list, normalizeValue = (value) => value) {
   if (!Array.isArray(list)) return []
   const seen = new Set()
   const out = []
   for (const raw of list) {
-    const value = String(raw ?? '').trim()
+    const value = normalizeValue(String(raw ?? '').trim())
     if (!value) continue
     const key = value.toLowerCase()
     if (seen.has(key)) continue
@@ -36,7 +42,7 @@ function normalizeList(list) {
 function normalizeTaxonomy(input) {
   return {
     programs: normalizeList(input?.programs),
-    sections: normalizeList(input?.sections),
+    sections: normalizeList(input?.sections, normalizeParticipantSection),
   }
 }
 

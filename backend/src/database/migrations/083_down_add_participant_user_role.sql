@@ -19,6 +19,7 @@ ALTER TABLE users
   USING role::text::user_role_without_participant;
 
 DROP TYPE user_role;
+
 ALTER TYPE user_role_without_participant RENAME TO user_role;
 
 COMMIT;

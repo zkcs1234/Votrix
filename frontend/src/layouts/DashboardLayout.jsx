@@ -3,7 +3,7 @@ import { getRoleDashboardPath } from '@/utils/auth'
 import { USER_ROLES, isParticipantRole } from '@/utils/constants'
 import AppShell from '@/layouts/AppShell'
 import {
-  LayoutDashboard, Users, CalendarDays, Settings, ClipboardList, Bell, Archive, Monitor,
+  LayoutDashboard, Users, CalendarDays, Settings, ClipboardList, Bell, Archive, Monitor, Mail,
 } from 'lucide-react'
 
 export default function DashboardLayout({
@@ -74,6 +74,12 @@ export default function DashboardLayout({
             path: '/admin/audit-logs',
             icon: ClipboardList,
             isActive: (loc) => loc.pathname.startsWith('/admin/audit-logs'),
+          },
+          {
+            label: 'Email Delivery',
+            path: '/admin/email-delivery',
+            icon: Mail,
+            isActive: (loc) => loc.pathname.startsWith('/admin/email-delivery'),
           },
         ]
       : []),
