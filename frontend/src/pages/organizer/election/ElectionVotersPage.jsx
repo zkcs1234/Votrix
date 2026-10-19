@@ -41,8 +41,8 @@ export default function ElectionVotersPage() {
         participantLabel="voters"
         rosterLocked={isParticipantsLocked(eventStatus)}
       />
-      <ElectionGroupEligibility eventId={eventId} locked={isParticipantsLocked(eventStatus)} />
       <ElectionPositionEligibilitySummary eventId={eventId} />
+      <ElectionGroupEligibility eventId={eventId} locked={isParticipantsLocked(eventStatus)} />
     </div>
   )
 }

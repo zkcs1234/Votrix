@@ -30,6 +30,7 @@ export default function ElectionPositionsPage() {
   const [eligibilityMode, setEligibilityMode] = useState('all')
   const [selectedPrograms, setSelectedPrograms] = useState([])
   const [eligibilityDrafts, setEligibilityDrafts] = useState({})
+  const [eligibilityModes, setEligibilityModes] = useState({})
   const [savingEligibility, setSavingEligibility] = useState('')
   const [saving, setSaving] = useState(false)
   const { success: showSuccess, error: showError } = useToast()
@@ -205,12 +206,21 @@ export default function ElectionPositionsPage() {
   }
 
   const handleSaveEligibility = async (position) => {
-    const eligiblePrograms = eligibilityDrafts[position.id] ?? position.eligiblePrograms ?? []
+    const mode = eligibilityModes[position.id] ?? (position.eligiblePrograms?.length ? 'programs' : 'all')
+    const eligiblePrograms = mode === 'all' ? [] : eligibilityDrafts[position.id] ?? position.eligiblePrograms ?? []
+    if (mode === 'programs' && !eligiblePrograms.length) {
+      showError('Select at least one program or choose all programs')
+      return
+    }
     setSavingEligibility(position.id)
     try {
       const { data } = await electionService.updatePosition(eventId, position.id, { eligiblePrograms })
       setPositions((current) => current.map((item) => item.id === position.id ? data.position : item))
       setEligibilityDrafts((current) => ({ ...current, [position.id]: data.position.eligiblePrograms ?? [] }))
+      setEligibilityModes((current) => ({
+        ...current,
+        [position.id]: data.position.eligiblePrograms?.length ? 'programs' : 'all',
+      }))
       showSuccess(`Eligibility updated for "${position.name}"`)
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to update position eligibility')
@@ -351,11 +361,11 @@ export default function ElectionPositionsPage() {
           <legend className="mb-1 block text-sm text-v-text-muted">Who can vote for this position?</legend>
           <label className="flex items-center gap-2 text-sm text-v-text">
             <input type="radio" name="position-eligibility" checked={eligibilityMode === 'all'} onChange={() => setEligibilityMode('all')} />
-            All voters eligible for this group
+            All programs eligible for this group
           </label>
           <label className="flex items-center gap-2 text-sm text-v-text">
             <input type="radio" name="position-eligibility" checked={eligibilityMode === 'programs'} onChange={() => setEligibilityMode('programs')} />
-            Restrict to selected programs
+            Only selected programs
           </label>
           {eligibilityMode === 'programs' && (
             <div className="grid gap-2 rounded-lg border border-v-border p-3 sm:grid-cols-2">
@@ -408,36 +418,61 @@ export default function ElectionPositionsPage() {
                 Winners: {p.numberOfWinners ?? 1} · Vote up to {p.maxVote}
               </p>
               <p className="mt-1 text-xs text-v-text-subtle">
-                Eligible voters: {p.eligiblePrograms?.length ? p.eligiblePrograms.join(', ') : 'All voters in group'}
+                Eligible programs: {p.eligiblePrograms?.length
+                  ? p.eligiblePrograms.length === 1 ? `${p.eligiblePrograms[0]} only` : p.eligiblePrograms.join(', ')
+                  : 'All programs (group eligibility applies)'}
               </p>
               {!setupLocked && (
                 <details className="mt-2">
                   <summary className="cursor-pointer text-xs font-medium text-v-primary">Edit program eligibility</summary>
                   <div className="mt-2 space-y-2 rounded-lg border border-v-border p-3">
-                    <p className="v-caption">Choose programs to restrict this position. Clear all selections to allow every voter eligible for the group.</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {[...new Set([...programs, ...(p.eligiblePrograms ?? [])])].map((program) => {
-                        const selected = eligibilityDrafts[p.id] ?? p.eligiblePrograms ?? []
-                        return (
-                          <label key={program} className="flex items-center gap-2 text-sm text-v-text">
-                            <input
-                              type="checkbox"
-                              checked={selected.includes(program)}
-                              onChange={(event) => setEligibilityDrafts((current) => {
-                                const previous = current[p.id] ?? p.eligiblePrograms ?? []
-                                return {
-                                  ...current,
-                                  [p.id]: event.target.checked
-                                    ? [...previous, program]
-                                    : previous.filter((value) => value !== program),
-                                }
-                              })}
-                            />
-                            {program}
-                          </label>
-                        )
-                      })}
-                    </div>
+                    <label className="flex items-center gap-2 text-sm text-v-text">
+                      <input
+                        type="radio"
+                        name={`position-eligibility-${p.id}`}
+                        checked={(eligibilityModes[p.id] ?? (p.eligiblePrograms?.length ? 'programs' : 'all')) === 'all'}
+                        onChange={() => {
+                          setEligibilityModes((current) => ({ ...current, [p.id]: 'all' }))
+                          setEligibilityDrafts((current) => ({ ...current, [p.id]: [] }))
+                        }}
+                      />
+                      All programs eligible for this group
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-v-text">
+                      <input
+                        type="radio"
+                        name={`position-eligibility-${p.id}`}
+                        checked={(eligibilityModes[p.id] ?? (p.eligiblePrograms?.length ? 'programs' : 'all')) === 'programs'}
+                        onChange={() => setEligibilityModes((current) => ({ ...current, [p.id]: 'programs' }))}
+                      />
+                      Only selected programs
+                    </label>
+                    {(eligibilityModes[p.id] ?? (p.eligiblePrograms?.length ? 'programs' : 'all')) === 'programs' && (
+                      <div className="grid gap-2 rounded-md border border-v-border p-3 sm:grid-cols-2">
+                        {[...new Set([...programs, ...(p.eligiblePrograms ?? [])])].map((program) => {
+                          const selected = eligibilityDrafts[p.id] ?? p.eligiblePrograms ?? []
+                          return (
+                            <label key={program} className="flex items-center gap-2 text-sm text-v-text">
+                              <input
+                                type="checkbox"
+                                checked={selected.includes(program)}
+                                onChange={(event) => setEligibilityDrafts((current) => {
+                                  const previous = current[p.id] ?? p.eligiblePrograms ?? []
+                                  return {
+                                    ...current,
+                                    [p.id]: event.target.checked
+                                      ? [...previous, program]
+                                      : previous.filter((value) => value !== program),
+                                  }
+                                })}
+                              />
+                              {program}
+                            </label>
+                          )
+                        })}
+                        {!programs.length && <p className="v-caption sm:col-span-2">No voter programs are available in your organizer scope.</p>}
+                      </div>
+                    )}
                     <button
                       type="button"
                       disabled={savingEligibility === p.id}

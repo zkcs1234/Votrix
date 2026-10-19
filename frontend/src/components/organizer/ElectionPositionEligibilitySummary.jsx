@@ -29,7 +29,7 @@ export default function ElectionPositionEligibilitySummary({ eventId }) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 id="position-eligibility-summary-title" className="v-section-title">Position Eligibility</h2>
-          <p className="v-caption mt-1">Review who can vote for each position. Configure these rules in the Position Builder.</p>
+          <p className="v-caption mt-1">Position rules narrow group eligibility; they do not override it. Counts include only voters enrolled in this event.</p>
         </div>
         <button type="button" className="v-btn-tertiary text-sm" onClick={() => setRefresh((value) => value + 1)}>
           Refresh
@@ -45,11 +45,15 @@ export default function ElectionPositionEligibilitySummary({ eventId }) {
                   <p className="text-sm font-medium text-v-text">{position.name}</p>
                   <p className="text-xs text-v-text-subtle">
                     {position.sectionName ? `${position.sectionName} · ` : ''}
-                    {position.eligiblePrograms?.length ? position.eligiblePrograms.join(', ') : 'All voters eligible for the group'}
+                    {position.eligiblePrograms?.length
+                      ? position.eligiblePrograms.length === 1
+                        ? `${position.eligiblePrograms[0]} only`
+                        : `Programs: ${position.eligiblePrograms.join(', ')}`
+                      : 'All programs (group eligibility applies)'}
                   </p>
                 </div>
                 <span className="text-xs text-v-text-muted">
-                  {position.eligibleVoterCount} eligible {position.eligibleVoterCount === 1 ? 'voter' : 'voters'}
+                  {position.eligibleVoterCount} eligible enrolled {position.eligibleVoterCount === 1 ? 'voter' : 'voters'}
                 </span>
               </li>
             ))}
