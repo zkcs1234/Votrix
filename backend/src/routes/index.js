@@ -7,6 +7,7 @@ import organizerRoutes from './organizer.routes.js'
 import voterRoutes from './voter.routes.js'
 import notificationsRoutes from './notifications.routes.js'
 import webhooksRoutes from './webhooks.routes.js'
+import competitionPublicResultsRoutes from './competition-public-results.routes.js'
 
 const router = Router()
 
