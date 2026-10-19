@@ -72,7 +72,7 @@ async function fillSchedule() {
   fireEvent.click(screen.getByRole('button', { name: 'Next: Branding' }))
   await screen.findByText('Poll banner upload')
   fireEvent.click(screen.getByRole('button', { name: 'Next: Settings' }))
-  await screen.findByLabelText(/^Poll expiration date and time/)
+  await screen.findByLabelText(/^Anonymous responses/)
 }
 
 beforeEach(() => {
@@ -82,10 +82,10 @@ beforeEach(() => {
   mocks.updateEvent.mockResolvedValue({ data: { event: { id: 'poll-id' } } })
 })
 
-it('saves a poll expiration in ISO format with the event date schedule', async () => {
+it('uses the event end date as the poll expiration', async () => {
   renderForm()
   await fillSchedule()
-  chooseDateTime('Poll expiration date and time', new Date(2026, 9, 21), 12)
+  expect(screen.queryByLabelText(/^Poll expiration date and time/)).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Create & continue' }))
 
   await waitFor(() => expect(mocks.publishDraft).toHaveBeenCalledTimes(1))
@@ -94,21 +94,25 @@ it('saves a poll expiration in ISO format with the event date schedule', async (
     title: 'Campus poll',
     startDate: new Date(2026, 9, 20, 9).toISOString(),
     endDate: new Date(2026, 9, 22, 17).toISOString(),
-    pollExpiresAt: new Date(2026, 9, 21, 12).toISOString(),
+    pollExpiresAt: new Date(2026, 9, 22, 17).toISOString(),
   })
 })
 
-it('rejects a poll expiration later than the event end before creating the event', async () => {
+it('rejects an event end before its start before creating the event', async () => {
   renderForm()
-  await fillSchedule()
-  chooseDateTime('Poll expiration date and time', new Date(2026, 9, 22), 18)
-  fireEvent.click(screen.getByRole('button', { name: 'Create & continue' }))
+  fireEvent.change(screen.getByLabelText(/^Poll title/), { target: { value: 'Campus poll' } })
+  chooseDateTime('Start Date and Time', new Date(2026, 9, 20), 9)
+  chooseDateTime('End Date and Time', new Date(2026, 9, 22), 17)
+  fireEvent.change(screen.getByLabelText(/^End Date and Time/), {
+    target: { value: '2026-10-19T17:00' },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Next: Branding' }))
 
-  expect(await screen.findByText('Expiration date must be between start and end dates')).toBeInTheDocument()
+  expect(await screen.findByText('End date must be on or after start date')).toBeInTheDocument()
   expect(mocks.publishDraft).not.toHaveBeenCalled()
 })
 
-it('loads and preserves a saved poll expiration when updating settings', async () => {
+it('uses the event end date when updating polling settings', async () => {
   mocks.getSettings.mockResolvedValue({ data: { settings: {
     id: 'poll-id',
     title: 'Saved poll',
@@ -125,15 +129,15 @@ it('loads and preserves a saved poll expiration when updating settings', async (
     <Route path="/organizer/polling/events/:eventId/builder" element={<div>Builder</div>} />
   </Routes></MemoryRouter>)
 
-  const expiration = await screen.findByLabelText(/^Poll expiration date and time/)
-  expect(expiration.value).toContain('Oct 21, 2026')
+  await screen.findByLabelText(/^Anonymous responses/)
+  expect(screen.queryByLabelText(/^Poll expiration date and time/)).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Next: Builder' }))
   await waitFor(() => expect(mocks.updateEvent).toHaveBeenCalledWith('poll-id', expect.objectContaining({
-    pollExpiresAt: new Date('2026-10-21T12:00:00.000Z').toISOString(),
+    pollExpiresAt: new Date('2026-10-22T17:00:00.000Z').toISOString(),
   })))
 })
 
-it('shows backend schedule errors when an edit conflicts with a saved expiration', async () => {
+it('replaces a legacy saved expiration with the updated event end date', async () => {
   mocks.getSettings.mockResolvedValue({ data: { settings: {
     id: 'poll-id',
     title: 'Saved poll',
@@ -145,7 +149,6 @@ it('shows backend schedule errors when an edit conflicts with a saved expiration
     pollAnonymous: false,
     pollAllowMultipleSubmissions: false,
   } } })
-  mocks.updateEvent.mockRejectedValue({ response: { data: { message: 'Poll expiration must be between the start and end dates' } } })
   render(<MemoryRouter initialEntries={['/organizer/polling/events/poll-id/details']}><Routes>
     <Route path="/organizer/polling/events/:eventId/details" element={<PollingEventFormPage />} />
   </Routes></MemoryRouter>)
@@ -154,8 +157,9 @@ it('shows backend schedule errors when an edit conflicts with a saved expiration
   chooseDateTime('Start Date and Time', new Date(2026, 9, 22), 16)
   fireEvent.click(screen.getByRole('button', { name: 'Next: Branding' }))
 
-  expect(await screen.findByText('Poll expiration must be between the start and end dates')).toBeInTheDocument()
-  expect(mocks.updateEvent).toHaveBeenCalledWith('poll-id', expect.objectContaining({
-    pollExpiresAt: '2026-10-21T12:00:00.000Z',
-  }))
+  await waitFor(() => expect(mocks.updateEvent).toHaveBeenCalledWith('poll-id', expect.objectContaining({
+    startDate: new Date(2026, 9, 22, 16).toISOString(),
+    endDate: '2026-10-22T17:00:00.000Z',
+    pollExpiresAt: '2026-10-22T17:00:00.000Z',
+  })))
 })

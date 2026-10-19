@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CalendarDays, Zap, Clock, CheckCircle2, Archive, Vote, Trophy, BarChart2, Download, X, FileSearch, MoreHorizontal } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
@@ -12,6 +12,7 @@ import PageHeader from '@/components/ui/PageHeader'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { INPUT_CLASS } from '@/utils/uiClasses'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function eventTypeMatches(eventType, filter) {
   if (filter === 'all') return true
@@ -98,28 +99,29 @@ export default function GlobalEventsPage() {
         ),
       )
       toastSuccess('Event restored as completed')
-    } catch {
-      toastError('Event restoration failed')
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Event restoration failed'))
     } finally {
       setEventRestoring(null)
     }
   }
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        setLoading(true)
-        const { data } = await adminService.getGlobalEvents()
-        setEvents(data.events || [])
-      } catch (err) {
-        setError('Failed to load global events')
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
+  const fetchEvents = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data } = await adminService.getGlobalEvents()
+      setEvents(data.events || [])
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load global events'))
+    } finally {
+      setLoading(false)
     }
-    fetchEvents()
   }, [])
+
+  useEffect(() => {
+    void fetchEvents()
+  }, [fetchEvents])
 
   const stats = useMemo(() => {
     const total = events.length
@@ -206,7 +208,10 @@ export default function GlobalEventsPage() {
 
       <Card padding="sm">
         {error ? (
-          <div className="p-8 text-center text-v-danger">{error}</div>
+          <div className="flex flex-col items-center gap-3 p-8 text-center">
+            <p className="text-sm text-v-danger">{error}</p>
+            <Button variant="secondary" onClick={fetchEvents}>Retry loading events</Button>
+          </div>
         ) : (
           <div className="space-y-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

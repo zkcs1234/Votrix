@@ -24,9 +24,9 @@ it('preserves participant pool selection in the URL while switching module accen
   )
 
   expect(screen.getByText('Election voters')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('tab', { name: 'Polling Respondent' }))
+  fireEvent.click(screen.getByRole('tab', { name: 'Polling Respondents' }))
 
   expect(screen.getByText('Polling respondents')).toBeInTheDocument()
   expect(screen.getByTestId('current-location')).toHaveTextContent('tab=participants&type=polling-respondent')
-  expect(screen.getByRole('tab', { name: 'Polling Respondent' }).closest('[data-module="polling"]')).not.toBeNull()
+  expect(screen.getByRole('tab', { name: 'Polling Respondents' }).closest('[data-module="polling"]')).not.toBeNull()
 })

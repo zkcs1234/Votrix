@@ -6,11 +6,13 @@ import { EVENT_STATUS } from '@/utils/constants'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import Button from '@/components/ui/Button'
-import Badge from '@/components/ui/Badge'
+import Badge, { statusTone } from '@/components/ui/Badge'
+import FormAlert from '@/components/ui/FormAlert'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import PageHeader from '@/components/ui/PageHeader'
 import useDraft from '@/hooks/useDraft'
 import DraftBanner from '@/components/organizer/DraftBanner'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function BallotPreviewModal({ eventId, onClose }) {
   const [preview, setPreview] = useState(null)
@@ -115,10 +117,7 @@ function EventCard({ event, onPreview }) {
               {event.title}
             </Link>
           </h3>
-          <Badge
-            tone={event.status === EVENT_STATUS.ACTIVE ? 'success' : event.status === EVENT_STATUS.CANCELLED ? 'danger' : 'default'}
-            className="capitalize"
-          >
+          <Badge tone={statusTone(event.status)} dot className="capitalize">
             {event.status === EVENT_STATUS.DRAFT ? 'Setup — not published' : event.status}
           </Badge>
           {event.electionStatus && (
@@ -172,6 +171,7 @@ function EventCardSkeleton() {
 export default function ElectionEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [previewEventId, setPreviewEventId] = useState(null)
   const { hasDraft, draft, deleteDraft } = useDraft('election')
 
@@ -180,11 +180,12 @@ export default function ElectionEventsPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
       const { data } = await electionService.listEvents()
       setEvents(data.events ?? [])
-    } catch {
-      // Errors are surfaced via the empty state below
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not load election events'))
     } finally {
       setLoading(false)
     }
@@ -254,6 +255,12 @@ export default function ElectionEventsPage() {
         />
       )}
 
+      {error ? (
+        <div className="space-y-3">
+          <FormAlert variant="error">{error}</FormAlert>
+          <Button variant="secondary" onClick={load}>Retry loading elections</Button>
+        </div>
+      ) : (
       <div className="space-y-3">
         {events.map((event) => (
           <EventCard
@@ -275,6 +282,7 @@ export default function ElectionEventsPage() {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }

@@ -9,6 +9,7 @@ import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
 // matching the Competition module's grouped layout. Routes are unchanged.
 const BASE = '/organizer/election/events'
 const navItems = [
+  { section: 'Overview' },
   { label: 'Dashboard', path: '/organizer/election', icon: LayoutDashboard },
   { label: 'Events', path: '/organizer/election/events', icon: CalendarDays },
 
@@ -36,6 +37,7 @@ export default function ElectionLayout() {
     <AppShell
       title="Election management"
       moduleLabel="Election"
+      headerLabel="Election"
       homeLink="/organizer/election"
       navItems={items}
       eventId={eventId}

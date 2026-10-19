@@ -47,7 +47,7 @@ export default function PollingDashboardPage() {
     <div className="v-dashboard space-y-6">
       <PageHeader
         title="Polling dashboard"
-        description="Manage surveys, configure polls, and track responses."
+        description="Event context and participation, without losing the operational detail."
         actions={
           <Link to="/organizer/polling/events/new">
             <Button>

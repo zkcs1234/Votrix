@@ -5,10 +5,13 @@ import { pollingService } from '@/services/polling.service'
 import { isSetupLocked } from '@/utils/constants'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
+import FormAlert from '@/components/ui/FormAlert'
 import PageHeader from '@/components/ui/PageHeader'
+import Badge, { statusTone } from '@/components/ui/Badge'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import useDraft from '@/hooks/useDraft'
 import DraftBanner from '@/components/organizer/DraftBanner'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function PollPreviewModal({ eventId, eventTitle, onClose }) {
   const [questions, setQuestions] = useState(null)
@@ -102,14 +105,21 @@ function PollPreviewModal({ eventId, eventTitle, onClose }) {
 export default function PollingEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [previewEventId, setPreviewEventId] = useState(null)
   const { hasDraft, draft, deleteDraft } = useDraft('polling')
 
-  const load = () => {
-    pollingService
-      .listEvents()
-      .then(({ data }) => setEvents(data.events ?? []))
-      .finally(() => setLoading(false))
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const { data } = await pollingService.listEvents()
+      setEvents(data.events ?? [])
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not load polls'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -164,6 +174,13 @@ export default function PollingEventsPage() {
         />
       )}
 
+      {error ? (
+        <div className="space-y-3">
+          <FormAlert variant="error">{error}</FormAlert>
+          <Button variant="secondary" onClick={load}>Retry loading polls</Button>
+        </div>
+      ) : (
+        <>
       {events.length === 0 && (
         <div className="v-card-md">
           <p className="font-semibold text-v-text">No polls yet.</p>
@@ -183,8 +200,10 @@ export default function PollingEventsPage() {
             >
               {event.title}
             </Link>
-            <div className="mt-1 text-sm text-v-text-subtle capitalize">
-              {event.status === 'draft' ? 'Setup — not published' : event.status}
+            <div className="mt-1.5">
+              <Badge tone={statusTone(event.status)} dot className="capitalize">
+                {event.status === 'draft' ? 'Setup — not published' : event.status}
+              </Badge>
             </div>
           </div>
           <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
@@ -223,6 +242,8 @@ export default function PollingEventsPage() {
           </div>
         </article>
       ))}
+        </>
+      )}
     </div>
   )
 }

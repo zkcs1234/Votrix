@@ -19,9 +19,9 @@ export default function ParticipationSnapshot({ events = [], module, title, desc
 
   return (
     <section className="v-card-md" aria-label={title}>
-      <div className="mb-2">
+      <div className="mb-3">
         <h3 className="v-section-title">{title}</h3>
-        <p className="v-caption">{description}</p>
+        <p className="v-caption mt-0.5">{description}</p>
       </div>
       <BarChartView
         data={data}

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link } from 'react-router-dom'
-import { Mail, Send, ArrowLeft } from 'lucide-react'
+
 import FormAlert from '@/components/ui/FormAlert'
 import { forgotPasswordSchema } from '@/schemas/auth.schemas'
 import { authService } from '@/services/auth.service'
@@ -40,37 +40,25 @@ export default function ForgotPasswordPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-v-primary-soft text-v-primary">
-          <Mail className="h-5 w-5" strokeWidth={1.5} aria-hidden />
-        </span>
-        <h2 className="text-xl font-semibold tracking-tight text-v-text">Forgot password</h2>
-      </div>
-      <p className="mt-2 text-sm leading-relaxed text-v-text-muted">
-        Enter your email and we will send a reset link if an account exists.
+      <h2 className="v-page-title">Forgot your password?</h2>
+      <p className="mt-2 text-sm leading-relaxed text-v-text-subtle">
+        Enter your account email to request a reset link.
       </p>
 
-      <form className="mt-6 space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <AuthFormField label="Email" id="email" error={errors.email?.message}>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
-            <Input id="email" type="email" autoComplete="email" className="pl-9" {...register('email')} />
-          </div>
+      <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <AuthFormField label="Email address" id="email" required error={errors.email?.message}>
+          <Input id="email" type="email" autoComplete="email" {...register('email')} />
         </AuthFormField>
 
         {error && <FormAlert variant="error">{error}</FormAlert>}
-        {message && <FormAlert variant="success">{message}</FormAlert>}
+        {message && <FormAlert variant="success" title="Check your inbox">{message}</FormAlert>}
 
-        <SubmitButton loading={loading}>
-          <Send className="h-4 w-4" strokeWidth={2} />
-          Send reset link
-        </SubmitButton>
+        <SubmitButton loading={loading}>Send reset link</SubmitButton>
       </form>
 
-      <p className="mt-4 flex items-center justify-center gap-3 text-center text-sm text-v-text-subtle">
-        <Link to="/login" className="inline-flex items-center gap-1 text-v-text-muted hover:text-v-text">
-          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
-          Back to login
+      <p className="mt-5 text-center text-sm">
+        <Link to="/login" className="font-semibold text-v-primary hover:underline">
+          Back to sign in
         </Link>
       </p>
     </div>

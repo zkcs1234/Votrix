@@ -18,6 +18,8 @@ import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import { isSetupLocked } from '@/utils/constants'
+import WizardSteps from '@/components/ui/WizardSteps'
+import EventSetupAside from '@/components/organizer/EventSetupAside'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
@@ -346,43 +348,30 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
   if (loading) return <p className="v-caption">Loading...</p>
 
   return (
-    <div data-module="election" className="mx-auto max-w-5xl space-y-6">
+    <div data-module="election" className="mx-auto max-w-6xl space-y-6">
       <>
-          <div className="v-card-sm flex flex-wrap items-center gap-2 p-3" aria-label="Event steps">
-            {["details","branding"].map((key, index) => (
-              <span
-                key={key}
-                aria-current={step === key ? 'step' : undefined}
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
-                  step === key
-                    ? 'border-v-primary/30 bg-v-primary-soft font-semibold text-v-primary'
-                    : 'border-v-border bg-v-surface text-v-text-muted'
-                }`}
-              >
-                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                  step === key ? 'bg-v-primary text-white' : 'bg-v-surface-elevated text-v-text-subtle'
-                }`}>
-                  {index + 1}
-                </span>
-                {key[0].toUpperCase() + key.slice(1)}
-              </span>
-            ))}
-          </div>
+          <WizardSteps module="election" currentKey={step} />
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="election" />}
 
-          <div className="v-card-md">
-            <header>
-              <h2 className="v-page-title mb-2">{isNew ? 'Create election event' : readOnly ? 'View election event' : 'Edit election event'}</h2>
-              <p className="v-helper-text">
-                Fill out the event basics and branding. Use the sidebar
-                to jump between sections.
-              </p>
-            </header>
-          </div>
+          <header>
+            <h2 className="v-page-title">{isNew ? 'Create election event' : readOnly ? 'View election event' : 'Edit election event'}</h2>
+            <p className="mt-1 text-sm text-v-text-subtle">
+              Define the event context and schedule before configuring the experience.
+            </p>
+          </header>
 
-          <div className="w-full">
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="min-w-0">
             <Card padding="md">
+            <div className="mb-5">
+              <h3 className="v-section-title">{step === 'branding' ? 'Event banner' : 'Event information'}</h3>
+              <p className="v-caption mt-0.5">
+                {step === 'branding'
+                  ? 'Optional banner used in the participant event header and previews.'
+                  : 'Only draft setup is editable.'}
+              </p>
+            </div>
             <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 m-0">
             {step === 'details' && (
           <form className="space-y-4" onSubmit={handleSubmitDetails}>
@@ -471,15 +460,15 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             </div>
 
             <fieldset className="v-form-field">
-              <legend className={LABEL_CLASS}>Election Settings — Results</legend>
-              <div className="mt-2 space-y-2">
+              <legend className={LABEL_CLASS}>Results visibility</legend>
+              <div className="mt-2 grid gap-3 sm:grid-cols-3">
                 {RESULTS_VISIBILITY_OPTIONS.map((opt) => (
                   <label
                     key={opt.value}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 transition ${
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition ${
                       resultsVisibility === opt.value
-                        ? 'border-v-primary bg-v-surface-elevated'
-                        : 'border-v-border hover:border-v-border-strong'
+                        ? 'border-v-primary bg-v-primary-soft ring-1 ring-v-primary'
+                        : 'border-v-border-strong bg-v-surface hover:border-v-primary/50'
                     }`}
                   >
                     <input
@@ -541,6 +530,9 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             </Button>
           )}
         </div>
+          </div>
+
+          <EventSetupAside module="election" />
           </div>
         </>
 

@@ -9,8 +9,9 @@ import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
 // matching the Competition module's grouped layout. Routes are unchanged.
 const BASE = '/organizer/polling/events'
 const navItems = [
+  { section: 'Overview' },
   { label: 'Dashboard', path: '/organizer/polling', icon: LayoutDashboard },
-  { label: 'Polls', path: '/organizer/polling/events', icon: CalendarDays },
+  { label: 'Events', path: '/organizer/polling/events', icon: CalendarDays },
 
   { section: 'Setup' },
   { label: 'Builder', path: 'builder', icon: PenSquare, scoped: true, basePath: BASE },
@@ -30,6 +31,7 @@ export default function PollingLayout() {
     <AppShell
       title="Polls & surveys"
       moduleLabel="Polling"
+      headerLabel="Polling"
       homeLink="/organizer/polling"
       navItems={navItems}
       eventId={eventId}

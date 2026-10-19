@@ -15,6 +15,7 @@ import useDraft from '@/hooks/useDraft'
 import useSilentDraftAutosave from '@/hooks/useSilentDraftAutosave'
 import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
+import EventSetupAside from '@/components/organizer/EventSetupAside'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import { isSetupLocked } from '@/utils/constants'
 import Button from '@/components/ui/Button'
@@ -362,7 +363,7 @@ useEffect(() => {
   if (loadFailed) return <div role="alert" className="v-card p-5 space-y-3"><p className="v-error-text">{error}</p><Button variant="secondary" onClick={() => setLoadAttempt(value => value + 1)}>Retry loading event</Button></div>
 
   return (
-    <div data-module="competition-scoring" className="mx-auto max-w-5xl space-y-6">
+    <div data-module="competition-scoring" className="mx-auto max-w-6xl space-y-6">
       <>
           <div className="v-card-sm overflow-hidden p-3 sm:p-4">
             <EventStepper
@@ -377,20 +378,31 @@ useEffect(() => {
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="competition" frozen={Boolean(officialRulesId)} />}
 
-          <div className="v-card-md">
-            <header>
-              <h2 className="v-page-title mb-2">
-                {isNew ? 'Create Competition Scoring Event' : readOnly ? 'View Competition Scoring Event' : 'Edit Competition Scoring Event'}
-              </h2>
-              <p className="v-helper-text">
-                Complete the eight setup steps, then review and create your event. Each competition keeps its own scoring, entries, judges, and results.
-              </p>
-            </header>
-          </div>
+          <header>
+            <h2 className="v-page-title">
+              {isNew ? 'Create Competition Scoring Event' : readOnly ? 'View Competition Scoring Event' : 'Edit Competition Scoring Event'}
+            </h2>
+            <p className="mt-1 text-sm text-v-text-subtle">
+              Define the event context and schedule before configuring the experience. Each competition keeps its own scoring, entries, judges, and results.
+            </p>
+          </header>
 
-          <div className="w-full">
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="min-w-0">
             {error && <p role="alert" className="v-error-text">{error}</p>}
             <Card padding="md">
+            <div className="mb-5">
+              <h3 className="v-section-title">
+                {step === 'branding' ? 'Event banner' : step === 'type' ? 'Competition type' : 'Event information'}
+              </h3>
+              <p className="v-caption mt-0.5">
+                {step === 'branding'
+                  ? 'Optional banner used in the participant event header and previews.'
+                  : step === 'type'
+                    ? 'Choose the competition type before creating categories.'
+                    : 'Only draft setup is editable.'}
+              </p>
+            </div>
             <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 m-0">
             {step === 'details' && (
           <form className="space-y-4" onSubmit={handleNext}>
@@ -565,6 +577,9 @@ useEffect(() => {
             </Button>
           )}
         </div>
+          </div>
+
+          <EventSetupAside module="competition" />
           </div>
         </>
 

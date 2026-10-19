@@ -11,6 +11,7 @@ import PollQuestionField from '@/components/voter/polling/PollQuestionField'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
 import { useAuth } from '@/hooks/useAuth'
 import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 export default function VoterPollPage() {
   const { eventId } = useParams()
@@ -46,12 +47,17 @@ export default function VoterPollPage() {
     }
   }, [draftRestored])
 
-  const loadPoll = useCallback(() => {
-    return pollingService.getPoll(eventId).then(({ data }) => {
+  const loadPoll = useCallback(async () => {
+    setError(null)
+    try {
+      const { data } = await pollingService.getPoll(eventId)
       setPoll(data)
       if (!data.canSubmit && data.submissionCount > 0) setDone(true)
       return data
-    })
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load poll'))
+      return null
+    }
   }, [eventId])
 
   useEffect(() => {
@@ -109,14 +115,31 @@ export default function VoterPollPage() {
     setDone(false)
     setAnswers({})
     setLoading(true)
-    await loadPoll()
-    setLoading(false)
+    try {
+      await loadPoll()
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (loading) {
     return (
       <div className="flex justify-center py-20">
         <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (error && !poll) {
+    return (
+      <div data-module="polling" className="mx-auto max-w-lg space-y-4">
+        <FormAlert variant="error">{error}</FormAlert>
+        <Button variant="secondary" onClick={() => {
+          setLoading(true)
+          loadPoll().finally(() => setLoading(false))
+        }}>
+          Retry loading poll
+        </Button>
       </div>
     )
   }

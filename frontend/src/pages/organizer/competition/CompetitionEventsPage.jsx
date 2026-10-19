@@ -6,6 +6,7 @@ import { isReadOnlyEventStatus, isSetupLocked } from '@/utils/constants'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
+import Badge, { statusTone } from '@/components/ui/Badge'
 import useCompetitionSync from '@/hooks/useCompetitionSync'
 import useLatestRequest from '@/hooks/useLatestRequest'
 import { getErrorMessage } from '@/utils/getErrorMessage'
@@ -224,8 +225,10 @@ export default function CompetitionEventsPage() {
             >
               {event.title}
             </Link>
-            <div className="mt-1 text-sm text-v-text-subtle capitalize">
-              {event.status === 'draft' ? 'Setup — not published' : event.status}
+            <div className="mt-1.5">
+              <Badge tone={statusTone(event.status)} dot className="capitalize">
+                {event.status === 'draft' ? 'Setup — not published' : event.status}
+              </Badge>
             </div>
           </div>
           <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">

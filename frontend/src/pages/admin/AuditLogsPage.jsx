@@ -271,6 +271,7 @@ function Row({ label, value, mono = false }) {
 export default function AuditLogsPage() {
   const { success: toastSuccess, error: toastError } = useToast()
   const [searchParams] = useSearchParams()
+  const initialEntity = searchParams.get('entity') || ''
   const initialEntityId = searchParams.get('entityId') || ''
 
   // ── Data state ──
@@ -283,8 +284,8 @@ export default function AuditLogsPage() {
   const [search, setSearch]           = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [actionFilter, setActionFilter]     = useState('')
-  const [entityFilter, setEntityFilter]     = useState('')
-  const [entityIdFilter] = useState(initialEntityId)
+  const [entityFilter, setEntityFilter]     = useState(initialEntity)
+  const [entityIdFilter, setEntityIdFilter] = useState(initialEntityId)
   const [startDate, setStartDate]           = useState('')
   const [endDate, setEndDate]               = useState('')
 
@@ -326,6 +327,7 @@ export default function AuditLogsPage() {
     debouncedSearch,
     actionFilter,
     entityFilter,
+    entityIdFilter,
     startDate,
     endDate,
   ].filter(Boolean).length
@@ -336,6 +338,7 @@ export default function AuditLogsPage() {
     setDebouncedSearch('')
     setActionFilter('')
     setEntityFilter('')
+    setEntityIdFilter('')
     setStartDate('')
     setEndDate('')
     setPage(1)

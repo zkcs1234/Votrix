@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, Clock3 } from 'lucide-react'
 import { electionService } from '@/services/election.service'
@@ -11,6 +11,7 @@ import VoterEventHeader from '@/components/voter/VoterEventHeader'
 import { useAuth } from '@/hooks/useAuth'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function validateSelections(positions, selections) {
   let hasAtLeastOneVote = false
@@ -147,15 +148,23 @@ export default function VoterEventPage() {
     localStorage.setItem(draftKey, JSON.stringify(selections))
   }, [ballot?.ballotSectionId, draftKey, loadedDraftKey, selections])
 
-  useEffect(() => {
-    electionService
-      .getBallot(eventId)
-      .then(({ data }) => {
-        setBallot(data)
-        if (data.hasVoted) setDone(true)
-      })
-      .finally(() => setLoading(false))
+  const loadBallot = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data } = await electionService.getBallot(eventId)
+      setBallot(data)
+      if (data.hasVoted) setDone(true)
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load ballot'))
+    } finally {
+      setLoading(false)
+    }
   }, [eventId])
+
+  useEffect(() => {
+    void loadBallot()
+  }, [loadBallot])
 
   const positions = useMemo(() => ballot?.positions ?? [], [ballot])
   const completedSections = ballot?.sections?.filter((section) => section.completed).length ?? 0
@@ -274,6 +283,15 @@ export default function VoterEventPage() {
     return (
       <div className="flex justify-center py-20">
         <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (error && !ballot) {
+    return (
+      <div data-module="election" className="mx-auto max-w-lg space-y-4">
+        <FormAlert variant="error">{error}</FormAlert>
+        <Button variant="secondary" onClick={loadBallot}>Retry loading ballot</Button>
       </div>
     )
   }

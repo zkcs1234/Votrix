@@ -30,7 +30,7 @@
   --color-charcoal: #111827;
   --color-charcoal-light: #374151;
   --color-muted: #6b7280;
-  --color-surface: #e9ebf1;
+  --color-surface: #dfe2ea;
   --color-white: #ffffff;
 
   /* Motion tokens */
@@ -66,6 +66,9 @@
   --color-v-primary: var(--v-primary);
   --color-v-primary-hover: var(--v-primary-hover);
   --color-v-primary-soft: var(--v-primary-soft);
+  --color-v-on-primary: var(--v-on-primary);
+  --color-v-info: var(--v-info);
+  --color-v-info-bg: var(--v-info-bg);
   --color-v-brand-accent: var(--v-brand-accent);
   --color-v-success: var(--v-success);
   --color-v-success-bg: var(--v-success-bg);
@@ -90,30 +93,43 @@
 @layer base {
   :root {
     color-scheme: light;
-    --v-bg: #e9ebf1;
+    /* Light neutrals are intentionally a step darker than the Figma canvas so
+       text keeps clear contrast against every surface. Cards stay pure white. */
+    --v-bg: #dfe2ea;
     --v-surface: #ffffff;
-    --v-surface-elevated: #f7f8fa;
-    --v-border: #dfe3ea;
-    --v-border-strong: #cbd2dc;
+    --v-surface-elevated: #e8ebf1;
+    --v-border: #c5ccd8;
+    --v-border-strong: #a9b3c2;
     --v-text: #111827;
     --v-text-muted: #374151;
-    --v-text-subtle: #5f6878;
+    --v-text-subtle: #4b5563;
+
+    /* Shell dimensions (Figma: sidebar 256 / rail 72 / header 72) */
+    --v-sidebar-w: 16rem;
+    --v-rail-w: 4.5rem;
+    --v-header-h: 4.5rem;
+    --v-radius-control: 0.5rem;
+    --v-radius-card: 0.75rem;
+    --v-radius-dialog: 1rem;
+    --v-on-primary: #ffffff;
     --v-sidebar: #111827;
     --v-sidebar-text: #d1d5db;
     --v-sidebar-active: #ffffff;
     --v-primary: #4f46e5;
     --v-primary-hover: #4338ca;
-    --v-primary-soft: #eef2ff;
+    --v-primary-soft: #dbe2fe;
+    --v-info: #4338ca;
+    --v-info-bg: #dbe2fe;
     --v-brand-accent: #7c3aed;
     --v-brand-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-    --v-success: #047857;
-    --v-success-bg: #ecfdf5;
-    --v-danger: #b91c1c;
-    --v-danger-bg: #fef2f2;
-    --v-warning: #92400e;
-    --v-warning-bg: #fffbeb;
-    --v-accent: #b45309;
-    --v-accent-bg: #fffbeb;
+    --v-success: #065f46;
+    --v-success-bg: #c8f2df;
+    --v-danger: #991b1b;
+    --v-danger-bg: #fbd0d0;
+    --v-warning: #78350f;
+    --v-warning-bg: #fce9a0;
+    --v-accent: #92400e;
+    --v-accent-bg: #fce9a0;
     --v-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
     --v-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
     --v-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
@@ -127,7 +143,9 @@
   [data-module='competition-scoring'] {
     --v-primary: #0f766e;
     --v-primary-hover: #115e59;
-    --v-primary-soft: #ccfbf1;
+    --v-primary-soft: #b5ece1;
+    --v-info: #115e59;
+    --v-info-bg: #b5ece1;
     --v-brand-accent: #14b8a6;
     --v-brand-gradient: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
     --gradient-comp: linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%);
@@ -136,7 +154,9 @@
   [data-module='polling'] {
     --v-primary: #c2410c;
     --v-primary-hover: #9a3412;
-    --v-primary-soft: #ffedd5;
+    --v-primary-soft: #fcd9b8;
+    --v-info: #9a3412;
+    --v-info-bg: #fcd9b8;
     --v-brand-accent: #ea580c;
     --v-brand-gradient: linear-gradient(135deg, #c2410c 0%, #ea580c 100%);
     --gradient-poll: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
@@ -168,14 +188,14 @@
 
   /* Card variants */
   .v-card {
-    border-radius: 0.875rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
   }
 
   .v-card-sm {
-    border-radius: 0.875rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
@@ -183,7 +203,7 @@
   }
 
   .v-card-md {
-    border-radius: 0.875rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
@@ -191,7 +211,7 @@
   }
 
   .v-card-lg {
-    border-radius: 0.875rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
@@ -256,7 +276,8 @@
   /* Input base */
   .v-input {
     width: 100%;
-    border-radius: 0.5rem;
+    min-height: 2.5rem;
+    border-radius: var(--v-radius-control);
     border: 1px solid var(--v-border-strong);
     background-color: var(--v-surface);
     padding: 0.625rem 0.875rem;
@@ -871,7 +892,7 @@
   /* Table styles */
   .v-table-wrap {
     overflow-x: auto;
-    border-radius: 0.875rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
@@ -891,7 +912,7 @@
     padding: 0.75rem 1rem;
     text-align: left;
     font-weight: 600;
-    color: var(--v-text-muted);
+    color: var(--v-text-subtle);
     border-bottom: 1px solid var(--v-border);
     font-size: 0.75rem;
     text-transform: uppercase;
@@ -1012,13 +1033,14 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0.5rem;
-    font-weight: 500;
+    min-height: 2.5rem;
+    border-radius: var(--v-radius-control);
+    font-weight: 600;
     font-size: 0.875rem;
     padding: 0.5rem 1rem;
     transition: all 0.15s;
     background-color: var(--v-primary);
-    color: #ffffff;
+    color: var(--v-on-primary);
     border: none;
     cursor: pointer;
   }
@@ -1097,8 +1119,9 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0.5rem;
-    font-weight: 500;
+    min-height: 2.5rem;
+    border-radius: var(--v-radius-control);
+    font-weight: 600;
     font-size: 0.875rem;
     padding: 0.5rem 1rem;
     transition: all 0.15s;
@@ -1110,6 +1133,13 @@
 
   .v-btn-secondary:hover {
     background-color: var(--v-surface-elevated);
+  }
+
+  @media (pointer: coarse) {
+    .v-btn-primary,
+    .v-btn-secondary {
+      min-height: 2.75rem;
+    }
   }
 
   .v-btn-tertiary {
@@ -1490,6 +1520,23 @@
 
   .text-white {
     color: var(--v-text) !important;
+  }
+
+  /* The remap above exists for legacy dark panels turned light. Anything that
+     sits on a filled/dark background must keep real white text, otherwise
+     primary buttons, step circles and sidebar items lose their contrast. */
+  .bg-v-primary.text-white:not(:disabled),
+  .bg-v-primary-hover.text-white:not(:disabled),
+  .bg-v-danger.text-white:not(:disabled),
+  .bg-v-success.text-white:not(:disabled),
+  .bg-v-brand-accent.text-white:not(:disabled),
+  .bg-emerald-500.text-white,
+  .bg-amber-500.text-white,
+  .bg-blue-600.text-white,
+  .bg-v-sidebar .text-white,
+  .v-on-dark .text-white,
+  .v-on-dark.text-white {
+    color: var(--v-on-primary) !important;
   }
 
   .text-slate-200,

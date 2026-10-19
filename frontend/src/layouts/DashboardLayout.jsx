@@ -3,7 +3,7 @@ import { getRoleDashboardPath } from '@/utils/auth'
 import { USER_ROLES, isParticipantRole } from '@/utils/constants'
 import AppShell from '@/layouts/AppShell'
 import {
-  LayoutDashboard, Users, CalendarDays, Settings, ClipboardList, Bell, Archive, Monitor, Mail,
+  LayoutDashboard, Users, CalendarDays, Settings, ClipboardList, Bell, Archive, Monitor, Mail, BarChart3,
 } from 'lucide-react'
 
 export default function DashboardLayout({
@@ -15,16 +15,31 @@ export default function DashboardLayout({
 }) {
   const { role } = useAuth()
   const home = getRoleDashboardPath(role)
+  const isAdmin = role === USER_ROLES.ADMIN
+  const isOrganizer = role === USER_ROLES.ORGANIZER
 
+  // Figma sidebars: admin = Overview > Admin dashboard; organizer = Workspace >
+  // Overview, Reports. Labels only: paths and permissions are unchanged.
   const navItems = [
+    { section: isAdmin ? 'Overview' : 'Workspace' },
     {
-      label: 'Overview',
+      label: isAdmin ? 'Admin dashboard' : 'Overview',
       path: home,
       icon: LayoutDashboard,
       isActive: (loc) => loc.pathname === home,
     },
+    ...(isOrganizer
+      ? [
+          {
+            label: 'Reports',
+            path: '/organizer/reports',
+            icon: BarChart3,
+            isActive: (loc) => loc.pathname.startsWith('/organizer/reports'),
+          },
+        ]
+      : []),
 
-    ...(role === USER_ROLES.ADMIN
+    ...(isAdmin
       ? [
           // Grouped into Manage → System → Monitoring so the sidebar reads as
           // clean sections, matching the Competition module's grouped layout.
@@ -90,6 +105,15 @@ export default function DashboardLayout({
     <AppShell
       title={title}
       moduleLabel={moduleLabelOverride ?? role}
+      headerLabel={isAdmin ? 'Administration' : undefined}
+      sidebarCaption={isAdmin ? 'Administration' : undefined}
+      footerLink={
+        isAdmin
+          ? { to: '/admin', label: '← VOTRIX administration' }
+          : isOrganizer
+            ? { to: '/organizer', label: '← Organizer home' }
+            : undefined
+      }
       homeLink={home}
       navItems={navItems}
       showSidebar={showSidebar}

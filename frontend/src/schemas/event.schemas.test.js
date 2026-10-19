@@ -10,35 +10,12 @@ const validPoll = {
 }
 
 describe('polling event date validation', () => {
-  it('allows an omitted or cleared optional expiration', () => {
+  it('validates the event schedule without a separate expiration field', () => {
     expect(pollingEventSchemaStep1.safeParse(validPoll).success).toBe(true)
-    expect(pollingEventSchemaStep3.safeParse({ ...validPoll, pollExpiresAt: null }).success).toBe(true)
-    expect(pollingEventSchemaStep3.safeParse({ ...validPoll, pollExpiresAt: '' }).success).toBe(true)
+    expect(pollingEventSchemaStep3.safeParse(validPoll).success).toBe(true)
   })
 
-  it('allows expiration at either schedule boundary and within the schedule', () => {
-    for (const pollExpiresAt of [
-      validPoll.startDate,
-      '2026-10-21T12:00',
-      validPoll.endDate,
-    ]) {
-      expect(pollingEventSchemaStep3.safeParse({ ...validPoll, pollExpiresAt }).success).toBe(true)
-    }
-  })
-
-  it.each(['2026-10-20T08:59', '2026-10-22T17:01'])(
-    'rejects expiration outside the event schedule (%s)',
-    pollExpiresAt => {
-      const result = pollingEventSchemaStep3.safeParse({ ...validPoll, pollExpiresAt })
-      expect(result.success).toBe(false)
-      expect(result.error.issues).toContainEqual(expect.objectContaining({
-        path: ['pollExpiresAt'],
-        message: 'Expiration date must be between start and end dates',
-      }))
-    },
-  )
-
-  it('keeps end-after-start validation and reports malformed expiration', () => {
+  it('rejects an event end before its start', () => {
     const invalidRange = pollingEventSchemaStep1.safeParse({
       ...validPoll,
       endDate: '2026-10-20T08:59',
@@ -47,16 +24,6 @@ describe('polling event date validation', () => {
     expect(invalidRange.error.issues).toContainEqual(expect.objectContaining({
       path: ['endDate'],
       message: 'End date must be on or after start date',
-    }))
-
-    const invalidExpiration = pollingEventSchemaStep3.safeParse({
-      ...validPoll,
-      pollExpiresAt: 'not-a-date',
-    })
-    expect(invalidExpiration.success).toBe(false)
-    expect(invalidExpiration.error.issues).toContainEqual(expect.objectContaining({
-      path: ['pollExpiresAt'],
-      message: 'Invalid expiration date',
     }))
   })
 })

@@ -29,6 +29,20 @@ it('shows an actionable empty state when there are no polls', async () => {
     .toHaveAttribute('href', '/organizer/polling/events/new')
 })
 
+it('shows load failures with a retry instead of a false empty state', async () => {
+  pollingService.listEvents
+    .mockRejectedValueOnce({ response: { status: 503, data: { message: 'Poll data unavailable' } } })
+    .mockResolvedValueOnce({ data: { events: [] } })
+
+  render(<MemoryRouter><PollingEventsPage /></MemoryRouter>)
+
+  expect(await screen.findByText('Poll data unavailable')).toBeInTheDocument()
+  expect(screen.queryByText('No polls yet.')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Retry loading polls' }))
+  expect(await screen.findByText('No polls yet.')).toBeInTheDocument()
+  expect(pollingService.listEvents).toHaveBeenCalledTimes(2)
+})
+
 it('preserves draft setup routes and loads the selected poll preview', async () => {
   pollingService.listEvents.mockResolvedValue({
     data: { events: [{ id: 'poll-1', title: 'Student survey', status: 'draft' }] },

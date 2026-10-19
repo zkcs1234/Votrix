@@ -33,9 +33,9 @@ export const CHART_COLORS = [
  */
 export const CHART_COLORS_HEX = {
   primary:  '#4f46e5',
-  success:  '#047857',
-  warning:  '#92400e',
-  danger:   '#b91c1c',
+  success:  '#065f46',
+  warning:  '#78350f',
+  danger:   '#991b1b',
   violet:   '#6d28d9',
   pink:     '#be185d',
   cyan:     '#0e7490',
