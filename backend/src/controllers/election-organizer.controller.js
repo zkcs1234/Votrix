@@ -117,7 +117,7 @@ export const createPosition = asyncHandler(async (req, res) => {
 })
 
 export const updatePosition = asyncHandler(async (req, res) => {
-  const payload = validatePosition(req.body)
+  const payload = validatePosition(req.body, { partial: true })
   const position = await electionService.updatePosition(
     req.params.eventId,
     req.user.id,
@@ -125,6 +125,11 @@ export const updatePosition = asyncHandler(async (req, res) => {
     payload,
   )
   res.json({ success: true, position })
+})
+
+export const getPositionEligibilitySummary = asyncHandler(async (req, res) => {
+  const positions = await electionService.getPositionEligibilitySummary(req.params.eventId, req.user.id)
+  res.json({ success: true, positions })
 })
 
 export const deletePosition = asyncHandler(async (req, res) => {
@@ -273,4 +278,3 @@ export const unpublishEvent = asyncHandler(async (req, res) => {
   )
   res.json({ success: true, event })
 })
-

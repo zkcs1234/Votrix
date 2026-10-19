@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { eligibleGroups, validateGroupName } from '../utils/electionGroups.js'
+import { eligibleGroups, isPositionProgramEligible, validateGroupName } from '../utils/electionGroups.js'
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES, EVENT_STATUS, EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
 import { isElectionVotingOpen, canVoterViewElectionResults } from '../utils/eventSchedule.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
-import { getOrganizerScope, isStudentInScope, isAllAccess } from './organizer-scope.service.js'
+import { getOrganizerScope, isStudentInScope, isAllAccess, areCohortValuesInScope } from './organizer-scope.service.js'
 import { getOrCreateElectionOrganization, mapOrganization } from './organization.service.js'
+import { getEventCohorts } from './cohort.service.js'
 import { emitToEvent, emitToEventOrganizer, emitToUser, emitToRole } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
 import { recordAudit } from '../foundation/audit.js'
@@ -41,7 +42,25 @@ function mapPosition(row) {
     numberOfWinners: row.number_of_winners ?? 1,
     displayOrder: row.display_order ?? 0,
     allowSkip: row.allow_skip,
+    eligiblePrograms: row.eligible_programs ?? [],
   }
+}
+
+async function normalizePositionPrograms(eventId, programs, organizerId) {
+  const uniquePrograms = [...new Map(
+    (programs ?? []).map((program) => [program.trim().toLowerCase(), program.trim()]),
+  ).values()]
+  const { programs: availablePrograms } = await getEventCohorts(eventId, organizerId)
+  const allowedPrograms = new Map(availablePrograms.map((program) => [program.value.toLowerCase(), program.value]))
+  if (uniquePrograms.some((program) => !allowedPrograms.has(program.toLowerCase()))) {
+    throw new ApiError(400, 'Choose programs from the available voter cohorts')
+  }
+  const canonicalPrograms = uniquePrograms.map((program) => allowedPrograms.get(program.toLowerCase()))
+  const scope = await getOrganizerScope(organizerId)
+  if (!areCohortValuesInScope(scope, 'program', canonicalPrograms)) {
+    throw new ApiError(403, 'Choose programs within your organizer scope')
+  }
+  return canonicalPrograms
 }
 
 function mapCandidate(row) {
@@ -500,7 +519,7 @@ export async function listPositions(eventId, organizerId, sectionId = null) {
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POSITIONS)
-    .select('id, event_id, ballot_section_id, name, description, max_vote, number_of_winners, display_order, allow_skip')
+    .select('id, event_id, ballot_section_id, name, description, max_vote, number_of_winners, display_order, allow_skip, eligible_programs')
     .eq('event_id', eventId)
     .eq('ballot_section_id', section.id)
     .order('display_order', { ascending: true })
@@ -508,6 +527,67 @@ export async function listPositions(eventId, organizerId, sectionId = null) {
 
   if (error) throw new ApiError(500, error.message)
   return (data ?? []).map(mapPosition)
+}
+
+export async function getPositionEligibilitySummary(eventId, organizerId) {
+  await assertElectionEvent(eventId, organizerId)
+  const [
+    { data: sections, error: sectionError },
+    { data: positions, error: positionError },
+  ] = await Promise.all([
+    getClient().from(DB_TABLES.ELECTION_BALLOT_SECTIONS)
+      .select('id, name, eligibility_mode').eq('event_id', eventId),
+    getClient().from(DB_TABLES.POSITIONS)
+      .select('id, ballot_section_id, name, eligible_programs').eq('event_id', eventId)
+      .order('display_order', { ascending: true }),
+  ])
+  if (sectionError) throw new ApiError(500, sectionError.message)
+  if (positionError) throw new ApiError(500, positionError.message)
+
+  const assignments = await groupAssignments(eventId)
+  const assignmentsByGroup = new Map()
+  for (const assignment of assignments) {
+    const assigned = assignmentsByGroup.get(assignment.ballot_section_id) ?? new Set()
+    assigned.add(assignment.participant_id)
+    assignmentsByGroup.set(assignment.ballot_section_id, assigned)
+  }
+
+  const scope = await getOrganizerScope(organizerId)
+  const voters = []
+  for (let offset = 0; ; offset += 500) {
+    const { data: rows, error } = await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
+      .select('id, users!inner(program, year_section)')
+      .eq('event_id', eventId)
+      .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
+      .order('id')
+      .range(offset, offset + 499)
+    if (error) throw new ApiError(500, error.message)
+    for (const row of rows ?? []) {
+      const profile = row.users
+      if (isAllAccess(scope) || isStudentInScope(scope, { program: profile.program, yearSection: profile.year_section })) {
+        voters.push({ id: row.id, program: profile.program })
+      }
+    }
+    if ((rows ?? []).length < 500) break
+  }
+
+  const sectionById = new Map((sections ?? []).map((section) => [section.id, section]))
+  return (positions ?? []).map((position) => {
+    const section = sectionById.get(position.ballot_section_id)
+    const assigned = assignmentsByGroup.get(position.ballot_section_id) ?? new Set()
+    const eligibleVoterCount = voters.filter((voter) => {
+      const groupEligible = section?.eligibility_mode !== 'selected' || assigned.has(voter.id)
+      return groupEligible && isPositionProgramEligible(position, voter.program)
+    }).length
+    return {
+      id: position.id,
+      name: position.name,
+      ballotSectionId: position.ballot_section_id,
+      eligiblePrograms: position.eligible_programs ?? [],
+      sectionName: section?.name ?? null,
+      eligibleVoterCount,
+    }
+  })
 }
 
 async function nextPositionDisplayOrder(eventId, sectionId) {
@@ -545,6 +625,7 @@ export async function createPosition(eventId, organizerId, payload, sectionId = 
     payload.displayOrder !== undefined
       ? payload.displayOrder
       : await nextPositionDisplayOrder(eventId, section.id)
+  const eligiblePrograms = await normalizePositionPrograms(eventId, payload.eligiblePrograms ?? [], organizerId)
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POSITIONS)
@@ -557,6 +638,7 @@ export async function createPosition(eventId, organizerId, payload, sectionId = 
       number_of_winners: payload.numberOfWinners ?? 1,
       display_order: displayOrder,
       allow_skip: payload.allowSkip ?? false,
+      eligible_programs: eligiblePrograms,
     })
     .select('*')
     .single()
@@ -568,7 +650,7 @@ export async function createPosition(eventId, organizerId, payload, sectionId = 
     action: 'election.position.create',
     entity: 'positions',
     entityId: data.id,
-    details: { name: data.name, eventId },
+    details: { name: data.name, eventId, eligiblePrograms },
   })
 
   return mapPosition(data)
@@ -584,6 +666,9 @@ export async function updatePosition(eventId, organizerId, positionId, payload) 
   if (payload.numberOfWinners !== undefined) updates.number_of_winners = payload.numberOfWinners
   if (payload.displayOrder !== undefined) updates.display_order = payload.displayOrder
   if (payload.allowSkip !== undefined) updates.allow_skip = payload.allowSkip
+  if (payload.eligiblePrograms !== undefined) {
+    updates.eligible_programs = await normalizePositionPrograms(eventId, payload.eligiblePrograms, organizerId)
+  }
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POSITIONS)
@@ -601,7 +686,12 @@ export async function updatePosition(eventId, organizerId, positionId, payload) 
     action: 'election.position.update',
     entity: 'positions',
     entityId: positionId,
-    details: { name: data.name, changedKeys: Object.keys(updates), eventId },
+    details: {
+      name: data.name,
+      changedKeys: Object.keys(updates),
+      eligiblePrograms: updates.eligible_programs,
+      eventId,
+    },
   })
 
   return mapPosition(data)
@@ -944,6 +1034,10 @@ export async function assertVoterEnrolled(eventId, voterId) {
 export async function getVoterBallot(eventId, voterId) {
   let enrollment = await assertVoterEnrolled(eventId, voterId)
   const event = await getEventById(eventId)
+  const { data: voterProfile, error: profileError } = await getClient().from(DB_TABLES.USERS)
+    .select('program').eq('id', voterId).maybeSingle()
+  if (profileError) throw new ApiError(500, profileError.message)
+  const voterProgram = voterProfile?.program ?? null
 
   if (event.event_type !== EVENT_TYPES.ELECTION) {
     throw new ApiError(400, 'Not an election event')
@@ -958,6 +1052,17 @@ export async function getVoterBallot(eventId, voterId) {
   if (sectionsError) throw new ApiError(500, sectionsError.message)
   if (!sections?.length) throw new ApiError(409, 'Election event has no ballot sections')
 
+  const { data: eventPositions, error: positionError } = await getClient()
+    .from(DB_TABLES.POSITIONS)
+    .select('id, event_id, ballot_section_id, name, description, max_vote, number_of_winners, display_order, allow_skip, eligible_programs')
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+  if (positionError) throw new ApiError(500, positionError.message)
+  const eligiblePositionRows = (eventPositions ?? []).filter(
+    (position) => isPositionProgramEligible(position, voterProgram),
+  )
+  const eligibleSectionIds = new Set(eligiblePositionRows.map((position) => position.ballot_section_id))
+
   const { data: submissions, error: submissionsError } = await getClient()
     .from(DB_TABLES.ELECTION_BALLOT_SUBMISSIONS)
     .select('ballot_section_id, submitted_at')
@@ -969,6 +1074,7 @@ export async function getVoterBallot(eventId, voterId) {
     (submissions ?? []).map((submission) => [submission.ballot_section_id, submission.submitted_at]),
   )
   const accessibleSections = eligibleGroups(sections, await groupAssignments(eventId), enrollment.id)
+    .filter((section) => eligibleSectionIds.has(section.id))
   const sectionProgress = accessibleSections.map((section) => ({
     ...mapBallotSection(section),
     completed: submittedBySection.has(section.id),
@@ -995,7 +1101,7 @@ export async function getVoterBallot(eventId, voterId) {
       currentSection: null,
       ballotSectionId: null,
       positions: [],
-      hasVoted: true,
+      hasVoted: sectionProgress.length > 0,
       sectionSubmitted: false,
       votingNonce: null,
       votingOpen: isElectionVotingOpen(event),
@@ -1004,17 +1110,9 @@ export async function getVoterBallot(eventId, voterId) {
     }
   }
 
-  const { data: positions, error: posErr } = await getClient()
-    .from(DB_TABLES.POSITIONS)
-    .select('id, event_id, ballot_section_id, name, description, max_vote, number_of_winners, display_order, allow_skip')
-    .eq('event_id', eventId)
-    .eq('ballot_section_id', currentSection.id)
-    .order('display_order', { ascending: true })
-    .order('created_at', { ascending: true })
+  const positions = eligiblePositionRows.filter((position) => position.ballot_section_id === currentSection.id)
 
-  if (posErr) throw new ApiError(500, posErr.message)
-
-  const positionIds = (positions ?? []).map((p) => p.id)
+  const positionIds = positions.map((p) => p.id)
   let candidates = []
 
   if (positionIds.length) {
@@ -1027,7 +1125,7 @@ export async function getVoterBallot(eventId, voterId) {
     candidates = cands ?? []
   }
 
-  const byPosition = (positions ?? []).map((p) => ({
+  const byPosition = positions.map((p) => ({
     ...mapPosition(p),
     candidates: candidates.filter((c) => c.position_id === p.id).map(mapCandidate),
   }))
@@ -1422,7 +1520,7 @@ async function fetchElectionResultsData(eventId) {
       .select('id, has_voted, users!inner (program, year_section)')
       .eq('event_id', eventId)
       .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
-    getClient().from(DB_TABLES.ELECTION_VOTES).select('candidate_id, position_id').eq('event_id', eventId),
+    getClient().from(DB_TABLES.ELECTION_VOTES).select('candidate_id, position_id, voter_id').eq('event_id', eventId),
     getClient().from(DB_TABLES.CANDIDATES).select('id, name, position_id, positions!inner(event_id)').eq('positions.event_id', eventId),
   ])
 
@@ -1474,16 +1572,36 @@ async function fetchElectionResultsData(eventId) {
 
   const { data: positionRows, error: posListErr } = await getClient()
     .from(DB_TABLES.POSITIONS)
-    .select('id, event_id, ballot_section_id, name, description, max_vote, number_of_winners, display_order, allow_skip')
+    .select('id, event_id, ballot_section_id, name, description, max_vote, number_of_winners, display_order, allow_skip, eligible_programs')
     .eq('event_id', eventId)
     .order('display_order', { ascending: true })
 
   if (posListErr) throw new ApiError(500, posListErr.message)
 
+  const { data: sectionRows, error: sectionError } = await getClient()
+    .from(DB_TABLES.ELECTION_BALLOT_SECTIONS)
+    .select('id, event_id, name, description, display_order, created_at, eligibility_mode')
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (sectionError) throw new ApiError(500, sectionError.message)
+  const assignments = await groupAssignments(eventId)
+  const sectionById = new Map((sectionRows ?? []).map((section) => [section.id, section]))
+
   const positions = (positionRows ?? []).map(mapPosition)
   const positionSummaries = positions.map((position) => {
     const inPosition = candidateResults.filter((c) => c.positionId === position.id)
     const totalPositionVotes = inPosition.reduce((s, c) => s + c.votes, 0)
+    const eligibleVoterCount = (participantRows ?? []).filter((participant) => {
+      const section = sectionById.get(position.ballotSectionId)
+      return section
+        && eligibleGroups([section], assignments, participant.id).length > 0
+        && isPositionProgramEligible(position, participant.users?.program)
+    }).length
+    const positionVoterIds = new Set((voteRows ?? [])
+      .filter((vote) => vote.position_id === position.id)
+      .map((vote) => vote.voter_id))
+    const positionVotedCount = positionVoterIds.size
     const winnersCount = position.numberOfWinners || 1
 
     const sortedCandidates = inPosition.slice().sort((a, b) => b.votes - a.votes)
@@ -1537,6 +1655,10 @@ async function fetchElectionResultsData(eventId) {
       positionId: position.id,
       positionName: position.name,
       ballotSectionId: position.ballotSectionId,
+      eligiblePrograms: position.eligiblePrograms,
+      eligibleVoterCount,
+      votedCount: positionVotedCount,
+      turnoutPercentage: computeTurnoutRate(positionVotedCount, eligibleVoterCount),
       numberOfWinners: winnersCount,
       totalVotes: totalPositionVotes,
       hasTie: hasCutoffTie,
@@ -1550,14 +1672,6 @@ async function fetchElectionResultsData(eventId) {
       candidates: candidatesWithWinnerStatus,
     }
   })
-
-  const { data: sectionRows, error: sectionError } = await getClient()
-    .from(DB_TABLES.ELECTION_BALLOT_SECTIONS)
-    .select('id, event_id, name, description, display_order, created_at, eligibility_mode')
-    .eq('event_id', eventId)
-    .order('display_order', { ascending: true })
-    .order('created_at', { ascending: true })
-  if (sectionError) throw new ApiError(500, sectionError.message)
 
   const sectionNameById = new Map((sectionRows ?? []).map((section) => [section.id, section.name]))
   for (const position of positionSummaries) {
@@ -1582,10 +1696,13 @@ async function fetchElectionResultsData(eventId) {
   const partialVotedCount = Math.max(0, distinctParticipants.size - voted)
 
   const sectionSummaries = (sectionRows ?? []).map((section) => {
-    const eligibleVoterCount = (participantRows ?? []).filter((participant) => eligibleGroups([section], assignments, participant.id).length).length
     const sectionPositions = positionSummaries.filter(
       (position) => position.ballotSectionId === section.id,
     )
+    const eligibleVoterCount = new Set((participantRows ?? [])
+      .filter((participant) => eligibleGroups([section], assignments, participant.id).length)
+      .filter((participant) => sectionPositions.some((position) => isPositionProgramEligible(position, participant.users?.program)))
+      .map((participant) => participant.id)).size
     const sectionVotedCount = submissionsBySection.get(section.id) ?? 0
     return {
       ...mapBallotSection(section),
@@ -1619,6 +1736,9 @@ async function fetchElectionResultsData(eventId) {
 export async function getVoterElectionResults(eventId, voterId) {
   const participant = await assertVoterEnrolled(eventId, voterId)
   const event = await getEventById(eventId)
+  const { data: voterProfile, error: profileError } = await getClient().from(DB_TABLES.USERS)
+    .select('program').eq('id', voterId).maybeSingle()
+  if (profileError) throw new ApiError(500, profileError.message)
 
   if (event.event_type !== EVENT_TYPES.ELECTION) {
     throw new ApiError(400, 'Not an election event')
@@ -1634,11 +1754,25 @@ export async function getVoterElectionResults(eventId, voterId) {
   if (error) throw new ApiError(500, error.message)
   const allowed = new Set(eligibleGroups(groups ?? [], await groupAssignments(eventId), participant.id).map((group) => group.id))
   if (!allowed.size) throw new ApiError(403, 'No eligible election groups available')
-  const positions = results.positionSummaries.filter((position) => allowed.has(position.ballotSectionId))
+  const positions = results.positionSummaries.filter((position) =>
+    allowed.has(position.ballotSectionId)
+      && isPositionProgramEligible(position, voterProfile?.program),
+  )
+  if (!positions.length) throw new ApiError(403, 'No eligible election positions available')
   const positionIds = new Set(positions.map((position) => position.positionId))
+  const ballotSections = results.ballotSections
+    .filter((group) => allowed.has(group.id))
+    .map((group) => {
+      const positionSummaries = group.positionSummaries.filter((position) => positionIds.has(position.positionId))
+      return {
+        ...group,
+        positionSummaries,
+        totalVotes: positionSummaries.reduce((sum, position) => sum + position.totalVotes, 0),
+      }
+    })
   return { ...results, positionSummaries: positions,
     candidateResults: results.candidateResults.filter((candidate) => positionIds.has(candidate.positionId)),
-    ballotSections: results.ballotSections.filter((group) => allowed.has(group.id)),
+    ballotSections,
     liveTotalVotes: positions.reduce((sum, position) => sum + position.totalVotes, 0),
   }
 }
@@ -1767,6 +1901,7 @@ export async function duplicateElectionEvent(eventId, organizerId) {
         numberOfWinners: pos.numberOfWinners,
         displayOrder: pos.displayOrder,
         allowSkip: pos.allowSkip,
+        eligiblePrograms: pos.eligiblePrograms,
       }, newSectionId)
       positionIdMap.set(pos.id, newPos.id)
     }

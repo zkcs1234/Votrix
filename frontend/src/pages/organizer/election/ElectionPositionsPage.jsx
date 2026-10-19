@@ -26,6 +26,11 @@ export default function ElectionPositionsPage() {
   // minVote removed – default is 1 (no minimum constraint)
   const [maxVote, setMaxVote] = useState(1)
   const [displayOrder, setDisplayOrder] = useState('')
+  const [programs, setPrograms] = useState([])
+  const [eligibilityMode, setEligibilityMode] = useState('all')
+  const [selectedPrograms, setSelectedPrograms] = useState([])
+  const [eligibilityDrafts, setEligibilityDrafts] = useState({})
+  const [savingEligibility, setSavingEligibility] = useState('')
   const [saving, setSaving] = useState(false)
   const { success: showSuccess, error: showError } = useToast()
   const { status, setupLocked } = useEventStatus(electionService, eventId)
@@ -44,6 +49,9 @@ export default function ElectionPositionsPage() {
 
   useEffect(() => {
     setGroupsLoading(true)
+    electionService.getCohorts(eventId).then(({ data }) => {
+      setPrograms((data.programs ?? []).map((program) => program.value))
+    }).catch((err) => showError(err.response?.data?.message || 'Failed to load voter programs'))
     electionService.listBallotSections(eventId).then(({ data }) => {
       const nextSections = data.sections ?? []
       setSections(nextSections)
@@ -65,11 +73,17 @@ export default function ElectionPositionsPage() {
     // setMinVote removed – no longer needed
     setMaxVote(1)
     setDisplayOrder('')
+    setEligibilityMode('all')
+    setSelectedPrograms([])
   }
 
   const handleCreate = async (e) => {
     e.preventDefault()
     if (!sectionId) { showError('Select an election group before adding a position'); return }
+    if (eligibilityMode === 'programs' && !selectedPrograms.length) {
+      showError('Select at least one program or allow all voters in the group')
+      return
+    }
 
     // No need to validate minVote vs maxVote now
     // Validation removed – minVote feature eliminated
@@ -83,6 +97,7 @@ export default function ElectionPositionsPage() {
         maxVote: Number(maxVote),
         displayOrder: displayOrder === '' ? undefined : Number(displayOrder),
         allowSkip: false,
+        eligiblePrograms: eligibilityMode === 'programs' ? selectedPrograms : [],
       }, sectionId)
       resetForm()
       setLoading(true)
@@ -186,6 +201,21 @@ export default function ElectionPositionsPage() {
       load()
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to reorder position')
+    }
+  }
+
+  const handleSaveEligibility = async (position) => {
+    const eligiblePrograms = eligibilityDrafts[position.id] ?? position.eligiblePrograms ?? []
+    setSavingEligibility(position.id)
+    try {
+      const { data } = await electionService.updatePosition(eventId, position.id, { eligiblePrograms })
+      setPositions((current) => current.map((item) => item.id === position.id ? data.position : item))
+      setEligibilityDrafts((current) => ({ ...current, [position.id]: data.position.eligiblePrograms ?? [] }))
+      showSuccess(`Eligibility updated for "${position.name}"`)
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to update position eligibility')
+    } finally {
+      setSavingEligibility('')
     }
   }
 
@@ -317,6 +347,35 @@ export default function ElectionPositionsPage() {
           />
         </div>
 
+        <fieldset className="space-y-2 sm:col-span-2">
+          <legend className="mb-1 block text-sm text-v-text-muted">Who can vote for this position?</legend>
+          <label className="flex items-center gap-2 text-sm text-v-text">
+            <input type="radio" name="position-eligibility" checked={eligibilityMode === 'all'} onChange={() => setEligibilityMode('all')} />
+            All voters eligible for this group
+          </label>
+          <label className="flex items-center gap-2 text-sm text-v-text">
+            <input type="radio" name="position-eligibility" checked={eligibilityMode === 'programs'} onChange={() => setEligibilityMode('programs')} />
+            Restrict to selected programs
+          </label>
+          {eligibilityMode === 'programs' && (
+            <div className="grid gap-2 rounded-lg border border-v-border p-3 sm:grid-cols-2">
+              {!programs.length && <p className="v-caption sm:col-span-2">No voter programs are available in your organizer scope.</p>}
+              {programs.map((program) => (
+                <label key={program} className="flex items-center gap-2 text-sm text-v-text">
+                  <input
+                    type="checkbox"
+                    checked={selectedPrograms.includes(program)}
+                    onChange={(event) => setSelectedPrograms((current) => event.target.checked
+                      ? [...current, program]
+                      : current.filter((value) => value !== program))}
+                  />
+                  {program}
+                </label>
+              ))}
+            </div>
+          )}
+        </fieldset>
+
         <button
           type="submit"
           disabled={saving || !sectionId}
@@ -348,6 +407,48 @@ export default function ElectionPositionsPage() {
               <p className="mt-1 text-xs text-v-text-subtle">
                 Winners: {p.numberOfWinners ?? 1} · Vote up to {p.maxVote}
               </p>
+              <p className="mt-1 text-xs text-v-text-subtle">
+                Eligible voters: {p.eligiblePrograms?.length ? p.eligiblePrograms.join(', ') : 'All voters in group'}
+              </p>
+              {!setupLocked && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-medium text-v-primary">Edit program eligibility</summary>
+                  <div className="mt-2 space-y-2 rounded-lg border border-v-border p-3">
+                    <p className="v-caption">Choose programs to restrict this position. Clear all selections to allow every voter eligible for the group.</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {[...new Set([...programs, ...(p.eligiblePrograms ?? [])])].map((program) => {
+                        const selected = eligibilityDrafts[p.id] ?? p.eligiblePrograms ?? []
+                        return (
+                          <label key={program} className="flex items-center gap-2 text-sm text-v-text">
+                            <input
+                              type="checkbox"
+                              checked={selected.includes(program)}
+                              onChange={(event) => setEligibilityDrafts((current) => {
+                                const previous = current[p.id] ?? p.eligiblePrograms ?? []
+                                return {
+                                  ...current,
+                                  [p.id]: event.target.checked
+                                    ? [...previous, program]
+                                    : previous.filter((value) => value !== program),
+                                }
+                              })}
+                            />
+                            {program}
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={savingEligibility === p.id}
+                      onClick={() => handleSaveEligibility(p)}
+                      className="rounded-md bg-v-primary px-3 py-1.5 text-xs text-white disabled:opacity-50"
+                    >
+                      {savingEligibility === p.id ? 'Saving...' : 'Save eligibility'}
+                    </button>
+                  </div>
+                </details>
+              )}
             </div>
             {!setupLocked && (
             <div className="flex shrink-0 items-center gap-2">

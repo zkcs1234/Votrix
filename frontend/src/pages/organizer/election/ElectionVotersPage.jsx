@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import CohortInviteManager from '@/components/organizer/CohortInviteManager'
 import ElectionGroupEligibility from '@/components/organizer/ElectionGroupEligibility'
+import ElectionPositionEligibilitySummary from '@/components/organizer/ElectionPositionEligibilitySummary'
 import { isParticipantsLocked } from '@/utils/constants'
 
 // Phase 5: organizers no longer register or CSV-import voters. Voter accounts
@@ -41,6 +42,7 @@ export default function ElectionVotersPage() {
         rosterLocked={isParticipantsLocked(eventStatus)}
       />
       <ElectionGroupEligibility eventId={eventId} locked={isParticipantsLocked(eventStatus)} />
+      <ElectionPositionEligibilitySummary eventId={eventId} />
     </div>
   )
 }
