@@ -230,6 +230,29 @@ export default function VoterEventPage() {
         )
       }
     } catch (err) {
+      const isAlreadySubmitted =
+        err.response?.status === 409 &&
+        (err.response?.data?.message?.toLowerCase().includes('already submitted') ||
+          err.response?.data?.message?.toLowerCase().includes('not the next'))
+
+      if (isAlreadySubmitted) {
+        try {
+          localStorage.removeItem(draftKey)
+          const { data: nextBallot } = await electionService.getBallot(eventId)
+          setBallot(nextBallot)
+          setSelections({})
+          setIsReviewing(false)
+          if (nextBallot.hasVoted) {
+            setDone(true)
+          } else {
+            setSectionNotice('Ballot section recorded. Loading next section...')
+          }
+          return
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+
       setError(err.response?.data?.message || 'Failed to submit ballot')
       setIsReviewing(false)
     } finally {

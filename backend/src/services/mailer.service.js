@@ -18,20 +18,86 @@ import {
   passwordResetUrl,
   forgotPasswordUrl,
 } from '../utils/urls.js'
+import { checkAndRecordEmailSend, buildEmailDedupeKey } from './emailGuard.js'
 
 /**
  * Send email without failing the parent operation.
  * Returns { sent, error? } for logging and API responses.
  */
-export async function sendWorkflowEmail({ to, subject, html }) {
+export async function sendWorkflowEmail({
+  to,
+  subject,
+  html,
+  workflow = 'general-email',
+  dedupeKey,
+  eventId,
+  userId,
+  template,
+}) {
   if (!isEmailConfigured()) {
     console.warn(`[mailer] Skipped email to ${to} — Resend not configured`)
     return { sent: false, skipped: true, reason: 'Email service not configured' }
   }
 
+  const guardResult = await checkAndRecordEmailSend({
+    to,
+    subject,
+    workflow,
+    eventId,
+    userId,
+    template,
+    dedupeKey:
+      dedupeKey ||
+      buildEmailDedupeKey({
+        to,
+        subject,
+        workflow,
+        eventId,
+        userId,
+        template,
+      }),
+  })
+
+  if (!guardResult.allowed) {
+    const result = {
+      sent: false,
+      skipped: true,
+      reason: guardResult.reason,
+      quotaType: guardResult.quotaType,
+      duplicate: guardResult.duplicate,
+      dedupeWindowMs: guardResult.dedupeWindowMs,
+      limit: guardResult.limit,
+    }
+
+    console.warn(`[mailer] Email blocked for ${to}: ${guardResult.reason}`)
+    return result
+  }
+
   try {
     const data = await sendEmail({ to, subject, html })
     console.log(`[mailer] Successfully sent email to ${to} (ID: ${data?.id})`)
+
+    try {
+      const { updateEmailAuditStatus } = await import('./emailAudit.service.js')
+      await updateEmailAuditStatus({
+        dedupeKey:
+          dedupeKey ||
+          buildEmailDedupeKey({
+            to,
+            subject,
+            workflow,
+            eventId,
+            userId,
+            template,
+          }),
+        workflow,
+        providerStatus: 'sent',
+        providerMessageId: data?.id || null,
+      })
+    } catch (auditError) {
+      console.warn('[mailer] failed to mark email sent in audit log:', auditError.message)
+    }
+
     return { sent: true, id: data?.id }
   } catch (error) {
     console.error(`[mailer] Failed to send to ${to}:`, error.message)
@@ -42,12 +108,35 @@ export async function sendWorkflowEmail({ to, subject, html }) {
     } catch (alertError) {
       console.error('[mailer] email failure alert failed (non-fatal):', alertError.message)
     }
-    
-    // For network connectivity issues, suggest retry
+
+    try {
+      const { updateEmailAuditStatus } = await import('./emailAudit.service.js')
+      await updateEmailAuditStatus({
+        dedupeKey:
+          dedupeKey ||
+          buildEmailDedupeKey({
+            to,
+            subject,
+            workflow,
+            eventId,
+            userId,
+            template,
+          }),
+        workflow,
+        providerStatus: 'failed',
+        providerError: error.message || 'Unknown email failure',
+        retryable: Boolean(
+          error.message?.includes('Network connectivity') || error.message?.includes('Unable to reach'),
+        ),
+      })
+    } catch (auditError) {
+      console.warn('[mailer] failed to mark email failure in audit log:', auditError.message)
+    }
+
     if (error.message?.includes('Network connectivity') || error.message?.includes('Unable to reach')) {
       return { sent: false, error: error.message, retryable: true }
     }
-    
+
     return { sent: false, error: error.message }
   }
 }
@@ -65,6 +154,8 @@ export async function sendOrganizerInvitationEmail({ email, temporaryPassword })
     to: email,
     subject: 'Your VOTRIX organizer account',
     html,
+    workflow: 'organizer-invite',
+    template: 'organizer-invitation',
   })
 }
 
@@ -81,6 +172,8 @@ export async function sendVoterAccountCreatedEmail({ email, temporaryPassword })
     to: email,
     subject: 'Your VOTRIX account',
     html,
+    workflow: 'participant-account-created',
+    template: 'voter-account-created',
   })
 }
 
@@ -92,6 +185,8 @@ export async function sendOrganizerOnboardingEmail({ email }) {
     to: email,
     subject: 'Complete your VOTRIX organization profile',
     html,
+    workflow: 'organizer-onboarding',
+    template: 'organizer-onboarding',
   })
 }
 
@@ -116,6 +211,9 @@ export async function sendVoterInvitationEmail({
     to: email,
     subject: `You're invited: ${eventTitle}`,
     html,
+    workflow: 'voter-invite',
+    template: 'voter-invite-new',
+    eventId,
   })
 }
 
@@ -137,6 +235,9 @@ export async function sendVoterInvitationEmailRegistered({
     to: email,
     subject: `You're invited: ${eventTitle}`,
     html,
+    workflow: 'voter-invite-registered',
+    template: 'voter-invite-registered',
+    eventId,
   })
 }
 
@@ -148,6 +249,8 @@ export async function sendPasswordResetEmail({ email, token, expiresInMinutes })
     to: email,
     subject: 'Reset your VOTRIX password',
     html,
+    workflow: 'password-reset',
+    template: 'password-reset',
   })
 }
 
@@ -171,6 +274,9 @@ export async function sendJudgeInvitationEmail({
     to: email,
     subject: `Judge invitation: ${eventTitle}`,
     html,
+    workflow: 'judge-invite',
+    template: 'judge-invite-new',
+    eventId,
   })
 }
 
@@ -194,6 +300,9 @@ export async function sendJudgeInvitationEmailRegistered({
     to: email,
     subject: `You've been added as a judge: ${eventTitle}`,
     html,
+    workflow: 'judge-invite-registered',
+    template: 'judge-invite-registered',
+    eventId,
   })
 }
 
@@ -220,5 +329,8 @@ export async function sendEventNotificationEmail({
     to: email,
     subject: `Event update: ${eventTitle}`,
     html,
+    workflow: 'event-notification',
+    template: 'event-notification',
+    eventId,
   })
 }

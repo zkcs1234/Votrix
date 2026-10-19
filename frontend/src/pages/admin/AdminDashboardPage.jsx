@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Users, CalendarDays, UserCheck, UserPlus, Gavel, Zap, CheckSquare,
+  Users, CalendarDays, UserCheck, UserPlus, Zap, CheckSquare,
   Settings, ArrowRight, LayoutDashboard,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -139,22 +139,10 @@ export default function AdminDashboardPage() {
                 Add organizer
               </Button>
             </Link>
-            <Link to="/admin/users?tab=participants&type=election-voter">
+            <Link to="/admin/users?tab=participants">
               <Button size="sm" variant="secondary">
                 <UserPlus className="h-4 w-4" strokeWidth={2} />
-                Add Election Voter
-              </Button>
-            </Link>
-            <Link to="/admin/users?tab=participants&type=competition-judge">
-              <Button size="sm" variant="secondary">
-                <Gavel className="h-4 w-4" strokeWidth={2} />
-                Add Competition Judge
-              </Button>
-            </Link>
-            <Link to="/admin/users?tab=participants&type=polling-respondent">
-              <Button size="sm" variant="secondary">
-                <UserPlus className="h-4 w-4" strokeWidth={2} />
-                Add Polling Respondent
+                Add participant
               </Button>
             </Link>
           </div>
@@ -224,29 +212,11 @@ export default function AdminDashboardPage() {
             </li>
             <li>
               <Link
-                to="/admin/users?tab=participants&type=election-voter"
+                to="/admin/users?tab=participants"
                 className="v-btn-tertiary inline-flex items-center gap-1.5"
               >
                 <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                Add Election Voter account
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/admin/users?tab=participants&type=competition-judge"
-                className="v-btn-tertiary inline-flex items-center gap-1.5"
-              >
-                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                Add Competition Judge account
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/admin/users?tab=participants&type=polling-respondent"
-                className="v-btn-tertiary inline-flex items-center gap-1.5"
-              >
-                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                Add Polling Respondent account
+                Add participant account
               </Link>
             </li>
             <li>

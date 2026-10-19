@@ -73,6 +73,7 @@ import {
   restoreArchivedEvent,
 } from '../services/archival.service.js'
 import { ApiError } from '../utils/ApiError.js'
+import { listEmailDeliveryLogs } from '../services/emailAudit.service.js'
 import { validateUUID } from '../utils/sanitize.js'
 
 // CWE-20: Allowlist for system setting keys — alphanumeric + underscores only.
@@ -304,6 +305,55 @@ export const getAuditLogs = asyncHandler(async (req, res) => {
     endDate: endDate || undefined,
     limit: safeLimit,
     offset,
+  })
+
+  res.json({
+    success: true,
+    logs,
+    pagination: {
+      total,
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit),
+    },
+  })
+})
+
+export const getEmailDeliveryLogs = asyncHandler(async (req, res) => {
+  const {
+    page = '1',
+    limit = '50',
+    search = '',
+    workflow = '',
+    providerStatus = '',
+    startDate = '',
+    endDate = '',
+  } = req.query ?? {}
+
+  const safeLimit = Math.min(Math.max(1, parseInt(limit, 10) || 50), 200)
+  const safePage = Math.max(1, parseInt(page, 10) || 1)
+  const dateFilters = {}
+
+  for (const [field, value] of Object.entries({ startDate, endDate })) {
+    if (value) {
+      const parsed = new Date(value)
+      if (Number.isNaN(parsed.getTime())) {
+        throw new ApiError(400, `${field} must be a valid date`)
+      }
+      dateFilters[field] = parsed.toISOString()
+    }
+  }
+  if (dateFilters.startDate && dateFilters.endDate && dateFilters.startDate > dateFilters.endDate) {
+    throw new ApiError(400, 'startDate must be before or equal to endDate')
+  }
+
+  const { logs, total } = await listEmailDeliveryLogs({
+    page: safePage,
+    limit: safeLimit,
+    search: String(search).trim().slice(0, 320),
+    workflow: String(workflow).trim().slice(0, 80),
+    providerStatus: String(providerStatus).trim().slice(0, 32),
+    ...dateFilters,
   })
 
   res.json({

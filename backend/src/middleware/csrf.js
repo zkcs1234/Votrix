@@ -18,6 +18,8 @@ const EXEMPT_PATHS = new Set([
   '/auth/reset-password',
   '/health',
   '/health/',
+  '/webhooks',
+  '/webhooks/',
 ])
 
 function normalizeApiPath(req) {
@@ -34,7 +36,7 @@ export function csrfProtection(req, res, next) {
   }
 
   const path = normalizeApiPath(req)
-  if (EXEMPT_PATHS.has(path) || path.startsWith('/health')) {
+  if (EXEMPT_PATHS.has(path) || path.startsWith('/health') || path.startsWith('/webhooks')) {
     return next()
   }
 

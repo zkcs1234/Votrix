@@ -739,6 +739,16 @@ export async function publishPollEvent(eventId, organizerId) {
   return mapPollEvent(published)
 }
 
+async function assertNoPollSubmissions(eventId, action = 'modify questions') {
+  const { count } = await getClient()
+    .from(DB_TABLES.POLL_SUBMISSIONS)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+  if (count > 0) {
+    throw new ApiError(409, `Cannot ${action} because submissions have already been received for this poll.`)
+  }
+}
+
 /**
  * Pull a published poll back to `draft` so its setup can be corrected. Only
  * allowed while the poll is still `scheduled` (published but not yet open).
@@ -749,6 +759,8 @@ export async function unpublishPollEvent(eventId, organizerId) {
   if (!canUnpublishEventStatus(event.status)) {
     throw new ApiError(400, 'Only a scheduled poll can be unpublished. It has already opened or is closed.')
   }
+
+  await assertNoPollSubmissions(eventId, 'unpublish this poll')
 
   const { error } = await getClient()
     .from(DB_TABLES.EVENTS)
@@ -856,6 +868,7 @@ type_config: typeConfig,
 
 export async function updateQuestion(eventId, organizerId, questionId, payload) {
   assertSetupEditable(await assertPollingEvent(eventId, organizerId))
+  await assertNoPollSubmissions(eventId, 'modify questions')
 
   const orgId = await getPollingOrgId(organizerId)
   const registry = await loadQuestionTypeRegistry(orgId)
@@ -960,6 +973,7 @@ async function currentTypeKey(questionId) {
 
 export async function deleteQuestion(eventId, organizerId, questionId) {
   assertSetupEditable(await assertPollingEvent(eventId, organizerId))
+  await assertNoPollSubmissions(eventId, 'delete questions')
 
   // Fetch question image_asset_id before deleting for cleanup
   const { data: questionData } = await getClient()
@@ -1107,6 +1121,7 @@ export async function duplicateQuestion(eventId, organizerId, questionId) {
 
 export async function reorderQuestions(eventId, organizerId, orders) {
   assertSetupEditable(await assertPollingEvent(eventId, organizerId))
+  await assertNoPollSubmissions(eventId, 'reorder questions')
 
   if (!orders || !Array.isArray(orders) || orders.length === 0) return []
 
@@ -1299,6 +1314,7 @@ export async function submitPollResponse(eventId, voterId, answers, startedAt) {
     p_started_at: startedAt || null,
     p_allow_multiple: Boolean(event.poll_allow_multiple_submissions),
     p_answers: rows,
+    p_is_anonymous: Boolean(event.poll_anonymous),
   })
 
   if (castErr) {

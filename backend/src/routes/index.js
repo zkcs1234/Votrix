@@ -6,7 +6,7 @@ import adminRoutes from './admin.routes.js'
 import organizerRoutes from './organizer.routes.js'
 import voterRoutes from './voter.routes.js'
 import notificationsRoutes from './notifications.routes.js'
-import competitionPublicResultsRoutes from './competition-public-results.routes.js'
+import webhooksRoutes from './webhooks.routes.js'
 
 const router = Router()
 
@@ -27,5 +27,6 @@ router.use('/organizer', organizerRoutes)
 router.use('/participant', voterRoutes)
 router.use('/voter', voterRoutes)
 router.use('/notifications', notificationsRoutes)
+router.use('/webhooks', webhooksRoutes)
 
 export default router

@@ -5,8 +5,6 @@
 
 BEGIN;
 
-UPDATE users
-SET role = 'participant'
-WHERE role = 'voter';
+UPDATE users SET role = 'participant' WHERE role = 'voter';
 
 COMMIT;

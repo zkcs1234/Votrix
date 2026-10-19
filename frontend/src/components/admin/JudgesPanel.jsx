@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 import { downloadBlob, downloadCsv } from '@/utils/csvDownload'
 import AccountStatusConfirmModal from '@/components/admin/AccountStatusConfirmModal'
+import { getEmailOutcomeMessage } from '@/utils/emailOutcome'
+import CsvImportResults from '@/components/admin/CsvImportResults'
 
 const STATUS_TONE = { active: 'success', suspended: 'danger', archived: 'default' }
 
@@ -39,7 +41,7 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
   const [organizers, setOrganizers] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const { success, error: toastError } = useToast()
+  const { success, warning, error: toastError } = useToast()
 
   useEffect(() => {
     adminService.getOrganizers().then(({ data: d }) => setOrganizers(d.organizers ?? [])).catch(() => {})
@@ -59,8 +61,9 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
         await adminService.updateJudge(initial.id, payload)
         success('Competition Judge updated')
       } else {
-        await adminService.createJudge(payload)
-        success('Competition Judge added — credentials emailed')
+        const { data } = await adminService.createJudge(payload)
+        success('Competition Judge added')
+        if (!data.email?.sent) warning(getEmailOutcomeMessage(data.email))
       }
       onSaved()
     } catch (err) {
@@ -166,7 +169,11 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
 // ---- CSV preview modal -----------------------------------------------------
 function CsvPreviewModal({ preview, onClose, onRegister, registering }) {
   return (
-    <Modal open onClose={onClose} title="Review & Register" size="lg">
+    <Modal open onClose={onClose} title={preview.importResult ? 'Import results' : 'Review & Register'} size="lg">
+      {preview.importResult ? (
+        <CsvImportResults result={preview.importResult} filename="judge-import-results.csv" onDone={onClose} />
+      ) : (
+        <>
       {preview.errors?.length > 0 && (
         <div className="mb-4 rounded-lg border border-v-danger/30 bg-v-danger/10 p-3">
           <p className="v-error-text mb-2 font-semibold">{preview.errors.length} row error(s) — these will be skipped</p>
@@ -218,6 +225,8 @@ function CsvPreviewModal({ preview, onClose, onRegister, registering }) {
           Register {preview.data?.length ?? 0}
         </Button>
       </div>
+        </>
+      )}
     </Modal>
   )
 }
@@ -293,7 +302,7 @@ export default function JudgesPanel() {
     try {
       const { data } = await adminService.registerJudgesCsv(preview.data)
       success(`Registered ${data.succeeded} of ${data.total}${data.failed ? ` (${data.failed} failed)` : ''}`)
-      setPreview(null)
+      setPreview((current) => current ? { ...current, importResult: data } : current)
       await fetchJudges()
     } catch (err) {
       toastError(getErrorMessage(err, 'Registration failed'))
@@ -366,17 +375,17 @@ export default function JudgesPanel() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={downloadTemplate}>
-            <Download className="h-4 w-4" strokeWidth={1.5} /> Import template
+            <Download className="h-4 w-4" strokeWidth={1.5} /> Template
           </Button>
           <Button variant="secondary" onClick={handleExport} loading={exporting}>
             <Download className="h-4 w-4" strokeWidth={1.5} /> Export CSV
           </Button>
           <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-            <Upload className="h-4 w-4" strokeWidth={1.5} /> Review CSV import
+            <Upload className="h-4 w-4" strokeWidth={1.5} /> Import CSV
           </Button>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFile} />
           <Button onClick={() => setModal({ mode: 'add' })}>
-            <UserPlus className="h-4 w-4" strokeWidth={2} /> Add Competition Judge
+            <UserPlus className="h-4 w-4" strokeWidth={2} /> Add participant
           </Button>
         </div>
       </div>
