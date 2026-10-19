@@ -80,7 +80,24 @@ export async function liveView(eventId,competitionId,actor,roundId=null,owner=fa
   boundary(eventId,competitionId,actor,roundId)
   const data=await rpc('competition_child_live_view',{p_event:eventId,p_competition:competitionId,p_actor:actor,p_round:roundId,p_owner:owner})
   if (data?.context?.eventId!==eventId||data.context.competitionId!==competitionId||data.context.roundId!==roundId||(!owner&&data.viewerJudgeId!==actor)) throw new ApiError(503,'Scoring snapshot identity mismatch')
-  return {...data,criteria:(data.criteria??[]).map(k=>({...k,open:k.open===true})),contestants:(data.contestants??[]).map(e=>({...e,open:e.open===true}))}
+  // Enrich only the already-authorized roster. Native entry numbers identify
+  // participation rows; the registration number is scoped to its division.
+  const masterIds=[...new Set((data.contestants??[]).map(e=>e.masterId).filter(Boolean))]
+  let registrations=[],divisions=[]
+  if(masterIds.length){
+    const {data:rows,error}=await db().from('competition_contestants').select('id,contestant_number,division_id').eq('event_id',eventId).in('id',masterIds)
+    scoringError(error,'live_registration_metadata');registrations=rows??[]
+    const divisionIds=[...new Set(registrations.map(row=>row.division_id).filter(Boolean))]
+    if(divisionIds.length){
+      const {data:rows,error}=await db().from('competition_divisions').select('id,name,row_color').eq('event_id',eventId).in('id',divisionIds)
+      scoringError(error,'live_division_metadata');divisions=rows??[]
+    }
+  }
+  const registrationById=new Map(registrations.map(row=>[row.id,row])),divisionById=new Map(divisions.map(row=>[row.id,row]))
+  return {...data,allowedDivisions:divisions.map(row=>({id:row.id,name:row.name,rowColor:row.row_color})),criteria:(data.criteria??[]).map(k=>({...k,open:k.open===true})),contestants:(data.contestants??[]).map(e=>{
+    const registration=registrationById.get(e.masterId),division=divisionById.get(registration?.division_id)
+    return {...e,open:e.open===true,...(registration?{registrationNumber:registration.contestant_number,divisionId:registration.division_id,divisionName:division?.name??'',rowColor:division?.row_color??null}:{})}
+  })}
 }
 function bodyContext(body) {
   validateUUID(body?.requestId,'requestId');validateUUID(body?.rulesVersion,'rulesVersion')

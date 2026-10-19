@@ -10,7 +10,7 @@ import { competitionTabulationService } from '@/services/competition-tabulation.
 import Button from '@/components/ui/Button'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const SECTIONS=['Overview','Judge Submissions','Score Matrix','Judge Worksheets','Calculations','Deductions & Eligibility','Rankings','Advancement','Verification & Audit']
-const SECTION_TABS={overview:'Overview',submissions:'Judge Submissions',matrix:'Score Matrix',deductions:'Deductions & Eligibility',results:'Rankings',audit:'Verification & Audit'}
+const SECTION_TABS={overview:'Overview',submissions:'Judge Submissions',matrix:'Score Matrix',deductions:'Deductions & Eligibility',results:'Rankings',audit:'Verification & Audit',validation:'Calculations',finalization:'Verification & Audit',advancement:'Advancement'}
 const TAB_SECTIONS=Object.fromEntries(Object.entries(SECTION_TABS).map(([section,tab])=>[tab,section]))
 const value=v=>v==null?'Missing / Incomplete':Number(v).toLocaleString(undefined,{maximumFractionDigits:6})
 export default function CompetitionTabulationWorkspace({eventId,initialSection='overview'}){

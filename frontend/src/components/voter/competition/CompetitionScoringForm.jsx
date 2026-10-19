@@ -1,3 +1,4 @@
+import { judgeContestantNumber, judgeDivision } from '@/utils/judgeContestantDivisions'
 import { useEffect, useState } from 'react'
 import { CheckCircle, Clock, Lock } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -25,6 +26,7 @@ export default function CompetitionScoringForm({
   sessionState = null,
   simplified = false,
   preview = false,
+  divisionFilter = 'all',
 }) {
   const { contestants, criteria } = sheet
   const [typing,setTyping]=useState(false)
@@ -116,7 +118,9 @@ export default function CompetitionScoringForm({
   })()
 
   // Preserve the published order without inserting division section rows.
-  const orderedContestants = baseOrdered
+  const hasRegisteredDivisions = contestants.some(cont => cont.registrationNumber != null && judgeDivision(cont, sheet).id)
+  const orderedContestants = (hasRegisteredDivisions ? [...baseOrdered].sort((a,b) => Number(judgeContestantNumber(a))-Number(judgeContestantNumber(b)) || judgeDivision(a,sheet).order-judgeDivision(b,sheet).order) : baseOrdered)
+    .filter(cont => divisionFilter === 'all' || judgeDivision(cont, sheet).id === divisionFilter)
 
   // Per-criterion Lock control (#6). Each criterion commits on its own the moment
   // the judge finishes it, so scores can't be revisited (fairness). States:
@@ -207,7 +211,7 @@ export default function CompetitionScoringForm({
               </th>}
             </tr>
           </thead>
-          <tbody>{orderedContestants.map(cont => {
+          <tbody>{orderedContestants.length === 0 && <tr><td colSpan={1 + critColumns.reduce((count, column) => count + column.minors.length, 0) + (!simplified ? 1 : 0) + (showDeductionColumn ? 1 : 0)} className="v-judge-empty">No contestants in this division for the selected round.</td></tr>}{orderedContestants.map(cont => {
             const closed = cont.open === false || !!sheet.submission
             const presentation = contestantPresentation(cont, sheet)
             const entryDeductions = deductionsForContestant(cont)
@@ -215,10 +219,10 @@ export default function CompetitionScoringForm({
               <td className="v-judge-contestant">
                 <div className="v-judge-identity">
                   <span className="v-judge-number" title={presentation.divisionName || undefined}>
-                    <span>#{cont.contestantNumber}</span>{presentation.indicator && <small>{presentation.indicator}</small>}
+                    <span>#{judgeContestantNumber(cont)}</span>{presentation.indicator && <small>{presentation.indicator}</small>}
                   </span>
                   {cont.photo && <img className="v-judge-photo" src={cont.photo} alt="" />}
-                  <span className="v-judge-name">{cont.name}</span>
+                  <span className="v-judge-name">{cont.name}{presentation.divisionName && <small className="v-judge-division-label">{presentation.divisionName}</small>}</span>
                 </div>
               </td>
               {statusBeforeCriteria && <td className="v-judge-status"><RowStatus cont={cont}/></td>}
@@ -279,14 +283,11 @@ export default function CompetitionScoringForm({
 // Presentation only: actual division/gender labels determine M/F. Unknown
 // divisions keep their own initials/color; names and photos never infer gender.
 function contestantPresentation(contestant, sheet) {
-  const division = (sheet.allowedDivisions ?? sheet.divisions ?? []).find(item => item.id === contestant.divisionId)
-  const divisionName = contestant.divisionName ?? division?.name ?? ''
-  const label = String(contestant.gender ?? contestant.sex ?? divisionName).trim().toLowerCase()
-  const female = /\b(female|women|woman|girls?|f)\b/.test(label)
-  const male = !female && /\b(male|men|man|boys?|m)\b/.test(label)
-  const tone = female ? 'female' : male ? 'male' : 'neutral'
-  const accent = female ? '#db2777' : male ? '#2563eb' : contestant.rowColor ?? division?.rowColor ?? division?.row_color
-  const indicator = female ? 'F' : male ? 'M' : divisionName.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase()
+  const division = judgeDivision(contestant, sheet)
+  const divisionName = division.label || division.name
+  const { tone } = division
+  const accent = tone === 'female' ? '#db2777' : tone === 'male' ? '#2563eb' : division.color
+  const indicator = tone === 'female' ? 'F' : tone === 'male' ? 'M' : divisionName.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase()
   return { tone, indicator, divisionName, style: accent ? { '--judge-accent': accent, '--judge-row-bg': `color-mix(in srgb, ${accent} 6%, var(--v-surface))` } : undefined }
 }
 

@@ -115,9 +115,12 @@ export function calculateOfficial(rules, submissions, { roundId = null, deductio
             continue
           }
           const weightedMinors = minors.some(m => m.percentage !== undefined)
-          if (weightedMinors && (minors.some(m => !Number.isFinite(m.percentage) || m.percentage <= 0) || Math.abs(minors.reduce((s,m)=>s+m.percentage,0)-100)>0.001)) throw new Error('Minor criterion weights must total 100%')
-          const value = weightedMinors ? sum(normalized.map((q,i)=>q.mul(Q.of(minors[i].percentage)).div(Q.of(100)))) : mean(normalized)
-          const weighted = value.mul(Q.of(criterion.percentage)).div(Q.of(100))
+          const overallMinorWeights = rules.scoringConfig.minorWeightBasis === 'overall'
+          const expectedMinorTotal = overallMinorWeights ? criterion.percentage : 100
+          if (weightedMinors && (minors.some(m => !Number.isFinite(m.percentage) || m.percentage <= 0) || Math.abs(minors.reduce((s,m)=>s+m.percentage,0)-expectedMinorTotal)>0.001)) throw new Error(`Minor criterion weights must total ${expectedMinorTotal}%`)
+          const minorValue = weightedMinors ? sum(normalized.map((q,i)=>q.mul(Q.of(minors[i].percentage)).div(Q.of(100)))) : mean(normalized)
+          const value = weightedMinors && overallMinorWeights ? minorValue.mul(Q.of(100)).div(Q.of(criterion.percentage)) : minorValue
+          const weighted = weightedMinors && overallMinorWeights ? minorValue : value.mul(Q.of(criterion.percentage)).div(Q.of(100))
           const adjusted = adjustCriterion(criterion, weighted)
           contributions.push(adjusted.value)
           trace.push({ criteriaId: criterion.id, name: criterion.name, percentage: criterion.percentage, minors: minors.map((m,i) => ({ ...m, raw: source.scores[m.id], normalized: normalized[i].rounded(dp) })), average: value.rounded(dp), originalContribution: weighted.rounded(dp), adjustedAverage: adjusted.value.mul(Q.of(100)).div(Q.of(criterion.percentage)).rounded(dp), contribution: adjusted.value.rounded(dp), deductions: adjusted.penalties })

@@ -61,6 +61,35 @@ test('shows the actual raw-score, criterion-weight and panel-aggregation steps',
   )
 })
 
+test('direct minor weights are explained as percentage-point shares of the round total', () => {
+  const input = props()
+  input.configuration.scoringConfig.minorWeightBasis = 'overall'
+  input.configuration.criteria[0].percentage = 30
+  input.configuration.criteria[0].minorCriteria = [
+    { id: 'skill', name: 'Skill', minScore: 0, maxScore: 10, percentage: 10 },
+    { id: 'energy', name: 'Energy', minScore: 0, maxScore: 10, percentage: 20 },
+  ]
+  input.calculation.output_snapshot.worksheets = [{
+    entryId: 'entry', roundId: 'final', judgeId: 'judge1', total: 20,
+    criteria: [{
+      criteriaId: 'technique', name: 'Technique', percentage: 30,
+      average: 66.67, contribution: 20, originalContribution: 20,
+      minors: [
+        { id: 'skill', name: 'Skill', raw: 8, maxScore: 10, normalized: 80, percentage: 10 },
+        { id: 'energy', name: 'Energy', raw: 6, maxScore: 10, normalized: 60, percentage: 20 },
+      ],
+    }],
+  }]
+  render(<Breakdown {...input} />)
+  const dialog = within(screen.getByRole('dialog'))
+  expect(dialog.getByLabelText('Step-by-step criterion calculation')).toHaveTextContent(
+    '80.00% × 10.00% = 8.00 percentage points; Energy: 6.00 ÷ 10.00 × 100 = 60.00%; 60.00% × 20.00% = 12.00 percentage points. Direct minor contributions = 20.00 percentage points.',
+  )
+  fireEvent.click(dialog.getByText('Minor criteria and configured ranges'))
+  expect(dialog.getByRole('columnheader', { name: 'Round weight' })).toBeInTheDocument()
+  expect(dialog.getByText('10% of round')).toBeInTheDocument()
+})
+
 test('points basis displays raw major points and omits normalized percentages and weights', () => {
   const input = props()
   input.configuration.scoringConfig.criterionBasis = 'points'

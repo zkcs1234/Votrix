@@ -3,7 +3,7 @@ const f=vi.hoisted(()=>({rpc:vi.fn(),from:vi.fn(),emit:vi.fn(),calculate:vi.fn()
 vi.mock('../../src/foundation/db.js',()=>({db:()=>({rpc:f.rpc,from:f.from})}))
 vi.mock('../../src/websocket/ws-emitter.js',()=>({emitToUser:f.emit}))
 vi.mock('../../src/modules/competition-native-tabulation.js',()=>({calculateNativeSnapshot:f.calculate,nativeDeductionsEnabled:f.deductionsEnabled,nativeQualifierProposal:f.qualify}))
-import {tabulationSnapshot,calculateNative,automaticallyCalculateNative,transitionNative,appointReviewer,deductionNative,qualificationNative} from '../../src/services/competition-native-tabulation.service.js'
+import {tabulationSnapshot,tabulationWorkspaceSnapshot,calculateNative,automaticallyCalculateNative,transitionNative,appointReviewer,deductionNative,qualificationNative} from '../../src/services/competition-native-tabulation.service.js'
 const id=n=>`10000000-0000-0000-0000-${String(n).padStart(12,'0')}`,event=id(1),child=id(2),owner=id(3),round=null,calc=id(4)
 let state
 beforeEach(()=>{
@@ -56,6 +56,20 @@ test('automatic calculation uses the organizer as its audited actor and skips un
  await expect(automaticallyCalculateNative(event,child)).resolves.toMatchObject({status:'up_to_date',calculationId:calc})
  expect(f.calculate).not.toHaveBeenCalled()
  expect(f.rpc).toHaveBeenCalledTimes(1)
+})
+test('Pageant stale combined calculations reconcile through the audited automatic path before showing tabulation',async()=>{
+ state.calculation=null;state.calculationStale=true;state.divisionRanking={mode:'division'}
+ state.rules={id:id(6),configuration_snapshot:{scoringConfig:{calculationMethod:'rank_based'}}}
+ f.calculate.mockReturnValue({input:{rules:{id:id(6)}},output:{ready:true,results:[]}})
+ f.rpc.mockImplementation(async name=>{
+  if(name==='competition_child_tabulation_snapshot')return {data:state}
+  if(name==='competition_child_official_calculate'){state={...state,calculation:{id:calc,source_digest:'digest'},calculationStale:false};return {data:{calculationId:calc}}}
+  return {data:{userIds:[],roundIds:[]}}
+ })
+ const result=await tabulationWorkspaceSnapshot(event,child,owner)
+ expect(f.calculate).toHaveBeenCalledTimes(1)
+ expect(result.calculation.id).toBe(calc)
+ expect(f.rpc).toHaveBeenCalledWith('competition_child_official_calculate',expect.objectContaining({p_actor:owner,p_digest:'digest'}))
 })
 test('complete submitted sources calculate automatically before the scoring session is closed',async()=>{
  state.session={status:'active'}

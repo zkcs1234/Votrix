@@ -42,6 +42,7 @@ export function criteriaSource(foundation) {
 }
 
 export function evaluateCriteriaReadiness(foundation) {
+  const scoringConfig = foundation.scoringConfig ?? {}
   const criteria = foundation.criteria ?? []
   const pointsBasis = foundation.scoringConfig?.criterionBasis === 'points'
   const savedRounds = foundation.rounds ?? []
@@ -73,7 +74,8 @@ export function evaluateCriteriaReadiness(foundation) {
       if (duplicateParents.has(c.id) || eventId && eventIdOf(c) && eventIdOf(c) !== eventId) add('invalid_parent_link', `${c.name}: repair the criterion's event link.`, c.id)
       const configured = minors.filter(m => (m.criteriaId ?? m.criteria_id) === c.id)
       const active = configured.filter(isCriteriaActive)
-      if (!pointsBasis && active.some(m => m.percentage !== undefined) && (active.some(m => !Number.isFinite(m.percentage) || m.percentage <= 0 || m.percentage > 100) || Math.abs(active.reduce((sum,m)=>sum+(Number(m.percentage)||0),0)-100)>CRITERIA_WEIGHT_TOLERANCE)) add('minor_weight_total', `${c.name}: minor criterion weights must total 100%.`, c.id)
+      const expectedMinorTotal = scoringConfig.minorWeightBasis === 'overall' ? weight : 100
+      if (!pointsBasis && active.some(m => m.percentage !== undefined) && (active.some(m => !Number.isFinite(m.percentage) || m.percentage <= 0 || m.percentage > 100) || Math.abs(active.reduce((sum,m)=>sum+(Number(m.percentage)||0),0)-expectedMinorTotal)>CRITERIA_WEIGHT_TOLERANCE)) add('minor_weight_total', `${c.name}: minor criterion weights must total ${formatCriteriaPercent(expectedMinorTotal)}%.`, c.id)
       if (configured.length && !active.length) add('missing_inputs', `${c.name}: enable at least one minor criterion or remove disabled minors to use direct scoring.`, c.id)
       for (const input of pointsBasis ? [c] : configured.length ? active : [c]) {
         const bounds = scoringInputBounds(input)

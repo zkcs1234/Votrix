@@ -69,3 +69,18 @@ test('manual placement mode shows placements without numeric judge or criterion 
   expect(screen.queryByRole('columnheader', { name: 'Judge totals' })).not.toBeInTheDocument()
   expect(screen.queryByRole('columnheader', { name: /Criterion averages/ })).not.toBeInTheDocument()
 })
+
+test('Pageant renders separate saved Men and Women calculations without an event-wide standings table',()=>{
+ const props=fixture()
+ props.view.divisionRanking={mode:'division',divisions:[{id:'men',name:'MEN'},{id:'women',name:'WOMEN'}],entries:props.view.entries.map((entry,i)=>({entryId:entry.id,divisionId:i%2?'women':'men'}))}
+ props.view.calculation.output_snapshot.divisionRanking=props.view.divisionRanking
+ props.view.calculation.output_snapshot.results.forEach((result,i)=>{result.rank=Math.floor(i/2)+1})
+ render(<Matrix {...props}/>)
+ const men=screen.getByRole('table',{name:'Men contestant tabulation matrix'}),women=screen.getByRole('table',{name:'Women contestant tabulation matrix'})
+ expect(within(men).getAllByRole('rowheader')).toHaveLength(6)
+ expect(within(women).getAllByRole('rowheader')).toHaveLength(6)
+ expect(within(men).queryByRole('rowheader',{name:'Contestant 2'})).not.toBeInTheDocument()
+ expect(within(women).queryByRole('rowheader',{name:'Contestant 1'})).not.toBeInTheDocument()
+ expect(screen.queryByRole('table',{name:'Contestant tabulation matrix'})).not.toBeInTheDocument()
+ expect(screen.getAllByRole('heading',{level:2}).map(h=>h.textContent)).toEqual(['Men calculations','Women calculations'])
+})

@@ -15,3 +15,29 @@ test('changed input, forged formula, duplicate identity and stale version are de
  received.Sheets['Raw Scores'].H2.v=12;received.Sheets['Raw Scores'].K2.f='HYPERLINK("https://example.invalid")';received.Sheets['Competition Info'].B4.v='stale'
  const result=compareWorkbook(expected,received);expect(result.verified).toBe(false);expect(result.invalid.length).toBeGreaterThan(0);expect(result.versionConflicts.length).toBe(1)
 })
+test('workbook contribution formulas use direct round weights and preserve legacy weighting',()=>{
+ const direct=structuredClone(state)
+ direct.rules.criteria=[{id:'major',percentage:30,minorCriteria:[{id:'m1',percentage:10},{id:'m2',percentage:10},{id:'m3',percentage:10}]}]
+ direct.rules.scoringConfig.minorWeightBasis='overall'
+ direct.worksheets[0].criteria=[{criteriaId:'major',percentage:30,minors:[
+  {id:'m1',raw:8,minScore:0,maxScore:10,normalized:80,percentage:10},
+  {id:'m2',raw:6,minScore:0,maxScore:10,normalized:60,percentage:10},
+  {id:'m3',raw:10,minScore:0,maxScore:10,normalized:100,percentage:10},
+ ]}]
+ const directSheet=buildWorkbook(direct).Sheets['Raw Scores']
+ expect(directSheet.N2.f).toBe('K2*M2/100')
+ expect(directSheet.N3.f).toBe('K3*M3/100')
+ expect(directSheet.M2.v).toBe(10)
+ expect(directSheet.N2.f).not.toContain('*L2')
+
+ const legacy=structuredClone(direct)
+ delete legacy.rules.scoringConfig.minorWeightBasis
+ legacy.worksheets[0].criteria[0].minors[0].percentage=40
+ legacy.worksheets[0].criteria[0].minors[1].percentage=60
+ legacy.worksheets[0].criteria[0].minors=legacy.worksheets[0].criteria[0].minors.slice(0,2)
+ expect(buildWorkbook(legacy).Sheets['Raw Scores'].N2.f).toBe('K2*L2*M2/10000')
+
+ const equal=structuredClone(state)
+ equal.worksheets[0].criteria[0].minors=[...state.worksheets[0].criteria[0].minors,{id:'m2',raw:7,minScore:0,maxScore:10,normalized:70}]
+ expect(buildWorkbook(equal).Sheets['Raw Scores'].N2.f).toBe('K2*L2/100/2')
+})

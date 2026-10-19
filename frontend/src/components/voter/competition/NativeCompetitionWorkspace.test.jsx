@@ -27,6 +27,27 @@ beforeEach(()=>{
 })
 afterEach(()=>vi.useRealTimers())
 const ready=async(owner=false)=>{if(owner)views.b.session=null;const r=render(<MemoryRouter><Workspace eventId="event" eventName="Campus arts showcase" choices={choices} owner={owner}/></MemoryRouter>);if(owner){await screen.findByRole('heading',{name:'Live Control Panel'});await screen.findByText('Dancer a')}else await screen.findByText('Dancer a');return r}
+test('judge division bar filters the same scoring table and hidden contestants remain required for submission',async()=>{
+ Object.assign(views.a.contestants[0],{registrationNumber:1,divisionId:'men',divisionName:'MEN',lockedCriteria:['criterion-a']})
+ views.a.contestants.push({id:'woman-a',name:'Woman a',contestantNumber:2,registrationNumber:1,divisionId:'women',divisionName:'WOMEN',open:true,lockedCriteria:[]})
+ views.a.session.entry_ids.push('woman-a')
+ await ready()
+ const bar=screen.getByRole('navigation',{name:'Contestant division filter'}),table=screen.getByRole('table')
+ expect(within(bar).getByRole('button',{name:'Event Wide'})).toHaveAttribute('aria-pressed','true')
+ expect(bar.nextElementSibling).toHaveTextContent('Connected')
+ expect(table.querySelectorAll('tbody tr')).toHaveLength(2)
+ const headers=table.querySelector('thead').innerHTML
+ fireEvent.click(within(bar).getByRole('button',{name:'Men'}))
+ expect(table.querySelectorAll('tbody tr')).toHaveLength(1)
+ expect(screen.queryByRole('spinbutton',{name:'Woman a: Technique, Execution score'})).not.toBeInTheDocument()
+ expect(screen.getByRole('button',{name:'Lock Submission'})).toBeDisabled()
+ fireEvent.click(within(bar).getByRole('button',{name:'Women'}))
+ expect(table.querySelector('tbody tr')).toHaveAttribute('data-contestant-id','woman-a')
+ expect(table.querySelector('thead').innerHTML).toBe(headers)
+ fireEvent.click(within(bar).getByRole('button',{name:'Event Wide'}))
+ expect([...table.querySelectorAll('.v-judge-number > span')].map(node=>node.textContent)).toEqual(['#1','#1'])
+ expect(f.score).not.toHaveBeenCalled()
+})
 test('native context keys isolate judge/event/competition/round/session/rules/revisions',()=>{
  const key=nativeContextKey('event','judge-a',views.a.context)
  for(const field of ['competitionId','roundId','sessionId','rulesVersion','setupRevision','inputRevision'])expect(nativeContextKey('event','judge-a',{...views.a.context,[field]:'changed'})).not.toBe(key)

@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { evaluateCriteriaReadiness, criteriaSource } from '../../../shared/competition-criteria-readiness.js'
 const parent = (id, percentage = 100, extra = {}) => ({ id, name: id, percentage, minScore: 1, maxScore: 100, is_active: true, minorCriteria: [], ...extra })
 const round = (id, criteriaIds, displayOrder = 0) => ({ id, name: id, displayOrder, criteriaIds })
-const validate = (criteria, rounds = []) => evaluateCriteriaReadiness({ event: { id: 'e' }, criteria, rounds })
+const validate = (criteria, rounds = [], scoringConfig = {}) => evaluateCriteriaReadiness({ event: { id: 'e' }, criteria, rounds, scoringConfig })
 
 test('saved active criteria drive round progress in official order without altering records', () => {
   const criteria = [parent('pre'), parent('final', 60), parent('disabled', 40, { is_active: false })]
@@ -52,6 +52,19 @@ test('one shared tolerance applies to fractional sums, budget overruns, and read
   expect(validate([parent('a', 33.333), parent('b', 33.333), parent('c', 33.333)]).allReady).toBe(true)
   expect(validate([parent('a', 99.99)]).allReady).toBe(false)
   expect(validate([parent('a', 80), parent('b', 30)]).scopes[0].status).toBe('Needs Attention')
+})
+test('overall-round minor weights must equal their major percentage', () => {
+  const weighted = parent('cheers', 30, { minorCriteria: [
+    { id: 'voice', name: 'Voice', minScore: 1, maxScore: 10, percentage: 10 },
+    { id: 'audience', name: 'Audience', minScore: 1, maxScore: 10, percentage: 10 },
+    { id: 'motion', name: 'Motion', minScore: 1, maxScore: 10, percentage: 10 },
+  ] })
+  const other = parent('routine', 70)
+  expect(validate([weighted, other], [], { minorWeightBasis: 'overall' }).allReady).toBe(true)
+  weighted.minorCriteria[2].percentage = 5
+  const result = validate([weighted, other], [], { minorWeightBasis: 'overall' })
+  expect(result.allReady).toBe(false)
+  expect(result.scopes[0].issues.find(issue => issue.code === 'minor_weight_total').message).toContain('must total 30%')
 })
 test('source projection tracks disabled inputs and membership changes with stable ordering', () => {
   const f = { criteria: [parent('b', 50), parent('a', 50)], rounds: [round('r', ['b', 'a'])] }

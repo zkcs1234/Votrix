@@ -10,6 +10,7 @@ export default function TabulationCalculationBreakdown({ entry, roundId, roundNa
   const round = configuration.rounds.find(item => item.id === roundId)
   const method = round?.calculationMethod ?? config.calculationMethod
   const points = config.criterionBasis === 'points'
+  const overallMinorWeights = config.minorWeightBasis === 'overall'
   const output = calculation.output_snapshot
   const sheets = (output.worksheets ?? []).filter(sheet => sheet.entryId === entry.id && sheet.roundId === roundId)
   const currentTab = tab ?? sheets[0]?.judgeId ?? 'average'
@@ -67,7 +68,7 @@ export default function TabulationCalculationBreakdown({ entry, roundId, roundNa
     <section id="breakdown-panel" role="tabpanel" aria-labelledby={`breakdown-tab-${tabs.findIndex(item => item.id === currentTab)}`} className="v-tab-breakdown-panel">
       {sheet ? <>
         <h4>How the total is calculated</h4>
-        <p className="v-helper-text">{points ? 'The configured raw criterion points are added. Criterion percentages are not applied.' : `Each score is divided by its configured maximum and normalized to 100. Minor scores are combined using their configured weights or equal averaging, then multiplied by the major criterion weight. Contributions are percentage points before ${method === 'rank_based' ? 'each judge’s scores are ranked and placements combined' : 'the selected scoring method combines judge totals'}.`}</p>
+        <p className="v-helper-text">{points ? 'The configured raw criterion points are added. Criterion percentages are not applied.' : `${overallMinorWeights ? 'Each minor score is normalized to 100, then multiplied by its direct share of the round total. Minor percentages within a major criterion sum to that major criterion’s weight.' : 'Each score is divided by its configured maximum and normalized to 100. Minor scores are combined using their configured weights or equal averaging, then multiplied by the major criterion weight.'} Contributions are percentage points before ${method === 'rank_based' ? 'each judge’s scores are ranked and placements combined' : 'the selected scoring method combines judge totals'}.`}</p>
         <div className="v-tab-table-scroll"><table className="v-table"><caption className="sr-only">{judgeName(sheet.judgeId)} criterion breakdown for {entry.name}</caption><thead><tr><th scope="col">Criterion</th><th scope="col">Original score</th>{!points && <><th scope="col">Normalized score</th><th scope="col">Weight</th></>}{criterionDeductionsEnabled && <th scope="col">{points ? 'Original contribution' : 'Original contribution (%)'}</th>}<th scope="col">{criterionDeductionsEnabled ? points ? 'Adjusted contribution' : 'Adjusted contribution (%)' : points ? 'Points' : 'Weighted contribution (%)'}</th></tr></thead><tbody>
           {sheet.criteria.map(item => {
             const criterion = criteria.find(c => c.id === item.criteriaId)
@@ -94,17 +95,21 @@ export default function TabulationCalculationBreakdown({ entry, roundId, roundNa
                   ? `${format(item.raw)} raw points − ${format(deduction)} criterion deduction = ${format(item.contribution)} points.`
                   : `Raw criterion score = ${format(item.contribution)} points.`
                 : item.minors?.length
-                  ? `${item.minors.map(minor => `${minor.name ?? criterion?.minorCriteria?.find(m => m.id === minor.id)?.name ?? 'Score'}: ${format(minor.raw)} ÷ ${format(minor.maxScore ?? criterion?.minorCriteria?.find(m => m.id === minor.id)?.maxScore)} × 100 = ${format(minor.normalized)}%`).join('; ')}. Combined criterion score = ${format(item.average)}%.`
+                  ? overallMinorWeights && item.minors.some(minor => minor.percentage != null)
+                    ? `${item.minors.map(minor => `${minor.name ?? criterion?.minorCriteria?.find(m => m.id === minor.id)?.name ?? 'Score'}: ${format(minor.raw)} ÷ ${format(minor.maxScore ?? criterion?.minorCriteria?.find(m => m.id === minor.id)?.maxScore)} × 100 = ${format(minor.normalized)}%; ${format(minor.normalized)}% × ${format(minor.percentage)}% = ${format(Number(minor.normalized) * Number(minor.percentage) / 100)} percentage points`).join('; ')}. Direct minor contributions = ${format(original)} percentage points.`
+                    : `${item.minors.map(minor => `${minor.name ?? criterion?.minorCriteria?.find(m => m.id === minor.id)?.name ?? 'Score'}: ${format(minor.raw)} ÷ ${format(minor.maxScore ?? criterion?.minorCriteria?.find(m => m.id === minor.id)?.maxScore)} × 100 = ${format(minor.normalized)}%`).join('; ')}. Combined criterion score = ${format(item.average)}%.`
                   : `Normalized criterion score = ${format(item.average)}%.`}{' '}
-              {!points && <>× {format(weight)}% criterion weight = {format(original)} percentage points{deduction > 0 ? ` − ${format(deduction)} point deduction = ${format(item.contribution)} percentage points` : ''}.</>}
+              {!points && !(overallMinorWeights && item.minors?.some(minor => minor.percentage != null)) && <>× {format(weight)}% criterion weight = {format(original)} percentage points</>}
+              {!points && deduction > 0 && <> − {format(deduction)} point deduction = {format(item.contribution)} percentage points</>}
+              {!points && '.'}
             </p>
           })}
           <p><strong>Then {tabulationMethodName(method, config)}:</strong> {aggregateFormula}</p>
         </section>
         <p className="v-helper-text">Contributions are rounded for display. The stored total uses the calculation engine’s full-precision arithmetic.</p>
-        {!points && sheet.criteria.some(item => item.minors?.length > 1) && <details className="v-tab-minor-trace"><summary>Minor criteria and configured ranges</summary><div className="v-tab-table-scroll"><table className="v-table"><thead><tr><th scope="col">Major criterion</th><th scope="col">Minor criterion</th><th scope="col">Range</th><th scope="col">Raw score</th><th scope="col">Normalized</th><th scope="col">Minor weight</th></tr></thead><tbody>{sheet.criteria.flatMap(item => (item.minors ?? []).map(minor => {
+        {!points && sheet.criteria.some(item => item.minors?.length > 1) && <details className="v-tab-minor-trace"><summary>Minor criteria and configured ranges</summary><div className="v-tab-table-scroll"><table className="v-table"><thead><tr><th scope="col">Major criterion</th><th scope="col">Minor criterion</th><th scope="col">Range</th><th scope="col">Raw score</th><th scope="col">Normalized</th><th scope="col">{overallMinorWeights ? 'Round weight' : 'Minor weight'}</th></tr></thead><tbody>{sheet.criteria.flatMap(item => (item.minors ?? []).map(minor => {
           const target = criteria.find(c => c.id === item.criteriaId)?.minorCriteria?.find(m => m.id === minor.id) ?? minor
-          return <tr key={`${item.criteriaId}:${minor.id}`}><td>{item.name}</td><td>{minor.name ?? target.name}</td><td>{target.minScore ?? '—'}–{target.maxScore ?? '—'}</td><td>{String(minor.raw ?? '—')}</td><td>{format(minor.normalized)}%</td><td>{minor.percentage == null ? 'Equal share' : `${minor.percentage}%`}</td></tr>
+          return <tr key={`${item.criteriaId}:${minor.id}`}><td>{item.name}</td><td>{minor.name ?? target.name}</td><td>{target.minScore ?? '—'}–{target.maxScore ?? '—'}</td><td>{String(minor.raw ?? '—')}</td><td>{format(minor.normalized)}%</td><td>{minor.percentage == null ? 'Equal share' : `${minor.percentage}%${overallMinorWeights ? ' of round' : ''}`}</td></tr>
         }))}</tbody></table></div></details>}
         {sheet.carryNumericTotal != null && <p className="v-tab-formula">Judge total after configured numeric carry and point deductions: <strong>{format(sheet.carryNumericTotal)}</strong></p>}
       </> : <>

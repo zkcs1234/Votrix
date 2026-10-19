@@ -1,7 +1,10 @@
 import dotenv from 'dotenv'
+import { fileURLToPath } from 'node:url'
 import { normalizeOrigin } from './trusted-origins.js'
 
-dotenv.config()
+// Resolve against this module so both repository-root and backend-directory
+// launches load the same file. Hosting-provided variables retain precedence.
+dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) })
 
 export const isProduction = process.env.NODE_ENV === 'production'
 

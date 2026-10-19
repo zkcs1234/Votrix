@@ -31,6 +31,26 @@ describe('Native organizer setup connections',()=>{
   expect(await screen.findByText('Selected Competitions')).toBeInTheDocument()
   expect(screen.queryByLabelText('Single round name')).not.toBeInTheDocument()
  })
+ it('converts legacy relative minor weights to equivalent direct round percentages before saving',async()=>{
+  const legacy=structuredClone(config)
+  legacy.criteria=[
+   {id:'cheers',roundId:null,name:'Cheers and Yells',percentage:30,minScore:1,maxScore:100,minorCriteria:[
+    {id:'voice',name:'Voice Projection',minScore:1,maxScore:100,percentage:40},
+    {id:'audience',name:'Audience Engagement',minScore:1,maxScore:100,percentage:60},
+   ]},
+   {id:'routine',roundId:null,name:'Routine',percentage:70,minScore:1,maxScore:100,minorCriteria:[]},
+  ]
+  const saved=foundation(children[0]);saved.configuration=legacy
+  service.foundation.mockImplementation(async(_event,id)=>({data:structuredClone({...saved,competition:children.find(child=>child.id===id)})}))
+  render(<MemoryRouter><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button',{name:'Edit Configuration Hip-Hop'}))
+  expect(await screen.findByText(/converted to direct round percentages/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Save & Return to Competitions'}))
+  await waitFor(()=>expect(service.configure).toHaveBeenCalled())
+  const persisted=service.configure.mock.calls[0][2].configuration
+  expect(persisted.scoringConfig.minorWeightBasis).toBe('overall')
+  expect(persisted.criteria[0].minorCriteria.map(minor=>minor.percentage)).toEqual([12,18])
+ })
  it('shows Pageant as one configured competition with its actual divisions',async()=>{
   const pageant={id:'pageant-child',event_id:'event',name:'Pageant',competition_type:'pageant',origin:'native'}
   const previousWomen={id:'women-child',event_id:'event',name:'Women',competition_type:'pageant',origin:'native'}

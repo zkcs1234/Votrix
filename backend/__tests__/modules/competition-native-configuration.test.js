@@ -21,6 +21,12 @@ test('minor criteria retain equal-averaging rules, configured bounds and unique 
  delete config.criteria[0].minorCriteria[0].weight;config.criteria[0].minorCriteria[0].maxScore=1
  expect(()=>validateNativeConfiguration(config)).toThrow('valid existing score bounds')
 })
+test('overall minor percentages must match their major and are accepted as direct round weights',()=>{
+ const cfg=single();cfg.criteria[0].percentage=30;cfg.scoringConfig.minorWeightBasis='overall'
+ cfg.criteria[0].minorCriteria=[{id:uid(2),name:'Projection',minScore:1,maxScore:10,percentage:10},{id:uid(3),name:'Engagement',minScore:1,maxScore:10,percentage:10},{id:uid(4),name:'Technique',minScore:1,maxScore:10,percentage:10}]
+ expect(validateNativeConfiguration(cfg)).toEqual(cfg);expect(nativeCriteriaReadiness(cfg).allReady).toBe(false)
+ cfg.criteria[0].percentage=100;expect(()=>validateNativeConfiguration(cfg)).toThrow('total 100%')
+})
 test('major criterion may be scored directly without artificial minors',()=>{
  const config=single();config.criteria[0].minorCriteria=[]
  expect(validateNativeConfiguration(config).criteria[0].minorCriteria).toEqual([])

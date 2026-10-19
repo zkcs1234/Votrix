@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "fixtureOnly": true,
+  "databaseTouched": false,
+  "actualNativeCalculation": true,
+  "layouts": [
+    {
+      "width": 1440,
+      "pageWidth": 1440
+    },
+    {
+      "width": 390,
+      "pageWidth": 375
+    },
+    {
+      "width": 320,
+      "pageWidth": 305
+    }
+  ]
+}

@@ -12,7 +12,20 @@ import {competitionScoringReady} from '../../../../../shared/competition-creatio
 import {INPUT_CLASS} from '@/utils/uiClasses'
 
 const message=e=>e.response?.data?.message??e.message??'Unable to load competition setup'
-const blank=()=>({structure:'single',rounds:[],criteria:[],scoringConfig:{calculationMethod:'weighted_average',criterionBasis:'percentage',tiePolicy:'shared',decimalPlaces:2,defaultMinScore:1,defaultMaxScore:10,deductionMode:'none',deductionRules:[]}})
+const blank=()=>({structure:'single',rounds:[],criteria:[],scoringConfig:{calculationMethod:'weighted_average',criterionBasis:'percentage',minorWeightBasis:'overall',tiePolicy:'shared',decimalPlaces:2,defaultMinScore:1,defaultMaxScore:10,deductionMode:'none',deductionRules:[]}})
+const convertLegacyMinorWeights=configuration=>{
+ if(configuration?.scoringConfig?.minorWeightBasis==='overall')return {configuration,converted:false}
+ const converted=structuredClone(configuration)
+ let changed=false
+ converted.criteria=(converted.criteria??[]).map(criterion=>{
+  const minors=criterion.minorCriteria??[]
+  if(!minors.some(minor=>minor.percentage!==undefined))return criterion
+  changed=true
+  return {...criterion,minorCriteria:minors.map(minor=>({...minor,percentage:Number(minor.percentage)*Number(criterion.percentage)/100}))}
+ })
+ converted.scoringConfig={...converted.scoringConfig,minorWeightBasis:'overall'}
+ return {configuration:converted,converted:changed}
+}
 const name=j=>j.displayName||[j.firstName,j.lastName].filter(Boolean).join(' ')||j.email||j.id
 
 // Disabled builds make no native request; mapped legacy setups keep their page.
@@ -149,7 +162,9 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
    if(current.current!==expected||generation.current!==request)return
    setChildren(list.data.competitions??[]);setEvent(ev.data.event);setPageantDivisions(eventDivisions.data.divisions??[]);setMasters(master.data.contestants??[]);setJudges(enrolled.data.judges??[]);setPool(available.data.judges??[]);setMasterNumber(Math.max(0,...(master.data.contestants??[]).map(m=>Number(m.contestantNumber??m.contestant_number)||0))+1)
    if(selected&&(foundation?.data?.competition?.id!==selected||foundation.data.competition.event_id!==eventId))throw new Error('Competition setup identity mismatch')
-   setSnapshot(foundation?.data??null);setEntries(participation?.data.entries??[]);setConfiguration(structuredClone(foundation?.data.configuration??blank()));setActiveRoundId(foundation?.data.configuration?.rounds?.[0]?.id??null);setDirty(false);setAck(false);setError('')
+   const loadedConfiguration=structuredClone(foundation?.data.configuration??blank())
+   const migratedConfiguration=convertLegacyMinorWeights(loadedConfiguration)
+   setSnapshot(foundation?.data??null);setEntries(participation?.data.entries??[]);setConfiguration(migratedConfiguration.configuration);setActiveRoundId(foundation?.data.configuration?.rounds?.[0]?.id??null);setDirty(migratedConfiguration.converted);setAck(false);setNotice(migratedConfiguration.converted?'Legacy minor weights were converted to direct round percentages without changing their relative contribution. Save the configuration to apply the new format.':'');setError('')
    const branchCompetitions=(list.data.competitions??[]).filter(c=>c.origin==='native'&&(
     ev.data.event.competitionType!=='pageant'
     ||(c.competition_type??c.competitionType)!=='pageant'

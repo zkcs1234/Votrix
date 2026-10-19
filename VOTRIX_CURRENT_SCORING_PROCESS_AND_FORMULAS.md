@@ -61,15 +61,21 @@ For each scored minor, the actual formula is:
 MinorPercent = RawScore / MinorMaximum × 100
 ```
 
-For a major containing several minors:
+For a major containing several equally weighted minors:
 
 ```text
 MajorAverage = arithmetic mean of its MinorPercent values
-
 CriterionContribution = MajorAverage × MajorWeight / 100
 ```
 
-The engine records both the normalized major `average` and its weighted `contribution`. **The contribution is what enters the judge's total.**
+When minor weights are configured as **overall-round percentages**, each minor's percentage is a direct share of the round. The minor percentages under a major must sum to the major's percentage:
+
+```text
+CriterionContribution = Σ (MinorPercent × MinorWeight / 100)
+Σ MinorWeight = MajorWeight
+```
+
+For example, a 30% major with three minors weighted 10% each contributes 10% for each perfectly scored minor. A score of 80/100 on one minor contributes 8 points. The engine records the normalized major `average` and its weighted `contribution`. **The contribution is what enters the judge's total.**
 
 For a directly scored major without minors, the engine uses one input with that major's saved maximum. The same normalization and weighting apply.
 
@@ -99,15 +105,14 @@ The criterion weight and the score maximum are independent configuration values.
 
 ### Example: A Major with Multiple Minor Criteria
 
-Suppose a 40% major contains scores of **8/10** and **90/100**:
+Suppose a 40% major contains scores of **8/10** and **90/100**, with direct round weights of **10%** and **30%**:
 
 ```text
 Normalized minors = 80 and 90
-MajorAverage = (80 + 90) / 2 = 85
-Contribution = 85 × 40 / 100 = 34
+Contribution = 80 × 10 / 100 + 90 × 30 / 100 = 35
 ```
 
-Each minor has equal influence within that major after normalization. There is no separate minor percentage in this formula.
+The 10% + 30% minor weights equal the 40% major weight. Older frozen configurations without the overall-round minor-weight basis retain their original relative-weight calculation; editable legacy configurations are converted to equivalent direct percentages before saving.
 
 The minimum restricts valid input. Normalization **divides by the maximum without subtracting the minimum**. The engine does not use `(RawScore − Minimum) / (Maximum − Minimum)`.
 
@@ -460,7 +465,7 @@ Evidence:
 
 | Item | Current VOTRIX behavior |
 |---|---|
-| **A. Criterion Score Formula** | `mean(RawMinor / MinorMaximum × 100) × MajorWeight / 100`. A direct-scored major uses one input. |
+| **A. Criterion Score Formula** | Equal minors: `mean(RawMinor / MinorMaximum × 100) × MajorWeight / 100`. Overall-weighted minors: `Σ((RawMinor / MinorMaximum × 100) × MinorWeight / 100)`, where minor weights sum to the major weight. A direct-scored major uses one input. |
 | **B. Judge Total Formula** | Round the sum of that judge's weighted criterion contributions. |
 | **C. Multiple-Judge Formula** | Aggregate complete submitted judge totals using the published method. Required missing totals remain incomplete. |
 | **D. Official Method Formula** | Average, sum, maximum, trimmed average, summed judge placements, or manually entered ranks. `undecided` produces no official result. |

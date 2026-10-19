@@ -8,6 +8,16 @@ const snapshot=version=>({publicationVersion:version,publishedAt:'2026-10-13',re
 beforeEach(()=>{vi.clearAllMocks();vi.useFakeTimers();f.public.mockResolvedValue({data:snapshot(1)})})
 afterEach(()=>vi.useRealTimers())
 const ready=async()=>{await act(async()=>render(<MemoryRouter initialEntries={['/competition/events/event/competitions/child/results']}><Routes><Route path="/competition/events/:eventId/competitions/:competitionId/results" element={<Page/>}/></Routes></MemoryRouter>))}
+test('published Pageant standings stay separated by division',async()=>{
+ const data=snapshot(1)
+ data.results.divisionRanking={mode:'division',divisions:[{id:'men',name:'MEN'},{id:'women',name:'WOMEN'}]}
+ data.results.standings[0].divisionId='men'
+ data.results.standings.push({participationId:'woman',divisionId:'women',entryNumber:1,name:'Woman winner',rank:1,score:3})
+ f.public.mockResolvedValue({data});await ready()
+ expect(screen.getAllByRole('table')).toHaveLength(2)
+ expect(screen.getByRole('heading',{name:'MEN'})).toBeInTheDocument()
+ expect(screen.getByRole('heading',{name:'WOMEN'})).toBeInTheDocument()
+})
 test('anonymous public view shows approved snapshot only with no worksheets or reviewer controls',async()=>{await ready();expect(screen.getByText(/Published dancer/)).toBeInTheDocument();expect(screen.queryByText(/worksheet/i)).not.toBeInTheDocument();expect(screen.queryByRole('button')).not.toBeInTheDocument()})
 
 test.each([{organizer:false,judge:false},{organizer:false,judge:true},{organizer:true,judge:false}])('published deductions follow the frozen responsibility flags: %j',async flags=>{

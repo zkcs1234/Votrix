@@ -1,3 +1,7 @@
+import NativeRoundProgress from './NativeRoundProgress'
+import { nativeRoundAdvancement, nextRoundScorePolicy } from '@/utils/nativeRoundAdvancement'
+import { advancementLabel } from '../../../../../shared/competition-participation.js'
+import { divisionStandings } from '../../../../../shared/competition-division-standings.js'
 import {tabulationDeductionReport} from '@/utils/tabulationDeductionReport'
 import {applicableDeductionRules, rulesForDeductionRound, deductionStage} from '../../../../../shared/competition-deductions.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -24,12 +28,12 @@ const key = (context) => `${context.competitionId}:${context.roundId ?? 'single'
 const sectionStage = {
   overview: 'overview', submissions: 'submissions', matrix: 'entries',
   deductions: 'deductions', validation: 'calculate', finalization: 'results',
-  results: 'ranking', audit: 'audit',
+  results: 'ranking', audit: 'audit', advancement: 'next',
 }
 const stageSection = {
   overview: 'overview', submissions: 'submissions', entries: 'matrix',
   deductions: 'deductions', calculate: 'validation', results: 'finalization',
-  ranking: 'results', audit: 'audit',
+  ranking: 'results', audit: 'audit', next: 'advancement',
 }
 const message = (error) =>
   error.response?.data?.message ?? error.message ?? 'Unable to load current official sources'
@@ -406,10 +410,11 @@ export default function NativeTabulationWorkspace({
   })
   const round = view?.rules?.configuration_snapshot.rounds.find(
     (item) => item.id === choice.roundId,
-  )
+  ) ?? (view?.advancement ? { id: choice.roundId, name: view.advancement.fromRoundName, advancementType: view.advancement.policy, advancementValue: view.advancement.value } : null)
   const configuration = view?.rules?.configuration_snapshot
-  const nextRound = round ? getNextRound(configuration?.rounds, round) : null
+  const nextRound = (round && configuration ? getNextRound(configuration.rounds, round) : null) ?? view?.advancement?.nextRound ?? null
   const hasNext = !!nextRound
+  const advancementState = nativeRoundAdvancement(view, nextRound)
   const criteria = getCriteria(configuration, choice.roundId)
   const name = (id) => view?.entries?.find((entry) => entry.id === id)?.name ?? 'Entry'
   const groups = useMemo(
@@ -592,8 +597,9 @@ export default function NativeTabulationWorkspace({
           ]),
       )
     }
+    if(view.divisionRanking){headers.push('Division');rows.forEach(row=>row.push(entry?.divisionName??''))}
     downloadTableReport(
-      `competition-entry-${String(entry?.contestantNumber ?? entryId).replace(/[^a-zA-Z0-9-]/g, '-')}.csv`,
+      `competition-entry-${view.divisionRanking?`${String(entry?.divisionName??'division').toLowerCase().replace(/[^a-z0-9]+/g,'-')}-`:''}${String(entry?.contestantNumber ?? entryId).replace(/[^a-zA-Z0-9-]/g, '-')}.csv`,
       headers,
       rows,
       {source:view,roundId:choice.roundId},
@@ -746,6 +752,7 @@ export default function NativeTabulationWorkspace({
           'Frozen rules version',
           'Source digest',
         ]
+        const divisionColumn=sources.divisionRanking?headers.push('Division')-1:-1
         const rows = []
         const blankRow = () => Array(headers.length).fill('')
         const columns = {
@@ -789,6 +796,7 @@ export default function NativeTabulationWorkspace({
         rows.push(reportRow)
         for (const entryId of sources.session?.entry_ids ?? []) {
           const entry = sources.entries?.find((item) => item.id === entryId)
+          const firstEntryRow=rows.length
           const entryRow = blankRow()
           entryRow[0] = 'Entry'
           entryRow[1] = entry?.contestantNumber ?? ''
@@ -856,6 +864,7 @@ export default function NativeTabulationWorkspace({
             decision[digestColumn] = sources.sourceDigest ?? ''
             rows.push(decision)
           }
+          if(divisionColumn>=0)rows.slice(firstEntryRow).forEach(row=>{row[divisionColumn]=entry?.divisionName??''})
         }
         downloadTableReport('competition-combined-scores.csv', headers, rows, {format:exportFormat,title:'Combined Scores',source:sources,roundId:exportContext.roundId,subtitle:`${exportContext.competitionName} / ${exportContext.roundName} / ${sources.calculation?.finalized?'Finalized calculation':sources.calculation?'Draft calculation':'Original submissions'}`})
       } else {
@@ -935,7 +944,7 @@ export default function NativeTabulationWorkspace({
     ...(hasOrganizerStage || judgeDeductionsEnabled ? [{ id: 'deductions', label: legacyDeductionReview ? 'Deductions' : hasOrganizerStage ? 'Organizer Deductions' : 'Judge Deductions', description: hasOrganizerStage ? 'Configured organizer deduction decisions' : 'Read-only submitted judge deductions', available: !!view, complete: !!view?.deductionsResolved }] : []),
     { id: 'calculate', label: 'Validation', description: 'Validate current calculation sources and scoring rules', available: !!view?.complete && view.session?.status === 'closed', complete: !!calculation },
     { id: 'results', label: 'Finalization', description: 'Independent review and official finalization', available: !!calculation, complete: !!calculation?.finalized },
-    ...(calculation?.finalized ? [{
+    ...(hasNext || calculation?.finalized ? [{
       id: 'next',
       label: hasNext
         ? 'Next Round'
@@ -947,11 +956,12 @@ export default function NativeTabulationWorkspace({
       description: hasNext
         ? 'Confirm eligible advancement'
         : 'Complete and publish this category before moving to another category',
-      available: true,
-      complete: categoryProgress?.status === 'ready' && categoryProgress.currentComplete,
+      available: !!view,
+      complete: hasNext ? advancementState.confirmed : categoryProgress?.status === 'ready' && categoryProgress.currentComplete,
     }] : []),
   ]
   const extraStages = [
+    ...(!steps.some(step => step.id === 'next') ? [{id:'next',label:'Round Progression',description:'Round completion and advancement',available:!!view}] : []),
     { id: 'ranking', label: 'Results & Rankings', description: 'Configured ranks and tie rules', available: !!calculation },
     { id: 'audit', label: 'Audit Trail', description: 'Recorded submission and calculation activity', available: !!view },
   ]
@@ -968,28 +978,15 @@ export default function NativeTabulationWorkspace({
   }
   const nextStage = steps[stageIndex + 1]
   const canOpenStep = (step) => step.available || step.id === activeStage
-  const tiedPlacements = [...new Set(
-    resultRows
-      .filter((result) => result.rank != null)
-      .map((result) => result.rank)
-      .filter((rank, _, ranks) => ranks.filter((candidate) => candidate === rank).length > 1),
-  )].map((rank) => ({
-    rank,
-    entries: resultRows.filter((result) => result.rank === rank),
-  }))
-  const advancementCount =
-    round?.advancementType === 'top_n'
-      ? Math.floor(Number(round.advancementValue))
-      : round?.advancementType === 'top_percent'
-        ? Math.ceil((resultRows.length * Number(round.advancementValue)) / 100)
-        : 0
-  const cutoffRank =
-    advancementCount > 0
-      ? [...resultRows].sort((a, b) => a.rank - b.rank)[
-          Math.min(advancementCount, resultRows.length) - 1
-        ]?.rank
-      : null
-  const advancementCutoffTie = tiedPlacements.some((group) => group.rank === cutoffRank)
+  const standingGroups = divisionStandings(resultRows, calculation?.output_snapshot?.divisionRanking)
+  const tiedPlacements = standingGroups.flatMap(division => {
+    const counts = new Map()
+    division.rows.forEach(row => { if(row.rank != null) counts.set(row.rank,(counts.get(row.rank) ?? 0)+1) })
+    const count = round?.advancementType === 'top_n' ? Math.floor(Number(round.advancementValue)) : round?.advancementType === 'top_percent' ? Math.ceil(division.rows.length*Number(round.advancementValue)/100) : 0
+    const cutoff = count > 0 ? [...division.rows].sort((a,b)=>a.rank-b.rank)[Math.min(count,division.rows.length)-1]?.rank : null
+    return [...counts].filter(([,count])=>count>1).map(([rank])=>({ rank, divisionId:division.id, divisionName:division.name, atCutoff:rank===cutoff, entries:division.rows.filter(row=>row.rank===rank) }))
+  })
+  const advancementCutoffTie = tiedPlacements.some(group=>group.atCutoff)
   const activeStageIsAvailable = allStages.some(
     (step) => step.id === activeStage && step.available,
   )
@@ -1131,59 +1128,31 @@ export default function NativeTabulationWorkspace({
     view,
   ])
   const loadQualification = async () => {
-    const expected = identity
-    const request = sequence.current
+    if(reviewer || busy || !advancementState.finalized) return
+    const expected = identity, request = sequence.current
+    setBusy(true); setError(null)
     try {
-      const { data: proposal } = await service.qualification(
-        eventId,
-        choice.competitionId,
-        body(),
-      )
-      if (identityRef.current === expected && request === sequence.current) {
-        setQualification(proposal)
-        setQualifierIds(proposal.automatic)
-      }
+      const { data: proposal } = await service.qualification(eventId, choice.competitionId, body())
+      if(identityRef.current !== expected || request !== sequence.current) return
+      const eligible = new Set(view.session?.entry_ids ?? [])
+      if(proposal.fromRound !== choice.roundId || proposal.toRound !== nextRound?.id || !Array.isArray(proposal.automatic) || !Array.isArray(proposal.standings) || proposal.automatic.some(id => !eligible.has(id)) || proposal.standings.some(row => !eligible.has(row.contestantId))) throw new Error('The advancement proposal does not match this finalized round. Refresh before confirming.')
+      setQualification(proposal); setQualifierIds(proposal.automatic)
     } catch (requestError) {
       if (identityRef.current === expected) setError(message(requestError))
-    }
+    } finally { if(identityRef.current === expected) setBusy(false) }
   }
   const proceedToNextRound = async () => {
-    if (!nextRound || !calculation?.finalized || busy) return
-    const nextChoice = choices.find(
-      (context) =>
-        context.competitionId === choice.competitionId &&
-        context.roundId === nextRound.id,
-    )
-    if (!nextChoice) {
-      setError(`The ${nextRound.name} round is not available in the current competition context.`)
-      return
-    }
-    setBusy(true)
-    setError(null)
+    if (!nextRound || !advancementState.canProceed || reviewer || busy) return
+    const expected=identity, request=sequence.current
+    setBusy(true);setError(null)
     try {
-      const { data: nextSnapshot } = await service.snapshot(
-        eventId,
-        choice.competitionId,
-        nextRound.id,
-        reviewer,
-      )
-      if (
-        nextSnapshot.eventId !== eventId ||
-        nextSnapshot.competitionId !== choice.competitionId ||
-        nextSnapshot.roundId !== nextRound.id
-      ) {
-        throw new Error('Next-round source context mismatch')
-      }
-      if (nextSnapshot.qualificationCurrent !== true) {
-        throw new Error('Confirm the eligible advancement roster before opening the next round.')
-      }
-      setSelected(key(nextChoice))
-      setActiveStage('entries')
-    } catch (requestError) {
-      setError(message(requestError))
-    } finally {
-      setBusy(false)
-    }
+      const { data: nextSnapshot } = await service.snapshot(eventId,choice.competitionId,nextRound.id,reviewer)
+      if(identityRef.current !== expected || request !== sequence.current) return
+      if(nextSnapshot.eventId!==eventId || nextSnapshot.competitionId!==choice.competitionId || nextSnapshot.roundId!==nextRound.id || nextSnapshot.viewerId!==actorId) throw new Error('Next-round source context mismatch')
+      if(nextSnapshot.qualificationCurrent!==true) throw new Error('The confirmed qualifier roster changed. Review advancement again before opening the next round.')
+      navigate(`/organizer/competition/events/${eventId}/live?${new URLSearchParams({competitionId:choice.competitionId,roundId:nextRound.id})}`)
+    } catch(requestError){if(identityRef.current===expected)setError(message(requestError))}
+    finally{if(identityRef.current===expected)setBusy(false)}
   }
   return (
     <section className="v-competition-workflow v-tabulation space-y-4">
@@ -1347,7 +1316,7 @@ export default function NativeTabulationWorkspace({
                   </div>
                   <div>
                     <dt className="text-v-text-muted">Ranking scope</dt>
-                    <dd>{configuration.scoringConfig.perDivision ? 'Within each configured division' : 'All eligible entries'}</dd>
+                    <dd>{view.divisionRanking?.mode === 'division' || configuration.scoringConfig.perDivision ? 'Within each configured division' : 'All eligible entries'}</dd>
                   </div>
                   {method === 'manual' && <div><dt className="text-v-text-muted">Manual official decision basis</dt><dd>{configuration.scoringConfig.manualBasis ?? 'Not specified'}</dd></div>}
                 </dl>
@@ -1377,6 +1346,7 @@ export default function NativeTabulationWorkspace({
         </div>
 
         {view && <TabulationMetrics view={view}/>}
+        <NativeRoundProgress view={view} roundName={choice.roundName} nextRound={nextRound} onReview={() => selectStage('next')} reviewer={reviewer} busy={busy}/>
       </header>
 
       {error && (
@@ -1436,7 +1406,7 @@ export default function NativeTabulationWorkspace({
           <section className="v-card-sm space-y-3" aria-labelledby="ranking-comparison-heading">
             <div>
               <h2 id="ranking-comparison-heading" className="v-section-title">
-                Overall ranking and tie rules
+                {view.divisionRanking?.mode === 'division' ? 'Division rankings and tie rules' : 'Overall ranking and tie rules'}
               </h2>
               <p className="v-caption">
                 Standings below are the saved backend calculation for this competition and round.
@@ -1459,9 +1429,9 @@ export default function NativeTabulationWorkspace({
                   </p>
                   <ul className="mt-2 space-y-1 text-sm">
                     {tiedPlacements.map((group) => (
-                      <li key={group.rank}>
-                        Place {group.rank}: {group.entries.map((entry) => name(entry.contestantId)).join(', ')}
-                        {group.rank === cutoffRank && (
+                      <li key={`${group.divisionId}:${group.rank}`}>
+                        {group.divisionName && `${group.divisionName} ? `}Place {group.rank}: {group.entries.map((entry) => name(entry.contestantId)).join(', ')}
+                        {group.atCutoff && (
                           <span className="text-v-text-muted"> · advancement cutoff</span>
                         )}
                       </li>
@@ -1483,10 +1453,11 @@ export default function NativeTabulationWorkspace({
                   )}
                 </section>
               )}
-              <div className="v-table-wrap">
+              {standingGroups.map(division => <div className="v-table-wrap" key={division.id}>
+                {division.name && <h3 className="v-section-title">{division.name}</h3>}
                 <table className="v-tab-grid">
                   <caption className="sr-only">
-                    Backend-calculated entry standings and configured rank breakdown
+                    {division.name ? `${division.name} standings and rank breakdown` : 'Backend-calculated entry standings and configured rank breakdown'}
                   </caption>
                   <thead>
                     <tr>
@@ -1510,7 +1481,7 @@ export default function NativeTabulationWorkspace({
                     </tr>
                   </thead>
                   <tbody>
-                    {resultRows.map((result) => (
+                    {division.rows.map((result) => (
                       <tr key={result.contestantId}>
                         <td className="font-semibold tabular-nums">{result.rank ?? '—'}</td>
                         <th scope="row">
@@ -1539,7 +1510,7 @@ export default function NativeTabulationWorkspace({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </div>)}
               </>
             ) : (
               <p className="rounded-lg border border-v-border p-3 text-sm text-v-text-muted">
@@ -1976,20 +1947,23 @@ export default function NativeTabulationWorkspace({
             <div>
               <h2 className="v-section-title">
                 {hasNext
-                  ? 'Round completed'
+                  ? advancementState.finalized ? `${choice.roundName} tabulation complete` : 'Prepare next-round advancement'
                   : categoryProgress?.status === 'ready' && categoryProgress.allComplete
                     ? 'Competition completed'
                     : categoryProgress?.status === 'ready' && categoryProgress.currentComplete
                       ? 'Category completed'
-                      : 'Category wrap-up'}
+                      : calculation?.finalized ? 'Category wrap-up' : 'Round completion pending'}
               </h2>
               <p className="v-caption">
-                {choice.competitionName} · {choice.roundName} · Finalized calculation version{' '}
-                {calculation?.version}
+                {choice.competitionName} · {choice.roundName} · Calculation version{' '}
+                {calculation?.version ?? 'pending'}
               </p>
             </div>
             {hasNext ? (
               <>
+                <ul className="v-tab-round-checks" aria-label="Requirements before next round">{advancementState.checks.map(([label,ready])=><li key={label} data-ready={ready}><span aria-hidden="true">{ready ? '\u2713' : '\u25cb'}</span><span>{label}: {ready?'Complete':'Pending'}</span></li>)}</ul>
+                <p className="v-caption">Scores and suggested qualifiers are calculated automatically. The organizer confirms the roster; the next scoring session opens separately in Live Control.</p>
+                {advancementState.confirmed && <div role="status" className="rounded-lg border border-v-border bg-v-surface-elevated p-3"><strong>{advancementState.count} {advancementState.count === 1 ? 'qualifier' : 'qualifiers'} confirmed for {nextRound.name}.</strong><p className="v-caption">{view.advancement?.nextSessionStatus ? `Next-round session: ${view.advancement.nextSessionStatus}.` : 'Next-round scoring has not started.'} Open Live Control to manage contestant access and start scoring.</p></div>}
                 <dl className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <dt className="text-sm text-v-text-muted">Next round</dt>
@@ -1998,20 +1972,20 @@ export default function NativeTabulationWorkspace({
                   <div>
                     <dt className="text-sm text-v-text-muted">Advancement rule</dt>
                     <dd className="font-semibold">
-                      {round?.advancementType?.replaceAll('_', ' ') ?? 'No elimination configured'}
-                      {round?.advancementValue != null ? ` · ${round.advancementValue}` : ''}
+                      {advancementLabel(round)}{(view.divisionRanking?.mode === 'division' || view.advancement?.perDivision) ? ' per division' : ''}
+
                     </dd>
                   </div>
                   <div>
                     <dt className="text-sm text-v-text-muted">Score policy</dt>
                     <dd className="font-semibold">
-                      {describeRoundProgression(nextRound, configuration, nextRound?.calculationMethod)}
+                      {nextRoundScorePolicy(configuration, view.advancement, nextRound)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-sm text-v-text-muted">Next-round judges</dt>
                     <dd className="font-semibold">
-                      {view.rules.assignment_snapshot?.filter(
+                      {view.rules?.assignment_snapshot?.filter(
                         (assignment) =>
                           assignment.round_id == null || assignment.round_id === nextRound?.id,
                       ).length ?? 'Configured for the next round'}
@@ -2024,26 +1998,33 @@ export default function NativeTabulationWorkspace({
                     standings and confirm the selected qualifier roster with a reason.
                   </p>
                 )}
+                {advancementState.blocker && <div role="status" className="space-y-2 rounded-lg border border-v-border bg-v-surface-elevated p-3 text-sm">
+                  <p>{advancementState.blocker.message}</p>
+                  {!reviewer && advancementState.blocker.stage && <Button size="sm" variant="secondary" disabled={busy} onClick={()=>selectStage(advancementState.blocker.stage)}>{advancementState.blocker.label}</Button>}
+                  {!reviewer && advancementState.blocker.live && <Link className="v-tab-text-button" to={`/organizer/competition/events/${eventId}/live?${new URLSearchParams({competitionId:choice.competitionId,roundId:choice.roundId})}`}>{advancementState.blocker.label}</Link>}
+                </div>}
                 {!reviewer && (
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="secondary"
-                      disabled={busy}
+                      disabled={busy || !advancementState.finalized || advancementState.confirmed}
+                      title={!advancementState.finalized ? advancementState.blocker?.message : advancementState.confirmed ? 'Qualifiers are already confirmed for this round.' : undefined}
                       loading={busy && !qualification}
                       onClick={loadQualification}
                     >
                       {qualification ? 'Refresh Advancement Proposal' : 'Review Advancement'}
                     </Button>
                     <Button
-                      disabled={busy}
+                      disabled={busy || !advancementState.canProceed}
+                      title={!advancementState.canProceed ? advancementState.blocker?.message : undefined}
                       loading={busy}
                       onClick={proceedToNextRound}
                     >
-                      Proceed to {nextRound?.name ?? 'Next Round'}
+                      Open {nextRound?.name ?? 'Next Round'} in Live Control
                     </Button>
                   </div>
                 )}
-                {qualification && (
+                {qualification && advancementState.finalized && !advancementState.confirmed && (
                   <fieldset disabled={busy} className="space-y-2 rounded-lg border border-v-border p-3">
                     <legend className="px-1 text-sm font-semibold">
                       Confirm qualifier roster ({qualification.policy})
@@ -2062,7 +2043,7 @@ export default function NativeTabulationWorkspace({
                             )
                           }
                         />{' '}
-                        {name(standing.contestantId)} · rank {standing.rank}
+                        {name(standing.contestantId)}{standing.divisionName ? ` \u00b7 ${standing.divisionName}` : ''} {'\u00b7'} rank {standing.rank}
                       </label>
                     ))}
                     <p className="v-caption">
@@ -2074,7 +2055,7 @@ export default function NativeTabulationWorkspace({
                       <textarea aria-label="Review reason" className="v-input mt-1 min-h-20" value={reason} onChange={event => setReason(event.target.value)} placeholder="Explain the reviewed qualifier roster." />
                     </label>
                     <Button
-                      disabled={busy || reason.trim().length < 5}
+                      disabled={busy || !qualifierIds.length || reason.trim().length < 5}
                       loading={busy}
                       onClick={() =>
                         perform(() =>
@@ -2094,6 +2075,7 @@ export default function NativeTabulationWorkspace({
               </>
             ) : (
               <>
+                {!calculation?.finalized && <p role="status">Finalize this round before completing the category. No outgoing main round is configured.</p>}
                 {!reviewer && categoryProgress?.status === 'loading' && (
                   <p role="status" className="v-caption">Checking this category’s rounds and published results…</p>
                 )}
@@ -2149,14 +2131,12 @@ export default function NativeTabulationWorkspace({
           <span className="text-sm text-v-text-muted">
             {stageIndex + 1} of {steps.length} · {activeStep?.label}
           </span>
-          <Button
-            disabled={!nextStage || !nextStage.available || !canContinueFromStage(activeStage) || busy}
+          {nextStage ? <Button
+            disabled={!nextStage.available || !canContinueFromStage(activeStage) || busy}
             onClick={() => nextStage && selectStage(nextStage.id)}
           >
-            {nextStage
-              ? `${activeStage === 'results' && hasNext ? 'Next Round' : 'Next'}: ${nextStage.label} →`
-              : 'Complete required actions to continue'}
-          </Button>
+            {`${activeStage === 'results' && hasNext ? 'Next Round' : 'Next'}: ${nextStage.label} →`}
+          </Button> : <span className="text-sm text-v-text-muted">{activeStep?.complete ? 'Stage complete' : 'Complete the required actions above'}</span>}
         </nav>
         </>
         </main>

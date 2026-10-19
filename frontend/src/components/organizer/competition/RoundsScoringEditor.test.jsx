@@ -45,6 +45,18 @@ test('custom scales preserve configured bounds without displaying extra range or
  fireEvent.click(screen.getByRole('button',{name:'Add',exact:true}));fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}));expect(observe.mock.lastCall[0].criteria[0].minorCriteria[1]).toMatchObject({minScore:2,maxScore:20,decimalPlaces:2});expect(observe.mock.lastCall[0].criteria[0].minorCriteria[0]).toEqual(value.criteria[0].minorCriteria[0])
 })
 
+test('overall minor weights are direct round shares and total the major percentage',()=>{
+ const value=initial();value.criteria[0].percentage=30;value.scoringConfig.minorWeightBasis='overall'
+ value.criteria[0].minorCriteria=[{id:'one',name:'Voice Projection',minScore:0,maxScore:10,percentage:10},{id:'two',name:'Audience Engagement',minScore:0,maxScore:10,percentage:10},{id:'three',name:'Motion Technique',minScore:0,maxScore:10,percentage:10}]
+ const observe=vi.fn();render(<Editor configuration={value} observe={observe}/>)
+ fireEvent.click(screen.getByRole('button',{name:'Edit criterion Technique'}))
+ expect(screen.getByLabelText('Voice Projection minor weight (%)')).toHaveValue(10)
+ expect(screen.getByLabelText('Voice Projection minor weight (%)').closest('label')).toHaveTextContent('% of round')
+ expect(screen.getByText(/Minor weight total: 30% \/ 30% major weight/)).toBeInTheDocument()
+ fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}))
+ expect(observe.mock.lastCall[0].criteria[0].minorCriteria.reduce((sum,minor)=>sum+minor.percentage,0)).toBe(30)
+})
+
 test('minor inputs appear only after Add minor criterion, and Cancel discards the unfinished form',()=>{
  const value=initial();value.criteria[0].minorCriteria=[];const observe=vi.fn();render(<Editor configuration={value} observe={observe}/>)
  fireEvent.click(screen.getByRole('button',{name:'Edit criterion Technique'}));expect(screen.queryByLabelText('Technique minor criterion name')).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Add',exact:true})).not.toBeInTheDocument()
@@ -52,9 +64,9 @@ test('minor inputs appear only after Add minor criterion, and Cancel discards th
  fireEvent.click(screen.getByRole('button',{name:'Add minor criterion'}));expect(screen.getByLabelText('Technique minor criterion name')).toHaveValue('')
 })
 test('preview uses actual judge inputs and official normalization; invalid precision prevents locking',()=>{
- render(<JudgePreview value={initial()}/>);const input=screen.getByRole('spinbutton');fireEvent.change(input,{target:{value:'8.5'}});expect(screen.getByText('85.00 / 100')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Lock',exact:true})).not.toBeDisabled()
- fireEvent.change(input,{target:{value:'8.55'}});expect(screen.getByText('Use at most 1 decimal places')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Lock',exact:true})).toBeDisabled();expect(screen.getByText('Complete all inputs')).toBeInTheDocument()
- fireEvent.change(input,{target:{value:'9'}});fireEvent.click(screen.getByRole('button',{name:'Lock',exact:true}));expect(input).toBeDisabled();fireEvent.click(screen.getByText('Reset Preview'));expect(input).not.toBeDisabled()
+ render(<JudgePreview value={initial()}/>);const input=screen.getByRole('spinbutton');fireEvent.change(input,{target:{value:'8.5'}});expect(screen.getByText('85.00 / 100')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Preview Entry: Technique, Execution Lock',exact:true})).not.toBeDisabled()
+ fireEvent.change(input,{target:{value:'8.55'}});expect(screen.getByText('Use at most 1 decimal places')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Preview Entry: Technique, Execution Lock',exact:true})).toBeDisabled();expect(screen.getByText('Complete all inputs')).toBeInTheDocument()
+ fireEvent.change(input,{target:{value:'9'}});fireEvent.click(screen.getByRole('button',{name:'Preview Entry: Technique, Execution Lock',exact:true}));expect(input).toBeDisabled();fireEvent.click(screen.getByText('Reset Preview'));expect(input).not.toBeDisabled()
 })
 test('preview normalizes unlike minor scales with configured weights',()=>{
  const value=initial();value.criteria[0].minorCriteria=[{id:'a',name:'Timing',minScore:1,maxScore:10,percentage:25},{id:'b',name:'Expression',minScore:0,maxScore:100,percentage:75}]
