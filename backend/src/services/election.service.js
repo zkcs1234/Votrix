@@ -531,6 +531,11 @@ export async function listPositions(eventId, organizerId, sectionId = null) {
 
 export async function getPositionEligibilitySummary(eventId, organizerId) {
   await assertElectionEvent(eventId, organizerId)
+  const scope = await getOrganizerScope(organizerId)
+  if (!isAllAccess(scope)) {
+    throw new ApiError(403, 'Only all-access organizers can view position eligibility')
+  }
+
   const [
     { data: sections, error: sectionError },
     { data: positions, error: positionError },
@@ -552,7 +557,6 @@ export async function getPositionEligibilitySummary(eventId, organizerId) {
     assignmentsByGroup.set(assignment.ballot_section_id, assigned)
   }
 
-  const scope = await getOrganizerScope(organizerId)
   const voters = []
   for (let offset = 0; ; offset += 500) {
     const { data: rows, error } = await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
@@ -608,6 +612,11 @@ async function nextPositionDisplayOrder(eventId, sectionId) {
 export async function createPosition(eventId, organizerId, payload, sectionId = null) {
   if (!sectionId) throw new ApiError(400, 'Select an election group before adding a position')
   assertSetupEditable(await assertElectionEvent(eventId, organizerId))
+  const organizerScope = await getOrganizerScope(organizerId)
+  const eligiblePrograms = payload.eligiblePrograms ?? []
+  if (eligiblePrograms.length && !isAllAccess(organizerScope)) {
+    throw new ApiError(403, 'Only all-access organizers can configure position eligibility')
+  }
 
   const section = sectionId
     ? { id: sectionId }
@@ -625,7 +634,9 @@ export async function createPosition(eventId, organizerId, payload, sectionId = 
     payload.displayOrder !== undefined
       ? payload.displayOrder
       : await nextPositionDisplayOrder(eventId, section.id)
-  const eligiblePrograms = await normalizePositionPrograms(eventId, payload.eligiblePrograms ?? [], organizerId)
+  const normalizedEligiblePrograms = eligiblePrograms.length
+    ? await normalizePositionPrograms(eventId, eligiblePrograms, organizerId)
+    : []
 
   const { data, error } = await getClient()
     .from(DB_TABLES.POSITIONS)
@@ -638,7 +649,7 @@ export async function createPosition(eventId, organizerId, payload, sectionId = 
       number_of_winners: payload.numberOfWinners ?? 1,
       display_order: displayOrder,
       allow_skip: payload.allowSkip ?? false,
-      eligible_programs: eligiblePrograms,
+      eligible_programs: normalizedEligiblePrograms,
     })
     .select('*')
     .single()
@@ -650,7 +661,7 @@ export async function createPosition(eventId, organizerId, payload, sectionId = 
     action: 'election.position.create',
     entity: 'positions',
     entityId: data.id,
-    details: { name: data.name, eventId, eligiblePrograms },
+    details: { name: data.name, eventId, eligiblePrograms: normalizedEligiblePrograms },
   })
 
   return mapPosition(data)
@@ -667,6 +678,9 @@ export async function updatePosition(eventId, organizerId, positionId, payload) 
   if (payload.displayOrder !== undefined) updates.display_order = payload.displayOrder
   if (payload.allowSkip !== undefined) updates.allow_skip = payload.allowSkip
   if (payload.eligiblePrograms !== undefined) {
+    if (!isAllAccess(await getOrganizerScope(organizerId))) {
+      throw new ApiError(403, 'Only all-access organizers can change position eligibility')
+    }
     updates.eligible_programs = await normalizePositionPrograms(eventId, payload.eligiblePrograms, organizerId)
   }
 

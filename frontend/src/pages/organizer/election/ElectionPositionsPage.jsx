@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/hooks/useToast'
+import { useAuth } from '@/hooks/useAuth'
 import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import useEventStatus from '@/hooks/useEventStatus'
@@ -34,6 +35,8 @@ export default function ElectionPositionsPage() {
   const [savingEligibility, setSavingEligibility] = useState('')
   const [saving, setSaving] = useState(false)
   const { success: showSuccess, error: showError } = useToast()
+  const { user } = useAuth()
+  const canManagePositionEligibility = user?.scope?.scopeType !== 'scoped'
   const { status, setupLocked } = useEventStatus(electionService, eventId)
 
   const load = useCallback((selectedSectionId = sectionId) => {
@@ -50,9 +53,11 @@ export default function ElectionPositionsPage() {
 
   useEffect(() => {
     setGroupsLoading(true)
-    electionService.getCohorts(eventId).then(({ data }) => {
-      setPrograms((data.programs ?? []).map((program) => program.value))
-    }).catch((err) => showError(err.response?.data?.message || 'Failed to load voter programs'))
+    if (canManagePositionEligibility) {
+      electionService.getCohorts(eventId).then(({ data }) => {
+        setPrograms((data.programs ?? []).map((program) => program.value))
+      }).catch((err) => showError(err.response?.data?.message || 'Failed to load voter programs'))
+    }
     electionService.listBallotSections(eventId).then(({ data }) => {
       const nextSections = data.sections ?? []
       setSections(nextSections)
@@ -61,7 +66,7 @@ export default function ElectionPositionsPage() {
       setLoading(false)
     }).catch((err) => { showError(err.response?.data?.message || 'Failed to load election groups'); setLoading(false) })
       .finally(() => setGroupsLoading(false))
-  }, [eventId, showError])
+  }, [eventId, showError, canManagePositionEligibility])
 
   useEffect(() => {
     load(sectionId)
@@ -357,7 +362,7 @@ export default function ElectionPositionsPage() {
           />
         </div>
 
-        <fieldset className="space-y-2 sm:col-span-2">
+        {canManagePositionEligibility && <fieldset className="space-y-2 sm:col-span-2">
           <legend className="mb-1 block text-sm text-v-text-muted">Who can vote for this position?</legend>
           <label className="flex items-center gap-2 text-sm text-v-text">
             <input type="radio" name="position-eligibility" checked={eligibilityMode === 'all'} onChange={() => setEligibilityMode('all')} />
@@ -384,7 +389,7 @@ export default function ElectionPositionsPage() {
               ))}
             </div>
           )}
-        </fieldset>
+        </fieldset>}
 
         <button
           type="submit"
@@ -417,12 +422,14 @@ export default function ElectionPositionsPage() {
               <p className="mt-1 text-xs text-v-text-subtle">
                 Winners: {p.numberOfWinners ?? 1} · Vote up to {p.maxVote}
               </p>
-              <p className="mt-1 text-xs text-v-text-subtle">
-                Eligible programs: {p.eligiblePrograms?.length
-                  ? p.eligiblePrograms.length === 1 ? `${p.eligiblePrograms[0]} only` : p.eligiblePrograms.join(', ')
-                  : 'All programs (group eligibility applies)'}
-              </p>
-              {!setupLocked && (
+              {canManagePositionEligibility && (
+                <p className="mt-1 text-xs text-v-text-subtle">
+                  Eligible programs: {p.eligiblePrograms?.length
+                    ? p.eligiblePrograms.length === 1 ? `${p.eligiblePrograms[0]} only` : p.eligiblePrograms.join(', ')
+                    : 'All programs (group eligibility applies)'}
+                </p>
+              )}
+              {!setupLocked && canManagePositionEligibility && (
                 <details className="mt-2">
                   <summary className="cursor-pointer text-xs font-medium text-v-primary">Edit program eligibility</summary>
                   <div className="mt-2 space-y-2 rounded-lg border border-v-border p-3">
