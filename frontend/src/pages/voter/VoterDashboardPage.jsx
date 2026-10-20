@@ -41,6 +41,12 @@ function formatOpeningDate(value) {
   return format(date, 'd MMM, HH:mm')
 }
 
+function formatOrganization(org) {
+  if (!org) return 'Organization not specified'
+  if (typeof org === 'string') return org
+  return org.name || org.organizationName || 'Organization not specified'
+}
+
 function ParticipantEventCard({ event }) {
   const TypeIcon = ROLE_ICONS[event.participantType] ?? Vote
   const roleLabel = PARTICIPANT_TYPE_META[event.participantType]?.label
@@ -54,12 +60,12 @@ function ParticipantEventCard({ event }) {
         <div className="min-w-0">
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-v-text-subtle">
             <TypeIcon className="h-3.5 w-3.5 text-v-primary" strokeWidth={1.8} aria-hidden />
-            {event.eventType === 'competition_scoring' ? 'Competition' : event.eventType === 'polling' ? 'Polling' : 'Election'}
+            {['competition_scoring', 'pageant'].includes(event.eventType) ? 'Competition' : event.eventType === 'polling' ? 'Polling' : 'Election'}
           </span>
           <h3 className="mt-2 text-sm font-semibold text-v-text">{event.title}</h3>
-          <p className="mt-1 text-xs text-v-text-subtle">{event.organization || 'Organization not specified'}</p>
+          <p className="mt-1 text-xs text-v-text-subtle">{formatOrganization(event.organization)}</p>
         </div>
-        <VoterStatusBadge bucket="active" label="Active" />
+        <VoterStatusBadge bucket={event.bucket || 'active'} label={event.statusLabel || 'Active'} />
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-v-border pt-3">
         {roleLabel && <Badge variant="outline" size="sm">{roleLabel}</Badge>}
@@ -82,7 +88,7 @@ function ParticipantEventCard({ event }) {
               )
             })}
           </div>
-        ) : (
+        ) : event.actionPath ? (
           <Link
             to={event.actionPath}
             className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-v-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary"
@@ -90,6 +96,10 @@ function ParticipantEventCard({ event }) {
             {event.actionLabel || 'Open event'}
             <ArrowRight className="h-3.5 w-3.5" aria-hidden />
           </Link>
+        ) : (
+          <span className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-v-text-muted">
+            {event.actionLabel || 'Open event'}
+          </span>
         )}
       </div>
     </article>
@@ -131,7 +141,7 @@ function EventSection({ title, description, events, variant = 'cards' }) {
                 <tr key={event.dashboardKey ?? `${event.eventType}-${event.id}`}>
                   <td>
                     <p className="font-medium text-v-text">{event.title}</p>
-                    <p className="mt-0.5 text-xs text-v-text-subtle">{event.organization || 'Organization not specified'}</p>
+                    <p className="mt-0.5 text-xs text-v-text-subtle">{formatOrganization(event.organization)}</p>
                   </td>
                   <td>
                     {variant === 'assigned'
@@ -141,7 +151,7 @@ function EventSection({ title, description, events, variant = 'cards' }) {
                   <td>
                     {variant === 'assigned' ? (
                       <span className="text-sm text-v-text-muted">{formatOpeningDate(event.startDate)}</span>
-                    ) : (
+                    ) : event.actionPath ? (
                       <Link
                         to={event.actionPath}
                         className="inline-flex min-h-9 items-center gap-1 text-sm font-medium text-v-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary"
@@ -155,6 +165,16 @@ function EventSection({ title, description, events, variant = 'cards' }) {
                               : 'Scores submitted'}
                         <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                       </Link>
+                    ) : (
+                      <span className="text-sm text-v-text-muted">
+                        {event.eventType === 'election' && event.canViewResults
+                          ? 'View permitted results'
+                          : event.eventType === 'polling'
+                            ? 'Response recorded'
+                            : event.eventType === 'election'
+                              ? 'Ballot recorded'
+                              : 'Scores submitted'}
+                      </span>
                     )}
                   </td>
                 </tr>

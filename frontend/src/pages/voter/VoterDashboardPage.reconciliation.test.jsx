@@ -32,3 +32,51 @@ test('versioned start session invalidation updates an already open assigned dash
   expect(screen.queryByRole('heading', { name: 'Assigned events' })).not.toBeInTheDocument()
   expect(screen.getByRole('link', { name: /Open scoresheet/ })).toHaveAttribute('href', event.actionPath)
 })
+
+test('renders correctly when organization is an object as returned by backend', async () => {
+  const objectOrgEvent = {
+    ...event,
+    id: 'event-with-object-org',
+    organization: {
+      id: 'org-123',
+      name: 'Central University',
+      logo: 'https://example.com/logo.png',
+    },
+    actionPath: null,
+  }
+  mocks.overview.mockResolvedValue({
+    data: {
+      stats: { total: 1, active: 1, assigned: 0, completed: 0 },
+      events: [objectOrgEvent],
+      assigned: [],
+      active: [objectOrgEvent],
+      completed: [],
+    },
+  })
+  render(<MemoryRouter><VoterDashboardPage /></MemoryRouter>)
+  await screen.findByRole('heading', { name: 'Active events' })
+  expect(screen.getByText('Central University')).toBeInTheDocument()
+})
+
+test('renders completed event table safely with object organization', async () => {
+  const completedEvent = {
+    ...event,
+    id: 'completed-event',
+    bucket: 'completed',
+    organization: { id: 'org-456', name: 'West Valley Academy' },
+    actionPath: '/participant/events/completed-event',
+  }
+  mocks.overview.mockResolvedValue({
+    data: {
+      stats: { total: 1, active: 0, assigned: 0, completed: 1 },
+      events: [completedEvent],
+      assigned: [],
+      active: [],
+      completed: [completedEvent],
+    },
+  })
+  render(<MemoryRouter><VoterDashboardPage /></MemoryRouter>)
+  await screen.findByRole('heading', { name: 'Completed events' })
+  expect(screen.getByText('West Valley Academy')).toBeInTheDocument()
+})
+

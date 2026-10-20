@@ -20,6 +20,12 @@ function isPollOpen(event) {
   })
 }
 
+function extractOrganizationName(org) {
+  if (!org) return null
+  if (typeof org === 'string') return org
+  return org.name || org.organizationName || null
+}
+
 function classifyElection(event) {
   let bucket = 'assigned'
   if (event.hasVoted) bucket = 'completed'
@@ -41,6 +47,7 @@ function classifyElection(event) {
     startDate: event.startDate ?? null,
     endDate: event.endDate ?? null,
     organization: event.organization ?? null,
+    organizationName: extractOrganizationName(event.organization),
     eventType: 'election',
     bucket,
     participantType: PARTICIPANT_TYPES.ELECTION_VOTER,
@@ -79,6 +86,7 @@ function classifyCompetition(event) {
       startDate:event.startDate??null,
       endDate:event.endDate??null,
       organization:event.organization??null,
+      organizationName:extractOrganizationName(event.organization),
       eventType:'competition_scoring',
       participantType:PARTICIPANT_TYPES.COMPETITION_JUDGE,
       bucket,
@@ -111,6 +119,7 @@ function classifyCompetition(event) {
     startDate: event.startDate ?? null,
     endDate: event.endDate ?? null,
     organization: event.organization ?? null,
+    organizationName: extractOrganizationName(event.organization),
     eventType: 'competition_scoring',
     bucket,
     participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE,
@@ -147,6 +156,7 @@ function classifyPoll(event) {
     startDate: event.startDate ?? null,
     endDate: event.endDate ?? null,
     organization: event.organization ?? null,
+    organizationName: extractOrganizationName(event.organization),
     eventType: 'polling',
     bucket,
     participantType: PARTICIPANT_TYPES.POLLING_RESPONDENT,
