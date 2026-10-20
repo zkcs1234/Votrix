@@ -73,16 +73,15 @@ export const pollingEventSchema = z.object({
   pollAllowMultipleSubmissions: z.boolean().optional(),
 })
 
-export const pollingEventSchemaEdit = pollingEventSchema.refine(
-  (data) => {
-    if (!data.startDate || !data.endDate) return true
-    return new Date(data.endDate) >= new Date(data.startDate)
-  },
-  {
-    message: 'End date must be on or after start date',
-    path: ['endDate'],
+export const pollingEventSchemaEdit = pollingEventSchema.superRefine((data, context) => {
+  if (data.startDate && data.endDate && new Date(data.endDate) < new Date(data.startDate)) {
+    context.addIssue({
+      code: 'custom',
+      message: 'End date must be on or after start date',
+      path: ['endDate'],
+    })
   }
-)
+})
 
 export const pollingEventSchemaStep1 = pollingEventSchemaEdit
 export const pollingEventSchemaStep3 = pollingEventSchemaEdit

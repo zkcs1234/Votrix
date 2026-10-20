@@ -1,10 +1,8 @@
 import { Link } from 'react-router-dom'
-import { Mail, LogIn } from 'lucide-react'
 import AuthFormField from '@/components/auth/AuthFormField'
 import Input from '@/components/ui/Input'
 import PasswordInput from '@/components/ui/PasswordInput'
 import SubmitButton from '@/components/auth/SubmitButton'
-import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
 
 export default function LoginForm({
@@ -18,50 +16,54 @@ export default function LoginForm({
   showForgot = false,
 }) {
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full">
       <h2 className="v-page-title">{title}</h2>
-      <p className="v-caption mt-2 leading-relaxed">{description}</p>
+      <p className="mt-2 text-sm leading-relaxed text-v-text-subtle">{description}</p>
 
-      <Card padding="md" className="mt-6">
-        <form className="space-y-4" onSubmit={onSubmit} noValidate>
-          <AuthFormField label="Email" id="email" error={errors.email?.message}>
-            <div className="relative">
-              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
-              <Input id="email" type="email" autoComplete="email" className="pl-9" {...register('email')} />
-            </div>
-          </AuthFormField>
+      <form className="mt-6 space-y-4" onSubmit={onSubmit} noValidate>
+        <AuthFormField label="Email address" id="email" required error={errors.email?.message}>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="Enter email address"
+            {...register('email')}
+          />
+        </AuthFormField>
 
-          <AuthFormField label="Password" id="password" error={errors.password?.message}>
-            <PasswordInput id="password" autoComplete="current-password" {...register('password')} />
-          </AuthFormField>
+        <AuthFormField label="Password" id="password" required error={errors.password?.message}>
+          <PasswordInput
+            id="password"
+            autoComplete="current-password"
+            placeholder="Enter password"
+            {...register('password')}
+          />
+        </AuthFormField>
 
-          <div className="flex items-center justify-between gap-4 text-sm">
-            <label className="flex cursor-pointer items-center gap-2 v-caption">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-v-border-strong"
-                {...register('remember')}
-              />
-              Remember me
-            </label>
-            {showForgot && (
-              <Link
-                to="/forgot-password"
-                className="v-btn-tertiary text-sm"
-              >
-                Forgot password?
-              </Link>
-            )}
-          </div>
+        <div className="flex items-center justify-between gap-4 text-sm">
+          <label className="flex cursor-pointer items-center gap-2 text-v-text-muted">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-v-border-strong accent-[var(--v-primary)]"
+              {...register('remember')}
+            />
+            Remember me
+          </label>
+          {showForgot && (
+            <Link to="/forgot-password" className="font-semibold text-v-primary hover:underline">
+              Forgot password?
+            </Link>
+          )}
+        </div>
 
-          {error && <FormAlert variant="error">{error}</FormAlert>}
+        {error && <FormAlert variant="error">{error}</FormAlert>}
 
-          <SubmitButton loading={loading} className="w-full">
-            <LogIn className="h-4 w-4" strokeWidth={2} />
-            Sign in
-          </SubmitButton>
-        </form>
-      </Card>
+        <SubmitButton loading={loading}>Sign in</SubmitButton>
+      </form>
+
+      <p className="mt-5 text-center text-xs leading-relaxed text-v-text-subtle">
+        Use the account provided by your administrator. Access is based on your assigned role.
+      </p>
     </div>
   )
 }

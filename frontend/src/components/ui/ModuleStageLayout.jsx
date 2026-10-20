@@ -9,6 +9,7 @@ import { pageantService } from '@/services/pageant.service'
 import { pollingService } from '@/services/polling.service'
 import {useEffect,useState} from 'react'
 import {nativeCompetitionService} from '@/services/competition-native.service'
+import { useEventContextStore } from '@/store/eventContext.store'
 
 const EVENT_SERVICES = {
   election: electionService,
@@ -61,7 +62,19 @@ export default function ModuleStageLayout({ module, children }) {
     return()=>{alive=false;window.removeEventListener('votrix-native-contexts-changed',changed)}
   },[module,eventId,location.pathname])
   const { completedKeys } = useEventProgress(module, eventId)
-  const { status: eventStatus } = useEventStatus(EVENT_SERVICES[module], eventId)
+  const { status: eventStatus, title: eventTitle } = useEventStatus(EVENT_SERVICES[module], eventId)
+
+  // Publish the event context for the shell's drawer card (no extra request).
+  const setEventContext = useEventContextStore((s) => s.setContext)
+  const clearEventContext = useEventContextStore((s) => s.clear)
+  useEffect(() => {
+    if (!eventId || eventId === 'new') {
+      clearEventContext()
+      return undefined
+    }
+    setEventContext({ eventId, title: eventTitle, status: eventStatus })
+    return () => clearEventContext()
+  }, [eventId, eventTitle, eventStatus, setEventContext, clearEventContext])
 
   const currentKey = stageKeyFromPath(module, location.pathname)
   const isFormWizard = currentKey && (FORM_WIZARD_STAGES[module] ?? []).includes(currentKey)

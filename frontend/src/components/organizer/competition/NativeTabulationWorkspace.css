@@ -13,6 +13,9 @@
 .v-tabulation-stages ol { display: flex; gap: .5rem; overflow-x: auto; padding-bottom: .25rem; }
 .v-tabulation-stages li { flex: 1 0 auto; }
 .v-tabulation-stages [role=tab] { min-height: 2.75rem; width: 100%; border-color: transparent; }
+.v-tabulation-stages [role=tab]:not(:disabled) { transition: color .16s ease, background-color .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.v-tabulation-stages [role=tab]:not([aria-selected=true]):not(:disabled):hover { border-color: var(--v-border); background: var(--v-primary-soft); color: var(--v-primary); }
+.v-tabulation-stages [role=tab]:focus-visible { outline: 2px solid var(--v-primary); outline-offset: 2px; }
 .v-tabulation-stages [aria-selected=true] { border-color: color-mix(in srgb, var(--v-primary) 25%, var(--v-border)); }
 .v-tabulation-stages [aria-selected=true] > span { color: white; background: var(--v-primary); }
 .v-tabulation-stages [aria-selected=false] > span { color: var(--v-text-subtle); background: var(--v-surface-elevated); }

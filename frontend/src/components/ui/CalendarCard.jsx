@@ -130,6 +130,7 @@ export default function CalendarCard({
   defaultMinute = 0,
   className = '',
   ariaLabel,
+  ariaDescribedBy,
   twoStep = false,
   confirmDate = false,
   showShortcuts = true,
@@ -393,6 +394,7 @@ export default function CalendarCard({
           disabled={disabled}
           required={required}
           aria-label={ariaLabel}
+          aria-describedby={ariaDescribedBy}
           aria-invalid={hasError || undefined}
           aria-haspopup="dialog"
           aria-expanded={open}

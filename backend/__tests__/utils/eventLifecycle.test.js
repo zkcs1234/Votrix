@@ -24,6 +24,9 @@ describe('assertEventUpdateAllowed', () => {
       expect(() => assertEventUpdateAllowed({ status }, { title: 'Updated title' })).toThrow(
         /cannot be edited/i,
       )
+      expect(() => assertEventUpdateAllowed({ status }, { pollExpiresAt: null })).toThrow(
+        /cannot be edited/i,
+      )
     }
   })
 

@@ -6,6 +6,7 @@ import StatCard from '@/components/ui/StatCard'
 import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
 import EventStatsTable from '@/components/organizer/EventStatsTable'
+import ParticipationSnapshot from '@/components/organizer/ParticipationSnapshot'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
@@ -34,7 +35,7 @@ export default function CompetitionDashboardPage() {
   // Show skeleton after 300ms
   if (isLoading || showLoader) {
     return (
-      <div className="space-y-6">
+      <div className="v-dashboard space-y-6">
         <div className="h-8 w-72 animate-pulse rounded-lg bg-v-surface-elevated" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -46,12 +47,12 @@ export default function CompetitionDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="v-dashboard space-y-6">
       <PageHeader
-        title="Competition Scoring dashboard"
-        description={nativeSetupEnabled ? 'Choose an event to configure its independent competitions, judges, and scoring.' : 'Manage contestants, criteria, and judge scoring.'}
+        title="Competition dashboard"
+        description={nativeSetupEnabled ? 'Choose an event to configure its independent competitions, judges, and scoring.' : 'Event context and participation, without losing the operational detail.'}
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
           {nativeSetupEnabled && <Link to="/organizer/competition/events"><Button variant="secondary">Manage competitions</Button></Link>}
           <Link to="/organizer/competition/events/new">
             <Button>
@@ -64,12 +65,25 @@ export default function CompetitionDashboardPage() {
       />
 
       {/* Counts aggregate cleanly; judge completion is per-event below. */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Events" value={data?.stats?.totalEvents ?? 0} icon={CalendarDays} />
         <StatCard label="Active sessions" value={data?.stats?.activeSessions ?? 0} icon={Zap} />
+<<<<<<< HEAD
         <StatCard label="Total contestants" value={data?.stats?.totalContestants ?? 0} icon={Users} />
         <StatCard label="Total judges" value={data?.stats?.totalJudges ?? 0} hint="Across all events" icon={Star} />
+=======
+        <StatCard label="Contestants" value={data?.stats?.totalContestants ?? 0} icon={Users} />
+        <StatCard label="Judges" value={data?.stats?.totalJudges ?? 0} hint="Across all events" icon={Star} />
+        <StatCard label="Scores submitted" value={data?.stats?.scoresSubmitted ?? 0} icon={CheckSquare} />
+>>>>>>> main
       </div>
+
+      <ParticipationSnapshot
+        events={data?.eventBreakdown ?? []}
+        module="competition"
+        title="Judge completion by event"
+        description="Highest judge submission completion rates across your events."
+      />
 
       <EventStatsTable
         tableClassName="v-competition-dashboard-table"

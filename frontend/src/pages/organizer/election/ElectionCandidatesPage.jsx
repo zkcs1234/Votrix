@@ -226,8 +226,10 @@ function ElectionCandidatesPageContent() {
   }
 
   return (
+    <div data-module="election" className="mx-auto max-w-7xl">
     <ManagementWorkspace
       title="Candidate Management"
+      subtitle="Add candidates to ballot positions, maintain their profiles, and review the full slate."
       formPanel={
         <div className="space-y-4">
         <div className="v-card p-4">
@@ -359,6 +361,7 @@ function ElectionCandidatesPageContent() {
         </div>
       }
     />
+    </div>
   )
 }
 
@@ -367,4 +370,3 @@ export default function ElectionCandidatesPage() {
     <ElectionCandidatesPageContent />
   )
 }
-

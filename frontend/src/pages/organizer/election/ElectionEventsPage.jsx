@@ -6,10 +6,13 @@ import { EVENT_STATUS } from '@/utils/constants'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import Button from '@/components/ui/Button'
-import Badge from '@/components/ui/Badge'
+import Badge, { statusTone } from '@/components/ui/Badge'
+import FormAlert from '@/components/ui/FormAlert'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import PageHeader from '@/components/ui/PageHeader'
 import useDraft from '@/hooks/useDraft'
 import DraftBanner from '@/components/organizer/DraftBanner'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function BallotPreviewModal({ eventId, onClose }) {
   const [preview, setPreview] = useState(null)
@@ -106,7 +109,7 @@ function BallotPreviewModal({ eventId, onClose }) {
 
 function EventCard({ event, onPreview }) {
   return (
-    <article aria-labelledby={`election-event-${event.id}`} className="flex min-w-0 flex-col gap-4 rounded-2xl border border-v-border bg-v-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+    <article aria-labelledby={`election-event-${event.id}`} className="v-card-md flex min-w-0 flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h3 id={`election-event-${event.id}`} className="min-w-0 break-words text-lg font-medium text-v-text">
@@ -114,10 +117,7 @@ function EventCard({ event, onPreview }) {
               {event.title}
             </Link>
           </h3>
-          <Badge
-            tone={event.status === EVENT_STATUS.ACTIVE ? 'success' : event.status === EVENT_STATUS.CANCELLED ? 'danger' : 'default'}
-            className="capitalize"
-          >
+          <Badge tone={statusTone(event.status)} dot className="capitalize">
             {event.status === EVENT_STATUS.DRAFT ? 'Setup — not published' : event.status}
           </Badge>
           {event.electionStatus && (
@@ -171,6 +171,7 @@ function EventCardSkeleton() {
 export default function ElectionEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [previewEventId, setPreviewEventId] = useState(null)
   const { hasDraft, draft, deleteDraft } = useDraft('election')
 
@@ -179,11 +180,12 @@ export default function ElectionEventsPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
       const { data } = await electionService.listEvents()
       setEvents(data.events ?? [])
-    } catch {
-      // Errors are surfaced via the empty state below
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not load election events'))
     } finally {
       setLoading(false)
     }
@@ -231,18 +233,16 @@ export default function ElectionEventsPage() {
         />
       )}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold text-v-text">Events</h2>
-        <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0">
-          <Link
-            to="/organizer/election/events/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white hover:bg-v-primary-hover font-medium"
-          >
+      <PageHeader
+        title="Events"
+        description="Create and manage election events, preview ballots, and continue setup."
+        actions={
+          <Link to="/organizer/election/events/new" className="v-btn-primary">
             <Plus className="h-4 w-4" strokeWidth={2} />
             New event
           </Link>
-        </div>
-      </div>
+        }
+      />
 
       {hasDraft && (
         <DraftBanner
@@ -255,6 +255,12 @@ export default function ElectionEventsPage() {
         />
       )}
 
+      {error ? (
+        <div className="space-y-3">
+          <FormAlert variant="error">{error}</FormAlert>
+          <Button variant="secondary" onClick={load}>Retry loading elections</Button>
+        </div>
+      ) : (
       <div className="space-y-3">
         {events.map((event) => (
           <EventCard
@@ -276,6 +282,7 @@ export default function ElectionEventsPage() {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }

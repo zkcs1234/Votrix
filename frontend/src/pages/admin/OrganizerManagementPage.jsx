@@ -12,6 +12,7 @@ import FormAlert from '@/components/ui/FormAlert'
 import Badge from '@/components/ui/Badge'
 import SearchInput from '@/components/ui/SearchInput'
 import StatCard from '@/components/ui/StatCard'
+import PageHeader from '@/components/ui/PageHeader'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
@@ -270,14 +271,11 @@ export default function OrganizerManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="v-page-title">Organizer management</h1>
-          <p className="v-caption">
-            Review organizer accounts, track onboarding, and suspend or restore access when needed.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <PageHeader
+        title="Organizer management"
+        description="Review organizer accounts, track onboarding, and suspend or restore access when needed."
+        actions={
+          <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={downloadTemplate}>
             <Download className="h-4 w-4" strokeWidth={1.5} />
             Template
@@ -295,10 +293,11 @@ export default function OrganizerManagementPage() {
             <UserPlus className="h-4 w-4" strokeWidth={2} />
             Add organizer
           </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard label="Total organizers" value={summary.total} icon={Users} />
         <StatCard label="Active" value={summary.active} icon={UserCheck} />
         <StatCard label="Suspended" value={summary.suspended} icon={ShieldOff} />

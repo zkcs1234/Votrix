@@ -145,6 +145,17 @@ export function buildPollingReportSheets(report) {
       })),
     },
     {
+      name: 'Respondent participation',
+      rows: (report?.respondentParticipation ?? []).map((r) => ({
+        'Student ID': r.schoolId || 'N/A',
+        'Last Name': r.lastName || '',
+        'First Name': r.firstName || '',
+        'Program': r.program || '',
+        'Year & Section': r.yearSection || '',
+        'Status': r.hasResponded ? 'Responded' : 'Not responded',
+      })),
+    },
+    {
       name: 'Questions',
       rows: (report?.questions ?? []).map((q) => ({
         type: pollingQuestionTypeLabel(q.type),
@@ -220,6 +231,16 @@ export function buildPollingReportCsvRows(report) {
         percentage: '',
       })
     }
+  }
+  for (const r of report?.respondentParticipation ?? []) {
+    rows.push({
+      reportSection: 'Respondent participation',
+      schoolId: r.schoolId || 'N/A',
+      name: `${r.lastName ? `${r.lastName}, ` : ''}${r.firstName || ''}`.trim(),
+      program: r.program || '',
+      yearSection: r.yearSection || '',
+      status: r.hasResponded ? 'Responded' : 'Not responded',
+    })
   }
   return rows
 }

@@ -3,6 +3,7 @@ import { Archive, Play, RefreshCw, Info, CheckCircle2 } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import PageHeader from '@/components/ui/PageHeader'
 import { useToast } from '@/hooks/useToast'
 
 export default function ArchivalPolicyPage() {
@@ -67,27 +68,27 @@ export default function ArchivalPolicyPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="v-page-title">Event archival policy</h1>
-          <p className="v-caption">Auto-archive completed events after a configurable period.</p>
-        </div>
-        <Button
-          variant="secondary"
-          onClick={handleRunNow}
-          loading={running}
-          disabled={!policy.enabled}
-        >
-          {running ? <RefreshCw className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Play className="h-4 w-4" strokeWidth={1.5} />}
-          Run now
-        </Button>
-      </div>
+      <PageHeader
+        title="Event archival policy"
+        description="Auto-archive completed events after a configurable period."
+        actions={
+          <Button
+            variant="secondary"
+            onClick={handleRunNow}
+            loading={running}
+            disabled={!policy.enabled}
+          >
+            {running ? <RefreshCw className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Play className="h-4 w-4" strokeWidth={1.5} />}
+            Run now
+          </Button>
+        }
+      />
 
-      <Card>
+      <Card className="border-v-primary/15 bg-v-primary-soft/25">
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-v-primary" aria-hidden />
           <div className="space-y-1 text-sm text-v-text-muted">
-            <p className="font-medium text-v-text">What this policy does</p>
+            <p className="font-semibold text-v-text">What this policy does</p>
             <p>
               Archival changes only events with a <strong className="text-v-text">Completed</strong> status.
               An event is archived when its end date is older than the number of days below.
@@ -102,8 +103,8 @@ export default function ArchivalPolicyPage() {
 
       <Card>
         <div className="divide-y divide-v-border">
-          <div className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
-            <div>
+          <div className="flex flex-col gap-4 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <p className="font-medium text-v-text">Enable automatic archival</p>
               <p className="v-caption mt-0.5">
                 When enabled, completed events older than the threshold can be archived.
@@ -114,7 +115,8 @@ export default function ArchivalPolicyPage() {
               role="switch"
               aria-checked={policy.enabled}
               onClick={handleToggle}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+              aria-label="Enable automatic archival"
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v-primary focus-visible:ring-offset-2 ${
                 policy.enabled ? 'bg-v-primary' : 'bg-v-border'
               }`}
             >
@@ -126,8 +128,8 @@ export default function ArchivalPolicyPage() {
             </button>
           </div>
 
-          <div className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
-            <div>
+          <div className="flex flex-col gap-4 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <p className="font-medium text-v-text">Days after completion</p>
               <p className="v-caption mt-0.5">
                 Events completed more than this many days ago will be archived on the next run.
@@ -139,7 +141,7 @@ export default function ArchivalPolicyPage() {
               max={3650}
               value={policy.daysAfterCompletion}
               onChange={(e) => handleDaysChange(e.target.value)}
-              className="v-input w-28 text-sm"
+              className="v-input w-full text-sm sm:w-32"
               disabled={!policy.enabled}
             />
           </div>

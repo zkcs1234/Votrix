@@ -7,6 +7,7 @@ import PageHeader from '@/components/ui/PageHeader'
 import StatCard from '@/components/ui/StatCard'
 import Button from '@/components/ui/Button'
 import EventStatsTable from '@/components/organizer/EventStatsTable'
+import ParticipationSnapshot from '@/components/organizer/ParticipationSnapshot'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
 // Reference page for the React Query adoption (Phase B1). The service layer is
@@ -31,10 +32,10 @@ export default function ElectionDashboardPage() {
   if (isLoading) return <PageLoader label="Loading dashboard…" />
 
   return (
-    <div className="space-y-8">
+    <div className="v-dashboard space-y-6">
       <PageHeader
         title="Election dashboard"
-        description="Manage events, ballots, and voter turnout."
+        description="Event context and participation, without losing the operational detail."
         actions={
           <Link to="/organizer/election/events/new">
             <Button>
@@ -48,7 +49,7 @@ export default function ElectionDashboardPage() {
       {/* Event counts aggregate cleanly; participation rates do not, so they
           live in the per-event table below rather than as blended totals. */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total events" value={data?.stats?.totalEvents ?? 0} icon={CalendarDays} />
+        <StatCard label="Events" value={data?.stats?.totalEvents ?? 0} icon={CalendarDays} />
         <StatCard
           label="Voting active"
           value={data?.stats?.activeVoting ?? 0}
@@ -58,6 +59,13 @@ export default function ElectionDashboardPage() {
         <StatCard label="Registered voters" value={data?.stats?.registeredVoters ?? 0} hint="Across all events" icon={Users} />
         <StatCard label="Votes recorded" value={data?.stats?.votesCast ?? 0} icon={CheckSquare} />
       </div>
+
+      <ParticipationSnapshot
+        events={data?.eventBreakdown ?? []}
+        module="election"
+        title="Participation by event"
+        description="Highest voter turnout rates across your elections."
+      />
 
       <EventStatsTable
         title="Election Events"

@@ -4,6 +4,7 @@ import { electionService } from '@/services/election.service'
 import CohortInviteManager from '@/components/organizer/CohortInviteManager'
 import ElectionGroupEligibility from '@/components/organizer/ElectionGroupEligibility'
 import ElectionPositionEligibilitySummary from '@/components/organizer/ElectionPositionEligibilitySummary'
+import PageHeader from '@/components/ui/PageHeader'
 import { isParticipantsLocked } from '@/utils/constants'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -30,13 +31,11 @@ export default function ElectionVotersPage() {
   }, [eventId])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="v-page-title">Election Voters</h1>
-        <p className="v-caption">
-          Invite eligible election voters by program or year &amp; section.
-        </p>
-      </div>
+    <div data-module="election" className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        title="Election Voters"
+        description="Invite eligible voters by program or year and section, then manage ballot eligibility."
+      />
 
       <CohortInviteManager
         eventId={eventId}

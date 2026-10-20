@@ -3,10 +3,10 @@ import { ArrowLeft, Building2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 const TYPE_GRADIENT = {
-  election: 'linear-gradient(135deg, #4338ca 0%, #7c3aed 50%, #0f766e 100%)',
-  pageant: 'linear-gradient(135deg, #047857 0%, #0891b2 55%, #4338ca 100%)',
-  competition_scoring: 'linear-gradient(135deg, #047857 0%, #0891b2 55%, #4338ca 100%)',
-  polling: 'linear-gradient(135deg, #c2410c 0%, #be123c 55%, #4338ca 100%)',
+  election: 'linear-gradient(135deg, #3730a3 0%, #4f46e5 60%, #7c3aed 100%)',
+  pageant: 'linear-gradient(135deg, #115e59 0%, #0f766e 60%, #14b8a6 100%)',
+  competition_scoring: 'linear-gradient(135deg, #115e59 0%, #0f766e 60%, #14b8a6 100%)',
+  polling: 'linear-gradient(135deg, #9a3412 0%, #c2410c 60%, #ea580c 100%)',
 }
 
 function getInitials(name) {

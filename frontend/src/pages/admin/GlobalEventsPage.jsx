@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CalendarDays, Zap, Clock, CheckCircle2, Archive, Vote, Trophy, BarChart2, Download, X, FileSearch, MoreHorizontal } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
@@ -8,9 +8,11 @@ import SearchInput from '@/components/ui/SearchInput'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import StatCard from '@/components/ui/StatCard'
+import PageHeader from '@/components/ui/PageHeader'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { INPUT_CLASS } from '@/utils/uiClasses'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function eventTypeMatches(eventType, filter) {
   if (filter === 'all') return true
@@ -23,6 +25,13 @@ function eventTypeLabel(eventType) {
   if (eventType === 'election') return 'Election'
   if (eventType === 'polling') return 'Polling'
   return eventType?.replace(/_/g, ' ') || 'Unknown'
+}
+
+function eventModule(eventType) {
+  if (eventType === 'election') return 'election'
+  if (eventType === 'competition_scoring' || eventType === 'pageant') return 'competition-scoring'
+  if (eventType === 'polling') return 'polling'
+  return undefined
 }
 
 export default function GlobalEventsPage() {
@@ -90,28 +99,29 @@ export default function GlobalEventsPage() {
         ),
       )
       toastSuccess('Event restored as completed')
-    } catch {
-      toastError('Event restoration failed')
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Event restoration failed'))
     } finally {
       setEventRestoring(null)
     }
   }
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        setLoading(true)
-        const { data } = await adminService.getGlobalEvents()
-        setEvents(data.events || [])
-      } catch (err) {
-        setError('Failed to load global events')
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
+  const fetchEvents = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data } = await adminService.getGlobalEvents()
+      setEvents(data.events || [])
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load global events'))
+    } finally {
+      setLoading(false)
     }
-    fetchEvents()
   }, [])
+
+  useEffect(() => {
+    void fetchEvents()
+  }, [fetchEvents])
 
   const stats = useMemo(() => {
     const total = events.length
@@ -177,20 +187,18 @@ export default function GlobalEventsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="v-page-title">Global events</h1>
-          <p className="v-caption">
-            Monitor all elections, competitions, and polls across the platform.
-          </p>
-        </div>
-        <Button size="sm" variant="secondary" onClick={handleExport} loading={exporting}>
-          <Download className="h-4 w-4" strokeWidth={1.5} />
-          Export CSV
-        </Button>
-      </div>
+      <PageHeader
+        title="Global events"
+        description="Monitor all elections, competitions, and polls across the platform."
+        actions={
+          <Button size="sm" variant="secondary" onClick={handleExport} loading={exporting}>
+            <Download className="h-4 w-4" strokeWidth={1.5} />
+            Export CSV
+          </Button>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total events" value={stats.total} icon={CalendarDays} />
         <StatCard label="Active" value={stats.active} icon={Zap} />
         <StatCard label="Scheduled" value={stats.scheduled} icon={Clock} />
@@ -198,9 +206,12 @@ export default function GlobalEventsPage() {
         <StatCard label="Archived" value={stats.archived} icon={Archive} />
       </div>
 
-      <Card>
+      <Card padding="sm">
         {error ? (
-          <div className="p-8 text-center text-v-danger">{error}</div>
+          <div className="flex flex-col items-center gap-3 p-8 text-center">
+            <p className="text-sm text-v-danger">{error}</p>
+            <Button variant="secondary" onClick={fetchEvents}>Retry loading events</Button>
+          </div>
         ) : (
           <div className="space-y-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -255,8 +266,8 @@ export default function GlobalEventsPage() {
                 No events match your current filters.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="v-table">
+              <div className="overflow-x-auto rounded-xl border border-v-border">
+                <table className="v-table min-w-[900px]">
                   <thead>
                     <tr>
                       <th>Title</th>
@@ -272,14 +283,16 @@ export default function GlobalEventsPage() {
                       <tr key={event.id} className="hover:bg-v-surface-elevated/50">
                         <td className="font-medium text-v-text">{event.title}</td>
                         <td className="capitalize">
-                          <Badge>
-                            <span className="inline-flex items-center gap-1.5">
+                          <span data-module={eventModule(event.event_type)}>
+                            <Badge className="border-v-primary/20 bg-v-primary-soft text-v-primary">
+                              <span className="inline-flex items-center gap-1.5">
                               {event.event_type === 'election' && <Vote className="h-3 w-3" strokeWidth={2} />}
                               {(event.event_type === 'competition_scoring' || event.event_type === 'pageant') && <Trophy className="h-3 w-3" strokeWidth={2} />}
                               {event.event_type === 'polling' && <BarChart2 className="h-3 w-3" strokeWidth={2} />}
                               {eventTypeLabel(event.event_type)}
-                            </span>
-                          </Badge>
+                              </span>
+                            </Badge>
+                          </span>
                         </td>
                         <td>{event.organizations?.organization_name || 'N/A'}</td>
                         <td className="capitalize">

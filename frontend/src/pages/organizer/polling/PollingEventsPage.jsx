@@ -5,9 +5,13 @@ import { pollingService } from '@/services/polling.service'
 import { isSetupLocked } from '@/utils/constants'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
+import FormAlert from '@/components/ui/FormAlert'
+import PageHeader from '@/components/ui/PageHeader'
+import Badge, { statusTone } from '@/components/ui/Badge'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import useDraft from '@/hooks/useDraft'
 import DraftBanner from '@/components/organizer/DraftBanner'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function PollPreviewModal({ eventId, eventTitle, onClose }) {
   const [questions, setQuestions] = useState(null)
@@ -101,14 +105,21 @@ function PollPreviewModal({ eventId, eventTitle, onClose }) {
 export default function PollingEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [previewEventId, setPreviewEventId] = useState(null)
   const { hasDraft, draft, deleteDraft } = useDraft('polling')
 
-  const load = () => {
-    pollingService
-      .listEvents()
-      .then(({ data }) => setEvents(data.events ?? []))
-      .finally(() => setLoading(false))
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const { data } = await pollingService.listEvents()
+      setEvents(data.events ?? [])
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not load polls'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -143,16 +154,16 @@ export default function PollingEventsPage() {
         />
       )}
 
-      <div className="flex justify-between">
-        <h2 className="text-xl font-semibold text-v-text">Polls</h2>
-        <Link
-          to="/organizer/polling/events/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2} />
-          New poll
-        </Link>
-      </div>
+      <PageHeader
+        title="Polls"
+        description="Manage poll setup, preview questions, and continue building respondent experiences."
+        actions={
+          <Link to="/organizer/polling/events/new" className="v-btn-primary">
+            <Plus className="h-4 w-4" strokeWidth={2} />
+            New poll
+          </Link>
+        }
+      />
 
       {hasDraft && (
         <DraftBanner
@@ -163,27 +174,43 @@ export default function PollingEventsPage() {
         />
       )}
 
+      {error ? (
+        <div className="space-y-3">
+          <FormAlert variant="error">{error}</FormAlert>
+          <Button variant="secondary" onClick={load}>Retry loading polls</Button>
+        </div>
+      ) : (
+        <>
+      {events.length === 0 && (
+        <div className="v-card-md">
+          <p className="font-semibold text-v-text">No polls yet.</p>
+          <p className="mt-1 text-sm text-v-text-muted">Create a poll to start collecting responses.</p>
+        </div>
+      )}
+
       {events.map((event) => (
-        <div
+        <article
           key={event.id}
-          className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-border bg-v-surface p-5"
+          className="v-card-md flex min-w-0 flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center"
         >
-          <div>
+          <div className="min-w-0">
             <Link
               to={`/organizer/polling/events/${event.id}/builder`}
-              className="text-lg font-medium text-v-text hover:text-v-text"
+              className="break-words text-lg font-semibold text-v-text hover:text-v-primary"
             >
               {event.title}
             </Link>
-            <div className="mt-1 text-sm text-v-text-subtle capitalize">
-              {event.status === 'draft' ? 'Setup — not published' : event.status}
+            <div className="mt-1.5">
+              <Badge tone={statusTone(event.status)} dot className="capitalize">
+                {event.status === 'draft' ? 'Setup — not published' : event.status}
+              </Badge>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
             <button
               type="button"
               onClick={() => setPreviewEventId(event.id)}
-              className="inline-flex items-center gap-1 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated"
+              className="v-btn-secondary"
             >
               <Eye className="h-3.5 w-3.5" strokeWidth={2} />
               Preview
@@ -191,14 +218,14 @@ export default function PollingEventsPage() {
             {event.status === 'draft' && (
               <Link
                 to={`/organizer/polling/events/${event.id}/builder`}
-                className="rounded-lg border border-v-primary bg-v-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-v-primary-hover"
+                className="v-btn-primary"
               >
                 Continue setup
               </Link>
             )}
             <Link
               to={`/organizer/polling/events/${event.id}/edit`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
+              className="v-btn-secondary"
             >
               {isSetupLocked(event.status) ? (
                 <>
@@ -213,8 +240,10 @@ export default function PollingEventsPage() {
               )}
             </Link>
           </div>
-        </div>
+        </article>
       ))}
+        </>
+      )}
     </div>
   )
 }

@@ -8,7 +8,7 @@ const RESTRICTED_STATUSES = new Set([
   EVENT_STATUS.ARCHIVED,
 ])
 
-const CORE_FIELD_KEYS = new Set(['title', 'description', 'banner', 'startDate', 'endDate'])
+const CORE_FIELD_KEYS = new Set(['title', 'description', 'banner', 'startDate', 'endDate', 'pollExpiresAt'])
 
 export function assertEventUpdateAllowed(event, updates = {}) {
   if (!event) return

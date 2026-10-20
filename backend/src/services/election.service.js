@@ -1508,9 +1508,7 @@ export async function listVoterElectionEvents(voterId) {
     }))
 }
 
-// ——— Analytics ———
-
-async function fetchElectionResultsData(eventId) {
+async function fetchElectionResultsData(eventId, organizerId = null) {
   const [
     { count: totalVoters, error: evErr },
     { count: votedCount, error: votedErr },
@@ -1531,7 +1529,7 @@ async function fetchElectionResultsData(eventId) {
       .eq('has_voted', true),
     getClient()
       .from(DB_TABLES.EVENT_PARTICIPANTS)
-      .select('id, has_voted, users!inner (program, year_section)')
+      .select('id, has_voted, users!inner (id, email, first_name, last_name, school_id, program, year_section)')
       .eq('event_id', eventId)
       .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
     getClient().from(DB_TABLES.ELECTION_VOTES).select('candidate_id, position_id, voter_id').eq('event_id', eventId),
@@ -1729,6 +1727,36 @@ async function fetchElectionResultsData(eventId) {
     }
   })
 
+  const scope = organizerId ? await getOrganizerScope(organizerId) : null
+  const scoped = scope ? !isAllAccess(scope) : false
+
+  let scopedParticipants = participantRows ?? []
+  if (scoped) {
+    scopedParticipants = scopedParticipants.filter((row) =>
+      isStudentInScope(scope, { program: row.users?.program, yearSection: row.users?.year_section })
+    )
+  }
+
+  const voterParticipation = scopedParticipants.map((row) => ({
+    id: row.id,
+    schoolId: row.users?.school_id ?? null,
+    firstName: row.users?.first_name ?? '',
+    lastName: row.users?.last_name ?? '',
+    program: row.users?.program ?? 'Unspecified',
+    yearSection: row.users?.year_section ?? 'Unspecified',
+    hasVoted: Boolean(row.has_voted),
+  }))
+
+  voterParticipation.sort((a, b) => {
+    const progCmp = a.program.localeCompare(b.program, undefined, { numeric: true })
+    if (progCmp !== 0) return progCmp
+    const secCmp = a.yearSection.localeCompare(b.yearSection, undefined, { numeric: true })
+    if (secCmp !== 0) return secCmp
+    const lastCmp = a.lastName.localeCompare(b.lastName, undefined, { numeric: true })
+    if (lastCmp !== 0) return lastCmp
+    return a.firstName.localeCompare(b.firstName, undefined, { numeric: true })
+  })
+
   return {
     totalVoters: total,
     votedCount: voted,
@@ -1740,6 +1768,7 @@ async function fetchElectionResultsData(eventId) {
     overallParticipationPercentage: computeTurnoutRate(distinctParticipants.size, total),
     participationByProgram: participationBy('program'),
     participationByYearSection: participationBy('year_section'),
+    voterParticipation,
     liveTotalVotes,
     candidateResults,
     positionSummaries,
@@ -1793,7 +1822,7 @@ export async function getVoterElectionResults(eventId, voterId) {
 
 export async function getElectionAnalytics(eventId, organizerId) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
-  return fetchElectionResultsData(eventId)
+  return fetchElectionResultsData(eventId, organizerId)
 }
 
 // ——— Time-Series Analytics (H3) ———

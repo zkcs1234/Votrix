@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Zap, CheckCircle2, Users, Vote, Trophy, BarChart2, BarChart3, ArrowRight, Clock, Play } from 'lucide-react'
+import { CalendarDays, Zap, CheckCircle2, Users, Vote, Trophy, BarChart2, BarChart3, Clock, Play, CheckSquare } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import StatCard from '@/components/ui/StatCard'
 import Card from '@/components/ui/Card'
+import PageHeader from '@/components/ui/PageHeader'
+import ModuleCard from '@/components/ui/ModuleCard'
 import {
   SkeletonStatCard,
   SkeletonModuleLink,
@@ -16,11 +18,7 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
 import OrganizerOverviewEvents from '@/components/organizer/OrganizerOverviewEvents'
-
-// SVG Illustrations
-import ElectionSVG from '@/assets/module/undraw_voting_3ygx.svg'
-import CompetitionSVG from '@/assets/module/pageant-amico.svg'
-import PollingSVG from '@/assets/module/undraw_data_25jw.svg'
+import CreateEventMenu from '@/components/organizer/CreateEventMenu'
 
 export default function OrganizerDashboardPage() {
   const { user } = useAuth()
@@ -111,13 +109,14 @@ export default function OrganizerDashboardPage() {
   // Show skeleton after 300ms
   if (loading || showLoader) {
     return (
-      <div className="space-y-6">
+      <div className="v-dashboard space-y-6">
         <div className="v-card-md">
           <div className="h-8 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
           <div className="mt-2 h-4 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <SkeletonStatCard />
           <SkeletonStatCard />
           <SkeletonStatCard />
           <SkeletonStatCard />
@@ -156,10 +155,27 @@ export default function OrganizerDashboardPage() {
   const participation = analytics?.charts?.eventParticipation ?? []
 
   return (
-    <div className="space-y-6">
+    <div className="v-dashboard space-y-6">
+      <PageHeader
+        title="Organizer dashboard"
+        description={
+          <>
+            Your organization&apos;s events, participation and live sessions at a glance.{' '}
+            <span className="whitespace-nowrap">
+              Signed in as <span className="font-medium text-v-text-muted">{user?.organizerName || user?.email}</span>.
+            </span>
+          </>
+        }
+        actions={<CreateEventMenu create showPlus label="Create event" />}
+      />
+
       {/* Live competition session banner */}
       {activeSessions.length > 0 && (
+<<<<<<< HEAD
         <div role="status" aria-live="polite" className="rounded-xl border border-v-primary/40 bg-v-primary-soft p-4 shadow-v-shadow">
+=======
+        <div className="rounded-xl border border-v-primary/40 bg-v-primary-soft p-4">
+>>>>>>> main
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-v-primary/15 text-v-primary">
               <Trophy className="h-5 w-5" strokeWidth={1.75} />
@@ -211,7 +227,7 @@ export default function OrganizerDashboardPage() {
 
                     <Link
                       to={`/organizer/competition/events/${activeSession.eventId}/live`}
-                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-v-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-v-primary-hover"
+                      className="v-press inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-v-primary-hover"
                     >
                       <Play className="h-4 w-4" strokeWidth={2} />
                       Open Live Control
@@ -224,14 +240,13 @@ export default function OrganizerDashboardPage() {
         </div>
       )}
 
-      <div className="v-card-md">
-        <h2 className="v-page-title">Organizer dashboard</h2>
-        <p className="v-caption mt-2">
-          Signed in as <span className="text-v-text-muted">{user?.organizerName || user?.email}</span>
-        </p>
-      </div>
+      <OrganizationLogoUpload
+        organizationName={dashboard?.organization?.organizationName}
+        logoUrl={dashboard?.organization?.logo}
+        onUpload={(file) => organizerService.uploadOrganizationLogo(file)}
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total events" value={stats?.totalEvents ?? 0} icon={CalendarDays} />
         <StatCard label="Active events" value={stats?.activeEvents ?? 0} icon={Zap} />
         <StatCard label="Finished events" value={stats?.finishedEvents ?? 0} icon={CheckCircle2} />
@@ -241,8 +256,15 @@ export default function OrganizerDashboardPage() {
           hint="Election voters only"
           icon={Users}
         />
+        <StatCard
+          label="Votes & responses"
+          value={stats?.totalVotesCast ?? 0}
+          hint="Votes, scores and poll answers"
+          icon={CheckSquare}
+        />
       </div>
 
+<<<<<<< HEAD
       <OrganizationLogoUpload
         organizationName={dashboard?.organization?.organizationName}
         logoUrl={dashboard?.organization?.logo}
@@ -321,20 +343,31 @@ export default function OrganizerDashboardPage() {
             </Link>
           </div>
         </div>
+=======
+      <div className="grid gap-4 md:grid-cols-3">
+        <ModuleCard
+          module="election"
+          icon={Vote}
+          title="Election"
+          description="Ballots, positions and voter turnout."
+          to="/organizer/election"
+        />
+        <ModuleCard
+          module="competition"
+          icon={Trophy}
+          title="Competition"
+          description="Scoring, live control and tabulation."
+          to="/organizer/competition"
+        />
+        <ModuleCard
+          module="polling"
+          icon={BarChart2}
+          title="Polling"
+          description="Questions, responses and insights."
+          to="/organizer/polling"
+        />
+>>>>>>> main
       </div>
-
-      <Link
-        to="/organizer/reports"
-        className="v-card-md block transition hover:border-v-border-strong"
-      >
-        <div className="flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
-          <h3 className="v-section-title">Analytics &amp; reports</h3>
-        </div>
-        <p className="v-caption mt-2">
-          Turnout reports, vote summaries, competition rankings, and polling charts.
-        </p>
-      </Link>
 
       <OrganizerOverviewEvents dashboard={dashboard} />
 
@@ -363,7 +396,7 @@ export default function OrganizerDashboardPage() {
             <div className="mt-3">
               <AreaChartView
                 data={monthlyEvents.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
-                areas={[{ dataKey: 'value', name: 'Events', color: '#818cf8' }]}
+                areas={[{ dataKey: 'value', name: 'Events', color: '#4f46e5' }]}
                 height={180}
                 showLegend={false}
               />
@@ -395,6 +428,19 @@ export default function OrganizerDashboardPage() {
           </div>
         )}
       </Card>
+
+      <Link
+        to="/organizer/reports"
+        className="v-card-sm flex items-start gap-3 p-4 transition hover:border-v-primary/50"
+      >
+        <BarChart3 className="mt-0.5 h-4 w-4 text-v-primary" strokeWidth={1.75} aria-hidden />
+        <span>
+          <span className="block font-semibold text-v-text">Analytics &amp; reports</span>
+          <span className="v-caption block">
+            Turnout reports, vote summaries, competition rankings, and polling charts.
+          </span>
+        </span>
+      </Link>
     </div>
   )
 }

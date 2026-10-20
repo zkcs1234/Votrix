@@ -14,10 +14,10 @@ export default function CandidateVoteControl({ candidate, selected, disabled, on
       aria-label={label}
       disabled={disabled}
       onClick={onToggle}
-      className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-v-primary ${
+      className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v-primary ${
         selected
-          ? 'border-v-text bg-v-surface-elevated ring-1 ring-v-border'
-          : 'border-v-border-strong hover:border-v-border-strong'
+          ? 'border-v-primary bg-v-primary-soft ring-1 ring-v-primary/20'
+          : 'border-v-border-strong bg-v-surface hover:border-v-primary/60 hover:bg-v-surface-elevated'
       }`}
     >
       {candidate.photo ? (
@@ -44,7 +44,7 @@ export default function CandidateVoteControl({ candidate, selected, disabled, on
       <span
         aria-hidden="true"
         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
-          selected ? 'border-v-primary bg-v-primary text-white' : 'border-v-border-strong'
+          selected ? 'border-v-primary bg-v-primary text-white' : 'border-v-border-strong bg-v-surface'
         }`}
       >
         {selected && '✓'}

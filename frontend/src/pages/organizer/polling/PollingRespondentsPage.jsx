@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import CohortInviteManager from '@/components/organizer/CohortInviteManager'
 import { isParticipantsLocked } from '@/utils/constants'
+import PageHeader from '@/components/ui/PageHeader'
 
 // Phase 5: organizers no longer register or CSV-import respondents. Accounts are
 // created by the admin; here the organizer invites existing students by cohort
@@ -25,13 +26,11 @@ export default function PollingRespondentsPage() {
   }, [eventId])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="v-page-title">Polling Respondents</h1>
-        <p className="v-caption">
-          Invite eligible polling respondents by program or year &amp; section.
-        </p>
-      </div>
+    <div data-module="polling" className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        title="Polling Respondents"
+        description="Invite eligible respondents by program or year and section, and manage poll enrollment."
+      />
 
       <CohortInviteManager
         eventId={eventId}

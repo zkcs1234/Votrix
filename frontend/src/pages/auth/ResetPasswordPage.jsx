@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { KeyRound, ShieldCheck, RefreshCcw } from 'lucide-react'
+
 import FormAlert from '@/components/ui/FormAlert'
 import { resetPasswordSchema } from '@/schemas/auth.schemas'
 import { authService } from '@/services/auth.service'
@@ -15,7 +15,7 @@ export default function ResetPasswordPage() {
   const navigate = useNavigate()
   const token = searchParams.get('token') || ''
 
-  const [error, setError] = useState(!token ? 'Invalid or missing reset link.' : null)
+  const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
   const {
@@ -51,14 +51,25 @@ export default function ResetPasswordPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <KeyRound className="h-5 w-5 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
-        <h2 className="text-xl font-semibold text-v-text">Set a new password</h2>
-      </div>
-      <p className="mt-2 text-sm text-v-text-subtle">Choose a strong password for your account.</p>
+      <h2 className="v-page-title">Set a new password</h2>
+      <p className="mt-2 text-sm leading-relaxed text-v-text-subtle">
+        Choose a password with at least 8 characters.
+      </p>
+
+      {!token && (
+        <FormAlert variant="warning" title="Invalid or missing reset token" className="mt-6">
+          Request a new link. Both password inputs and the reset action are disabled.
+        </FormAlert>
+      )}
 
       <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <AuthFormField label="New password" id="newPassword" error={errors.newPassword?.message}>
+        <AuthFormField
+          label="New password"
+          id="newPassword"
+          required
+          hint="At least 8 characters."
+          error={errors.newPassword?.message}
+        >
           <PasswordInput
             id="newPassword"
             autoComplete="new-password"
@@ -68,8 +79,10 @@ export default function ResetPasswordPage() {
         </AuthFormField>
 
         <AuthFormField
-          label="Confirm password"
+          label="Confirm new password"
           id="confirmPassword"
+          required
+          hint="Passwords must match."
           error={errors.confirmPassword?.message}
         >
           <PasswordInput
@@ -82,16 +95,15 @@ export default function ResetPasswordPage() {
 
         {error && <FormAlert variant="error">{error}</FormAlert>}
 
-        <SubmitButton loading={loading}>
-          <ShieldCheck className="h-4 w-4" strokeWidth={2} />
-          Update password
-        </SubmitButton>
+        <SubmitButton loading={loading} disabled={!token}>Reset password</SubmitButton>
       </form>
 
-      <p className="mt-4 text-center text-sm text-v-text-subtle">
-        <Link to="/forgot-password" className="inline-flex items-center gap-1 text-v-text-muted hover:text-v-text">
-          <RefreshCcw className="h-3.5 w-3.5" strokeWidth={2} />
-          Request a new link
+      <p className="mt-5 flex items-center justify-center gap-4 text-center text-sm">
+        <Link to="/login" className="font-semibold text-v-primary hover:underline">
+          Back to sign in
+        </Link>
+        <Link to="/forgot-password" className="font-semibold text-v-primary hover:underline">
+          Request new reset link
         </Link>
       </p>
     </div>

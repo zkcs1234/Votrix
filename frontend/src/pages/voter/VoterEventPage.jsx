@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ArrowLeft, CheckCircle2, Clock3 } from 'lucide-react'
 import { electionService } from '@/services/election.service'
 import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -10,6 +11,7 @@ import VoterEventHeader from '@/components/voter/VoterEventHeader'
 import { useAuth } from '@/hooks/useAuth'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function validateSelections(positions, selections) {
   let hasAtLeastOneVote = false
@@ -68,13 +70,17 @@ function BallotSubmittedScreen({ ballot, eventId }) {
   }, [ballot?.canViewResults, eventId])
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="v-card-lg text-center border-v-success">
+    <div data-module="election" className="mx-auto max-w-2xl space-y-6">
+      <div className="v-card-lg border-v-success/30 bg-v-success-bg text-center">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-v-surface text-v-success">
+          <CheckCircle2 className="h-6 w-6" strokeWidth={1.8} aria-hidden />
+        </span>
         <p className="v-page-title text-v-success">Ballot submitted</p>
-        <p className="v-caption mt-2">
+        <p className="mt-2 text-sm leading-relaxed text-v-text-muted">
           Your {ballot?.event?.title} ballots have been recorded and locked.
         </p>
-        <Link to="/participant" className="v-btn-tertiary mt-6 inline-block">
+        <Link to="/participant" className="v-btn-tertiary mt-5 inline-flex items-center justify-center gap-2">
+          <ArrowLeft className="h-4 w-4" aria-hidden />
           Back to dashboard
         </Link>
       </div>
@@ -142,15 +148,23 @@ export default function VoterEventPage() {
     localStorage.setItem(draftKey, JSON.stringify(selections))
   }, [ballot?.ballotSectionId, draftKey, loadedDraftKey, selections])
 
-  useEffect(() => {
-    electionService
-      .getBallot(eventId)
-      .then(({ data }) => {
-        setBallot(data)
-        if (data.hasVoted) setDone(true)
-      })
-      .finally(() => setLoading(false))
+  const loadBallot = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data } = await electionService.getBallot(eventId)
+      setBallot(data)
+      if (data.hasVoted) setDone(true)
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load ballot'))
+    } finally {
+      setLoading(false)
+    }
   }, [eventId])
+
+  useEffect(() => {
+    void loadBallot()
+  }, [loadBallot])
 
   const positions = useMemo(() => ballot?.positions ?? [], [ballot])
   const completedSections = ballot?.sections?.filter((section) => section.completed).length ?? 0
@@ -273,23 +287,39 @@ export default function VoterEventPage() {
     )
   }
 
+  if (error && !ballot) {
+    return (
+      <div data-module="election" className="mx-auto max-w-lg space-y-4">
+        <FormAlert variant="error">{error}</FormAlert>
+        <Button variant="secondary" onClick={loadBallot}>Retry loading ballot</Button>
+      </div>
+    )
+  }
+
   if (done || ballot?.hasVoted) {
     return <BallotSubmittedScreen ballot={ballot} eventId={eventId} />
   }
 
   if (ballot && !ballot.sections?.length) {
-    return <div className="v-card-md text-center">
+    return <div data-module="election" className="v-card-md text-center">
       <p className="v-body-text">No positions are available for you in this election.</p>
-      <Link to="/participant" className="v-btn-tertiary mt-4 inline-block">Back to dashboard</Link>
+      <Link to="/participant" className="v-btn-tertiary mt-4 inline-flex items-center justify-center gap-2">
+        <ArrowLeft className="h-4 w-4" aria-hidden />
+        Back to dashboard
+      </Link>
     </div>
   }
 
   if (!ballot?.votingOpen) {
     return (
-      <div className="mx-auto max-w-lg v-card-md text-center">
-        <p className="v-body-text">Voting is not open for this event yet.</p>
-        <p className="v-caption mt-2">Check back when the organizer opens voting.</p>
-        <Link to="/participant" className="v-btn-tertiary mt-4 inline-block">
+      <div data-module="election" className="v-card-md mx-auto max-w-lg text-center">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-v-primary-soft text-v-primary">
+          <Clock3 className="h-6 w-6" strokeWidth={1.8} aria-hidden />
+        </span>
+        <p className="mt-4 text-lg font-semibold text-v-text">Voting is not open for this event yet.</p>
+        <p className="mt-2 text-sm leading-relaxed text-v-text-muted">Check back when the organizer opens voting.</p>
+        <Link to="/participant" className="v-btn-tertiary mt-5 inline-flex items-center justify-center gap-2">
+          <ArrowLeft className="h-4 w-4" aria-hidden />
           Back to dashboard
         </Link>
       </div>
@@ -306,12 +336,12 @@ export default function VoterEventPage() {
       progress bar and submit footer cannot both stay on screen on mobile.
     */
     <FullscreenVotingShell>
-    <div className="fixed inset-0 z-50 flex flex-col h-dvh bg-v-surface">
+    <div data-module="election" className="fixed inset-0 z-50 flex h-dvh flex-col bg-v-bg">
       {/* ===== FIXED TOP: Floating progress card (does not scroll) ===== */}
       {!isReviewing && (
         <div className="shrink-0">
           <div className="mx-auto max-w-2xl px-4 pt-3 pb-1 md:px-8">
-            <div className="v-card-sm p-3 shadow-v-shadow-md">
+            <div className="v-card-sm border-t-4 border-t-v-primary p-3 shadow-v-shadow-md">
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="v-caption">
                   Ballot {currentSectionNumber} of {totalSections}

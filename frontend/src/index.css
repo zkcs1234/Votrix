@@ -30,7 +30,7 @@
   --color-charcoal: #111827;
   --color-charcoal-light: #374151;
   --color-muted: #6b7280;
-  --color-surface: #f3f4f6;
+  --color-surface: #dfe2ea;
   --color-white: #ffffff;
 
   /* Motion tokens */
@@ -66,6 +66,9 @@
   --color-v-primary: var(--v-primary);
   --color-v-primary-hover: var(--v-primary-hover);
   --color-v-primary-soft: var(--v-primary-soft);
+  --color-v-on-primary: var(--v-on-primary);
+  --color-v-info: var(--v-info);
+  --color-v-info-bg: var(--v-info-bg);
   --color-v-brand-accent: var(--v-brand-accent);
   --color-v-success: var(--v-success);
   --color-v-success-bg: var(--v-success-bg);
@@ -83,45 +86,80 @@
 
   /* Module gradient backgrounds */
   --gradient-vote: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-  --gradient-comp: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  --gradient-poll: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  --gradient-comp: linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%);
+  --gradient-poll: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
 }
 
 @layer base {
   :root {
     color-scheme: light;
-    --v-bg: #f3f4f6;
+    /* Light neutrals are intentionally a step darker than the Figma canvas so
+       text keeps clear contrast against every surface. Cards stay pure white. */
+    --v-bg: #dfe2ea;
     --v-surface: #ffffff;
-    --v-surface-elevated: #f9fafb;
-    --v-border: #e5e7eb;
-    --v-border-strong: #d1d5db;
+    --v-surface-elevated: #e8ebf1;
+    --v-border: #c5ccd8;
+    --v-border-strong: #a9b3c2;
     --v-text: #111827;
     --v-text-muted: #374151;
-    --v-text-subtle: #6b7280;
+    --v-text-subtle: #4b5563;
+
+    /* Shell dimensions (Figma: sidebar 256 / rail 72 / header 72) */
+    --v-sidebar-w: 16rem;
+    --v-rail-w: 4.5rem;
+    --v-header-h: 4.5rem;
+    --v-radius-control: 0.5rem;
+    --v-radius-card: 0.75rem;
+    --v-radius-dialog: 1rem;
+    --v-on-primary: #ffffff;
     --v-sidebar: #111827;
     --v-sidebar-text: #d1d5db;
     --v-sidebar-active: #ffffff;
-      --v-primary: #4f46e5;          /* Votrix Indigo */
+    --v-primary: #4f46e5;
     --v-primary-hover: #4338ca;
-    --v-primary-soft: #eef2ff;     /* tinted background */
-    --v-brand-accent: #7c3aed;     /* gradient end-stop (violet) */
+    --v-primary-soft: #dbe2fe;
+    --v-info: #4338ca;
+    --v-info-bg: #dbe2fe;
+    --v-brand-accent: #7c3aed;
     --v-brand-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-    --v-success: #059669;
-    --v-success-bg: #ecfdf5;
-    --v-danger: #b91c1c;
-    --v-danger-bg: #fef2f2;
-    --v-warning: #b45309;
-    --v-warning-bg: #fffbeb;
-    --v-accent: #d97706;
-    --v-accent-bg: #fffbeb;
+    --v-success: #065f46;
+    --v-success-bg: #c8f2df;
+    --v-danger: #991b1b;
+    --v-danger-bg: #fbd0d0;
+    --v-warning: #78350f;
+    --v-warning-bg: #fce9a0;
+    --v-accent: #92400e;
+    --v-accent-bg: #fce9a0;
     --v-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
     --v-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
     --v-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
     --v-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
     --v-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.06);
     --gradient-vote: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-    --gradient-comp: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    --gradient-poll: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    --gradient-comp: linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%);
+    --gradient-poll: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+  }
+
+  [data-module='competition-scoring'] {
+    --v-primary: #0f766e;
+    --v-primary-hover: #115e59;
+    --v-primary-soft: #b5ece1;
+    --v-info: #115e59;
+    --v-info-bg: #b5ece1;
+    --v-brand-accent: #14b8a6;
+    --v-brand-gradient: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+    --gradient-comp: linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%);
+  }
+
+  [data-module='polling'] {
+    --v-primary: #c2410c;
+    --v-primary-hover: #9a3412;
+    --v-primary-soft: #fcd9b8;
+    --v-info: #9a3412;
+    --v-info-bg: #fcd9b8;
+    --v-brand-accent: #ea580c;
+    --v-brand-gradient: linear-gradient(135deg, #c2410c 0%, #ea580c 100%);
+    --gradient-poll: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
   }
 
   html {
@@ -150,14 +188,14 @@
 
   /* Card variants */
   .v-card {
-    border-radius: 0.75rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
   }
 
   .v-card-sm {
-    border-radius: 0.75rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
@@ -165,7 +203,7 @@
   }
 
   .v-card-md {
-    border-radius: 0.75rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
@@ -173,7 +211,7 @@
   }
 
   .v-card-lg {
-    border-radius: 0.75rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
@@ -182,7 +220,7 @@
 
   /* Elevated card — uses the larger shadow tier, suitable for featured content */
   .v-card-elevated {
-    border-radius: 0.75rem;
+    border-radius: 0.875rem;
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow-md);
@@ -190,7 +228,7 @@
 
   /* Hoverable card — adds lift + shadow-md on hover. Use on clickable cards. */
   .v-card-hover {
-    border-radius: 0.75rem;
+    border-radius: 0.875rem;
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
@@ -214,10 +252,32 @@
     background-color: var(--v-surface-elevated);
   }
 
+  .v-dashboard {
+    --dashboard-accent: var(--v-primary);
+  }
+
+  .v-dashboard > .v-card-md,
+  .v-dashboard > .v-card,
+  .v-dashboard > .v-card-sm {
+    border-color: var(--v-border);
+  }
+
+  .v-dashboard > .grid > a.v-card-md {
+    position: relative;
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  }
+
+  .v-dashboard > .grid > a.v-card-md:hover {
+    border-color: color-mix(in srgb, var(--dashboard-accent) 42%, var(--v-border));
+    box-shadow: var(--v-shadow-md);
+    transform: translateY(-1px);
+  }
+
   /* Input base */
   .v-input {
     width: 100%;
-    border-radius: 0.5rem;
+    min-height: 2.5rem;
+    border-radius: var(--v-radius-control);
     border: 1px solid var(--v-border-strong);
     background-color: var(--v-surface);
     padding: 0.625rem 0.875rem;
@@ -883,7 +943,7 @@
   /* Table styles */
   .v-table-wrap {
     overflow-x: auto;
-    border-radius: 0.75rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
@@ -903,7 +963,7 @@
     padding: 0.75rem 1rem;
     text-align: left;
     font-weight: 600;
-    color: var(--v-text-muted);
+    color: var(--v-text-subtle);
     border-bottom: 1px solid var(--v-border);
     font-size: 0.75rem;
     text-transform: uppercase;
@@ -924,6 +984,7 @@
     background-color: var(--v-surface-elevated);
   }
 
+<<<<<<< HEAD
   .v-competition-dashboard-table {
     border: 2px solid var(--v-border-strong);
     border-radius: 0;
@@ -1017,6 +1078,10 @@
       min-width: 0;
       max-width: none;
     }
+=======
+  .v-table th {
+    white-space: nowrap;
+>>>>>>> main
   }
 
   /* Typography utilities */
@@ -1115,19 +1180,47 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0.5rem;
-    font-weight: 500;
+    min-height: 2.5rem;
+    border-radius: var(--v-radius-control);
+    font-weight: 600;
     font-size: 0.875rem;
     padding: 0.5rem 1rem;
     transition: all 0.15s;
     background-color: var(--v-primary);
-    color: var(--v-text);
+    color: var(--v-on-primary);
     border: none;
     cursor: pointer;
   }
 
   .v-btn-primary:hover {
     background-color: var(--v-primary-hover);
+  }
+
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--v-primary);
+    outline-offset: 2px;
+  }
+
+  .v-card-sm,
+  .v-card-md,
+  .v-card-lg,
+  .v-card,
+  .v-module-card {
+    box-shadow: 0 1px 2px rgb(17 24 39 / 0.04), 0 1px 3px rgb(17 24 39 / 0.05);
+  }
+
+  @media (max-width: 639px) {
+    .v-card-md {
+      padding: 1rem;
+    }
+
+    .v-card-lg {
+      padding: 1.25rem;
+    }
+
+    .v-table {
+      min-width: 36rem;
+    }
   }
 
   /* Brand gradient button — used for hero CTAs and "Get started" actions */
@@ -1173,8 +1266,9 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0.5rem;
-    font-weight: 500;
+    min-height: 2.5rem;
+    border-radius: var(--v-radius-control);
+    font-weight: 600;
     font-size: 0.875rem;
     padding: 0.5rem 1rem;
     transition: all 0.15s;
@@ -1186,6 +1280,13 @@
 
   .v-btn-secondary:hover {
     background-color: var(--v-surface-elevated);
+  }
+
+  @media (pointer: coarse) {
+    .v-btn-primary,
+    .v-btn-secondary {
+      min-height: 2.75rem;
+    }
   }
 
   .v-btn-tertiary {
@@ -1295,7 +1396,7 @@
   .v-module-card__icon {
     width: 1.25rem;
     height: 1.25rem;
-    color: var(--v-text-muted);
+    color: var(--v-primary);
     margin-bottom: 0.375rem;
   }
 
@@ -1572,8 +1673,26 @@
     color: var(--v-text) !important;
   }
 
+<<<<<<< HEAD
   .v-events-table-header [role="columnheader"] {
     color: #fff !important;
+=======
+  /* The remap above exists for legacy dark panels turned light. Anything that
+     sits on a filled/dark background must keep real white text, otherwise
+     primary buttons, step circles and sidebar items lose their contrast. */
+  .bg-v-primary.text-white:not(:disabled),
+  .bg-v-primary-hover.text-white:not(:disabled),
+  .bg-v-danger.text-white:not(:disabled),
+  .bg-v-success.text-white:not(:disabled),
+  .bg-v-brand-accent.text-white:not(:disabled),
+  .bg-emerald-500.text-white,
+  .bg-amber-500.text-white,
+  .bg-blue-600.text-white,
+  .bg-v-sidebar .text-white,
+  .v-on-dark .text-white,
+  .v-on-dark.text-white {
+    color: var(--v-on-primary) !important;
+>>>>>>> main
   }
 
   .text-slate-200,

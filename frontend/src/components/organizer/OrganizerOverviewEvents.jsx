@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Card from '@/components/ui/Card'
-import Badge from '@/components/ui/Badge'
+import Badge, { statusTone } from '@/components/ui/Badge'
+import CreateEventMenu from '@/components/organizer/CreateEventMenu'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { electionService } from '@/services/election.service'
 import { pageantService } from '@/services/pageant.service'
@@ -23,24 +24,7 @@ function moduleFor(event) {
 }
 
 function ModuleNavigation({ create = false }) {
-  return (
-    <details className="relative shrink-0">
-      <summary className={`${create ? 'v-btn-primary' : 'v-btn-secondary'} cursor-pointer list-none`}>
-        {create ? 'Create Event' : 'See All'}
-      </summary>
-      <div className="absolute right-0 z-10 mt-2 w-48 rounded-lg border border-v-border bg-v-surface p-1 shadow-v-shadow">
-        {MODULES.map((module) => (
-          <Link
-            key={module.key}
-            to={`/organizer/${module.key}/events${create ? '/new' : ''}`}
-            className="block rounded-md px-3 py-2 text-sm text-v-text-muted hover:bg-v-surface-elevated"
-          >
-            {module.label}
-          </Link>
-        ))}
-      </div>
-    </details>
-  )
+  return <CreateEventMenu create={create} />
 }
 
 export default function OrganizerOverviewEvents({ dashboard }) {
@@ -74,7 +58,7 @@ export default function OrganizerOverviewEvents({ dashboard }) {
     <Card padding="sm">
       <section aria-labelledby="overview-events-title">
         <div className="flex items-center justify-between gap-3">
-          <h3 id="overview-events-title" className="v-section-title">Your Events</h3>
+          <h3 id="overview-events-title" className="v-section-title">Recent events</h3>
           {!loading && !error && events.length > 4 && <ModuleNavigation />}
         </div>
         {loading ? (
@@ -90,8 +74,13 @@ export default function OrganizerOverviewEvents({ dashboard }) {
             <ModuleNavigation create />
           </div>
         ) : (
+<<<<<<< HEAD
           <div role="table" aria-label="Your Events" className="mt-3 overflow-hidden rounded-lg border-2 border-v-border-strong text-sm">
             <div role="row" className="v-events-table-header hidden grid-cols-[minmax(0,1fr)_9rem_8rem_5rem] gap-4 border-b-2 border-v-primary-hover bg-v-primary px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white shadow-sm sm:grid sm:px-4">
+=======
+          <div role="table" aria-label="Your Events" className="mt-3 text-sm">
+            <div role="row" className="hidden grid-cols-[minmax(0,1fr)_9rem_8rem_5rem] gap-4 border-b border-v-border pb-2 text-xs font-semibold uppercase tracking-wide text-v-text-subtle sm:grid">
+>>>>>>> main
               {['Event', 'Type', 'Status', 'Action'].map((label) => (
                 <span key={label} role="columnheader" className="flex items-center font-bold text-white">{label}</span>
               ))}
@@ -106,8 +95,13 @@ export default function OrganizerOverviewEvents({ dashboard }) {
                     {EVENT_TYPE_META[event.eventType]?.label ?? event.eventType}
                   </div>
                   <div role="cell">
+<<<<<<< HEAD
                     <span className="mr-2 text-[.7rem] font-semibold uppercase tracking-wide text-v-text-subtle sm:hidden">Status</span>
                     <Badge tone={event.status === 'active' ? 'success' : event.status === 'cancelled' ? 'danger' : 'default'} className="px-2 py-0.5 text-xs capitalize">
+=======
+                    <span className="v-caption mr-2 sm:hidden">Status</span>
+                    <Badge tone={statusTone(event.status)} dot className="capitalize">
+>>>>>>> main
                       {event.status}
                     </Badge>
                   </div>
