@@ -332,6 +332,8 @@ function SidebarContent({
 export default function AppShell({
   title,
   moduleLabel,
+  headerLabel,
+  sidebarCaption,
   homeLink = '/',
   navItems = [],
   eventId,
@@ -366,6 +368,8 @@ export default function AppShell({
   const { user, clearSession } = useAuth()
   const profileDropdownRef = useRef(null)
   const isOrganizer = user?.role === 'organizer'
+
+  const caption = sidebarCaption ?? (isOrganizer ? user?.organizationName : undefined)
 
   const closeMobile = () => setMobileOpen(false)
 
@@ -507,15 +511,20 @@ export default function AppShell({
       onNavigate={closeMobile}
       isCollapsed={isDesktop ? isCollapsed : false}
       onToggleCollapse={isDesktop ? toggleCollapse : undefined}
+      caption={caption}
     />
   )
 
   return (
-    <div className="flex min-h-screen bg-v-bg" style={{ '--sidebar-width': showSidebar ? (isCollapsed ? '4.5rem' : '16rem') : '0px' }}>
+    <div
+      data-module={moduleLabel?.toLowerCase().replace(/\s+/g, '-')}
+      className="flex min-h-screen bg-v-bg"
+      style={{ '--sidebar-width': showSidebar ? (isCollapsed ? 'var(--v-rail-w)' : 'var(--v-sidebar-w)') : '0px' }}
+    >
       {showSidebar && (
         <aside
-          className={`hidden shrink-0 bg-v-sidebar lg:block sticky top-0 self-start h-screen min-h-screen overflow-y-auto transition-[width,padding] duration-200 ease-in-out ${
-            isCollapsed ? 'w-18 px-3 py-6' : 'w-64 p-6'
+          className={`sticky top-0 hidden h-screen min-h-screen shrink-0 self-start overflow-y-auto border-r border-white/5 bg-v-sidebar transition-[width,padding] duration-200 ease-in-out md:block ${
+            isCollapsed ? 'w-18 px-3 py-6' : 'w-64 p-5'
           }`}
         >
           {sidebar(true)}
@@ -524,25 +533,25 @@ export default function AppShell({
 
       {/* Off-canvas sidebar for Tablet/Mobile */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
           <button
             type="button"
             className="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-sm cursor-default"
             aria-label="Close menu"
             onClick={closeMobile}
           />
-          <aside className="relative flex h-full w-[min(100%,280px)] flex-col bg-v-sidebar p-6 shadow-xl animate-in slide-in-from-left duration-200 ease-out">
+          <aside className="relative flex h-full w-[min(100%,288px)] flex-col overflow-y-auto border-r border-white/5 bg-v-sidebar p-5 shadow-xl animate-in slide-in-from-left duration-200 ease-out">
             {sidebar(false)}
           </aside>
         </div>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow sm:px-6 sm:py-4">
+        <header className="sticky top-0 z-40 flex min-h-18 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-v-border bg-v-surface/95 px-4 py-3 backdrop-blur-md sm:px-6">
           {showSidebar && (
             <button
               type="button"
-              className="flex-shrink-0 rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated lg:hidden"
+              className="flex-shrink-0 rounded-lg border border-v-border p-2 text-v-text-muted transition hover:border-v-primary/40 hover:bg-v-primary-soft/50 hover:text-v-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary pointer-coarse:min-h-11 pointer-coarse:min-w-11 md:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Open menu"
               aria-expanded={mobileOpen}
@@ -561,11 +570,19 @@ export default function AppShell({
                 Back to dashboard
               </Link>
             )}
-            <h1 className="truncate text-base font-semibold text-v-text sm:text-lg">
-              {title}
-            </h1>
-            {moduleLabel && (
-              <p className="truncate text-xs text-v-text-subtle">{moduleLabel}</p>
+            {showSidebar ? (
+              <h1 className="truncate font-display text-base font-bold text-v-text sm:text-lg">
+                {headerLabel ?? title}
+              </h1>
+            ) : (
+              // Figma participant header: wordmark + context, no sidebar or search.
+              <div className="flex min-w-0 items-center gap-2">
+                <VotrixLogo size="sm" linkTo={homeLink} />
+                <span className="text-v-text-subtle" aria-hidden="true">/</span>
+                <h1 className="truncate text-sm font-semibold text-v-text sm:text-base">
+                  {headerLabel ?? title}
+                </h1>
+              </div>
             )}
           </div>
 
@@ -575,14 +592,17 @@ export default function AppShell({
               <button
                 type="button"
                 onClick={() => setNotificationsOpen((prev) => !prev)}
-                className={`relative rounded-lg border border-v-border p-2 transition hover:bg-v-surface-elevated ${
+                className={`relative flex items-center gap-2 rounded-lg border border-v-border p-2 transition hover:bg-v-surface-elevated pointer-coarse:min-h-11 pointer-coarse:min-w-11 lg:px-3 ${
                   notificationsOpen ? 'bg-v-surface-elevated text-v-text' : 'text-v-text-muted'
                 }`}
                 aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
               >
                 <Bell className="h-5 w-5" strokeWidth={1.5} />
+                <span className="hidden text-sm font-medium lg:inline" aria-hidden="true">
+                  Notifications{unreadCount > 0 ? ` (${unreadCount > 99 ? '99+' : unreadCount})` : ''}
+                </span>
                 {unreadCount > 0 && (
-                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-v-danger px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-v-danger px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white lg:hidden">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
@@ -673,7 +693,7 @@ export default function AppShell({
           </div>
         </header>
 
-        <main className="v-page-enter flex-1 p-4 md:p-8">{children ?? <Outlet />}</main>
+        <main className="v-page-enter flex-1 p-4 md:px-7 md:py-6 xl:px-8">{children ?? <Outlet />}</main>
         <div id="stage-footer-portal" className="shrink-0 empty:hidden sticky bottom-0 z-40" />
       </div>
     </div>
