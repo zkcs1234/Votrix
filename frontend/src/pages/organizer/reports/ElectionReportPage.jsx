@@ -12,6 +12,7 @@ import {
   downloadPdf,
 } from '@/modules/analytics'
 import TurnoutReport from '@/components/reports/TurnoutReport'
+import ParticipantParticipationTable from '@/components/reports/ParticipantParticipationTable'
 import {
   buildElectionAuditActivity,
   buildElectionExportPayload,
@@ -138,6 +139,16 @@ export default function ElectionReportPage() {
       />
 
       <ParticipationTable rows={report.participationByProgram ?? []} />
+
+      <ParticipantParticipationTable
+        title="Voter participation"
+        description="List of all enrolled voters and their ballot submission status."
+        participants={report.voterParticipation ?? []}
+        statusKey="hasVoted"
+        votedLabel="Voted"
+        notVotedLabel="Not voted"
+        filename={`voter-participation-${eventId}`}
+      />
 
       <AnalyticsStatsGrid
         stats={[

@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom'
+import ParticipantParticipationTable from '@/components/reports/ParticipantParticipationTable'
 import {
   AnalyticsSection,
   AnalyticsStatsGrid,
@@ -25,7 +26,7 @@ import {
 } from '@/components/ui/Skeleton'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
-function ParticipationTable({ rows }) {
+
   if (!rows.length) return null
   return (
     <AnalyticsSection
@@ -129,7 +130,7 @@ export default function PollingReportPage() {
         barColorClass="bg-v-primary"
       />
 
-      <ParticipationTable rows={report.participationByProgram ?? []} />
+      <ParticipantParticipationTable participants={report.respondentParticipation ?? []} title="Respondent participation" description="List of enrolled respondents and their response status." filename="respondent-roster" />
 
       <AnalyticsStatsGrid
         stats={[

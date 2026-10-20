@@ -1488,7 +1488,7 @@ export async function getPollAnalytics(eventId, organizerId) {
 
   const { data: participantRows, error: participantErr } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('has_responded, users!inner (program, year_section)')
+    .select('id, has_responded, users!inner (id, email, first_name, last_name, school_id, program, year_section)')
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
 
@@ -1571,6 +1571,36 @@ export async function getPollAnalytics(eventId, organizerId) {
     }
   })
 
+  const scope = organizerId ? await getOrganizerScope(organizerId) : null
+  const scoped = scope ? !isAllAccess(scope) : false
+
+  let scopedParticipants = participantRows ?? []
+  if (scoped) {
+    scopedParticipants = scopedParticipants.filter((row) =>
+      isStudentInScope(scope, { program: row.users?.program, yearSection: row.users?.year_section })
+    )
+  }
+
+  const respondentParticipation = scopedParticipants.map((row) => ({
+    id: row.id,
+    schoolId: row.users?.school_id ?? null,
+    firstName: row.users?.first_name ?? '',
+    lastName: row.users?.last_name ?? '',
+    program: row.users?.program ?? 'Unspecified',
+    yearSection: row.users?.year_section ?? 'Unspecified',
+    hasResponded: Boolean(row.has_responded),
+  }))
+
+  respondentParticipation.sort((a, b) => {
+    const progCmp = a.program.localeCompare(b.program, undefined, { numeric: true })
+    if (progCmp !== 0) return progCmp
+    const secCmp = a.yearSection.localeCompare(b.yearSection, undefined, { numeric: true })
+    if (secCmp !== 0) return secCmp
+    const lastCmp = a.lastName.localeCompare(b.lastName, undefined, { numeric: true })
+    if (lastCmp !== 0) return lastCmp
+    return a.firstName.localeCompare(b.firstName, undefined, { numeric: true })
+  })
+
   return {
     totalSubmissions: totalSubmissions ?? 0,
     enrolledRespondents: enrolledRespondents ?? 0,
@@ -1578,6 +1608,7 @@ export async function getPollAnalytics(eventId, organizerId) {
     pollAnonymous: anonymous,
     participationByProgram: participationBy('program'),
     participationByYearSection: participationBy('year_section'),
+    respondentParticipation,
     responseActivity: Array.from(activityByDay.entries()).map(([period, responses]) => ({ period, responses })),
     averageCompletionTimeSeconds,
     questions: questionAnalytics,
