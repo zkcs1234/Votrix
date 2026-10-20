@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { officialMean } from '../../../../../shared/competition-calculation.js'
 import { tabulationNumber } from '@/utils/competitionTabulationPresentation'
 import { applicableDeductionRules } from '../../../../../shared/competition-deductions.js'
+import PlacementBadge from '@/components/ui/PlacementBadge'
 
 export function criterionCode(index) {
   let code = ''
@@ -92,13 +93,13 @@ function ScoreMatrix({ view, roundId, criteria, method, search, onSearch, select
             const result = results.get(entry.id), reviewStatus = entryReviewStatus(view, entry.id)
             const own = sheets.filter(sheet => sheet.entryId === entry.id)
             return <tr key={entry.id} data-selected={selectedEntryId === entry.id}>
-              <td className="v-tab-rank">{result?.rank ?? '—'}</td><td className="v-tab-no">{String(entry.contestantNumber ?? '—').padStart(2, '0')}</td>
+              <td className="v-tab-rank"><PlacementBadge rank={result?.rank}/></td><td className="v-tab-no">{String(entry.contestantNumber ?? '—').padStart(2, '0')}</td>
               <th scope="row" className="v-tab-name"><button type="button" title={entry.name} onClick={() => onSelectEntry(entry.id)} aria-pressed={selectedEntryId === entry.id}>{entry.name}</button></th>
-              {!manual && judges.map(judge => { const sheet = sheetByJudge.get(`${entry.id}:${judge.judgeId}`); const placement = result?.judgeRanks?.[judge.judgeId] ?? output?.roundResults?.find(row => row.roundId === roundId && row.contestantId === entry.id)?.judgeRanks?.[judge.judgeId]; return <td key={judge.judgeId}>{format(sheet?.carryNumericTotal ?? sheet?.total)}{ranked && placement != null && <small title="Judge placement">#{placement}</small>}</td> })}
+              {!manual && judges.map(judge => { const sheet = sheetByJudge.get(`${entry.id}:${judge.judgeId}`); const placement = result?.judgeRanks?.[judge.judgeId] ?? output?.roundResults?.find(row => row.roundId === roundId && row.contestantId === entry.id)?.judgeRanks?.[judge.judgeId]; return <td key={judge.judgeId}>{format(sheet?.carryNumericTotal ?? sheet?.total)}{ranked && placement != null && <small title="Judge placement"><PlacementBadge rank={placement}/></small>}</td> })}
               {!manual && criteria.map(criterion => { const values = own.map(sheet => sheet.criteria?.find(row => row.criteriaId === criterion.id)?.contribution); const complete = judges.length > 0 && values.length === judges.length && values.every(value => typeof value === 'number' && Number.isFinite(value)); return <td key={criterion.id}>{format(complete ? officialMean(values, precision) : undefined)}</td> })}
               {!manual && <td>{format(result?.baseScore)}</td>}
               {!manual && organizerPenalties && <td>{format(result?.deductionTotal)}{result?.pointDeductionTotal > 0 && <small>{format(result.pointDeductionTotal)} points</small>}</td>}
-              <td className="v-tab-final">{manual ? result?.rank ?? '—' : format(result?.finalScore)}</td><td><span className="v-tab-status" data-status={reviewStatus}>{reviewStatus}</span></td>
+              <td className="v-tab-final">{manual ? <PlacementBadge rank={result?.rank}/> : format(result?.finalScore)}</td><td><span className="v-tab-status" data-status={reviewStatus}>{reviewStatus}</span></td>
               <td className="v-tab-actions"><button type="button" className="v-tab-menu-trigger" aria-label={`Actions for ${entry.name}`} aria-expanded={menu === entry.id} onClick={() => setMenu(menu === entry.id ? '' : entry.id)}>⋯</button></td>
             </tr>
           })}{!entries.length && <tr><td colSpan={columns} className="v-tab-empty">{allowed.size ? 'No contestants match your filters.' : 'No contestants in this round.'}</td></tr>}</tbody>

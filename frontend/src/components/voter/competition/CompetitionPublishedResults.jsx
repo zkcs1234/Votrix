@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { workflowService } from '@/services/competition-workflow.service'
 import useCompetitionSync from '@/hooks/useCompetitionSync'
 import useLatestRequest from '@/hooks/useLatestRequest'
+import PlacementBadge from '@/components/ui/PlacementBadge'
 
 // This endpoint returns the published overall snapshot only, with no worksheets
 // or other judges' scores. Local/live totals never stand in for official results.
@@ -25,6 +26,6 @@ export default function CompetitionPublishedResults({ eventId, judgeId }) {
   return <section className="v-card p-5 space-y-3"><h2 className="v-section-title">Official published results</h2>
     <p className="v-caption">Published {new Date(publication.publishedAt).toLocaleString()} · {publication.method}</p>
     <div className="overflow-x-auto"><table className="v-table"><thead><tr><th>Rank</th><th>Contestant</th><th>Official result</th></tr></thead>
-      <tbody>{publication.results.map(row => <tr key={row.contestantId}><td>{row.rank}</td><td>{row.contestantName}</td><td>{publication.method === 'manual' ? `Placement ${row.rank}` : row.finalScore ?? 'Incomplete'}</td></tr>)}</tbody>
+      <tbody>{publication.results.map(row => <tr key={row.contestantId}><td><PlacementBadge rank={row.rank}/></td><td>{row.contestantName}</td><td>{publication.method === 'manual' ? `Placement ${row.rank}` : row.finalScore ?? 'Incomplete'}</td></tr>)}</tbody>
     </table></div></section>
 }

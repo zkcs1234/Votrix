@@ -1,5 +1,5 @@
 DO $$
-DECLARE f round_advancement_fixture; state jsonb; member jsonb; results jsonb:='[]'; input jsonb; output jsonb; saved jsonb; digest text; reviewer uuid; qualified jsonb; q jsonb; target jsonb; source jsonb; ctx jsonb;
+DECLARE f round_advancement_fixture; state jsonb; member jsonb; results jsonb:='[]'; input jsonb; output jsonb; saved jsonb; digest text; qualified jsonb; q jsonb; target jsonb; source jsonb; ctx jsonb;
 BEGIN
  SELECT * INTO f FROM round_advancement_fixture;
  state:=competition_child_tabulation_snapshot(f.event_id,f.child,f.actor,f.pre_id,false);
@@ -11,11 +11,13 @@ BEGIN
  input:=jsonb_build_object('rules',jsonb_build_object('id',state->'rules'->>'id','scoringConfig',jsonb_build_object('perDivision',true,'calculationMethod','weighted_average')));
  output:=jsonb_build_object('ready',true,'results',results,'divisionRanking',state->'divisionRanking');
  saved:=competition_child_official_calculate(f.event_id,f.child,f.actor,f.pre_id,digest,input,output);
- SELECT user_id INTO reviewer FROM event_participants WHERE event_id=f.event_id AND judge_role::text='score_reviewer';
- PERFORM competition_child_official_transition(f.event_id,f.child,reviewer,(saved->>'calculationId')::uuid,'verify','Reviewed preliminary calculation');
+ IF EXISTS(SELECT 1 FROM competition_child_calculation_transitions WHERE calculation_id=(saved->>'calculationId')::uuid AND action='verify') THEN RAISE EXCEPTION 'UNEXPECTED_REVIEWER_VERIFICATION'; END IF;
  PERFORM competition_child_official_transition(f.event_id,f.child,f.actor,(saved->>'calculationId')::uuid,'finalize','Finalized preliminary calculation');
  state:=competition_child_tabulation_snapshot(f.event_id,f.child,f.actor,f.pre_id,false);
- IF state->>'sourceDigest'<>digest THEN RAISE EXCEPTION 'STATUS_METADATA_CHANGED_SCORING_DIGEST'; END IF;
+ IF state->>'sourceDigest'<>digest OR state->'calculation'->'finalized' IS DISTINCT FROM 'true'::jsonb
+  OR state->'calculation'->'verified' IS DISTINCT FROM 'false'::jsonb
+  OR state->'advancement'->'qualificationCurrent' IS DISTINCT FROM 'false'::jsonb
+ THEN RAISE EXCEPTION 'DIRECT_FINALIZATION_FAILED_OR_DIGEST_CHANGED'; END IF;
  ctx:=competition_child_live_view(f.event_id,f.child,f.actor,f.final_id,true)->'context';
  BEGIN
   PERFORM competition_child_live_control(f.event_id,f.child,f.actor,f.final_id,'start',ctx||jsonb_build_object('requestId',gen_random_uuid()));
@@ -40,5 +42,5 @@ BEGIN
  IF state->'advancement'->'qualificationCurrent' IS DISTINCT FROM 'false'::jsonb THEN RAISE EXCEPTION 'SOURCE_CORRECTION_RETAINED_READY_STATUS'; END IF;
  state:=competition_child_live_view(f.event_id,f.child,f.actor,f.final_id,true);
  IF state->'laterRoundBlocked' IS DISTINCT FROM 'true'::jsonb THEN RAISE EXCEPTION 'FINAL_NOT_BLOCKED_AFTER_SOURCE_CORRECTION'; END IF;
- RAISE NOTICE 'PASS 30/70 setup, explicit finalization and qualifier confirmation, next-round roster/status, special-round resolver and correction guards';
+ RAISE NOTICE 'PASS direct organizer finalization without verification, 30/70 setup, explicit qualifier confirmation, next-round roster/status, special-round resolver and correction guards';
 END $$;

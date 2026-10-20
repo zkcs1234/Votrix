@@ -1,6 +1,6 @@
 ﻿import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, Zap, Users, Star, CheckSquare, Plus } from 'lucide-react'
+import { CalendarDays, Zap, Users, Star, Plus } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import StatCard from '@/components/ui/StatCard'
 import PageHeader from '@/components/ui/PageHeader'
@@ -69,10 +69,11 @@ export default function CompetitionDashboardPage() {
         <StatCard label="Active sessions" value={data?.stats?.activeSessions ?? 0} icon={Zap} />
         <StatCard label="Total contestants" value={data?.stats?.totalContestants ?? 0} icon={Users} />
         <StatCard label="Total judges" value={data?.stats?.totalJudges ?? 0} hint="Across all events" icon={Star} />
-        <StatCard label="Scores submitted" value={data?.stats?.scoresSubmitted ?? 0} icon={CheckSquare} />
       </div>
 
       <EventStatsTable
+        tableClassName="v-competition-dashboard-table"
+        toolbarLayout="single-row"
         title="Judge completion by event"
         events={data?.eventBreakdown ?? []}
         linkFor={(e) => `/organizer/competition/events/${e.id}/${nativeSetupEnabled ? 'workspace' : 'contestants'}`}

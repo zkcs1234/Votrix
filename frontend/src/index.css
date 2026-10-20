@@ -454,15 +454,29 @@
     width: 17rem;
   }
   .v-cal-pop-polished {
-    width: 20rem;
+    width: 21rem;
     max-height: calc(100dvh - 2rem);
     overflow-y: auto;
-    gap: 0.75rem;
+    gap: 0.35rem;
     border-radius: 0.75rem;
-    padding: 1rem;
+    padding: 0.625rem;
+  }
+  .v-cal-step-content {
+    animation: v-cal-step-in 160ms ease-out both;
+  }
+  @keyframes v-cal-step-in {
+    from { opacity: 0; transform: translateY(0.3rem); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .v-cal-step-content { animation: none; }
   }
   .v-cal-pop-polished .v-cal-header {
-    padding: 0.25rem 0;
+    padding: 0;
+  }
+  .v-cal-pop-polished .v-cal-nav {
+    width: 1.75rem;
+    height: 1.75rem;
   }
   .v-cal-pop-polished .v-press.bg-v-primary {
     /* The legacy text-white utility remaps to body text; keep primary actions legible. */
@@ -473,22 +487,33 @@
     font-weight: 500;
     letter-spacing: 0.06em;
   }
+  .v-cal-pop-polished .v-cal-weekday {
+    padding: 0;
+  }
   .v-cal-pop-polished .v-cal-grid {
-    gap: 0.2rem;
+    gap: 0.125rem;
   }
   .v-cal-steps {
     display: flex;
-    justify-content: center;
-    gap: 2rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--v-border);
-    font-size: 0.75rem;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--v-text-subtle);
+  }
+  .v-cal-date-step-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--v-border);
+    padding-bottom: 0.4rem;
   }
   .v-cal-steps li {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.25rem;
+    white-space: nowrap;
   }
   .v-cal-steps li[aria-current="step"] {
     color: var(--v-primary);
@@ -498,10 +523,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 0.9rem;
-    height: 0.9rem;
+    width: 1rem;
+    height: 1rem;
     border: 1px solid var(--v-border-strong);
     border-radius: 50%;
+    font-size: 0.625rem;
+    line-height: 1;
   }
   [aria-current="step"] .v-cal-step-dot,
   .v-cal-step-dot:has(svg) {
@@ -534,18 +561,27 @@
   }
   .v-cal-date-summary {
     display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
     border-top: 1px solid var(--v-border);
-    padding-top: 0.75rem;
+    padding-top: 0.5rem;
+  }
+  .v-cal-date-summary > div:first-child {
+    min-width: 0;
+  }
+  .v-cal-date-summary > div:first-child p:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .v-clock-polished .v-clock-value {
-    width: 3.25rem;
-    min-height: 2.75rem;
-    border-radius: 0.5rem;
+    width: 2.4rem;
+    min-height: 2rem;
+    border-radius: 0.4rem;
     border-color: transparent;
     background: var(--v-surface-elevated);
-    font-size: 1.75rem;
+    font-size: 1.4rem;
     font-variant-numeric: tabular-nums;
   }
   .v-clock-polished .v-clock-value[aria-pressed="true"] {
@@ -553,8 +589,8 @@
     color: white;
   }
   .v-clock-polished .v-clock-display-period {
-    margin-left: 0.25rem;
-    font-size: 0.875rem;
+    margin-left: 0.125rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: var(--v-text-muted);
   }
@@ -567,16 +603,16 @@
   }
   .v-clock-polished > .v-clock-period {
     align-self: center;
-    min-width: 10rem;
+    min-width: 8.5rem;
     gap: 0.25rem;
-    padding: 0.25rem;
+    padding: 0.15rem;
     border-radius: 0.625rem;
     background: var(--v-surface-elevated);
   }
   .v-clock-polished > .v-clock-period .v-cal-quick-btn {
-    min-height: 2.25rem;
+    min-height: 1.65rem;
     border-color: transparent;
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     font-weight: 600;
   }
   .v-clock-picker {
@@ -584,9 +620,20 @@
     flex-direction: column;
     gap: 0.5rem;
   }
+  .v-clock-picker.v-clock-polished {
+    gap: 0.2rem;
+  }
+  .v-clock-date-compact {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  .v-clock-hint-compact {
+    font-size: 0.6875rem;
+    line-height: 0.9rem;
+  }
   .v-clock-face {
     position: relative;
-    width: min(100%, 13.75rem);
+    width: min(100%, 9rem);
     aspect-ratio: 1;
     align-self: center;
     border-radius: 50%;
@@ -606,10 +653,10 @@
   .v-clock-number {
     position: absolute;
     transform: translate(-50%, -50%);
-    width: 2rem;
-    height: 2rem;
+    width: 1.65rem;
+    height: 1.65rem;
     border-radius: 50%;
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     color: var(--v-text);
     cursor: pointer;
   }
@@ -644,6 +691,10 @@
   .v-clock-picker .v-cal-quick-btn:focus-visible {
     outline: 2px solid var(--v-primary);
     outline-offset: 2px;
+  }
+  .v-clock-actions-compact .v-press {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.75rem;
   }
   .v-cal-pop-up {
     top: auto;
@@ -871,6 +922,101 @@
 
   .v-table tbody tr:hover {
     background-color: var(--v-surface-elevated);
+  }
+
+  .v-competition-dashboard-table {
+    border: 2px solid var(--v-border-strong);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .v-competition-dashboard-table .v-table {
+    table-layout: fixed;
+  }
+
+  .v-competition-dashboard-table .v-table th,
+  .v-competition-dashboard-table .v-table td {
+    border-right: 1px solid var(--v-border-strong);
+    border-bottom: 1px solid var(--v-border-strong);
+    vertical-align: middle;
+  }
+
+  .v-competition-dashboard-table .v-table th {
+    background-color: var(--v-primary);
+    color: #fff !important;
+    border-bottom: 2px solid var(--v-primary-hover);
+    font-weight: 700;
+  }
+
+  .v-competition-dashboard-table .v-table th:last-child,
+  .v-competition-dashboard-table .v-table td:last-child {
+    border-right: 0;
+  }
+
+  .v-competition-dashboard-table .v-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .v-competition-dashboard-table .v-table th:first-child,
+  .v-competition-dashboard-table .v-table td:first-child {
+    width: 34%;
+  }
+
+  .v-competition-dashboard-table .v-table th:nth-child(2),
+  .v-competition-dashboard-table .v-table td:nth-child(2) {
+    width: 16%;
+  }
+
+  .v-competition-dashboard-table .v-table th:nth-child(3),
+  .v-competition-dashboard-table .v-table td:nth-child(3),
+  .v-competition-dashboard-table .v-table th:nth-child(4),
+  .v-competition-dashboard-table .v-table td:nth-child(4),
+  .v-competition-dashboard-table .v-table th:nth-child(5),
+  .v-competition-dashboard-table .v-table td:nth-child(5) {
+    width: 16.66%;
+  }
+
+  .v-event-stats-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 1.5rem;
+    row-gap: 0.75rem;
+  }
+
+  .v-filter-bar-single-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 1024px) {
+    .v-event-stats-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      gap: 1.5rem;
+    }
+
+    .v-event-stats-header > h3 {
+      white-space: nowrap;
+    }
+
+    .v-filter-bar-single-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      min-width: 0;
+      gap: 0.75rem;
+    }
+
+    .v-filter-bar-single-row > p {
+      white-space: nowrap;
+    }
+
+    .v-filter-bar-single-row__search {
+      min-width: 0;
+      max-width: none;
+    }
   }
 
   /* Typography utilities */
@@ -1169,6 +1315,10 @@
     margin-top: 0.125rem;
   }
 
+  .v-module-card__action {
+    color: #fff !important;
+  }
+
 
   /* Search input */
   .v-search-input {
@@ -1420,6 +1570,10 @@
 
   .text-white {
     color: var(--v-text) !important;
+  }
+
+  .v-events-table-header [role="columnheader"] {
+    color: #fff !important;
   }
 
   .text-slate-200,

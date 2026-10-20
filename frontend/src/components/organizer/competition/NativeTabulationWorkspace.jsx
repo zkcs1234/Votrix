@@ -1,4 +1,6 @@
 import NativeRoundProgress from './NativeRoundProgress'
+import TabulationSection from './TabulationSection'
+import { tabulationDestination } from '@/utils/tabulationNavigation'
 import { nativeRoundAdvancement, nextRoundScorePolicy } from '@/utils/nativeRoundAdvancement'
 import { advancementLabel } from '../../../../../shared/competition-participation.js'
 import { divisionStandings } from '../../../../../shared/competition-division-standings.js'
@@ -8,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import Button from '@/components/ui/Button'
+import PlacementBadge from '@/components/ui/PlacementBadge'
 import Modal from '@/components/ui/Modal'
 import { BarChart3, BookOpen } from 'lucide-react'
 import TabulationCalculationBreakdown from './TabulationCalculationBreakdown'
@@ -17,6 +20,7 @@ import { tabulationMethodName, tabulationReportRecords } from '@/utils/competiti
 import './NativeTabulationWorkspace.css'
 import './TabulationDashboard.css'
 import useCompetitionSync from '@/hooks/useCompetitionSync'
+import useCompetitionContext from '@/hooks/useCompetitionContext'
 import { nativeCompetitionService } from '@/services/competition-native.service'
 import { nativeResultsService } from '@/services/competition-native-results.service'
 import { nativeTabulationService as service } from '@/services/competition-native-tabulation.service'
@@ -130,9 +134,10 @@ function downloadTableReport(filename, headers, rows, { format = 'csv', title = 
   else downloadCsv(filename, records)
 }
 
-export function NativeTabulationBoundary({ eventId, Legacy, initialSection = 'overview' }) {
+export function NativeTabulationBoundary({ eventId, Legacy, initialSection = 'overview', workspace = null }) {
   const [params] = useSearchParams()
   const [state, setState] = useState(null)
+  const contexts = useMemo(() => (state?.choices ?? []).map(context => ({ ...context, eventName: state.eventName ?? context.eventName })), [state])
 
   useEffect(() => {
     if (import.meta.env.VITE_COMPETITION_NATIVE_TABULATION_ENABLED !== 'true') return
@@ -152,7 +157,7 @@ export function NativeTabulationBoundary({ eventId, Legacy, initialSection = 'ov
   }, [eventId])
 
   if (import.meta.env.VITE_COMPETITION_NATIVE_TABULATION_ENABLED !== 'true') {
-    return <Legacy eventId={eventId} initialSection={initialSection} />
+    return <Legacy eventId={eventId} initialSection={initialSection} workspace={workspace} />
   }
   if (!state) return <p role="status">Loading competition tabulation…</p>
   if (state.error) return <p role="alert">{state.error}</p>
@@ -167,11 +172,11 @@ export function NativeTabulationBoundary({ eventId, Legacy, initialSection = 'ov
   if (!state.choices.length && state.nativeEvent !== false) {
     return <p role="alert">Competition identity is unavailable. Reconnect before continuing.</p>
   }
-  if (!state.choices.length) return <Legacy eventId={eventId} initialSection={initialSection} />
+  if (!state.choices.length) return <Legacy eventId={eventId} initialSection={initialSection} workspace={workspace} />
   const requestedCompetition = params.get('competitionId'), requestedRound = params.get('roundId')
-  const initialChoice = requestedCompetition ? state.choices.find(context => context.competitionId === requestedCompetition && (requestedRound == null || (context.roundId ?? null) === requestedRound)) : null
+  const initialChoice = requestedCompetition ? contexts.find(context => context.competitionId === requestedCompetition && (requestedRound == null || (context.roundId ?? null) === requestedRound)) : null
   if (requestedCompetition && !initialChoice) return <p role="alert">This competition or round is not available in the current tabulation context.</p>
-  return <NativeTabulationWorkspace key={eventId} eventId={eventId} choices={state.choices.map(context => ({ ...context, eventName: state.eventName ?? context.eventName }))} initialChoice={initialChoice} initialSection={initialSection} />
+  return <NativeTabulationWorkspace key={eventId} eventId={eventId} choices={contexts} workspace={workspace} initialChoice={initialChoice} initialSection={initialSection} />
 }
 
 export default function NativeTabulationWorkspace({
@@ -180,14 +185,14 @@ export default function NativeTabulationWorkspace({
   reviewer = false,
   initialChoice = null,
   initialSection = 'overview',
+  workspace = null,
 }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const actorId = user?.id
-  const [selected, setSelected] = useState(key(initialChoice ?? choices[0]))
+  const { selected, setSelected, choice } = useCompetitionContext(choices, initialChoice, !reviewer)
   const initialSectionRef = useRef(initialSection)
   initialSectionRef.current = initialSection
-  const choice = choices.find((context) => key(context) === selected) ?? choices[0]
   const identity = `${eventId}:${actorId}:${selected}:${reviewer}`
   const identityRef = useRef(identity)
   identityRef.current = identity
@@ -196,7 +201,6 @@ export default function NativeTabulationWorkspace({
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [reason, setReason] = useState('')
-  const [participant, setParticipant] = useState('')
   const [placements, setPlacements] = useState({})
   const [deduction, setDeduction] = useState({ entryId: '', ruleKey: '', offenseKey: '' })
   const [qualification, setQualification] = useState(null)
@@ -225,7 +229,7 @@ export default function NativeTabulationWorkspace({
     data.viewerId === actorId
       ? data
       : null
-  const calculation = view?.complete ? view.calculation : null
+  const calculation = view?.complete && !view.calculationStale ? view.calculation : null
   const exportContext =
     choices.find((context) => key(context) === exportContextKey) ?? choice
   const exportDeductionsEnabled =
@@ -281,7 +285,6 @@ export default function NativeTabulationWorkspace({
     setError(null)
     setBusy(false)
     setReason('')
-    setParticipant('')
     setPlacements({})
     setDeduction({ entryId: '', ruleKey: '', offenseKey: '' })
     setQualification(null)
@@ -943,6 +946,7 @@ export default function NativeTabulationWorkspace({
     { id: 'entries', label: 'Tabulation Matrix', description: 'One row per contestant with saved judge totals and criterion contributions', available: !!view, complete: !!calculation },
     ...(hasOrganizerStage || judgeDeductionsEnabled ? [{ id: 'deductions', label: legacyDeductionReview ? 'Deductions' : hasOrganizerStage ? 'Organizer Deductions' : 'Judge Deductions', description: hasOrganizerStage ? 'Configured organizer deduction decisions' : 'Read-only submitted judge deductions', available: !!view, complete: !!view?.deductionsResolved }] : []),
     { id: 'calculate', label: 'Validation', description: 'Validate current calculation sources and scoring rules', available: !!view?.complete && view.session?.status === 'closed', complete: !!calculation },
+    { id: 'ranking', label: 'Results & Rankings', description: 'Configured ranks and tie rules', available: !!calculation, complete: !!calculation },
     { id: 'results', label: 'Finalization', description: 'Independent review and official finalization', available: !!calculation, complete: !!calculation?.finalized },
     ...(hasNext || calculation?.finalized ? [{
       id: 'next',
@@ -961,8 +965,8 @@ export default function NativeTabulationWorkspace({
     }] : []),
   ]
   const extraStages = [
+    ...(!steps.some(step => step.id === 'deductions') ? [{id:'deductions',label:'Deductions & Adjustments',available:false}] : []),
     ...(!steps.some(step => step.id === 'next') ? [{id:'next',label:'Round Progression',description:'Round completion and advancement',available:!!view}] : []),
-    { id: 'ranking', label: 'Results & Rankings', description: 'Configured ranks and tie rules', available: !!calculation },
     { id: 'audit', label: 'Audit Trail', description: 'Recorded submission and calculation activity', available: !!view },
   ]
   const allStages = [...steps, ...extraStages]
@@ -987,19 +991,14 @@ export default function NativeTabulationWorkspace({
     return [...counts].filter(([,count])=>count>1).map(([rank])=>({ rank, divisionId:division.id, divisionName:division.name, atCutoff:rank===cutoff, entries:division.rows.filter(row=>row.rank===rank) }))
   })
   const advancementCutoffTie = tiedPlacements.some(group=>group.atCutoff)
-  const activeStageIsAvailable = allStages.some(
-    (step) => step.id === activeStage && step.available,
-  )
   const selectStage = (stage) => {
     setActiveStage(stage)
     const section = stageSection[stage]
-    if (!reviewer && section && section !== initialSection) {
-      navigate(`/organizer/competition/events/${eventId}/tabulation/${section}?competitionId=${choice.competitionId}${choice.roundId ? `&roundId=${choice.roundId}` : ''}`)
+    if (!reviewer && section && (workspace || section !== initialSection)) {
+      const contextSearch = `?${new URLSearchParams({competitionId:choice.competitionId,...(choice.roundId?{roundId:choice.roundId}:{})})}`
+      navigate(workspace ? tabulationDestination(eventId, section, contextSearch) : `/organizer/competition/events/${eventId}/tabulation/${section}${contextSearch}`)
     }
   }
-  useEffect(() => {
-    if (view && !activeStageIsAvailable) setActiveStage('overview')
-  }, [view, activeStageIsAvailable])
   useEffect(() => {
     if (reviewer || activeStage !== 'next' || hasNext || !calculation?.finalized) {
       setCategoryProgress(null)
@@ -1136,7 +1135,7 @@ export default function NativeTabulationWorkspace({
       if(identityRef.current !== expected || request !== sequence.current) return
       const eligible = new Set(view.session?.entry_ids ?? [])
       if(proposal.fromRound !== choice.roundId || proposal.toRound !== nextRound?.id || !Array.isArray(proposal.automatic) || !Array.isArray(proposal.standings) || proposal.automatic.some(id => !eligible.has(id)) || proposal.standings.some(row => !eligible.has(row.contestantId))) throw new Error('The advancement proposal does not match this finalized round. Refresh before confirming.')
-      setQualification(proposal); setQualifierIds(proposal.automatic)
+      setQualification(proposal); setQualifierIds(proposal.automatic); setReason('')
     } catch (requestError) {
       if (identityRef.current === expected) setError(message(requestError))
     } finally { if(identityRef.current === expected) setBusy(false) }
@@ -1146,256 +1145,29 @@ export default function NativeTabulationWorkspace({
     const expected=identity, request=sequence.current
     setBusy(true);setError(null)
     try {
-      const { data: nextSnapshot } = await service.snapshot(eventId,choice.competitionId,nextRound.id,reviewer)
+      const { data: sourceSnapshot } = await service.snapshot(eventId,choice.competitionId,choice.roundId,reviewer)
       if(identityRef.current !== expected || request !== sequence.current) return
-      if(nextSnapshot.eventId!==eventId || nextSnapshot.competitionId!==choice.competitionId || nextSnapshot.roundId!==nextRound.id || nextSnapshot.viewerId!==actorId) throw new Error('Next-round source context mismatch')
-      if(nextSnapshot.qualificationCurrent!==true) throw new Error('The confirmed qualifier roster changed. Review advancement again before opening the next round.')
+      if(sourceSnapshot.eventId!==eventId || sourceSnapshot.competitionId!==choice.competitionId || sourceSnapshot.roundId!==choice.roundId || sourceSnapshot.viewerId!==actorId) throw new Error('Current-round source context mismatch')
+      if(sourceSnapshot.complete!==true || sourceSnapshot.calculationStale===true || sourceSnapshot.calculation?.finalized!==true) throw new Error('Round results changed or are no longer finalized. Refresh tabulation before proceeding.')
+      if(sourceSnapshot.advancement?.fromRoundId!==choice.roundId || sourceSnapshot.advancement?.toRoundId!==nextRound.id || sourceSnapshot.advancement?.qualificationCurrent!==true || !(sourceSnapshot.advancement?.qualifiedEntryIds?.length>0)) throw new Error('The confirmed qualifier roster changed. Review advancement again before opening the next round.')
       navigate(`/organizer/competition/events/${eventId}/live?${new URLSearchParams({competitionId:choice.competitionId,roundId:nextRound.id})}`)
     } catch(requestError){if(identityRef.current===expected)setError(message(requestError))}
     finally{if(identityRef.current===expected)setBusy(false)}
   }
-  return (
-    <section className="v-competition-workflow v-tabulation space-y-4">
-      <header className="v-tabulation-page-header space-y-3">
-        <div className="v-tabulation-header">
-          <div className="v-tabulation-title"><span className="v-tabulation-title-icon"><BarChart3 size={26} aria-hidden="true"/></span><div>
-            {choice.eventName && (
-              <p className="text-sm font-medium text-v-text-muted">{choice.eventName}</p>
-            )}
-            <h1 className="v-page-title">{choice.competitionName}</h1>
-            <p className="v-caption">
-              {choice.roundName} · Official Tabulation
-            </p>
-          </div></div>
-          {!reviewer && (
-            <details className="relative">
-              <summary className="v-press cursor-pointer list-none rounded-lg bg-v-primary px-4 py-2 text-sm font-semibold text-white">
-                Export <span aria-hidden="true">▾</span>
-              </summary>
-              <div className="absolute right-0 z-20 mt-2 w-64 rounded-lg border border-v-border bg-v-surface p-2 shadow-lg">
-                {Object.entries(exportLabels).map(([type, label]) => (
-                  <button
-                    key={type}
-                    type="button"
-                    className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-v-surface-elevated disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={!view?.complete || busy}
-                    onClick={() => openExport(type)}
-                  >
-                    <span className="block font-medium">{label}</span>
-                    <span className="text-xs text-v-text-muted">
-                      {type === 'judge' && 'Original individual or all judge sheets'}
-                      {type === 'tabulation' && 'Current combined scoring spreadsheet'}
-                      {type === 'deductions' && 'Decisions and review statuses'}
-                      {type === 'final' && 'Current published official results'}
-                    </span>
-                  </button>
-                ))}
-                <div className="mt-1 border-t border-v-border pt-1">
-                  {[
-                    ['CSV', 'csv'],
-                    ['Excel', 'xls'],
-                    ['PDF', 'pdf'],
-                  ].map(([label, format]) => (
-                    <button
-                      key={format}
-                      type="button"
-                      className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-v-surface-elevated disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!view?.complete || busy}
-                      onClick={() => openExport('tabulation', format)}
-                    >
-                      Export All Entries ({label})
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </details>
-          )}
-        </div>
-
-        <div className="v-tabulation-context">
-          <label className="min-w-52 flex-1 text-sm font-medium">
-            Competition
-            <select
-              aria-label="Competition"
-              className="v-input mt-1"
-              value={choice.competitionId}
-              disabled={busy || exportBusy}
-              onChange={(event) => {
-                const next = choices.find(
-                  (context) => context.competitionId === event.target.value,
-                )
-                if (next) setSelected(key(next))
-              }}
-            >
-              {groups.map((context) => (
-                <option key={context.competitionId} value={context.competitionId}>
-                  {context.competitionName}
-                </option>
-              ))}
-            </select>
-          </label>
-          {choices.some(
-            (context) => context.competitionId === choice.competitionId && context.roundId != null,
-          ) && (
-            <label className="min-w-48 flex-1 text-sm font-medium">
-              Round
-              <select
-                aria-label="Round"
-                className="v-input mt-1"
-                value={selected}
-                disabled={busy || exportBusy}
-                onChange={(event) => setSelected(event.target.value)}
-              >
-                {choices
-                  .filter((context) => context.competitionId === choice.competitionId)
-                  .map((context) => (
-                    <option key={key(context)} value={key(context)}>
-                      {context.roundName}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          )}
-          {view && (
-            <>
-              {configuration ? (
-                <div><Button variant="secondary" onClick={() => setRulesOpen(true)}><BookOpen size={16} aria-hidden="true"/>View Scoring Rules</Button>
-                <Modal open={rulesOpen} onClose={() => setRulesOpen(false)} title="Scoring Rules" id="scoring-rules" size="lg" footer={<Button variant="secondary" onClick={() => setRulesOpen(false)}>Close Rules</Button>}>
-                <p className="text-sm text-v-text-muted">{choice.competitionName} / {choice.roundName}</p>
-                <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
-                  <div>
-                    <dt className="text-v-text-muted">Calculation method</dt>
-                    <dd>{tabulationMethodName(method, configuration.scoringConfig)}. {describeCalculationMethod(method, configuration.scoringConfig)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-v-text-muted">Criterion basis</dt>
-                    <dd>
-                      {configuration.scoringConfig.criterionBasis === 'points'
-                        ? 'Configured raw points'
-                        : 'Normalize to 100%, then apply criterion weights'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-v-text-muted">Round progression</dt>
-                    <dd>{describeRoundProgression(round, configuration, method)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-v-text-muted">Advancement</dt>
-                    <dd>
-                      {hasNext && round?.advancementType
-                        ? `${round.advancementType.replaceAll('_', ' ')}${
-                            round.advancementValue == null ? '' : ` (${round.advancementValue})`
-                          }`
-                        : hasNext ? 'All entries continue' : 'Final round - no outgoing advancement'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-v-text-muted">Tie policy</dt>
-                    <dd>
-                      {configuration.scoringConfig.tiePolicy === 'highest_criterion' &&
-                      method !== 'rank_based'
-                        ? 'Highest criterion breaks equal scores'
-                        : 'Equal calculated scores share placement'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-v-text-muted">Organizer-managed deductions</dt>
-                    <dd>{deductionsEnabled ? 'Enabled for this round scope' : 'Disabled for this round'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-v-text-muted">Frozen rule revision</dt>
-                    <dd>{view.rules?.version ?? view.rules?.id ?? 'Unavailable'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-v-text-muted">Result precision</dt>
-                    <dd>{configuration.scoringConfig.decimalPlaces ?? 2} decimal places</dd>
-                  </div>
-                  <div>
-                    <dt className="text-v-text-muted">Score input precision</dt>
-                    <dd>{configuration.scoringConfig.inputDecimalPlaces == null ? 'Existing precision' : configuration.scoringConfig.inputDecimalPlaces === 0 ? 'Whole numbers' : `Up to ${configuration.scoringConfig.inputDecimalPlaces} decimal places`}. Individual criterion settings take precedence.</dd>
-                  </div>
-                  <div>
-                    <dt className="text-v-text-muted">Ranking scope</dt>
-                    <dd>{view.divisionRanking?.mode === 'division' || configuration.scoringConfig.perDivision ? 'Within each configured division' : 'All eligible entries'}</dd>
-                  </div>
-                  {method === 'manual' && <div><dt className="text-v-text-muted">Manual official decision basis</dt><dd>{configuration.scoringConfig.manualBasis ?? 'Not specified'}</dd></div>}
-                </dl>
-                <div className="mt-3">
-                  <p className="font-medium">Configured criteria and score ranges</p>
-                  <ul className="mt-1 grid gap-1 text-v-text-muted sm:grid-cols-2">
-                    {criteria.map((criterion) => (
-                      <li key={criterion.id}>
-                        {formatCriterionHeader(
-                          criterion,
-                          configuration.scoringConfig.criterionBasis === 'points',
-                        )}
-                      </li>
-                    ))}
-                    {!criteria.length && <li>No criteria configured for this round.</li>}
-                  </ul>
-                </div>
-                {deductionsEnabled && <div className="mt-3"><p className="font-medium">Applicable deduction rules</p><ul className="mt-1 space-y-1 text-sm text-v-text-muted">{getApplicableDeductionRules(configuration, choice.roundId).map(rule => <li key={rule.id}>{rule.description} · {rule.amount} {rule.units}{rule.roundId ? ` · ${configuration.rounds.find(item => item.id === rule.roundId)?.name ?? 'Configured round'}` : ''}{rule.criteriaId ? ` · ${configuration.criteria.find(item => item.id === rule.criteriaId)?.name ?? 'Configured criterion'}` : ''}</li>)}</ul></div>}
-                </Modal></div>
-              ) : (
-                <p className="w-full text-sm text-v-text-muted">
-                  Frozen scoring rules are unavailable until current source validation completes.
-                </p>
-              )}
-            </>
-          )}
-        </div>
-
-        {view && <TabulationMetrics view={view}/>}
-        <NativeRoundProgress view={view} roundName={choice.roundName} nextRound={nextRound} onReview={() => selectStage('next')} reviewer={reviewer} busy={busy}/>
-      </header>
-
-      {error && (
-        <p role="alert" className="v-error-text">
-          {error}
-        </p>
-      )}
-      {!view && !error && <p role="status">Checking current submission completeness…</p>}
-
-      {view && (
-        <div className="v-tabulation-layout">
-        <main className="min-w-0 space-y-4">
-        <>
-          <nav className="v-tabulation-stages" aria-label="Tabulation stages">
-            <h2 id="tabulation-workflow-heading" className="sr-only">
-              Tabulation workflow
-            </h2>
-            <ol role="tablist" aria-label="Tabulation workflow" className="mt-2 flex gap-2 overflow-x-auto pb-1">
-              {steps.map((step, index) => (
-                <li
-                  key={step.id}
-                  className="min-w-max"
-                >
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeStage === step.id}
-                    aria-current={activeStage === step.id ? 'step' : undefined}
-                    aria-label={`${step.label}: ${step.complete ? 'complete' : step.available ? 'available' : 'blocked'}`}
-                    disabled={!canOpenStep(step)}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
-                      activeStage === step.id
-                        ? 'border-v-primary bg-v-primary-soft text-v-primary'
-                        : step.complete
-                          ? 'border-v-border-strong bg-v-surface'
-                          : 'border-v-border bg-v-surface'
-                    }`}
-                    onClick={() => selectStage(step.id)}
-                  >
-                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-v-surface-elevated tabular-nums">
-                      {step.complete ? '✓' : index + 1}
-                    </span>
-                    {step.label}
-                  </button>
-                </li>
-              ))}
-            </ol>
-
-          </nav>
+  const pageStages = workspace === 'scoring' ? ['submissions', 'entries', 'deductions']
+    : workspace === 'results' ? ['calculate', 'ranking', 'results'] : [activeStage]
+  const renderStage = (activeStage) => {
+    const activeStep = allStages.find(step => step.id === activeStage) ?? steps[0]
+    const activeStageIsAvailable = !!activeStep.available
+  const unavailableMessage = activeStage === 'deductions'
+    ? 'No deductions are configured for this round.'
+    : activeStage === 'calculate'
+      ? 'Complete the required judge submissions and close scoring in Live Control before validating this round.'
+      : 'A current official calculation is required. Check judge submissions and Validation before continuing.'
+    return (!activeStageIsAvailable ? <section role="status" className="v-card-sm space-y-2">
+            <h2 className="v-section-title">{activeStep.label}</h2>
+            <p>{unavailableMessage}</p>
+          </section> : <>
           {activeStage === 'overview' && <TabulationOverviewCards view={view} choice={choice} criteria={criteria} method={method} onStage={selectStage} onExport={openExport} reviewer={reviewer} busy={busy} hasDeductions={hasOrganizerStage || judgeDeductionsEnabled}/>}
           {['overview', 'entries'].includes(activeStage) && <TabulationScoreMatrix key={`matrix:${identity}`} view={view} roundId={choice.roundId} criteria={criteria} method={method} search={search} onSearch={setSearch} selectedEntryId={focusedEntryId || view.entries?.[0]?.id} onSelectEntry={setFocusedEntryId} onOriginals={viewOriginalSheets} onBreakdown={setBreakdownEntryId} onExportEntry={downloadEntryTabulation} onExport={() => openExport('tabulation')} reviewer={reviewer} busy={busy}/>}
           {activeStage === 'submissions' && <TabulationJudgeSubmissions view={view} choice={choice} selection={sheetSelection} onSelect={setSheetSelection} onDownload={downloadJudgeSheet} reviewer={reviewer} busy={busy}/>}
@@ -1410,7 +1182,7 @@ export default function NativeTabulationWorkspace({
               </h2>
               <p className="v-caption">
                 Standings below are the saved backend calculation for this competition and round.
-                They remain drafts until independently verified and finalized.
+                They remain drafts until finalized by an organizer.
               </p>
             </div>
             {calculation ? (
@@ -1483,7 +1255,7 @@ export default function NativeTabulationWorkspace({
                   <tbody>
                     {division.rows.map((result) => (
                       <tr key={result.contestantId}>
-                        <td className="font-semibold tabular-nums">{result.rank ?? '—'}</td>
+                        <td><PlacementBadge rank={result.rank} tied={result.tied} /></td>
                         <th scope="row">
                           {String(
                             view.entries.find((entry) => entry.id === result.contestantId)
@@ -1496,7 +1268,7 @@ export default function NativeTabulationWorkspace({
                             .filter((judge) => judge.submitted)
                             .map((judge) => (
                               <td key={judge.judgeId} className="text-center tabular-nums">
-                                {result.judgeRanks?.[judge.judgeId] ?? '—'}
+                                <PlacementBadge rank={result.judgeRanks?.[judge.judgeId]} />
                               </td>
                             ))}
                         <td className="tabular-nums">{result.baseScore ?? '—'}</td>
@@ -1523,101 +1295,6 @@ export default function NativeTabulationWorkspace({
 
           {['results', 'deductions'].includes(activeStage) && (
           <div className="space-y-4">
-            {(activeStage==='results'||legacyDeductionReview) && <section className="v-card-sm space-y-3">
-              <div>
-                <h2 className="v-section-title">Independent review</h2>
-                <p className="v-caption">A separate reviewer verifies the official calculation.</p>
-              </div>
-              {view.reviewPolicy ? (
-                <dl className="grid gap-2 text-sm sm:grid-cols-2">
-                  <div>
-                    <dt className="text-v-text-muted">Assigned reviewer</dt>
-                    <dd className="font-medium">
-                      {view.reviewPolicy.reviewerName ?? 'Assigned reviewer'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-v-text-muted">Appointment</dt>
-                    <dd>{view.reviewPolicy.active ? 'Active' : 'Needs attention'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-v-text-muted">Review progress</dt>
-                    <dd>
-                      {calculation?.verified
-                        ? 'Verified'
-                        : calculation
-                          ? 'Awaiting verification'
-                          : 'Ready after calculation'}
-                    </dd>
-                  </div>
-                </dl>
-              ) : (
-                !reviewer && (
-                  <fieldset disabled={busy} className="space-y-2">
-                    <legend className="text-sm font-medium">Assign an independent reviewer</legend>
-                    <label className="block text-sm">
-                      Reviewer
-                      <select
-                        aria-label="Independent reviewer"
-                        className="v-input mt-1"
-                        value={participant}
-                        onChange={(event) => setParticipant(event.target.value)}
-                      >
-                        <option value="">Choose an active score reviewer</option>
-                        {view.reviewerOptions?.map((reviewerOption) => (
-                          <option
-                            key={reviewerOption.participantId}
-                            value={reviewerOption.participantId}
-                          >
-                            {reviewerOption.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <Button
-                      disabled={!participant}
-                      loading={busy}
-                      onClick={() =>
-                        perform(() =>
-                          service.appoint(eventId, choice.competitionId, participant),
-                        )
-                      }
-                    >
-                      Assign Reviewer
-                    </Button>
-                  </fieldset>
-                )
-              )}
-              <label className="block text-sm">
-                Review notes / decision reason
-                <textarea
-                  aria-label="Review reason"
-                  className="v-input mt-1 min-h-20"
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder="Add notes used to support a formal review decision."
-                />
-              </label>
-              {reviewer && calculation && !calculation.verified && (
-                <Button
-                  disabled={busy || reason.trim().length < 5}
-                  loading={busy}
-                  onClick={() =>
-                    perform(() =>
-                      service.transition(
-                        eventId,
-                        choice.competitionId,
-                        { ...body(), action: 'verify' },
-                        true,
-                      ),
-                    )
-                  }
-                >
-                  Verify calculation
-                </Button>
-              )}
-            </section>}
-
             {activeStage === 'deductions' && hasOrganizerStage && (
             <section className="v-card-sm space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1631,6 +1308,10 @@ export default function NativeTabulationWorkspace({
                   {deductionRows.length} decisions
                 </span>
               </div>
+              {legacyDeductionReview && <label className="block text-sm">
+                Deduction decision reason
+                <textarea aria-label="Review reason" className="v-input mt-1 min-h-20" value={reason} onChange={event => setReason(event.target.value)} placeholder="Explain the deduction decision." />
+              </label>}
               {!reviewer && proposalRules.length > 0 && (
                 <fieldset disabled={busy} className="grid gap-2 sm:grid-cols-2">
                   <legend className="text-sm font-medium">Record a configured organizer deduction</legend>
@@ -1840,6 +1521,10 @@ export default function NativeTabulationWorkspace({
                 {deductionsEnabled ? ', including configured deduction reviews.' : '.'}
               </p>
             )}
+            {method !== 'manual' && calculationReady && !calculation && <div role="status" className="space-y-2">
+              <p>Scores calculate automatically from the submitted sheets. A saved calculation is not available yet. Recheck automatic calculation before continuing.</p>
+              <Button variant="secondary" disabled={busy} onClick={() => void refresh()}>Recheck automatic calculation</Button>
+            </div>}
             {method === 'manual' && !reviewer && view.complete && (
               <fieldset disabled={busy} className="space-y-2">
                 <legend className="text-sm font-medium">Explicit manual placements</legend>
@@ -1900,14 +1585,18 @@ export default function NativeTabulationWorkspace({
                     {calculation.finalized
                       ? 'Finalized'
                       : calculation.verified
-                        ? 'Verified'
-                        : 'Awaiting independent verification'}
+                        ? 'Verified · ready to finalize'
+                        : 'Ready to finalize'}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {!reviewer &&
-                    calculation.verified &&
-                    !calculation.finalized && (
+                  {reviewer && !calculation.verified && <Button
+                    disabled={busy || reason.trim().length < 5}
+                    loading={busy}
+                    onClick={() => perform(() => service.transition(eventId, choice.competitionId, { ...body(), action: 'verify' }, true))}
+                  >Verify calculation</Button>}
+
+                  {!reviewer && !calculation.finalized && (
                       <Button
                         disabled={busy || reason.trim().length < 5}
                         loading={busy}
@@ -1933,11 +1622,11 @@ export default function NativeTabulationWorkspace({
                   )}
                 </div>
               </div>
-              {!calculation.verified && !reviewer && (
-                <p className="text-sm text-v-text-muted">
-                  An independent reviewer must verify this calculation before it can be finalized.
-                </p>
-              )}
+              {((reviewer && !calculation.verified) || (!reviewer && !calculation.finalized)) && <label className="block text-sm">
+                {reviewer ? 'Verification reason' : 'Finalization reason'}
+                <textarea aria-label="Review reason" className="v-input mt-1 min-h-20" value={reason} onChange={event => setReason(event.target.value)} placeholder={reviewer ? 'Explain the source verification.' : 'Explain the finalization decision.'} />
+              </label>}
+              {!reviewer && !calculation.finalized && <p className="text-sm">Review the standings and score details, then finalize this calculation with a decision reason. Finalization unlocks qualifier review.</p>}
               <p className="v-caption">Scores remain in the contestant matrix. Review the current standings and tie rules before final approval.</p>
               <div className="v-tab-inline-actions"><Button size="sm" variant="secondary" onClick={() => selectStage('entries')}>View Score Matrix</Button><Button size="sm" variant="secondary" onClick={() => selectStage('ranking')}>Results & Rankings</Button><Button size="sm" variant="secondary" onClick={() => selectStage('audit')}>Audit Trail</Button></div>
             </section>
@@ -2020,7 +1709,7 @@ export default function NativeTabulationWorkspace({
                       loading={busy}
                       onClick={proceedToNextRound}
                     >
-                      Open {nextRound?.name ?? 'Next Round'} in Live Control
+                      {workspace ? 'Proceed to' : 'Open'} {nextRound?.name ?? 'Next Round'}{workspace ? '' : ' in Live Control'}
                     </Button>
                   </div>
                 )}
@@ -2052,10 +1741,18 @@ export default function NativeTabulationWorkspace({
                     </p>
                     <label className="block text-sm">
                       Advancement decision reason
-                      <textarea aria-label="Review reason" className="v-input mt-1 min-h-20" value={reason} onChange={event => setReason(event.target.value)} placeholder="Explain the reviewed qualifier roster." />
+                      <textarea aria-label="Review reason" aria-describedby="advancement-reason-help" className="v-input mt-1 min-h-20" value={reason} onChange={event => setReason(event.target.value)} placeholder="For example: Confirmed the top two entries for Round 2." />
                     </label>
+                    <p id="advancement-reason-help" className="text-sm text-v-text-muted" role="status">
+                      {!qualifierIds.length
+                        ? 'Select at least one qualifier to continue.'
+                        : reason.trim().length < 5
+                          ? `Enter a decision reason of at least 5 characters to enable confirmation (${reason.trim().length}/5).`
+                          : 'Reason entered. Confirm the roster to enable the next round.'}
+                    </p>
                     <Button
                       disabled={busy || !qualifierIds.length || reason.trim().length < 5}
+                      title={!qualifierIds.length ? 'Select at least one qualifier.' : reason.trim().length < 5 ? 'Enter an advancement decision reason of at least 5 characters.' : undefined}
                       loading={busy}
                       onClick={() =>
                         perform(() =>
@@ -2100,9 +1797,9 @@ export default function NativeTabulationWorkspace({
                 <div className="flex flex-wrap gap-2">
                   <Link
                     className="inline-flex items-center rounded-lg border border-v-border-strong px-3 py-2 text-sm font-medium hover:bg-v-surface-elevated"
-                    to={`/organizer/competition/events/${eventId}/report`}
+                    to={`/organizer/competition/events/${eventId}/report?${new URLSearchParams({competitionId:choice.competitionId,...(choice.roundId?{roundId:choice.roundId}:{})})}`}
                   >
-                    View Finalized Report
+                    View Final Results
                   </Link>
                   {!reviewer && nextCompetition?.nextChoice && (
                     <Button
@@ -2120,7 +1817,254 @@ export default function NativeTabulationWorkspace({
             )}
           </section>
         )}
-        <nav className="v-tab-stage-footer" aria-label="Stage navigation" hidden={stageIndex < 0}>
+        </>)
+  }
+  return (
+    <section className="v-competition-workflow v-tabulation space-y-4">
+      <header className="v-tabulation-page-header space-y-3">
+        <div className="v-tabulation-header">
+          <div className="v-tabulation-title"><span className="v-tabulation-title-icon"><BarChart3 size={26} aria-hidden="true"/></span><div>
+            {choice.eventName && (
+              <p className="text-sm font-medium text-v-text-muted">{choice.eventName}</p>
+            )}
+            <h1 className="v-page-title">{choice.competitionName}</h1>
+            <p className="v-caption">
+              {choice.roundName} · {workspace === 'audit' ? 'Audit Trail' : workspace === 'advancement' ? 'Round Advancement' : workspace === 'scoring' ? 'Scoring' : workspace === 'results' ? 'Results' : 'Official Tabulation'}
+            </p>
+          </div></div>
+          {!reviewer && (
+            <details className="relative">
+              <summary className="v-press cursor-pointer list-none rounded-lg bg-v-primary px-4 py-2 text-sm font-semibold text-white">
+                Export <span aria-hidden="true">▾</span>
+              </summary>
+              <div className="absolute right-0 z-20 mt-2 w-64 rounded-lg border border-v-border bg-v-surface p-2 shadow-lg">
+                {Object.entries(exportLabels).map(([type, label]) => (
+                  <button
+                    key={type}
+                    type="button"
+                    className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-v-surface-elevated disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!view?.complete || busy}
+                    onClick={() => openExport(type)}
+                  >
+                    <span className="block font-medium">{label}</span>
+                    <span className="text-xs text-v-text-muted">
+                      {type === 'judge' && 'Original individual or all judge sheets'}
+                      {type === 'tabulation' && 'Current combined scoring spreadsheet'}
+                      {type === 'deductions' && 'Decisions and review statuses'}
+                      {type === 'final' && 'Current published official results'}
+                    </span>
+                  </button>
+                ))}
+                <div className="mt-1 border-t border-v-border pt-1">
+                  {[
+                    ['CSV', 'csv'],
+                    ['Excel', 'xls'],
+                    ['PDF', 'pdf'],
+                  ].map(([label, format]) => (
+                    <button
+                      key={format}
+                      type="button"
+                      className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-v-surface-elevated disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={!view?.complete || busy}
+                      onClick={() => openExport('tabulation', format)}
+                    >
+                      Export All Entries ({label})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </details>
+          )}
+        </div>
+
+        <div className="v-tabulation-context">
+          <label className="min-w-52 flex-1 text-sm font-medium">
+            Competition
+            <select
+              aria-label="Competition"
+              className="v-input mt-1"
+              value={choice.competitionId}
+              disabled={busy || exportBusy}
+              onChange={(event) => {
+                const next = choices.find(
+                  (context) => context.competitionId === event.target.value,
+                )
+                if (next) setSelected(key(next))
+              }}
+            >
+              {groups.map((context) => (
+                <option key={context.competitionId} value={context.competitionId}>
+                  {context.competitionName}
+                </option>
+              ))}
+            </select>
+          </label>
+          {choices.some(
+            (context) => context.competitionId === choice.competitionId && context.roundId != null,
+          ) && (
+            <label className="min-w-48 flex-1 text-sm font-medium">
+              Round
+              <select
+                aria-label="Round"
+                className="v-input mt-1"
+                value={selected}
+                disabled={busy || exportBusy}
+                onChange={(event) => setSelected(event.target.value)}
+              >
+                {choices
+                  .filter((context) => context.competitionId === choice.competitionId)
+                  .map((context) => (
+                    <option key={key(context)} value={key(context)}>
+                      {context.roundName}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
+          {view && (
+            <>
+              {configuration ? (
+                <div><Button variant="secondary" onClick={() => setRulesOpen(true)}><BookOpen size={16} aria-hidden="true"/>View Scoring Rules</Button>
+                <Modal open={rulesOpen} onClose={() => setRulesOpen(false)} title="Scoring Rules" id="scoring-rules" size="lg" footer={<Button variant="secondary" onClick={() => setRulesOpen(false)}>Close Rules</Button>}>
+                <p className="text-sm text-v-text-muted">{choice.competitionName} / {choice.roundName}</p>
+                <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
+                  <div>
+                    <dt className="text-v-text-muted">Calculation method</dt>
+                    <dd>{tabulationMethodName(method, configuration.scoringConfig)}. {describeCalculationMethod(method, configuration.scoringConfig)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-v-text-muted">Criterion basis</dt>
+                    <dd>
+                      {configuration.scoringConfig.criterionBasis === 'points'
+                        ? 'Configured raw points'
+                        : 'Normalize to 100%, then apply criterion weights'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-v-text-muted">Round progression</dt>
+                    <dd>{describeRoundProgression(round, configuration, method)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-v-text-muted">Advancement</dt>
+                    <dd>
+                      {hasNext && round?.advancementType
+                        ? `${round.advancementType.replaceAll('_', ' ')}${
+                            round.advancementValue == null ? '' : ` (${round.advancementValue})`
+                          }`
+                        : hasNext ? 'All entries continue' : 'Final round - no outgoing advancement'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-v-text-muted">Tie policy</dt>
+                    <dd>
+                      {configuration.scoringConfig.tiePolicy === 'highest_criterion' &&
+                      method !== 'rank_based'
+                        ? 'Highest criterion breaks equal scores'
+                        : 'Equal calculated scores share placement'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-v-text-muted">Organizer-managed deductions</dt>
+                    <dd>{deductionsEnabled ? 'Enabled for this round scope' : 'Disabled for this round'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-v-text-muted">Frozen rule revision</dt>
+                    <dd>{view.rules?.version ?? view.rules?.id ?? 'Unavailable'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-v-text-muted">Result precision</dt>
+                    <dd>{configuration.scoringConfig.decimalPlaces ?? 2} decimal places</dd>
+                  </div>
+                  <div>
+                    <dt className="text-v-text-muted">Score input precision</dt>
+                    <dd>{configuration.scoringConfig.inputDecimalPlaces == null ? 'Existing precision' : configuration.scoringConfig.inputDecimalPlaces === 0 ? 'Whole numbers' : `Up to ${configuration.scoringConfig.inputDecimalPlaces} decimal places`}. Individual criterion settings take precedence.</dd>
+                  </div>
+                  <div>
+                    <dt className="text-v-text-muted">Ranking scope</dt>
+                    <dd>{view.divisionRanking?.mode === 'division' || configuration.scoringConfig.perDivision ? 'Within each configured division' : 'All eligible entries'}</dd>
+                  </div>
+                  {method === 'manual' && <div><dt className="text-v-text-muted">Manual official decision basis</dt><dd>{configuration.scoringConfig.manualBasis ?? 'Not specified'}</dd></div>}
+                </dl>
+                <div className="mt-3">
+                  <p className="font-medium">Configured criteria and score ranges</p>
+                  <ul className="mt-1 grid gap-1 text-v-text-muted sm:grid-cols-2">
+                    {criteria.map((criterion) => (
+                      <li key={criterion.id}>
+                        {formatCriterionHeader(
+                          criterion,
+                          configuration.scoringConfig.criterionBasis === 'points',
+                        )}
+                      </li>
+                    ))}
+                    {!criteria.length && <li>No criteria configured for this round.</li>}
+                  </ul>
+                </div>
+                {deductionsEnabled && <div className="mt-3"><p className="font-medium">Applicable deduction rules</p><ul className="mt-1 space-y-1 text-sm text-v-text-muted">{getApplicableDeductionRules(configuration, choice.roundId).map(rule => <li key={rule.id}>{rule.description} · {rule.amount} {rule.units}{rule.roundId ? ` · ${configuration.rounds.find(item => item.id === rule.roundId)?.name ?? 'Configured round'}` : ''}{rule.criteriaId ? ` · ${configuration.criteria.find(item => item.id === rule.criteriaId)?.name ?? 'Configured criterion'}` : ''}</li>)}</ul></div>}
+                </Modal></div>
+              ) : (
+                <p className="w-full text-sm text-v-text-muted">
+                  Frozen scoring rules are unavailable until current source validation completes.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        {view && <TabulationMetrics view={view}/>}
+        <NativeRoundProgress view={view} roundName={choice.roundName} nextRound={nextRound} onReview={() => selectStage('next')} onAction={workspace ? selectStage : undefined} reviewer={reviewer} busy={busy}/>
+      </header>
+
+      {error && (
+        <p role="alert" className="v-error-text">
+          {error}
+        </p>
+      )}
+      {!view && !error && <p role="status">Checking current submission completeness…</p>}
+
+      {view && (
+        <div className="v-tabulation-layout">
+        <main className="min-w-0 space-y-4">
+        <>
+          {reviewer && <nav className="v-tabulation-stages" aria-label="Tabulation stages">
+            <h2 id="tabulation-workflow-heading" className="sr-only">
+              Tabulation workflow
+            </h2>
+            <ol role="tablist" aria-label="Tabulation workflow" className="mt-2 flex gap-2 overflow-x-auto pb-1">
+              {steps.map((step, index) => (
+                <li
+                  key={step.id}
+                  className="min-w-max"
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeStage === step.id}
+                    aria-current={activeStage === step.id ? 'step' : undefined}
+                    aria-label={`${step.label}: ${step.complete ? 'complete' : step.available ? 'available' : 'blocked'}`}
+                    disabled={!canOpenStep(step)}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                      activeStage === step.id
+                        ? 'border-v-primary bg-v-primary-soft text-v-primary'
+                        : step.complete
+                          ? 'border-v-border-strong bg-v-surface'
+                          : 'border-v-border bg-v-surface'
+                    }`}
+                    onClick={() => selectStage(step.id)}
+                  >
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-v-surface-elevated tabular-nums">
+                      {step.complete ? '✓' : index + 1}
+                    </span>
+                    {step.label}
+                  </button>
+                </li>
+              ))}
+            </ol>
+
+          </nav>}
+          {pageStages.map(stage => <TabulationSection key={stage} section={stageSection[stage]} label={allStages.find(item => item.id === stage)?.label ?? stage}>
+            {renderStage(stage)}
+          </TabulationSection>)}
+        <nav className="v-tab-stage-footer" aria-label="Stage navigation" hidden={!!workspace || stageIndex < 0}>
           <Button
             variant="secondary"
             disabled={stageIndex <= 0 || busy}
@@ -2138,6 +2082,8 @@ export default function NativeTabulationWorkspace({
             {`${activeStage === 'results' && hasNext ? 'Next Round' : 'Next'}: ${nextStage.label} →`}
           </Button> : <span className="text-sm text-v-text-muted">{activeStep?.complete ? 'Stage complete' : 'Complete the required actions above'}</span>}
         </nav>
+        {workspace === 'scoring' && <nav className="v-tab-stage-footer" aria-label="Page navigation"><span>Review submissions, scores and deductions above.</span><Button disabled={busy} onClick={() => selectStage('calculate')}>Continue to Results</Button></nav>}
+        {workspace === 'results' && <nav className="v-tab-stage-footer" aria-label="Page navigation"><span>{calculation?.finalized ? 'Results finalized.' : 'Finalize current results before round advancement.'}</span><Button disabled={busy || !calculation?.finalized} onClick={() => selectStage('next')}>Continue to Round Advancement</Button></nav>}
         </>
         </main>
         </div>

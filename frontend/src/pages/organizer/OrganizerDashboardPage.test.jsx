@@ -31,7 +31,8 @@ it('shows active native sessions and refreshes after Live Control invalidates th
  render(<MemoryRouter><OrganizerDashboardPage/></MemoryRouter>)
  expect(await screen.findByText('New showcase')).toBeInTheDocument()
  expect(screen.getByText('Dance · Finals')).toBeInTheDocument()
- expect(screen.getByRole('link',{name:/Rejoin live session/})).toHaveAttribute('href','/organizer/competition/events/event-1/live')
+ expect(screen.getByRole('heading',{name:'Live scoring session ongoing'})).toBeInTheDocument()
+ expect(screen.getByRole('link',{name:/Open Live Control/})).toHaveAttribute('href','/organizer/competition/events/event-1/live')
 
  f.dashboard.mockResolvedValue(dashboard([nativeSession('Updated showcase')]))
  f.listeners.get('competition:native-invalidated')({eventId:'event-1'})

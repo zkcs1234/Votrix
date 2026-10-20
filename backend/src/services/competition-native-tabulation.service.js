@@ -22,6 +22,10 @@ export function tabulationError(error){
  throw new ApiError(503,'Official tabulation is unavailable; no legacy fallback was selected')
 }
 async function rpc(name,args){const {data,error}=await db().rpc(name,args);tabulationError(error);return data}
+function calculationMethod(snapshot){
+ const configuration=snapshot.rules?.configuration_snapshot
+ return configuration?.rounds?.find(round=>round.id===snapshot.roundId)?.calculationMethod??configuration?.scoringConfig?.calculationMethod
+}
 export async function tabulationSnapshot(eventId,competitionId,actor,roundId=null,reviewer=false){
  boundary(eventId,competitionId,actor,roundId)
  const data=await rpc('competition_child_tabulation_snapshot',{p_event:eventId,p_competition:competitionId,p_actor:actor,p_round:roundId,p_reviewer:reviewer})
@@ -52,8 +56,8 @@ export async function automaticallyCalculateNative(eventId,competitionId,roundId
   const actor=event?.organizations?.organizer_id
   if(!actor)throw new ApiError(503,'Competition organizer identity is unavailable for automatic calculation')
   const snapshot=await tabulationSnapshot(eventId,competitionId,actor,roundId)
-  if(!snapshot.complete||!['active','closed'].includes(snapshot.session?.status)||!snapshot.deductionsResolved)return {status:'incomplete'}
-  const method=snapshot.rules?.configuration_snapshot?.scoringConfig?.calculationMethod
+  if(!snapshot.complete||!['active','closed'].includes(snapshot.session?.status)||nativeDeductionsEnabled(snapshot)&&!snapshot.deductionsResolved)return {status:'incomplete'}
+  const method=calculationMethod(snapshot)
   if(method==='manual')return {status:'needs_review',message:'Manual placements require an authorized recorded decision.'}
   if(snapshot.calculation?.source_digest===snapshot.sourceDigest)return {status:'up_to_date',calculationId:snapshot.calculation.id}
   const calculated=calculateNativeSnapshot(snapshot)
@@ -69,9 +73,11 @@ export async function automaticallyCalculateNative(eventId,competitionId,roundId
 }
 export async function tabulationWorkspaceSnapshot(eventId,competitionId,actor,roundId=null){
  const state=await tabulationSnapshot(eventId,competitionId,actor,roundId)
- // Migration 130 gives combined Pageant calculations a new source fingerprint.
- // Reconcile through the same audited/idempotent automatic-calculation path.
- if(state.divisionRanking?.mode==='division'&&state.complete&&state.calculationStale&&!state.calculation&&state.rules?.configuration_snapshot?.scoringConfig?.calculationMethod!=='manual'&&['active','closed'].includes(state.session?.status)&&state.deductionsResolved){
+ // Recover a missed/failed submit or close calculation through the existing
+ // audited, digest-checked path. Manual placements remain an explicit decision.
+ const method=calculationMethod(state)
+ const needsCalculation=!state.calculation||state.calculationStale||state.calculation.source_digest!==state.sourceDigest
+ if(state.complete&&method&&method!=='manual'&&needsCalculation&&['active','closed'].includes(state.session?.status)&&(!nativeDeductionsEnabled(state)||state.deductionsResolved)){
   await automaticallyCalculateNative(eventId,competitionId,roundId)
   return tabulationSnapshot(eventId,competitionId,actor,roundId)
  }
@@ -88,7 +94,7 @@ export async function calculateNative(eventId,competitionId,actor,body={}){
  const roundId=body?.roundId??null,snapshot=await tabulationSnapshot(eventId,competitionId,actor,roundId)
  const deductionsEnabled=nativeDeductionsEnabled(snapshot)
  if(!snapshot.complete||snapshot.session?.status!=='closed'||deductionsEnabled&&!snapshot.deductionsResolved)throw new ApiError(409,'Close scoring and resolve all current submissions and configured deductions before calculating')
- if(snapshot.rules?.configuration_snapshot?.scoringConfig?.calculationMethod!=='manual')throw new ApiError(403,'Numeric score calculations run automatically when current sources are ready')
+ if(calculationMethod(snapshot)!=='manual')throw new ApiError(403,'Numeric score calculations run automatically when current sources are ready')
  if(body.sourceDigest!==snapshot.sourceDigest)throw new ApiError(409,'Scoring sources changed during review')
  let calculated
  try{calculated=calculateNativeSnapshot(snapshot,{manualResults:body.manualResults,reason:body.reason})}catch(e){throw new ApiError(400,e.message)}

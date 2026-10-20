@@ -90,24 +90,24 @@ export default function OrganizerOverviewEvents({ dashboard }) {
             <ModuleNavigation create />
           </div>
         ) : (
-          <div role="table" aria-label="Your Events" className="mt-3 text-sm">
-            <div role="row" className="hidden grid-cols-[minmax(0,1fr)_9rem_8rem_5rem] gap-4 border-b border-v-border pb-2 text-v-text-subtle sm:grid">
+          <div role="table" aria-label="Your Events" className="mt-3 overflow-hidden rounded-lg border-2 border-v-border-strong text-sm">
+            <div role="row" className="v-events-table-header hidden grid-cols-[minmax(0,1fr)_9rem_8rem_5rem] gap-4 border-b-2 border-v-primary-hover bg-v-primary px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white shadow-sm sm:grid sm:px-4">
               {['Event', 'Type', 'Status', 'Action'].map((label) => (
-                <span key={label} role="columnheader">{label}</span>
+                <span key={label} role="columnheader" className="flex items-center font-bold text-white">{label}</span>
               ))}
             </div>
             {overviewEvents.map((event) => {
               const module = moduleFor(event)
               return (
-                <div key={event.id} role="row" className="grid min-w-0 grid-cols-2 items-center gap-3 border-b border-v-border py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_9rem_8rem_5rem] sm:gap-4">
-                  <div role="cell" className="col-span-2 min-w-0 break-words font-medium text-v-text sm:col-span-1">{event.title}</div>
+                <div key={event.id} role="row" className="grid min-w-0 grid-cols-2 items-center gap-x-3 gap-y-2 border-b border-v-border-strong px-3 py-2.5 transition-colors last:border-b-0 hover:bg-v-surface-elevated/70 sm:min-h-14 sm:grid-cols-[minmax(0,1fr)_9rem_8rem_5rem] sm:gap-4 sm:px-4">
+                  <div role="cell" className="col-span-2 min-w-0 break-words text-[.875rem] font-medium leading-5 text-v-text sm:col-span-1">{event.title}</div>
                   <div role="cell" className="text-v-text-muted">
-                    <span className="v-caption mr-2 sm:hidden">Type</span>
+                    <span className="mr-2 text-[.7rem] font-semibold uppercase tracking-wide text-v-text-subtle sm:hidden">Type</span>
                     {EVENT_TYPE_META[event.eventType]?.label ?? event.eventType}
                   </div>
                   <div role="cell">
-                    <span className="v-caption mr-2 sm:hidden">Status</span>
-                    <Badge tone={event.status === 'active' ? 'success' : event.status === 'cancelled' ? 'danger' : 'default'} className="capitalize">
+                    <span className="mr-2 text-[.7rem] font-semibold uppercase tracking-wide text-v-text-subtle sm:hidden">Status</span>
+                    <Badge tone={event.status === 'active' ? 'success' : event.status === 'cancelled' ? 'danger' : 'default'} className="px-2 py-0.5 text-xs capitalize">
                       {event.status}
                     </Badge>
                   </div>
@@ -115,7 +115,7 @@ export default function OrganizerOverviewEvents({ dashboard }) {
                     <Link
                       to={`/organizer/${module.key}/events/${event.id}/${module.destination}`}
                       aria-label={`View ${event.title}`}
-                      className="v-btn-secondary"
+                      className="v-btn-secondary min-h-8 px-3 py-1 text-sm"
                     >
                       View
                     </Link>

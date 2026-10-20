@@ -15,12 +15,8 @@ export function nativeRoundAdvancement(view, nextRound) {
         ? { message: 'Resolve the configured organizer deductions before continuing.', label: 'Review deductions', stage: 'deductions' }
         : !calculation
           ? { message: 'A current official calculation is required. Open Validation to check the calculation status.', label: 'Check calculation status', stage: 'calculate' }
-          : !finalized && !calculation.verified
-            ? { message: view.reviewPolicy?.active
-              ? `${view.reviewPolicy.reviewerName ?? 'The assigned independent reviewer'} must verify this calculation from their reviewer account. Then the organizer can finalize this round.`
-              : 'Assign an active independent reviewer in Finalization. They must verify the calculation before the organizer can finalize this round.', label: 'Open Finalization', stage: 'results' }
             : !finalized
-              ? { message: 'The calculation is verified. Finalize this round with a decision reason before reviewing advancement.', label: 'Finalize this round', stage: 'results' }
+                ? { message: 'Review the current standings, then finalize this round with a decision reason before reviewing advancement.', label: 'Finalize this round', stage: 'results' }
               : confirmed && count === 0
                 ? { message: 'The confirmed roster has no qualifiers. The next round cannot start with an empty roster.' }
                 : !confirmed
@@ -28,18 +24,16 @@ export function nativeRoundAdvancement(view, nextRound) {
                   : null
   const status = confirmed ? count ? 'Qualifiers confirmed' : 'No qualifiers selected'
     : finalized ? 'Tabulation complete · confirm qualifiers'
-      : calculation?.verified ? 'Verified · finalize this round'
-        : calculation ? 'Calculated · independent verification required'
+      : calculation ? 'Calculated · ready to finalize'
           : view?.complete ? view.session?.status === 'closed' ? 'Official calculation pending' : 'Close scoring after all submissions'
             : 'Awaiting complete judge submissions'
-  return { finalized, confirmed, count, status, blocker, canProceed: confirmed && count > 0,
+  return { finalized, confirmed, count, status, blocker, canProceed: confirmed && count > 0 && !blocker,
     checks: [
       ['All current judge sheets complete', view?.complete === true],
       ['Scoring session closed', view?.session?.status === 'closed'],
       ...(hasOrganizerDeductions
         ? [['Configured organizer deductions resolved', view?.deductionsResolved === true]] : []),
       ['Current official calculation saved', !!calculation],
-      ['Independently verified', !!calculation?.verified || finalized],
       ['Round finalized', finalized],
       ['Next-round qualifiers confirmed', confirmed],
     ],

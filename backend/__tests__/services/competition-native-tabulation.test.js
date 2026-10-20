@@ -143,3 +143,78 @@ test('calculation accepts complete closed sources before an independent reviewer
  expect(f.calculate).toHaveBeenCalled()
  expect(f.rpc).toHaveBeenCalledWith('competition_child_official_calculate',expect.objectContaining({p_actor:owner,p_digest:'digest'}))
 })
+
+
+test('opening tabulation recovers a missing numeric calculation for any competition',async()=>{
+ state.calculation=null;state.deductionsResolved=false
+ state.rules={id:id(6),configuration_snapshot:{scoringConfig:{calculationMethod:'weighted_average',deductionRules:[]}}}
+ f.rpc.mockImplementation(async name=>{
+  if(name==='competition_child_tabulation_snapshot')return {data:state}
+  if(name==='competition_child_official_calculate'){state={...state,calculation:{id:calc,source_digest:'digest'}};return {data:{calculationId:calc}}}
+  return {data:{userIds:[],roundIds:[]}}
+ })
+ const recovered=await tabulationWorkspaceSnapshot(event,child,owner)
+ expect(recovered.calculation.id).toBe(calc)
+ expect(f.calculate).toHaveBeenCalledTimes(1)
+ await tabulationWorkspaceSnapshot(event,child,owner)
+ expect(f.calculate).toHaveBeenCalledTimes(1)
+})
+
+test.each(['manual','incomplete','open_deductions'])('workspace recovery preserves the %s calculation gate',async(gate)=>{
+ state.calculation=null
+ state.rules={id:id(6),configuration_snapshot:{scoringConfig:{calculationMethod:gate==='manual'?'manual':'sum',deductionRules:gate==='open_deductions'?[{id:'rule'}]:[]}}}
+ if(gate==='incomplete')state.complete=false
+ if(gate==='open_deductions')state.deductionsResolved=false
+ await tabulationWorkspaceSnapshot(event,child,owner)
+ expect(f.calculate).not.toHaveBeenCalled()
+ expect(f.rpc.mock.calls.map(([name])=>name)).not.toContain('competition_child_official_calculate')
+})
+
+test('disabled organizer deductions do not block automatic numeric calculation',async()=>{
+ state.calculation=null;state.deductionsResolved=false
+ state.rules={id:id(6),configuration_snapshot:{scoringConfig:{calculationMethod:'sum',deductionRules:[]}}}
+ await expect(automaticallyCalculateNative(event,child)).resolves.toMatchObject({status:'up_to_date'})
+ expect(f.calculate).toHaveBeenCalledTimes(1)
+})
+
+
+test('a failed automatic calculation can recover on the next workspace check',async()=>{
+ const log=vi.spyOn(console,'error').mockImplementation(()=>{})
+ try{
+  state.calculation=null
+  state.rules={id:id(6),configuration_snapshot:{scoringConfig:{calculationMethod:'sum'}}}
+  f.calculate.mockImplementationOnce(()=>{throw new Error('Temporary calculation failure')})
+  f.rpc.mockImplementation(async name=>{
+   if(name==='competition_child_tabulation_snapshot')return {data:state}
+   if(name==='competition_child_official_calculate'){state={...state,calculation:{id:calc,source_digest:'digest'}};return {data:{calculationId:calc}}}
+   return {data:{userIds:[],roundIds:[]}}
+  })
+  expect((await tabulationWorkspaceSnapshot(event,child,owner)).calculation).toBeNull()
+  expect((await tabulationWorkspaceSnapshot(event,child,owner)).calculation.id).toBe(calc)
+  expect(f.calculate).toHaveBeenCalledTimes(2)
+ }finally{log.mockRestore()}
+})
+
+test('automatic recovery cannot run for a mismatched authorized snapshot',async()=>{
+ state.viewerId=id(99);state.calculation=null
+ state.rules={id:id(6),configuration_snapshot:{scoringConfig:{calculationMethod:'sum'}}}
+ await expect(tabulationWorkspaceSnapshot(event,child,owner)).rejects.toMatchObject({statusCode:503})
+ expect(f.calculate).not.toHaveBeenCalled()
+})
+
+
+test('a manual round override stays explicit even when the competition default is numeric',async()=>{
+ state.roundId=id(8);state.calculation=null
+ state.rules={id:id(6),configuration_snapshot:{rounds:[{id:id(8),calculationMethod:'manual'}],scoringConfig:{calculationMethod:'sum'}}}
+ await expect(automaticallyCalculateNative(event,child,id(8))).resolves.toMatchObject({status:'needs_review'})
+ expect(f.calculate).not.toHaveBeenCalled()
+ await calculateNative(event,child,owner,{roundId:id(8),sourceDigest:'digest',reason:'Manual round decision',manualResults:[]})
+ expect(f.calculate).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({reason:'Manual round decision'}))
+})
+
+test('a numeric round override calculates automatically even under a manual competition default',async()=>{
+ state.roundId=id(8);state.calculation=null
+ state.rules={id:id(6),configuration_snapshot:{rounds:[{id:id(8),calculationMethod:'sum'}],scoringConfig:{calculationMethod:'manual'}}}
+ await expect(automaticallyCalculateNative(event,child,id(8))).resolves.toMatchObject({status:'up_to_date'})
+ expect(f.calculate).toHaveBeenCalledTimes(1)
+})

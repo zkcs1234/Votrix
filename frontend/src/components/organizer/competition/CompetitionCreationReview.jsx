@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { nativeCompetitionService as service } from '@/services/competition-native.service'
+import {fetchCompetitionSetupData, invalidateCompetitionSetupData} from '@/services/competition-setup-cache'
 import Button from '@/components/ui/Button'
 import StageFooter from '@/components/ui/StageFooter'
 import { competitionSetupIssues } from '../../../../../shared/competition-creation-flow.js'
@@ -11,13 +12,20 @@ export default function CompetitionCreationReview({ eventId }) {
   const invalidate = useCallback(() => { sequence.current++ }, [])
   const load = useCallback(async () => {
     const request = ++sequence.current
-    const [ev, list, enrolled] = await Promise.all([service.parentReview(eventId), service.list(eventId), service.enrollments(eventId)])
+    const [ev, list, enrolled] = await Promise.all([
+      fetchCompetitionSetupData(eventId,'parent-review',()=>service.parentReview(eventId)),
+      fetchCompetitionSetupData(eventId,'competitions',()=>service.list(eventId)),
+      fetchCompetitionSetupData(eventId,'enrollments',()=>service.enrollments(eventId)),
+    ])
     const branches = await Promise.all((list.data.competitions ?? []).filter(c => c.origin === 'native' && (
       ev.data.event.competitionType !== 'pageant'
       || (c.competition_type ?? c.competitionType) !== 'pageant'
       || c.name.trim().toLowerCase() === 'pageant'
     )).map(async child => {
-      const [foundation, participation] = await Promise.all([service.foundation(eventId,child.id), service.entries(eventId,child.id)])
+      const [foundation, participation] = await Promise.all([
+        fetchCompetitionSetupData(eventId,`foundation:${child.id}`,()=>service.foundation(eventId,child.id)),
+        fetchCompetitionSetupData(eventId,`entries:${child.id}`,()=>service.entries(eventId,child.id)),
+      ])
       const branch = {...foundation.data, entries:participation.data.entries ?? [], judges:enrolled.data.judges ?? []}
       if (branch.competition.id !== child.id || branch.competition.event_id !== eventId) throw new Error('Competition review identity mismatch')
       branch.issues = competitionSetupIssues({...branch, competition:{...branch.competition,rulesCurrent:branch.rulesCurrent}})
@@ -34,8 +42,19 @@ export default function CompetitionCreationReview({ eventId }) {
     operation.current = true; setBusy(true)
     try {
       await service.complete(eventId,{acknowledged:true,parentReviewToken:data.parentReviewToken,competitions:data.branches.map(b => ({id:b.competition.id,setupRevision:b.competition.setup_revision,inputRevision:b.competition.input_revision}))})
-      navigate(`/organizer/competition/events/${eventId}/live`)
-    } catch (e) { await load().catch(() => setData(null)); setError(e.response?.data?.message || e.message) }
+      navigate(`/organizer/competition/events/${eventId}/published`, {
+        state: {
+          eventTitle: data.event.title,
+          eventStatus: 'scheduled',
+          startDate: data.event.startDate,
+          endDate: data.event.endDate,
+        },
+      })
+    } catch (e) {
+      await invalidateCompetitionSetupData(eventId)
+      await load().catch(() => setData(null))
+      setError(e.response?.data?.message || e.message)
+    }
     finally { operation.current = false; setBusy(false) }
   }
   return <section className="space-y-5">

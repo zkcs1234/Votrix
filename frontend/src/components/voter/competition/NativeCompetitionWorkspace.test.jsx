@@ -1,12 +1,12 @@
 import {act,fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import {beforeEach,afterEach,expect,test,vi} from 'vitest'
-import {MemoryRouter} from 'react-router-dom'
-const f=vi.hoisted(()=>({view:vi.fn(),score:vi.fn(),control:vi.fn(),activity:vi.fn(),tabulation:vi.fn(),listeners:new Map()}))
+import {MemoryRouter,Route,Routes} from 'react-router-dom'
+const f=vi.hoisted(()=>({view:vi.fn(),score:vi.fn(),control:vi.fn(),activity:vi.fn(),tabulation:vi.fn(),choices:vi.fn(),activate:vi.fn(),listeners:new Map()}))
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'judge-a'}})}))
-vi.mock('@/services/competition-native.service',()=>({nativeCompetitionService:{view:f.view,score:f.score,control:f.control,activity:f.activity}}))
+vi.mock('@/services/competition-native.service',()=>({nativeCompetitionService:{view:f.view,score:f.score,control:f.control,activity:f.activity,choices:f.choices,activateLiveControl:f.activate}}))
 vi.mock('@/services/competition-native-tabulation.service',()=>({nativeTabulationService:{snapshot:f.tabulation,reviewerChoices:vi.fn()}}))
 vi.mock('@/services/socket.service',()=>({isConnected:()=>true,subscribe:(type,callback)=>{const group=f.listeners.get(type)??new Set();group.add(callback);f.listeners.set(type,group);return()=>group.delete(callback)}}))
-import Workspace,{nativeContextKey} from './NativeCompetitionWorkspace'
+import Workspace,{CompetitionWorkspaceBoundary,nativeContextKey} from './NativeCompetitionWorkspace'
 const choices=[{competitionId:'a',competitionName:'Hip-Hop',roundId:null,roundName:'Single phase',state:'open'},{competitionId:'b',competitionName:'Contemporary',roundId:null,roundName:'Single phase',state:'waiting'}]
 const emit=payload=>{for(const cb of f.listeners.get('competition:native-invalidated')??[])cb(payload)}
 let views
@@ -25,8 +25,17 @@ beforeEach(()=>{
  })
  f.control.mockResolvedValue({data:{}})
 })
-afterEach(()=>vi.useRealTimers())
+afterEach(()=>{vi.useRealTimers();vi.unstubAllEnvs()})
 const ready=async(owner=false)=>{if(owner)views.b.session=null;const r=render(<MemoryRouter><Workspace eventId="event" eventName="Campus arts showcase" choices={choices} owner={owner}/></MemoryRouter>);if(owner){await screen.findByRole('heading',{name:'Live Control Panel'});await screen.findByText('Dancer a')}else await screen.findByText('Dancer a');return r}
+test('opening published Live Control marks the event active without starting scoring',async()=>{
+ vi.stubEnv('VITE_COMPETITION_NATIVE_SCORING_ENABLED','true')
+ f.choices.mockResolvedValue({data:{contexts:choices,nativeEvent:true,eventName:'Campus arts showcase',event:{id:'event',status:'scheduled'}}})
+ f.activate.mockResolvedValue({data:{status:'active',changed:true}})
+ render(<MemoryRouter initialEntries={['/organizer/competition/events/event/live']}><Routes><Route path="/organizer/competition/events/:eventId/live" element={<CompetitionWorkspaceBoundary owner/>}/></Routes></MemoryRouter>)
+ expect(await screen.findByText('Event ongoing')).toBeInTheDocument()
+ expect(f.activate).toHaveBeenCalledWith('event')
+ expect(f.control).not.toHaveBeenCalled()
+})
 test('judge division bar filters the same scoring table and hidden contestants remain required for submission',async()=>{
  Object.assign(views.a.contestants[0],{registrationNumber:1,divisionId:'men',divisionName:'MEN',lockedCriteria:['criterion-a']})
  views.a.contestants.push({id:'woman-a',name:'Woman a',contestantNumber:2,registrationNumber:1,divisionId:'women',divisionName:'WOMEN',open:true,lockedCriteria:[]})
@@ -40,7 +49,7 @@ test('judge division bar filters the same scoring table and hidden contestants r
  fireEvent.click(within(bar).getByRole('button',{name:'Men'}))
  expect(table.querySelectorAll('tbody tr')).toHaveLength(1)
  expect(screen.queryByRole('spinbutton',{name:'Woman a: Technique, Execution score'})).not.toBeInTheDocument()
- expect(screen.getByRole('button',{name:'Lock Submission'})).toBeDisabled()
+ expect(screen.getByRole('button',{name:'Submit Scores'})).toBeDisabled()
  fireEvent.click(within(bar).getByRole('button',{name:'Women'}))
  expect(table.querySelector('tbody tr')).toHaveAttribute('data-contestant-id','woman-a')
  expect(table.querySelector('thead').innerHTML).toBe(headers)
@@ -53,22 +62,34 @@ test('native context keys isolate judge/event/competition/round/session/rules/re
  for(const field of ['competitionId','roundId','sessionId','rulesVersion','setupRevision','inputRevision'])expect(nativeContextKey('event','judge-a',{...views.a.context,[field]:'changed'})).not.toBe(key)
  expect(nativeContextKey('event','judge-b',views.a.context)).not.toBe(key)
 })
-test('existing table retains identity, photos, minor bounds, major percentages and Lock/Lock Submission',async()=>{
- await ready();expect(screen.getByRole('heading',{name:'Campus arts showcase'})).toBeInTheDocument();const dashboardLink=screen.getByRole('link',{name:'Back to dashboard'});expect(dashboardLink).toHaveAttribute('href','/participant');expect(dashboardLink.compareDocumentPosition(screen.getByRole('heading',{name:'Campus arts showcase'}))&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();expect(screen.getByRole('navigation',{name:'Competition categories'})).toBeInTheDocument();expect(screen.getByRole('button',{name:/Contemporary:/})).toBeInTheDocument();const table=screen.getByRole('table');expect(within(table).getByText('100%')).toBeInTheDocument();expect(within(table).getByText('0–10')).toBeInTheDocument();expect(table.querySelector('img').src).toContain('/photo.jpg');expect(within(table).queryByText('Waiting')).not.toBeInTheDocument();expect(within(table).queryByText('Not open yet')).not.toBeInTheDocument();expect(within(table).getByText('Technique')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Dancer a: Technique, Execution Lock'})).toBeDisabled();expect(screen.getByRole('button',{name:'Lock Submission'})).toBeDisabled()
+test('existing table retains identity, photos, minor bounds, major percentages and criterion locking/score submission',async()=>{
+ await ready();expect(screen.getByRole('heading',{name:'Campus arts showcase'})).toBeInTheDocument();const dashboardLink=screen.getByRole('link',{name:'Back to dashboard'});expect(dashboardLink).toHaveAttribute('href','/participant');expect(dashboardLink.compareDocumentPosition(screen.getByRole('heading',{name:'Campus arts showcase'}))&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();expect(screen.getByRole('navigation',{name:'Competition categories'})).toBeInTheDocument();expect(screen.getByRole('button',{name:/Contemporary:/})).toBeInTheDocument();const table=screen.getByRole('table');expect(within(table).getByText('100%')).toBeInTheDocument();expect(within(table).getByText('0–10')).toBeInTheDocument();expect(table.querySelector('img').src).toContain('/photo.jpg');expect(within(table).queryByText('Waiting')).not.toBeInTheDocument();expect(within(table).queryByText('Not open yet')).not.toBeInTheDocument();expect(within(table).getByText('Technique')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Dancer a: Technique, Execution Lock'})).toBeDisabled();expect(screen.getByRole('button',{name:'Submit Scores'})).toBeDisabled()
 })
 test('locked category navigation selects its context but prevents scoring until organizer opens it',async()=>{
  views.b.scoringAvailable=false;views.b.criteria[0].open=false;views.b.contestants[0].open=false
  await ready();fireEvent.click(screen.getByRole('button',{name:/Contemporary:/}));await screen.findByText('Dancer b')
- expect(screen.getByRole('spinbutton')).toBeDisabled();expect(screen.getAllByText('This category is locked until the organizer opens scoring.').length).toBeGreaterThan(0);expect(screen.getByRole('button',{name:'Lock Submission'})).toBeDisabled()
+ expect(screen.getByRole('spinbutton')).toBeDisabled();expect(screen.getAllByText('This category is locked until the organizer opens scoring.').length).toBeGreaterThan(0);expect(screen.getByRole('button',{name:'Submit Scores'})).toBeDisabled()
 })
 test('locking and submission send participation identity, raw score and child/session revisions, then reconcile automatically',async()=>{
  await ready();fireEvent.change(screen.getByRole('spinbutton'),{target:{value:'7.5'}});fireEvent.click(screen.getByRole('button',{name:'Dancer a: Technique, Execution Lock'}))
- await waitFor(()=>expect(screen.getByRole('button',{name:'Lock Submission'})).toBeEnabled())
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Submit Scores'})).toBeEnabled())
  const lockedButton=screen.getByRole('button',{name:'Dancer a: Technique, Execution locked'})
  expect(lockedButton).toBeDisabled();expect(lockedButton).toHaveClass('is-locked');expect(lockedButton).toHaveTextContent('Locked')
  expect(f.view).toHaveBeenCalledTimes(1)
  expect(f.score.mock.calls[0]).toMatchObject(['event','a','lock',{entryId:'entry-a',criterionId:'criterion-a',scores:{'minor-a':7.5},competitionId:'a',roundId:null,sessionId:'s-a',rulesVersion:'rules-a',setupRevision:2,inputRevision:3,rowRevision:0}])
- fireEvent.click(screen.getByRole('button',{name:'Lock Submission'}));await screen.findByText(/Round submitted/);expect(f.score.mock.calls.at(-1)[2]).toBe('submit');expect(screen.getByRole('spinbutton')).toBeDisabled()
+ fireEvent.click(screen.getByRole('button',{name:'Submit Scores'}))
+ const confirmation=await screen.findByRole('dialog',{name:'Submit scores for this round?'})
+ expect(confirmation).toHaveTextContent('you won’t be able to edit these scores unless the organizer reopens the round')
+ expect(f.score.mock.calls.some(call=>call[2]==='submit')).toBe(false)
+ fireEvent.click(within(confirmation).getByRole('button',{name:'Cancel'}))
+ expect(screen.queryByRole('dialog',{name:'Submit scores for this round?'})).not.toBeInTheDocument()
+ expect(f.score.mock.calls.some(call=>call[2]==='submit')).toBe(false)
+ fireEvent.click(screen.getByRole('button',{name:'Submit Scores'}))
+ fireEvent.click(await screen.findByRole('button',{name:'Yes, Submit Scores'}))
+ await screen.findByText(/Round submitted/)
+ expect(f.score.mock.calls.at(-1)[2]).toBe('submit')
+ expect(screen.queryByRole('dialog',{name:'Submit scores for this round?'})).not.toBeInTheDocument()
+ expect(screen.getByRole('spinbutton')).toBeDisabled()
 })
 test('Lock shows progress only on its button and locks score inputs after success',async()=>{
  let finishLock
@@ -80,7 +101,7 @@ test('Lock shows progress only on its button and locks score inputs after succes
  expect(loadingButton).toBeDisabled()
  expect(loadingButton.querySelector('.animate-spin')).toBeInTheDocument()
  expect(screen.getByRole('spinbutton')).toBeDisabled()
- expect(screen.getByRole('button',{name:'Lock Submission'})).toBeDisabled()
+ expect(screen.getByRole('button',{name:'Submit Scores'})).toBeDisabled()
  await act(async()=>finishLock({data:{rowRevision:1,locked:true}}))
  const lockedButton=await screen.findByRole('button',{name:'Dancer a: Technique, Execution locked'})
  expect(lockedButton).toBeDisabled()
@@ -188,13 +209,11 @@ test.each([
  f.view.mockImplementation(async(_eventId,competitionId,roundId)=>({data:structuredClone(roundViews[`${competitionId}:${roundId}`])}))
  render(<MemoryRouter><Workspace eventId="event" eventName="Campus arts showcase" event={{competitionType}} choices={rounds} owner/></MemoryRouter>)
  await screen.findByRole('heading',{name:'Live Control Panel'})
- const selector=screen.getByRole('combobox',{name:'Current round'})
- const isLocked=competitionType==='pageant'&&blocked
- const finalOption=await within(selector).findByRole('option',{name:isLocked?'Final · Locked until finalization and advancement confirmation':'Final'})
- if(disabled)expect(finalOption).toBeDisabled()
- else expect(finalOption).toBeEnabled()
+ const finalRound=await screen.findByRole('button',{name:/Round 2: CLOSED — Final/})
+ if(disabled)expect(finalRound).toBeDisabled()
+ else expect(finalRound).toBeEnabled()
 })
-test('closed Pageant rounds hand off to tabulation with the source round selected',async()=>{
+test.each(['pageant','competition'])('closed %s rounds hand off to tabulation before the next round starts',async(competitionType)=>{
  const rounds=[
   {competitionId:'pageant',competitionName:'Pageant',roundId:'preliminary',roundName:'Preliminary'},
   {competitionId:'pageant',competitionName:'Pageant',roundId:'final',roundName:'Final'},
@@ -208,11 +227,11 @@ test('closed Pageant rounds hand off to tabulation with the source round selecte
   return [`${context.competitionId}:${context.roundId}`,base]
  }))
  f.view.mockImplementation(async(_eventId,competitionId,roundId)=>({data:structuredClone(roundViews[`${competitionId}:${roundId}`])}))
- render(<MemoryRouter><Workspace eventId="event" eventName="Pageant" event={{competitionType:'pageant'}} choices={rounds} owner/></MemoryRouter>)
+ render(<MemoryRouter><Workspace eventId="event" eventName="Pageant" event={{competitionType}} choices={rounds} owner/></MemoryRouter>)
  await screen.findByRole('heading',{name:'Live Control Panel'})
  const link=await screen.findByRole('link',{name:'Go to Preliminary Tabulation →'})
- expect(link).toHaveAttribute('href','/organizer/competition/events/event/tabulation?competitionId=pageant&roundId=preliminary')
- expect(screen.getByText(/confirm the configured qualifiers \(such as a top-percentage cutoff\)/)).toBeInTheDocument()
+ expect(link).toHaveAttribute('href','/organizer/competition/events/event/tabulation/overview?competitionId=pageant&roundId=preliminary')
+ expect(screen.getByText(/Scores calculate automatically/)).toBeInTheDocument()
 })
 test('final closed category shows completion and Tabulation action instead of a next-category action',async()=>{
  views.a.progress[0].submitted=true
@@ -223,7 +242,7 @@ test('final closed category shows completion and Tabulation action instead of a 
  await screen.findByRole('heading',{name:'Live Control Panel'})
  await screen.findByText('Dancer a')
  expect(screen.getByText('All Competition Categories Completed')).toBeInTheDocument()
- expect(screen.getByRole('link',{name:'Go to Tabulation →'})).toHaveAttribute('href','/organizer/competition/events/event/tabulation')
+ expect(screen.getByRole('link',{name:'Go to Tabulation →'})).toHaveAttribute('href','/organizer/competition/events/event/tabulation/overview?competitionId=a')
  expect(screen.queryByRole('button',{name:/Proceed to/})).not.toBeInTheDocument()
 })
 test('organizer can open judge scoring for an individual major criterion',async()=>{
@@ -305,13 +324,13 @@ test('opening the next category does not require finalized prior results',async(
 })
 
 test('explicit round selection isolates pending drafts and blocks Final until confirmed qualification',async()=>{
- const rounds=[{...choices[0],roundId:'preliminary',roundName:'Preliminary'},{...choices[0],roundId:'final',roundName:'Final'}]
+ const rounds=[{...choices[0],roundId:'preliminary',roundName:'Preliminary',state:'open'},{...choices[0],roundId:'final',roundName:'Final',state:'waiting'}]
  views.a.context.roundId='preliminary';views.a.context.sessionId='s-preliminary'
  const final={...snapshot('b'),context:{...snapshot('b').context,competitionId:'a',roundId:'final',sessionId:null},session:null,laterRoundBlocked:true,criteria:snapshot('b').criteria.map(k=>({...k,open:false})),contestants:snapshot('b').contestants.map(e=>({...e,open:false}))}
  f.view.mockImplementation(async(e,c,r)=>({data:structuredClone(r==='preliminary'?views.a:final)}))
  render(<MemoryRouter><Workspace eventId="event" choices={rounds}/></MemoryRouter>);await screen.findByText('Dancer a');fireEvent.change(screen.getByRole('spinbutton'),{target:{value:'8'}})
- fireEvent.change(screen.getByLabelText('Round'),{target:{value:'a:final'}});await screen.findByText('Dancer b');expect(screen.getByRole('spinbutton')).toBeDisabled();expect(screen.getByRole('spinbutton').value).toBe('');expect(screen.getByText(/confirmed qualification/)).toBeInTheDocument()
- fireEvent.change(screen.getByLabelText('Round'),{target:{value:'a:preliminary'}});await screen.findByText('Dancer a');expect(screen.getByRole('spinbutton').value).toBe('8');expect(f.score).not.toHaveBeenCalled()
+ fireEvent.click(screen.getByRole('button',{name:/Round 2: CLOSED — Final/}));await screen.findByText('Dancer b');expect(screen.getByRole('spinbutton')).toBeDisabled();expect(screen.getByRole('spinbutton').value).toBe('');expect(screen.getByText(/confirmed qualification/)).toBeInTheDocument()
+ fireEvent.click(screen.getByRole('button',{name:/Round 1: OPEN — Preliminary/}));await screen.findByText('Dancer a');expect(screen.getByRole('spinbutton').value).toBe('8');expect(f.score).not.toHaveBeenCalled()
 })
 test('reconnect refetches authoritative access; older session/source snapshots cannot reopen scoring',async()=>{
  await ready();views.a.session.revision=5;views.a.session.source_revision=5;views.a.context.sessionRevision=5;views.a.session.status='paused';views.a.criteria[0].open=false;views.a.contestants[0].open=false
@@ -324,7 +343,7 @@ test('organizer sees lock and submission progress from invalidations without con
 })
 test('terminal event state disables round submission even when every source is locked',async()=>{
  views.a.eventStatus='completed';views.a.scoringAvailable=false;views.a.criteria[0].open=false;views.a.contestants[0].open=false;views.a.contestants[0].lockedCriteria=['criterion-a']
- await ready();expect(screen.getByRole('spinbutton')).toBeDisabled();expect(screen.getByRole('button',{name:'Lock Submission'})).toBeDisabled();expect(screen.getByText(/Scoring is read only/)).toBeInTheDocument()
+ await ready();expect(screen.getByRole('spinbutton')).toBeDisabled();expect(screen.getByRole('button',{name:'Submit Scores'})).toBeDisabled();expect(screen.getByText(/Scoring is read only/)).toBeInTheDocument()
 })
 test('a Lock click during an in-flight draft is queued and committed instead of silently ignored',async()=>{
  let release,firstBody
@@ -352,14 +371,15 @@ test('judge deductions lock and submit with the original criterion score and can
  expect(screen.getByRole('button',{name:'Dancer a: Technique, Execution Lock'})).toBeEnabled()
  expect(screen.queryByText(/Judge total preview/)).not.toBeInTheDocument()
  fireEvent.click(screen.getByRole('button',{name:'Dancer a: Technique, Execution Lock'}))
- await waitFor(()=>expect(screen.getByRole('button',{name:'Lock Submission'})).toBeEnabled())
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Submit Scores'})).toBeEnabled())
  const payload=f.score.mock.calls.find(call=>call[2]==='lock')[3]
  expect(payload.scores).toEqual({'minor-a':8})
  expect(payload.deductions).toEqual([expect.objectContaining({id:expect.any(String),ruleId:'late'})])
  expect(payload.deductions[0]).not.toHaveProperty('offenseKey')
  expect(payload.deductions[0]).not.toHaveProperty('reason')
  expect(payload.deductions[0]).not.toHaveProperty('amount')
- fireEvent.click(screen.getByRole('button',{name:'Lock Submission'}))
+ fireEvent.click(screen.getByRole('button',{name:'Submit Scores'}))
+ fireEvent.click(await screen.findByRole('button',{name:'Yes, Submit Scores'}))
  await screen.findByText(/Round submitted/)
  expect(f.score.mock.calls.at(-1)[2]).toBe('submit')
 })
@@ -371,4 +391,28 @@ test('competition switching isolates incomplete local judge deductions without p
  await screen.findByText('Dancer b')
  expect(screen.queryByLabelText(/violation reference|deduction reason/i)).not.toBeInTheDocument()
  expect(f.score.mock.calls.filter(call=>call[1]==='b')).toHaveLength(0)
+})
+
+
+test('a qualified Round 2 handoff opens its own Live Control session explicitly',async()=>{
+ const rounds=[{competitionId:'pageant',competitionName:'Pageant',roundId:'preliminary',roundName:'Preliminary'},{competitionId:'pageant',competitionName:'Pageant',roundId:'final',roundName:'Final'}]
+ f.view.mockImplementation(async(_e,c,r)=>{const base=structuredClone(views.a);return {data:{...base,context:{...base.context,eventId:'event',competitionId:c,roundId:r},session:r==='preliminary'?{...base.session,status:'closed'}:null,progress:[{judgeId:'judge-a',submitted:r==='preliminary'}],laterRoundBlocked:false}}})
+ render(<MemoryRouter initialEntries={['/organizer/competition/events/event/live?competitionId=pageant&roundId=final']}><Workspace eventId="event" eventName="Pageant" event={{competitionType:'pageant'}} choices={rounds} owner/></MemoryRouter>)
+ const open=await screen.findByRole('button',{name:'Open Final scoring'})
+ await waitFor(()=>expect(open).toBeEnabled())
+ expect(screen.getByRole('button',{name:/Round 2: CLOSED — Final/})).toHaveAttribute('aria-pressed','true')
+ fireEvent.click(open)
+ await waitFor(()=>expect(f.control).toHaveBeenCalledWith('event','pageant','start',expect.objectContaining({roundId:'final'})))
+})
+
+
+test('a next-round Open action remains disabled until its authorized live context loads',async()=>{
+ let release
+ f.view.mockImplementationOnce(()=>new Promise(resolve=>{release=resolve}))
+ render(<MemoryRouter><Workspace eventId="event" choices={[choices[0]]} owner/></MemoryRouter>)
+ await screen.findByRole('heading',{name:'Live Control Panel'})
+ expect(screen.getByRole('button',{name:'Open Category'})).toBeDisabled()
+ expect(f.control).not.toHaveBeenCalled()
+ await act(async()=>release({data:{...views.a,session:null}}))
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Open Category'})).toBeEnabled())
 })

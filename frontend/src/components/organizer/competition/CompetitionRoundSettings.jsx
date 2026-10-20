@@ -54,7 +54,7 @@ function AdvancementForm({ round, onSave, onCancel, readOnly }) {
           min={type === 'threshold' ? 0 : 1} max={type === 'top_percent' ? 100 : undefined} step={type === 'top_n' ? 1 : 'any'}
           onChange={event => { setAmount(event.target.value); setError('') }} aria-invalid={Boolean(error)} />
       </div>}
-      <p className="text-xs leading-relaxed text-v-text-subtle">{type==='none'?'No elimination: eligible entries continue to the next main round without a qualification decision. Live Control activates judging separately.':'Review submitted round standings, verify tabulation, and confirm qualifiers in Tabulation before the next round opens.'}</p>
+      <p className="text-xs leading-relaxed text-v-text-subtle">{type==='none'?'No elimination: eligible entries continue to the next main round without a qualification decision. Live Control activates judging separately.':'Review and finalize round standings, then confirm qualifiers in Tabulation before opening the next round in Live Control.'}</p>
       {['top_n','top_percent'].includes(type)&&<p className="text-xs text-v-text-subtle">Published shared cutoff ties advance together, so the approved count can exceed the requested number.</p>}
       <p className="text-xs leading-relaxed text-v-text-subtle">Entry eligibility is separate from Back to Zero, carry-forward, and weighted score combination. Configure score use in Next Round / Back to Zero.</p>
       {error && <p role="alert" className="v-error-text">{error}</p>}

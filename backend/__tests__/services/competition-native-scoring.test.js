@@ -1,18 +1,40 @@
 import {afterEach,beforeEach,expect,test,vi} from 'vitest'
-const f=vi.hoisted(()=>({rpc:vi.fn(),from:vi.fn(),emit:vi.fn(),autoCalculate:vi.fn()}))
+const f=vi.hoisted(()=>({rpc:vi.fn(),from:vi.fn(),emit:vi.fn(),autoCalculate:vi.fn(),own:vi.fn()}))
 vi.mock('../../src/foundation/db.js',()=>({db:()=>({rpc:f.rpc,from:f.from})}))
 vi.mock('../../src/websocket/ws-emitter.js',()=>({emitToUser:f.emit}))
 vi.mock('../../src/services/competition-native-tabulation.service.js',()=>({automaticallyCalculateNative:f.autoCalculate}))
-import {scoringChoices,activeSessionsForOrganizer,liveView,liveControl,scoreWrite,scoringError} from '../../src/services/competition-native-scoring.service.js'
+vi.mock('../../src/services/event.service.js',()=>({assertOrganizerOwnsEvent:f.own}))
+import {scoringChoices,activateLiveControl,activeSessionsForOrganizer,liveView,liveControl,scoreWrite,scoringError} from '../../src/services/competition-native-scoring.service.js'
 const id=n=>`10000000-0000-0000-0000-${String(n).padStart(12,'0')}`,event=id(1),child=id(2),judge=id(3),owner=id(4),session=id(5)
 const body={requestId:id(6),rulesVersion:id(7),setupRevision:2,inputRevision:3,sessionId:session,sessionRevision:1,entryId:id(8),criterionId:id(9),rowRevision:0,scores:{[id(10)]:7}}
-beforeEach(()=>{vi.clearAllMocks();for(const flag of ['COMPETITION_CHILD_CONTEXTS_ENABLED','COMPETITION_NATIVE_SETUP_ENABLED','COMPETITION_NATIVE_SCORING_ENABLED','COMPETITION_NATIVE_TABULATION_ENABLED'])vi.stubEnv(flag,'true');f.rpc.mockResolvedValue({data:{sessionId:session,sessionRevision:2,notificationUserIds:[judge,owner],rowRevision:1,locked:true},error:null});f.autoCalculate.mockResolvedValue({status:'up_to_date'})})
+beforeEach(()=>{vi.clearAllMocks();for(const flag of ['COMPETITION_CHILD_CONTEXTS_ENABLED','COMPETITION_NATIVE_SETUP_ENABLED','COMPETITION_NATIVE_SCORING_ENABLED','COMPETITION_NATIVE_TABULATION_ENABLED'])vi.stubEnv(flag,'true');f.rpc.mockResolvedValue({data:{sessionId:session,sessionRevision:2,notificationUserIds:[judge,owner],rowRevision:1,locked:true},error:null});f.autoCalculate.mockResolvedValue({status:'up_to_date'});f.own.mockResolvedValue({id:event,status:'scheduled',competition_created_at:'2026-10-20T00:00:00Z'})})
 afterEach(()=>vi.unstubAllEnvs())
 test('scoring requires all three deployment gates and never calls RPC when disabled',async()=>{
  for(const flag of ['COMPETITION_CHILD_CONTEXTS_ENABLED','COMPETITION_NATIVE_SETUP_ENABLED','COMPETITION_NATIVE_SCORING_ENABLED']){vi.stubEnv(flag,'false');await expect(scoringChoices(event,judge)).rejects.toMatchObject({statusCode:503});vi.stubEnv(flag,'true')}
  expect(f.rpc).not.toHaveBeenCalled()
 })
 test('choices bind authenticated actor and owner mode',async()=>{await scoringChoices(event,judge);expect(f.rpc).toHaveBeenCalledWith('competition_child_scoring_choices',{p_event:event,p_actor:judge,p_owner:false})})
+test('opening Live Control activates only the published event and does not start a scoring session',async()=>{
+ const query={}
+ query.eq=vi.fn(()=>query);query.select=vi.fn(()=>query);query.maybeSingle=vi.fn().mockResolvedValue({data:{id:event,status:'active'},error:null})
+ const update=vi.fn(()=>query)
+ f.from.mockReturnValue({update})
+ await expect(activateLiveControl(event,owner)).resolves.toEqual({status:'active',changed:true})
+ expect(f.own).toHaveBeenCalledWith(event,owner)
+ expect(f.from).toHaveBeenCalledWith('events')
+ expect(update).toHaveBeenCalledWith({status:'active'})
+ expect(query.eq).toHaveBeenNthCalledWith(1,'id',event)
+ expect(query.eq).toHaveBeenNthCalledWith(2,'status','scheduled')
+ expect(f.rpc).not.toHaveBeenCalled()
+})
+test('opening Live Control is idempotent and refuses unpublished events',async()=>{
+ f.own.mockResolvedValueOnce({id:event,status:'active',competition_created_at:'2026-10-20T00:00:00Z'})
+ await expect(activateLiveControl(event,owner)).resolves.toEqual({status:'active',changed:false})
+ expect(f.from).not.toHaveBeenCalled()
+ f.own.mockResolvedValueOnce({id:event,status:'draft',competition_created_at:null})
+ await expect(activateLiveControl(event,owner)).rejects.toMatchObject({statusCode:409})
+ expect(f.from).not.toHaveBeenCalled()
+})
 test('organizer dashboard loads owner-authorized active native sessions without score data',async()=>{
  f.rpc.mockResolvedValue({data:[{eventId:event,eventTitle:'Show',competitionName:'Dance',roundName:'Finals',sessionId:session,status:'active',startedAt:'2026-10-18T00:00:00Z'}],error:null})
  await expect(activeSessionsForOrganizer(owner)).resolves.toEqual([{eventId:event,eventTitle:'Show',competitionName:'Dance',roundName:'Finals',session:{id:session,status:'active',startedAt:'2026-10-18T00:00:00Z'}}])

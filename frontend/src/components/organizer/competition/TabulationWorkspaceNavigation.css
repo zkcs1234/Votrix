@@ -1,0 +1,49 @@
+.v-results-workspace, .v-results-workspace-nav {
+  --v-primary: #192c65;
+  --v-primary-hover: color-mix(in srgb, var(--v-primary) 85%, #000);
+  --v-primary-soft: color-mix(in srgb, var(--v-primary) 8%, var(--v-surface));
+}
+.v-results-workspace-nav {
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  min-width: 0;
+  border: 1px solid var(--v-border);
+  border-radius: 1rem;
+  background: var(--v-surface);
+  overflow: hidden;
+}
+.v-results-workspace-heading { padding: 1rem 1.25rem; }
+.v-results-workspace-heading .v-results-workspace-eyebrow {
+  margin: 0 0 .25rem;
+  color: var(--v-text-subtle);
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.v-results-workspace-heading h2 { margin: 0; font-family: inherit; font-size: 1.25rem; line-height: 1.3; font-weight: 650; color: var(--v-text); }
+.v-results-workspace-heading > p:last-child { margin: .3rem 0 0; font-size: .85rem; color: var(--v-text-muted); }
+.v-results-workspace-nav nav { display: flex; flex-wrap: wrap; gap: .35rem; padding: .5rem; border-top: 1px solid var(--v-border); }
+.v-results-workspace-nav nav a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 2.75rem;
+  padding: .65rem 1rem;
+  border-radius: .6rem;
+  color: var(--v-text-muted);
+  font-size: .85rem;
+  font-weight: 550;
+  text-align: center;
+  text-decoration: none;
+}
+.v-results-workspace-nav nav a:hover { background: var(--v-surface-elevated); color: var(--v-text); }
+.v-results-workspace-nav nav a[aria-current=location] { background: var(--v-primary); color: #fff; }
+.v-tabulation-page-section { scroll-margin-top: 6rem; }
+.v-tabulation-page-section:focus { outline: none; }
+.v-results-workspace-nav nav a:focus-visible { outline: 2px solid var(--v-primary); outline-offset: 2px; }
+.v-results-workspace-current { flex: 1 1 auto; align-self: center; padding: .65rem 1rem; color: var(--v-text); font-size: .85rem; font-weight: 600; text-align: center; }
+@media (max-width: 480px) {
+  .v-results-workspace-heading { padding: .85rem 1rem; }
+  .v-results-workspace-nav nav { flex-direction: column; }
+}

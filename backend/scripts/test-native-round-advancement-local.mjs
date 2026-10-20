@@ -26,6 +26,7 @@ const migration = name => read(`backend/src/database/migrations/${name}`).replac
 const setup=read('backend/__tests__/fixtures/native-round-advancement-setup.sql')
 const checks=read('backend/__tests__/fixtures/native-round-advancement-assertions.sql')
 const update=migration('131_native_round_advancement_status.sql')
-const result=sql(`BEGIN; ${migration('127_competition_idempotent_auto_calculation.sql')} ${setup} ${migration('130_pageant_division_tabulation.sql')} ${update} ${update} ${checks} ROLLBACK;`)
+const finalization=migration('133_competition_organizer_finalization.sql')
+const result=sql(`BEGIN; ${migration('127_competition_idempotent_auto_calculation.sql')} ${setup} ${migration('130_pageant_division_tabulation.sql')} ${update} ${update} ${finalization} ${finalization} ${checks} ROLLBACK;`)
 console.log(result.notices)
 console.log('PASS round readiness, division qualifiers, persistent confirmation, explicit next-round start and correction invalidation; all changes rolled back')

@@ -10,6 +10,26 @@ test('single round converts to explicit rounds without deleting criterion or min
  const value=observe.mock.lastCall[0];expect(value.rounds).toHaveLength(1);expect(value.criteria[0].id).toBe('major');expect(value.criteria[0].roundId).toBe(value.rounds[0].id);expect(value.criteria[0].minorCriteria[0].id).toBe('minor')
  fireEvent.click(screen.getByText('+ Add Another Round'));expect(observe.mock.lastCall[0].rounds).toHaveLength(2);expect(observe.mock.lastCall[0].rounds[0].nextRoundId).toBe(observe.mock.lastCall[0].rounds[1].id)
 })
+test('round modes use accessible selection cards and retain the selected mode',()=>{
+ render(<Editor step="structure"/>)
+ const multiple=screen.getByRole('radio',{name:/Multiple Rounds/})
+ fireEvent.click(multiple)
+ expect(multiple.closest('label')).toHaveAttribute('data-selected','true')
+ expect(screen.getByRole('heading',{name:'Your Rounds'})).toBeInTheDocument()
+ expect(screen.getByLabelText('Round 1 name')).toBeInTheDocument()
+})
+test('criterion weight feedback and progress update from the current draft total',()=>{
+ const value=initial();value.criteria=[]
+ render(<Editor configuration={value}/>)
+ expect(screen.getByRole('progressbar',{name:'Criterion weight allocation'})).toHaveAttribute('aria-valuenow','0')
+ fireEvent.click(screen.getByRole('button',{name:'Add Criterion',exact:true}))
+ fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:'Technique'}})
+ fireEvent.change(screen.getByLabelText('Major criterion weight (%)'),{target:{value:'60'}})
+ fireEvent.click(screen.getByRole('button',{name:'Save Criterion',exact:true}))
+ expect(screen.getByRole('progressbar',{name:'Criterion weight allocation'})).toHaveAttribute('aria-valuenow','60')
+ expect(screen.getByText('Add 40% before continuing.')).toBeInTheDocument()
+ expect(screen.getByRole('button',{name:'Edit criterion Technique'})).toBeInTheDocument()
+})
 test('major editor rejects duplicate names and over-allocation before changing saved criteria',()=>{
  const observe=vi.fn();render(<Editor observe={observe}/>);fireEvent.click(screen.getByRole('button',{name:'Add Criterion',exact:true}));fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:' technique '}});fireEvent.change(screen.getByLabelText('Major criterion weight (%)'),{target:{value:'20'}});fireEvent.click(screen.getByRole('button',{name:'Save Criterion',exact:true}));expect(screen.getByRole('alert')).toHaveTextContent('already exists');expect(observe).not.toHaveBeenCalled()
  fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:'Performance'}});fireEvent.click(screen.getByRole('button',{name:'Save Criterion',exact:true}));expect(screen.getByRole('alert')).toHaveTextContent('cannot exceed 100%')

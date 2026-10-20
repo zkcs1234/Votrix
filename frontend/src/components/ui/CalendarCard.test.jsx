@@ -1,10 +1,14 @@
 import { useState } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import CalendarCard from './CalendarCard'
 import { electionEventSchemaStep1, isoToLocalInput, localInputToIso } from '@/schemas/event.schemas'
 
 const dayLabel = (day) => new Date(2026, 9, day).toDateString()
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 function ControlledPicker({ initial = '2026-10-12T09:17', onChange = () => {}, ...props }) {
   const [value, setValue] = useState(initial)
@@ -22,13 +26,16 @@ describe('two-step CalendarCard', () => {
     const onChange = vi.fn()
     render(<ControlledPicker confirmDate onChange={onChange} />)
     openAndChooseDate(13)
+    const dateHeading = screen.getByText('Select date')
+    const stepIndicator = screen.getByRole('list', { name: 'Date and time steps' })
+    expect(dateHeading.parentElement).toBe(stepIndicator.parentElement)
     expect(screen.getByText('Selected date')).toBeInTheDocument()
     expect(screen.getByText(new Date(2026, 9, 13).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }))).toBeInTheDocument()
     expect(screen.getByText('Date').closest('li')).toHaveAttribute('aria-current', 'step')
     expect(screen.getByRole('button', { name: dayLabel(13) })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByRole('group', { name: 'Hour clock' })).not.toBeInTheDocument()
     expect(onChange).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Time' }))
     expect(screen.getByText('Time').closest('li')).toHaveAttribute('aria-current', 'step')
     expect(screen.queryByRole('button', { name: dayLabel(13) })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Hour 2' }))
@@ -36,19 +43,46 @@ describe('two-step CalendarCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'PM' }))
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByRole('button', { name: dayLabel(13) })).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Time' }))
     expect(screen.getByRole('button', { name: 'Select minute' })).toHaveTextContent('40')
     expect(screen.getByRole('button', { name: 'PM' })).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     expect(onChange).toHaveBeenCalledExactlyOnceWith('2026-10-13T14:40')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    const input = screen.getByRole('textbox', { name: 'Start Date and Time' })
+    expect(input.value).toMatch(/Oct 13, 2026.*2:40 PM/)
+    fireEvent.click(input)
+    expect(screen.getByRole('button', { name: dayLabel(13) })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('requires a date before Continue and retains the existing min/max constraints', () => {
+  it('requires a date before Next and retains the existing min/max constraints', () => {
     render(<ControlledPicker initial="" confirmDate />)
     fireEvent.click(screen.getByRole('textbox'))
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Time' })).toBeDisabled()
     expect(screen.getByText('Choose a date')).toBeInTheDocument()
+  })
+
+  it('blocks dates and times before the current local minute', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 20, 8, 37))
+    render(<ControlledPicker initial="" confirmDate preventPast />)
+    fireEvent.click(screen.getByRole('textbox'))
+
+    expect(screen.getByRole('button', { name: dayLabel(19) })).toBeDisabled()
+    const today = screen.getByRole('button', { name: dayLabel(20) })
+    fireEvent.click(today)
+    expect(screen.getByRole('button', { name: 'Time' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Time' }))
+
+    expect(screen.getByRole('button', { name: 'Hour 7' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Hour 8' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hour 8' }))
+    expect(screen.getByRole('button', { name: 'Minute 35' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Minute 40' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    expect(screen.getByRole('textbox').value).toMatch(/Oct 20, 2026.*8:40 AM/)
   })
 
   it('uses the polished dial controls for exact minutes and keeps the form unsubmitted', () => {
@@ -56,7 +90,7 @@ describe('two-step CalendarCard', () => {
     const onSubmit = vi.fn((event) => event.preventDefault())
     render(<form onSubmit={onSubmit}><ControlledPicker confirmDate onChange={onChange} /></form>)
     openAndChooseDate(13)
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Time' }))
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Select hour' })).toHaveFocus()
     fireEvent.click(screen.getByRole('button', { name: 'Hour 12' }))
@@ -68,11 +102,11 @@ describe('two-step CalendarCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'PM' }))
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByRole('button', { name: dayLabel(13) })).toHaveFocus()
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Time' }))
     expect(screen.getByRole('button', { name: 'Select minute' })).toHaveTextContent('59')
     expect(screen.getByRole('button', { name: 'PM' })).toHaveAttribute('aria-pressed', 'true')
     expect(onChange).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     expect(onChange).toHaveBeenCalledExactlyOnceWith('2026-10-13T12:59')
     expect(screen.getByRole('textbox')).toHaveFocus()
     expect(onSubmit).not.toHaveBeenCalled()
@@ -83,8 +117,8 @@ describe('two-step CalendarCard', () => {
     render(<ControlledPicker confirmDate initial="2026-10-12T00:00" onChange={onChange} />)
     expect(screen.getByRole('textbox').value).toMatch(/12:00\s*AM/)
     openAndChooseDate()
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Time' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     expect(onChange).toHaveBeenCalledExactlyOnceWith('2026-10-12T00:00')
     expect(isoToLocalInput(localInputToIso(onChange.mock.calls[0][0]))).toBe('2026-10-12T00:00')
   })

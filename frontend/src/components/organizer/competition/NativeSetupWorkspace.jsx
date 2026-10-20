@@ -1,8 +1,9 @@
 import {useCallback,useEffect,useRef,useState} from 'react'
 import {Link,useParams,useLocation,useSearchParams} from 'react-router-dom'
-import {Check, Link2, Pencil, Search, Trash2, Trophy, UserPlus, Users, ShieldCheck} from 'lucide-react'
+import {Check, ChevronRight, Link2, Pencil, Search, Trash2, Trophy, UserPlus, Users, ShieldCheck} from 'lucide-react'
 import {nativeCompetitionService as service} from '@/services/competition-native.service'
 import {pageantService} from '@/services/pageant.service'
+import {fetchCompetitionSetupData, invalidateCompetitionSetupData, setCompetitionSetupData} from '@/services/competition-setup-cache'
 import CompetitionCreationReview from './CompetitionCreationReview'
 import StageFooter from '@/components/ui/StageFooter'
 import RoundsScoringEditor from './RoundsScoringEditor'
@@ -34,7 +35,7 @@ export function NativeSetupBoundary({Legacy}){
  useEffect(()=>{
   if(import.meta.env.VITE_COMPETITION_NATIVE_SETUP_ENABLED!=='true')return
   let alive=true;setState(null);setLegacy(false);const started=performance.now()
-  service.list(eventId).then(({data})=>{if(import.meta.env.DEV)console.debug('[competition-setup] boundary list',Math.round(performance.now()-started),'ms');if(alive)setState(data)}).catch(e=>{if(import.meta.env.DEV)console.debug('[competition-setup] boundary list failed',Math.round(performance.now()-started),'ms');if(alive)setState({error:message(e)})})
+  fetchCompetitionSetupData(eventId,'competitions',()=>service.list(eventId)).then(({data})=>{if(import.meta.env.DEV)console.debug('[competition-setup] boundary list',Math.round(performance.now()-started),'ms');if(alive)setState(data)}).catch(e=>{if(import.meta.env.DEV)console.debug('[competition-setup] boundary list failed',Math.round(performance.now()-started),'ms');if(alive)setState({error:message(e)})})
   return()=>{alive=false}
  },[eventId,attempt])
  if(import.meta.env.VITE_COMPETITION_NATIVE_SETUP_ENABLED!=='true')return <Legacy/>
@@ -140,24 +141,27 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
  const [childName,setChildName]=useState(''),[masterNumber,setMasterNumber]=useState(1),[poolSearch,setPoolSearch]=useState(''),[poolPickerOpen,setPoolPickerOpen]=useState(false),[selectedPoolJudges,setSelectedPoolJudges]=useState([]),[judgeSearch,setJudgeSearch]=useState(''),[assignmentSearch,setAssignmentSearch]=useState(''),[assignmentCompetitionFilter,setAssignmentCompetitionFilter]=useState(''),[assignmentJudgeFilter,setAssignmentJudgeFilter]=useState(''),[assignmentStatusFilter,setAssignmentStatusFilter]=useState('all'),[assignmentDrawerOpen,setAssignmentDrawerOpen]=useState(false),[coverageManageCompetitionId,setCoverageManageCompetitionId]=useState(''),[assignmentDraftJudge,setAssignmentDraftJudge]=useState(''),[assignmentDraftCompetitions,setAssignmentDraftCompetitions]=useState([]),[assignmentDraftRound,setAssignmentDraftRound]=useState(''),[assignmentBeingEdited,setAssignmentBeingEdited]=useState(null)
  const identity=`${eventId}:${selected}`,current=useRef(identity);current.current=identity
  const generation=useRef(0),mutating=useRef(false),createRequest=useRef(null)
+ const hasLoadedData=useRef(false);hasLoadedData.current=!!snapshot||!!event
  const view=snapshot?.competition?.id===selected&&snapshot.competition.event_id===eventId?snapshot:null
  const pageantEvent=event?.competitionType==='pageant'
  const editable=!!view&&!view.competition.official_child_rules_id&&event?.status==='draft'&&!event?.competitionCreatedAt&&!loading
  const reload=useCallback(async()=>{
   const expected=identity,request=++generation.current
-  setLoading(true)
+  if(!hasLoadedData.current)setLoading(true)
   try{
    const [list,ev,master,enrolled,available,foundation,participation]=await Promise.all([
-    initialList.current?Promise.resolve({data:{competitions:initialList.current}}):service.list(eventId),pageantService.getEvent(eventId),
-    stage==='contestants'||stage===null?pageantService.listContestants(eventId):Promise.resolve({data:{contestants:[]}}),
-    stage==='judges'||stage===null?service.enrollments(eventId):Promise.resolve({data:{judges:[]}}),
-    stage==='judges'||stage===null?service.pool(eventId):Promise.resolve({data:{judges:[]}}),
-    selected?service.foundation(eventId,selected):Promise.resolve(null),
-    selected&&(stage==='contestants'||stage==='judges'||stage===null)?service.entries(eventId,selected):Promise.resolve(null),
+    initialList.current?Promise.resolve({data:{competitions:initialList.current}}):fetchCompetitionSetupData(eventId,'competitions',()=>service.list(eventId)),
+    fetchCompetitionSetupData(eventId,'event',()=>pageantService.getEvent(eventId)),
+    stage==='contestants'||stage===null?fetchCompetitionSetupData(eventId,'contestants',()=>pageantService.listContestants(eventId)):Promise.resolve({data:{contestants:[]}}),
+    stage==='judges'||stage===null?fetchCompetitionSetupData(eventId,'enrollments',()=>service.enrollments(eventId)):Promise.resolve({data:{judges:[]}}),
+    stage==='judges'||stage===null?fetchCompetitionSetupData(eventId,'judge-pool',()=>service.pool(eventId)):Promise.resolve({data:{judges:[]}}),
+    selected?fetchCompetitionSetupData(eventId,`foundation:${selected}`,()=>service.foundation(eventId,selected)):Promise.resolve(null),
+    selected&&(stage==='contestants'||stage==='judges'||stage===null)?fetchCompetitionSetupData(eventId,`entries:${selected}`,()=>service.entries(eventId,selected)):Promise.resolve(null),
    ])
    const eventDivisions = ev.data.event.competitionType === 'pageant'
-    ? await pageantService.listDivisions(eventId)
+    ? await fetchCompetitionSetupData(eventId,'divisions',()=>pageantService.listDivisions(eventId))
     : { data: { divisions: [] } }
+   setCompetitionSetupData(eventId,'competitions',list)
    initialList.current=null
    if(current.current!==expected||generation.current!==request)return
    setChildren(list.data.competitions??[]);setEvent(ev.data.event);setPageantDivisions(eventDivisions.data.divisions??[]);setMasters(master.data.contestants??[]);setJudges(enrolled.data.judges??[]);setPool(available.data.judges??[]);setMasterNumber(Math.max(0,...(master.data.contestants??[]).map(m=>Number(m.contestantNumber??m.contestant_number)||0))+1)
@@ -171,8 +175,8 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
     ||c.name.trim().toLowerCase()==='pageant'
    ))
    const branchStates=stage?await Promise.all(branchCompetitions.map(async c=>{
-    if(stage==='contestants'){const [result,branchFoundation]=c.id===selected?[participation,foundation]:await Promise.all([service.entries(eventId,c.id),service.foundation(eventId,c.id)]),saved=branchFoundation?.data,scoring=competitionScoringReady(saved);return [c.id,{roundCount:saved?.configuration?.structure==='multiple'?saved.configuration.rounds.length:1,scoring,status:scoring&&result?.data.entries?.length?'complete':scoring?'in_progress':'not_configured',ready:scoring&&!!result?.data.entries?.length}]}
-    const result=c.id===selected?foundation:await service.foundation(eventId,c.id),saved=result?.data,scoring=competitionScoringReady(saved)
+    if(stage==='contestants'){const [result,branchFoundation]=c.id===selected?[participation,foundation]:await Promise.all([fetchCompetitionSetupData(eventId,`entries:${c.id}`,()=>service.entries(eventId,c.id)),fetchCompetitionSetupData(eventId,`foundation:${c.id}`,()=>service.foundation(eventId,c.id)) ]),saved=branchFoundation?.data,scoring=competitionScoringReady(saved);return [c.id,{roundCount:saved?.configuration?.structure==='multiple'?saved.configuration.rounds.length:1,scoring,status:scoring&&result?.data.entries?.length?'complete':scoring?'in_progress':'not_configured',ready:scoring&&!!result?.data.entries?.length}]}
+    const result=c.id===selected?foundation:await fetchCompetitionSetupData(eventId,`foundation:${c.id}`,()=>service.foundation(eventId,c.id)),saved=result?.data,scoring=competitionScoringReady(saved)
     const panel=saved.assignments.filter(a=>(enrolled.data.judges??[]).some(j=>j.id===a.participant_id&&j.isActive&&j.accountStatus==='active'&&['judge','head_judge'].includes(j.role)))
     const scopes=saved.configuration?.structure==='multiple'?saved.configuration.rounds:[{id:null}]
     const covered=!!saved.configuration&&scopes.every(r=>panel.some(a=>a.round_id==null||a.round_id===r.id))&&panel.length===saved.assignments.length
@@ -189,7 +193,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
  const run=async(action,success)=>{
   if(mutating.current)return
   mutating.current=true;setBusy(true);setNotice('');const expected=identity
-  try{await action();if(current.current===expected){await reload();if(current.current===expected)setNotice(success)};return true}
+  try{await action();if(current.current===expected){await invalidateCompetitionSetupData(eventId);await reload();if(current.current===expected)setNotice(success)};return true}
   catch(e){if(current.current===expected)setError(message(e));return false}
   finally{mutating.current=false;setBusy(false)}
  }
@@ -284,11 +288,14 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
    setParams(previous=>{const next=new URLSearchParams(previous);next.delete('competitionId');next.delete('scoringStep');return next},{replace:true})
   }
  },[pageantEvent,pageantChildId,children,selected,dirty,formPending,setParams])
- return <section className="v-competition-workflow space-y-5" aria-label="Independent competition setup">
+ const configurationIssues=Object.values(validation.issues).flat()
+ const returnToCompetitions=()=>{if(!(dirty||formPending)||window.confirm('Discard unsaved configuration changes and return to competitions?')){setPendingForms({});setShowValidation(false);void reload();returnToList()}}
+ const configurationStatus=dirty?'Unsaved changes':validation.allReady?'Configured':'Setup incomplete'
+ return <section className={`v-competition-workflow space-y-5 ${stage==='workspace'?'rs-config-page':''}`} aria-label="Independent competition setup">
   <div className="rounded-2xl border border-v-border bg-v-surface-elevated/50 p-5 sm:p-6">
    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-v-primary">{stage === 'workspace' ? 'Step 5 of 7' : stage === 'contestants' ? 'Step 6 of 7' : stage === 'judges' ? 'Step 7 of 7' : 'Competition setup'}</p>
-   <h2 className="mt-1 text-2xl font-semibold tracking-tight text-v-text">{stage === 'workspace' ? 'Rounds & Scoring Configuration' : stage === 'contestants' ? 'Contestants & Entries' : stage === 'judges' ? 'Judges' : 'Competition setup'}</h2>
-   {stage === 'judges' ? <p className="mt-2 max-w-3xl text-sm leading-relaxed text-v-text-subtle">Enroll judges and assign them to the competitions they will score.</p> : stage!=='contestants' && <p className="mt-2 max-w-3xl text-sm leading-relaxed text-v-text-subtle">Set up the rounds (if any) and configure the scoring rules for each competition.</p>}
+   {stage==='workspace'&&view?<><nav className="rs-breadcrumbs" aria-label="Breadcrumb"><button type="button" onClick={returnToCompetitions}>Competitions</button><ChevronRight size={15} aria-hidden="true"/><span>{view.competition.name}</span><ChevronRight size={15} aria-hidden="true"/><span aria-current="page">Configuration</span></nav><div className="rs-page-heading"><div><h2>{view.competition.name}</h2><p>Configure scoring rounds and criteria for this competition. Review your setup before saving.</p></div><div className="rs-page-heading-actions"><span className="rs-config-status" data-status={dirty?'draft':validation.allReady?'complete':'incomplete'}>{configurationStatus}</span><Button variant="ghost" className="rs-back-button" onClick={returnToCompetitions}>← Back to Competitions</Button></div></div></>:<h2 className="mt-1 text-2xl font-semibold tracking-tight text-v-text">{stage === 'contestants' ? 'Contestants & Entries' : stage === 'judges' ? 'Judges' : 'Competition setup'}</h2>}
+   {stage === 'judges' ? <p className="mt-2 max-w-3xl text-sm leading-relaxed text-v-text-subtle">Enroll judges and assign them to the competitions they will score.</p> : stage==='contestants'&& <p className="mt-2 max-w-3xl text-sm leading-relaxed text-v-text-subtle">Register contestants and entries for each selected competition.</p>}
    {!stage&&visible('workspace')&&<div className="mt-6 pb-1">
     <div className="grid grid-cols-2 gap-4 sm:flex sm:items-start">
      {setupSteps.map((step,index)=><div key={step.label} className="flex min-w-0 flex-1 items-start">
@@ -347,7 +354,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
   {view&&<>
    {stage==='judges'&&!entries.length&&<p role="status">Register entries in Step 6 before assigning judges to this competition.</p>}
    {visible('contestants')&&configuring&&<ContestantsStep event={event} eventId={eventId} children={nativeChildren} selected={selected} view={view} entries={entries} masters={masters} used={used} masterNumber={masterNumber} setMasterNumber={setMasterNumber} editable={editable} busy={busy} dirty={dirty} run={run} service={service} pageantService={pageantService} divisions={pageantDivisions} editingEntry={editingEntry} setEditingEntry={setEditingEntry} onBack={returnToList} onProceed={proceedEntries}/>}
-   {visible('workspace')&&<>{stage==='workspace'?<div className="rs-card-heading"><div><p className="rs-kicker">Competition Configuration</p><h3 className="text-xl font-semibold text-v-text">{view.competition.name}</h3>{pageantEvent&&<p className="v-helper-text mt-1">Pageant · {pageantDivisions.length} {pageantDivisions.length===1?'division':'divisions'} · {roundCounts[selected]??1} {(roundCounts[selected]??1)===1?'round':'rounds'}</p>}</div><Button variant="secondary" onClick={()=>{if(!(dirty||formPending)||window.confirm('Discard unsaved configuration changes and return to competitions?')){setPendingForms({});setShowValidation(false);void reload();returnToList()}}}>Back to Competitions</Button></div>:<h3 className="font-semibold">2. Structure, criteria and scoring rules</h3>}
+   {visible('workspace')&&<>{stage!=='workspace'&&<h3 className="font-semibold">2. Structure, criteria and scoring rules</h3>}
    {stage==='workspace'&&pageantEvent&&<section className="v-card space-y-3 p-4" aria-labelledby="pageant-divisions-heading"><div><h3 id="pageant-divisions-heading" className="text-sm font-semibold text-v-text">Pageant divisions</h3><p className="v-helper-text">These divisions organize contestants. The Pageant shares one scoring configuration across them.</p></div><ul className="flex flex-wrap gap-2">{pageantDivisions.map(division=><li key={division.id} className="inline-flex items-center gap-2 rounded-full border border-v-border bg-v-surface-elevated px-3 py-1.5 text-sm text-v-text">{division.name}<button type="button" aria-label={`Remove ${division.name} division`} disabled={!editable||busy} className="font-semibold text-v-text-subtle hover:text-v-danger disabled:opacity-50" onClick={()=>removePageantDivision(division)}>×</button></li>)}{!pageantDivisions.length&&<li className="text-sm text-v-text-subtle">No divisions configured yet.</li>}</ul><form onSubmit={addPageantDivision} className="flex flex-wrap gap-2"><label className="sr-only" htmlFor="pageant-division-name">New division name</label><input id="pageant-division-name" className={`${INPUT_CLASS} min-w-0 flex-1`} maxLength={200} placeholder="Add a custom division" value={divisionName} onChange={e=>setDivisionName(e.target.value)} disabled={!editable||busy}/><Button type="submit" disabled={!editable||busy||!divisionName.trim()}>Add division</Button></form></section>}
    {view.competition.official_child_rules_id&&<p>{view.rulesCurrent?'Rules frozen. Continue to Live Control.':'Frozen rules are stale after a dependency change. Scoring is blocked pending an authorized amendment.'}</p>}
    {stage!=='workspace'&&<p className="text-sm font-semibold">Current competition: {view.competition.name}</p>}
@@ -355,7 +362,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
     {stage==='workspace'?<>
       {showValidation&&!validation.allReady&&<div role="alert" className="rs-validation"><p className="font-semibold">Complete the following before saving:</p><ul>{Object.values(validation.issues).flat().map(issue=><li key={issue}>{issue}</li>)}</ul></div>}
       {formPending&&<p role="status" className="text-sm text-v-text-muted">Save or cancel the unfinished form before saving this competition.</p>}
-      <div className="rs-save-footer"><p className="v-helper-text">{nextPageantRound?`Round ${selectedRoundIndex+1} of ${pageantRounds.length} · Changes are saved after the final round.`:dirty?'You have unsaved changes.':'Each competition keeps its own scoring configuration.'}</p>{nextPageantRound?<Button disabled={busy||formPending} onClick={advancePageantRound}>Proceed to {nextPageantRound.name} →</Button>:<Button disabled={busy||formPending} onClick={saveConfiguration}>Save &amp; Return to Competitions</Button>}</div>
+      <div className="rs-save-footer rs-config-sticky-footer"><div className="rs-save-footer-copy"><p className="font-medium text-v-text">{nextPageantRound?`Round ${selectedRoundIndex+1} of ${pageantRounds.length}`:dirty?'Unsaved configuration changes':'Configuration status'}</p><p className="v-helper-text">{nextPageantRound?`Round ${selectedRoundIndex+1} of ${pageantRounds.length} · Changes are saved after the final round.`:!validation.allReady?configurationIssues[0]??'Complete the required configuration before saving.':dirty?'Save to apply these changes.':'Your configuration is ready to save.'}</p>{formPending&&<p className="rs-footer-warning">Finish or cancel the open form before continuing.</p>}</div><div className="rs-save-footer-actions"><Button variant="secondary" onClick={returnToCompetitions}>Back to Competitions</Button>{nextPageantRound?<Button aria-label={`Proceed to ${nextPageantRound.name} →`} disabled={busy||formPending||!validation.allReady} onClick={advancePageantRound}>Next: {nextPageantRound.name} <ChevronRight size={16}/></Button>:<Button disabled={busy||formPending||!validation.allReady} onClick={saveConfiguration}>{busy?'Saving…':'Save & Return to Competitions'}</Button>}</div></div>
     </>:<>    {(showValidation||dirty)&&validation.issues[activeSetupStep].length>0&&<ul className="rounded-xl border border-v-border p-4 text-sm text-v-danger" aria-label="Substep validation">{validation.issues[activeSetupStep].map(issue=><li key={issue}>{issue}</li>)}</ul>}
     {showValidation&&activeSetupStep==='deductions'&&!validation.allReady&&<p role="alert">Review incomplete substeps before completing this competition.</p>}
     {formPending&&<p role="status" className="text-sm text-v-text-muted">Use Add or Update to include the unfinished form before saving.</p>}

@@ -1,26 +1,37 @@
+import CalendarCard from '@/components/ui/CalendarCard'
+
 export default function DateTimeInput({
   value,
   onChange,
   onBlur,
   id,
   name,
+  min,
+  max,
   required = false,
   hasError = false,
   disabled = false,
   className = '',
+  showShortcuts = true,
 }) {
   return (
-    <input
-      type="datetime-local"
+    <CalendarCard
       id={id}
       name={name}
-      className={`v-input ${className}`}
-      value={value ?? ''}
-      onChange={event => onChange(event.target.value)}
+      className={className}
+      value={value}
+      onChange={onChange}
       onBlur={onBlur}
+      min={min}
+      max={max}
       required={required}
-      aria-invalid={hasError || undefined}
+      hasError={hasError}
       disabled={disabled}
+      placeholder="Select date and time"
+      twoStep
+      confirmDate
+      showShortcuts={showShortcuts}
+      preventPast
     />
   )
 }

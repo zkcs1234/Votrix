@@ -5,9 +5,11 @@ import { ArrowLeft, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Filt
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import useCompetitionSync from '@/hooks/useCompetitionSync'
+import useCompetitionContext from '@/hooks/useCompetitionContext'
 import { nativeCompetitionService as service } from '@/services/competition-native.service'
 import CompetitionScoringForm from './CompetitionScoringForm'
 import Button from '@/components/ui/Button'
+import Modal from '@/components/ui/Modal'
 import NativeTabulationWorkspace from '@/components/organizer/competition/NativeTabulationWorkspace'
 import {nativeTabulationService} from '@/services/competition-native-tabulation.service'
 import {competitionRetryDelay} from '@/utils/competitionRetry'
@@ -16,6 +18,21 @@ const message=e=>e.response?.data?.message??e.message??'Unable to connect. Saved
 export const nativeContextKey=(eventId,judgeId,ctx)=>`votrix.native.scoring.v1:${judgeId}:${eventId}:${ctx.competitionId}:${ctx.roundId??'single'}:${ctx.sessionId??'waiting'}:${ctx.rulesVersion}:${ctx.setupRevision}:${ctx.inputRevision}`
 const chooseKey=c=>`${c.competitionId}:${c.roundId??'single'}`
 const serverScores=view=>Object.fromEntries((view.drafts??[]).flatMap(d=>Object.entries(d.scores).map(([id,value])=>[`${d.entry_id}:${id}`,value])))
+const roundStatusLabel=status=>({open:'OPEN',active:'OPEN',paused:'PAUSED',submitted:'SUBMITTED',closed:'CLOSED',waiting:'CLOSED',review:'CLOSED'}[status]??'CLOSED')
+function RoundNavigation({contexts,selected,onSelect,statusFor,isDisabled,ariaLabel}) {
+ return <nav className="v-native-round-nav" aria-label={ariaLabel}>
+  <span className="v-native-round-label">Round</span>
+  <div className="v-native-round-options">
+   {contexts.map((context,index)=>{
+    const status=roundStatusLabel(statusFor(context))
+    const key=chooseKey(context)
+    return <button key={key} type="button" className="v-native-round-option" data-status={status.toLowerCase()} aria-pressed={selected===key} aria-label={`Round ${index+1}: ${status}${context.roundName?` — ${context.roundName}`:''}`} title={context.roundName||undefined} disabled={isDisabled?.(context,index)} onClick={()=>onSelect(key)}>
+     <span>Round {index+1}</span><strong>{status}</strong>
+    </button>
+   })}
+  </div>
+ </nav>
+}
 
 // Flag defaults off. Existing pages continue without any native request.
 export function CompetitionWorkspaceBoundary({owner=false,Legacy}) {
@@ -34,7 +51,12 @@ export function CompetitionWorkspaceBoundary({owner=false,Legacy}) {
    if(!owner&&!choices.length&&!reviewerChoices.length&&import.meta.env.VITE_COMPETITION_NATIVE_TABULATION_ENABLED==='true'){
     const response=await nativeTabulationService.reviewerChoices(eventId);reviewerChoices=response.data.contexts??[]
    }
-   if(sequence===discoveryRequest.current&&discoveryActor.current===actor)setState({choices,reviewerChoices,nativeEvent:data.nativeEvent,eventName:data.eventName,event:data.event})
+   let event=data.event
+   if(owner&&data.nativeEvent&&choices.length&&event?.status==='scheduled'){
+    const {data:activation}=await service.activateLiveControl(eventId)
+    event={...event,status:activation.status}
+   }
+   if(sequence===discoveryRequest.current&&discoveryActor.current===actor)setState({choices,reviewerChoices,nativeEvent:data.nativeEvent,eventName:data.eventName,event})
   }catch(e){if(sequence===discoveryRequest.current&&discoveryActor.current===actor)setState({error:message(e)})}
  },[eventId,owner,actor])
  const invalidateDiscovery=useCallback(()=>{discoveryRequest.current++},[])
@@ -54,20 +76,19 @@ export function CompetitionWorkspaceBoundary({owner=false,Legacy}) {
  if(!state.choices.length&&state.nativeEvent===true)return owner?<p>Complete competition setup before starting scoring. <Link to={`/organizer/competition/events/${eventId}/workspace`}>Open competition setup</Link></p>:<p>No competition or round is currently assigned to you. Contact the organizer.</p>
  if(!state.choices.length&&state.nativeEvent!==false)return <p role="alert">Competition identity is unavailable. Reconnect before continuing.</p>
  if(!state.choices.length)return <Legacy/>
- return <NativeCompetitionWorkspace key={`${eventId}:${owner}:${requestedCompetition}:${requestedRound}`} eventId={eventId} eventName={state.eventName} event={state.event} choices={state.choices} initialChoice={initial} owner={owner}/>
+ return <NativeCompetitionWorkspace key={owner?`${eventId}:owner`:`${eventId}:${owner}:${requestedCompetition}:${requestedRound}`} eventId={eventId} eventName={state.eventName} event={state.event} choices={state.choices} initialChoice={initial} owner={owner}/>
 }
 
 export default function NativeCompetitionWorkspace({eventId,eventName,event=null,choices,owner=false,initialChoice=null}) {
  const {user}=useAuth()
  const judgeId=user?.id
- const [selected,setSelected]=useState(chooseKey(initialChoice??choices[0]))
- const choice=choices.find(c=>chooseKey(c)===selected)??choices[0]
+ const {selected,setSelected,choice}=useCompetitionContext(choices,initialChoice,owner)
  const choicesRef=useRef(choices);choicesRef.current=choices
  const choiceRef=useRef(choice);choiceRef.current=choice
  const identity=`${eventId}:${judgeId}:${selected}:${owner}`
  const identityRef=useRef(identity);identityRef.current=identity
  const request=useRef(0),version=useRef(null),viewRef=useRef(null),queue=useRef({}),storageKey=useRef(null),busyRef=useRef(false),scoresRef=useRef({}),viewError=useRef(false)
- const [snapshot,setView]=useState(null),[ownerSnapshots,setOwnerSnapshots]=useState({}),[ownerTabulations,setOwnerTabulations]=useState({}),[scores,setScores]=useState({}),[error,setError]=useState(null),[notice,setNotice]=useState(null),[busy,setBusy]=useState(false),[pending,setPending]=useState(0),[submittingKey,setSubmittingKey]=useState(null),[accessBusyKeys,setAccessBusyKeys]=useState(()=>new Set())
+ const [snapshot,setView]=useState(null),[ownerSnapshots,setOwnerSnapshots]=useState({}),[ownerTabulations,setOwnerTabulations]=useState({}),[scores,setScores]=useState({}),[error,setError]=useState(null),[notice,setNotice]=useState(null),[busy,setBusy]=useState(false),[pending,setPending]=useState(0),[submittingKey,setSubmittingKey]=useState(null),[accessBusyKeys,setAccessBusyKeys]=useState(()=>new Set()),[submitConfirmOpen,setSubmitConfirmOpen]=useState(false)
  const accessQueue=useRef(Promise.resolve())
  const view=snapshot?.context?.eventId===eventId&&snapshot.context.competitionId===choice.competitionId&&snapshot.context.roundId===choice.roundId&&(owner||snapshot.viewerJudgeId===judgeId)?snapshot:null
  const [divisionFilter,setDivisionFilter]=useState('all')
@@ -246,13 +267,17 @@ export default function NativeCompetitionWorkspace({eventId,eventName,event=null
  const submit=async()=>{
   if(busyRef.current)return
   const expected=identity
-  if(!await flush()||identityRef.current!==expected||Object.keys(queue.current).length)return
-  queue.current.submit={action:'submit',body:envelope()};persist();await flush()
+  if(!await flush()||identityRef.current!==expected||Object.keys(queue.current).length)return false
+  queue.current.submit={action:'submit',body:envelope()};persist();return flush()
+ }
+ const confirmSubmit=async()=>{
+  await submit()
+  setSubmitConfirmOpen(false)
  }
  const control=async(action,extra={})=>{
   const expected=identity
   setBusy(true)
-  try{await service.control(eventId,choice.competitionId,action,{...envelope(),...extra});if(identityRef.current===expected){setError(null);setNotice(action==='start'?'Category scoring opened.':action==='close'?'Category scoring closed.':action==='access'?extra.open?'Judge scoring access opened for participant.':'Judge scoring access closed for participant.':action==='pause'?'Scoring paused.':action==='resume'?'Scoring resumed.':'Live control updated.')}}catch(e){if(identityRef.current===expected){setError(message(e));setNotice(null)}}finally{if(identityRef.current===expected){setBusy(false);await refresh()}}
+  try{const {data}=await service.control(eventId,choice.competitionId,action,{...envelope(),...extra});if(identityRef.current===expected){setError(null);setNotice(action==='close'&&data?.calculation?`Scoring closed. ${data.calculation.status==='up_to_date'?'Scores calculated automatically. Continue to Tabulation to review and finalize this round.':data.calculation.message??'Automatic calculation will run once all current submissions and configured deductions are ready.'}`:action==='start'?'Category scoring opened.':action==='close'?'Category scoring closed.':action==='access'?extra.open?'Judge scoring access opened for participant.':'Judge scoring access closed for participant.':action==='pause'?'Scoring paused.':action==='resume'?'Scoring resumed.':'Live control updated.')}}catch(e){if(identityRef.current===expected){setError(message(e));setNotice(null)}}finally{if(identityRef.current===expected){setBusy(false);await refresh()}}
  }
  const proceedToCategory=async targetChoice=>{
   const target=ownerSnapshots[chooseKey(targetChoice)]
@@ -312,7 +337,15 @@ export default function NativeCompetitionWorkspace({eventId,eventName,event=null
    })}
   </nav>
   <div className="v-native-judge-session-bar">
-   <label>Round <select aria-label="Round" value={selected} onChange={e=>setSelected(e.target.value)}>{choices.filter(c=>c.competitionId===choice.competitionId).map(c=><option key={chooseKey(c)} value={chooseKey(c)}>{c.roundName}</option>)}</select></label>
+   <RoundNavigation ariaLabel="Scoring rounds" contexts={choices.filter(c=>c.competitionId===choice.competitionId)} selected={selected} onSelect={setSelected} statusFor={context=>{
+    const current=chooseKey(context)===selected?view:null
+    if(current?.laterRoundBlocked)return 'closed'
+    if(current?.session?.status==='active')return current.scoringAvailable===false?'closed':'open'
+    if(current?.session?.status==='paused')return 'paused'
+    if(current?.session?.status==='closed')return 'closed'
+    if(current?.submission)return 'submitted'
+    return context.state
+   }}/>
    <span className="v-native-live-indicator" data-live={view?.session?.status==='active'} role="status">{view?.session?.status==='active'?(connected?'Scoring session is live':'Reconnecting to live session'):view?.session?.status==='paused'?'Scoring is paused':view?.submission?'Round submitted · waiting for organizer':owner?'Session not started':'Waiting for organizer to open scoring'}</span>
    {!owner&&divisionOptions.length>0&&<nav className="v-native-division-filter" aria-label="Contestant division filter"><div role="group" aria-label="Show contestants by division"><button type="button" aria-pressed={activeDivision==='all'} onClick={()=>setDivisionFilter('all')}>Event Wide</button>{divisionOptions.map(division=><button key={division.id} type="button" data-division-tone={division.tone} aria-pressed={activeDivision===division.id} onClick={()=>setDivisionFilter(division.id)}>{division.label}</button>)}</div></nav>}
    {!owner&&<span className="v-native-connection-state">{connected?'Connected':'Reconnecting'}</span>}
@@ -342,20 +375,24 @@ export default function NativeCompetitionWorkspace({eventId,eventName,event=null
    <footer className="v-native-submit-footer">
     <div className="v-native-submit-status" role="status">
      <strong>{pending?`Saving ${pending} draft${pending===1?'':'s'}`:view.submission?'Round submitted':'Drafts saved'}</strong>
-     <span>{view.submission?'Wait for the organizer to open the next category.':view.scoringAvailable?'Lock every criterion for every contestant before submitting.':lockedReason??'Drafts will sync when scoring is available.'}</span>
+     <span>{view.submission?'Wait for the organizer to open the next category.':view.scoringAvailable?'Lock every criterion for every contestant before submitting their scores.':lockedReason??'Drafts will sync when scoring is available.'}</span>
      {error&&<span className="v-error-text">{error}</span>}
     </div>
     <div className="v-native-submit-actions">
      {pending>0&&<Button variant="secondary" disabled={busy} onClick={()=>{for(const job of Object.values(queue.current))job.blocked=false;persist();void flush()}}>Retry saves</Button>}
      {Object.values(queue.current).some(job=>job.blocked)&&<Button variant="secondary" disabled={busy||view.session?.status!=='active'||!!view.submission} onClick={()=>{for(const [row,job] of Object.entries(queue.current)){if(job.action==='submit'){delete queue.current[row];continue}delete job.body;job.blocked=false;job.action='draft'}persist();void flush()}}>Review scores</Button>}
-     <Button disabled={busy||view.scoringAvailable===false||!!view.submission||view.session?.status!=='active'||!view.contestants.length||!view.contestants.every(e=>view.criteria.every(k=>e.lockedCriteria.includes(k.id)))} onClick={submit}>{view.submission?'Submitted':'Lock Submission'}</Button>
+     <Button className="v-native-submit-button" disabled={busy||view.scoringAvailable===false||!!view.submission||view.session?.status!=='active'||!view.contestants.length||!view.contestants.every(e=>view.criteria.every(k=>e.lockedCriteria.includes(k.id)))} onClick={()=>setSubmitConfirmOpen(true)}>{view.submission?'Scores Submitted':'Submit Scores'}</Button>
     </div>
    </footer>
+   <Modal open={submitConfirmOpen} onClose={()=>setSubmitConfirmOpen(false)} closeDisabled={busy} closeOnBackdrop={!busy} title="Submit scores for this round?" id="submit-scores-confirmation" size="sm" footer={<div className="flex justify-end gap-2"><Button variant="secondary" disabled={busy} onClick={()=>setSubmitConfirmOpen(false)}>Cancel</Button><Button loading={busy} disabled={busy} onClick={confirmSubmit}>{busy?'Submitting…':'Yes, Submit Scores'}</Button></div>}>
+    <p className="text-sm text-v-text-muted">After submitting, you won’t be able to edit these scores unless the organizer reopens the round.</p>
+   </Modal>
   </>}
  </div>
 }
 
 function NativeOrganizerLiveDashboard({eventId,eventName,event,choices,choice,selected,setSelected,views,tabulations,view,connected,busy,accessBusyKeys,error,notice,eventClosed,control,proceedToCategory,accessControl,reason,setReason,correctionJudge,setCorrectionJudge}) {
+ const tabulationPath=`/organizer/competition/events/${eventId}/tabulation/overview?${new URLSearchParams({competitionId:choice.competitionId,...(choice.roundId?{roundId:choice.roundId}:{})})}`
  const [search,setSearch]=useState('')
  const isPageant=(event?.competitionType??event?.competition_type)?.toLowerCase()==='pageant'
  const [accessFilter,setAccessFilter]=useState('all')
@@ -418,13 +455,10 @@ function NativeOrganizerLiveDashboard({eventId,eventName,event,choices,choice,se
  const pageCount=Math.max(1,Math.ceil(filtered.length/pageSize))
  const currentPage=Math.min(page,pageCount)
  const pageRows=filtered.slice((currentPage-1)*pageSize,currentPage*pageSize)
- const lockedCategory=eventClosed||Boolean(activeOther)||!priorComplete||Boolean(view?.laterRoundBlocked)
+ const lockedCategory=!view||eventClosed||Boolean(activeOther)||!priorComplete||Boolean(view?.laterRoundBlocked)
  const selectedContextStatus=categoryStatus(currentCategory??choice)
  const selectedSubmitted=(view?.progress??[]).filter(judge=>judge.submitted).length
  const selectedJudges=(view?.progress??[]).length
- const pageantRounds=contextsFor(choice.competitionId)
- const pageantRoundIndex=pageantRounds.findIndex(context=>chooseKey(context)===chooseKey(choice))
- const hasNextPageantRound=pageantRoundIndex>=0&&pageantRoundIndex<pageantRounds.length-1
  const allJudgesSubmitted=selectedJudges>0&&selectedSubmitted===selectedJudges
  const waitingJudges=Math.max(0,selectedJudges-selectedSubmitted)
  const fmtDate=value=>value?new Date(value).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'Schedule not set'
@@ -560,18 +594,18 @@ function NativeOrganizerLiveDashboard({eventId,eventName,event,choices,choice,se
    <aside className="v-native-live-sidebar">
     <section className="v-native-live-card">
      <div className="v-native-live-side-title"><h2>Live Control Panel</h2><span className={statusClass(session?.status==='active'?'scoring':session?.status==='paused'?'paused':'waiting')}>{session?.status==='active'?'Scoring live':session?.status==='paused'?'Paused':'Waiting'}</span></div>
-     <div className="v-native-live-current"><span>Current category</span><strong>{choice.competitionName}</strong><label>Round<select aria-label="Current round" value={selected} onChange={event=>setSelected(event.target.value)}>{contextsFor(choice.competitionId).map((context,index)=>{const locked=isPageant&&index>0&&views[chooseKey(context)]?.laterRoundBlocked!==false;return <option key={chooseKey(context)} value={chooseKey(context)} disabled={locked}>{context.roundName}{locked?' · Locked until finalization and advancement confirmation':''}</option>})}</select></label><p>{selectedSubmitted} of {selectedJudges} judges submitted</p></div>
+     <div className="v-native-live-current"><span>Current category</span><strong>{choice.competitionName}</strong><RoundNavigation ariaLabel="Live control rounds" contexts={contextsFor(choice.competitionId)} selected={selected} onSelect={setSelected} statusFor={context=>{const roundView=views[chooseKey(context)];return roundView?.laterRoundBlocked?'closed':roundView?.session?.status??context.state}} isDisabled={(context,index)=>isPageant&&index>0&&views[chooseKey(context)]?.laterRoundBlocked!==false}/><p>{selectedSubmitted} of {selectedJudges} judges submitted</p></div>
      <div className="v-native-live-buttons">
-      {!session&&<button type="button" disabled={busy||lockedCategory} title={activeOther?'Close scoring in the currently active category first':!priorComplete?'Finish live scoring and close previous categories before opening this category':view?.laterRoundBlocked?'Confirm qualification for this round before opening it.':undefined} onClick={()=>void openCategory()}>{busy?'Opening…':'Open Category'}</button>}
+      {!session&&<button type="button" disabled={busy||lockedCategory} title={!view?'Loading the selected round':activeOther?'Close scoring in the currently active category first':!priorComplete?'Finish live scoring and close previous categories before opening this category':view?.laterRoundBlocked?'Confirm qualification for this round before opening it.':undefined} onClick={()=>void openCategory()}>{busy?'Opening…':choice.roundId?`Open ${choice.roundName} scoring`:'Open Category'}</button>}
       {session?.status==='active'&&<><button type="button" className="secondary" disabled={busy||eventClosed} onClick={()=>void control('pause')}>Pause scoring</button><button type="button" className="danger" disabled={busy||eventClosed||!allJudgesSubmitted} title={!allJudgesSubmitted?(selectedJudges?`Waiting for ${waitingJudges} judge${waitingJudges===1?'':'s'} to submit.`:'No required judges are assigned to this category and round.'):undefined} onClick={()=>void closeScoring()}>{busy?'Closing…':`Close ${choice.competitionName}`}</button></>}
       {session?.status==='paused'&&<><button type="button" disabled={busy||eventClosed} onClick={()=>void control('resume')}>Resume scoring</button><button type="button" className="danger" disabled={busy||eventClosed||!allJudgesSubmitted} title={!allJudgesSubmitted?(selectedJudges?`Waiting for ${waitingJudges} judge${waitingJudges===1?'':'s'} to submit.`:'No required judges are assigned to this category and round.'):undefined} onClick={()=>void closeScoring()}>{busy?'Closing…':`Close ${choice.competitionName}`}</button></>}
       {session?.status==='closed'&&<p>Scoring is closed. Submissions are preserved; review and finalize results in Tabulation.</p>}
       {session?.status==='active'&&!allJudgesSubmitted&&<p role="status">Waiting for {selectedJudges?`${waitingJudges} judge${waitingJudges===1?'':'s'} to submit.`:'required judges to be assigned.'}</p>}
       {session?.status==='active'&&allJudgesSubmitted&&<p role="status">All required judges have submitted. Close this category to continue.</p>}
       {session?.status==='closed'&&currentCategoryComplete&&nextCategory&&<div className="v-native-live-progression" role="status"><strong>{choice.competitionName} closed — {selectedSubmitted}/{selectedJudges} judges submitted.</strong><span>Scores are saved and ready for later tabulation.</span><button type="button" disabled={busy||eventClosed||activeOther} onClick={()=>void proceedToCategory(contextsFor(nextCategory.competitionId)[0])}>{busy?`Opening ${nextCategory.competitionName}…`:`Proceed to ${nextCategory.competitionName} →`}</button></div>}
-      {isPageant&&session?.status==='closed'&&hasNextPageantRound&&<div className="v-native-live-progression" role="status"><strong>{choice.roundName} scoring is closed.</strong><span>Calculate and finalize this round in Tabulation, then review and confirm the configured qualifiers (such as a top-percentage cutoff) before opening the next round.</span><Link to={`/organizer/competition/events/${eventId}/tabulation?competitionId=${encodeURIComponent(choice.competitionId)}&roundId=${encodeURIComponent(choice.roundId)}`}>Go to {choice.roundName} Tabulation →</Link></div>}
-      {!session&&lockedCategory&&<p>{activeOther?'Another category or round is currently scoring. Close it before opening this one.':!priorComplete?'Complete and close previous categories after all required judges submit before opening this category.':eventClosed?'This event is read only.':'Category unavailable.'}</p>}
-      {allCategoriesComplete&&<div className="v-native-live-progression" role="status"><strong>All Competition Categories Completed</strong><span>All live scoring sessions are closed. Scores are ready for tabulation.</span><Link to={`/organizer/competition/events/${eventId}/tabulation`}>Go to Tabulation →</Link></div>}
+      {session?.status==='closed'&&allJudgesSubmitted&&<div className="v-native-live-progression" role="status"><strong>{choice.roundName} scoring is closed.</strong><span>Scores calculate automatically. Review and finalize this round in Tabulation, then confirm the proposed qualifiers before opening the next round.</span><Link to={tabulationPath}>{choice.roundId?`Go to ${choice.roundName} Tabulation`:'Go to Tabulation'} &rarr;</Link></div>}
+      {!session&&lockedCategory&&<p>{!view?'Loading the selected round.':activeOther?'Another category or round is currently scoring. Close it before opening this one.':!priorComplete?'Complete and close previous categories after all required judges submit before opening this category.':eventClosed?'This event is read only.':'Category unavailable.'}</p>}
+      {allCategoriesComplete&&<div className="v-native-live-progression" role="status"><strong>All Competition Categories Completed</strong><span>All live scoring sessions are closed. Scores are ready for tabulation.</span></div>}
      </div>
      <p className="v-native-live-explainer">Closing scoring preserves all submitted work. It does not finalize results or advance contestants.</p>
     </section>
@@ -586,7 +620,7 @@ function NativeOrganizerLiveDashboard({eventId,eventName,event,choices,choice,se
     <section className="v-native-live-card">
      <h2 className="v-native-live-quick-title">Quick Actions</h2>
      <div className="v-native-live-quick-links">
-      <Link to={`/organizer/competition/events/${eventId}/tabulation`}><Trophy aria-hidden/>Results & tabulation</Link>
+      <Link to={tabulationPath}><Trophy aria-hidden/>Results & tabulation</Link>
       <Link to={`/organizer/competition/events/${eventId}/judges`}><Users aria-hidden/>Judge management</Link>
       <Link to={`/organizer/competition/events/${eventId}/workspace`}><Shield aria-hidden/>Category rules</Link>
       <Link to={`/organizer/competition/events/${eventId}/edit`}><Settings2 aria-hidden/>Event settings</Link>

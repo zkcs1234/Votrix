@@ -275,7 +275,7 @@ export default function CompetitionScoringForm({
           })}</tbody>
         </table>
       </div>
-      <p className="v-judge-sheet-help">{simplified?'Score each criterion, then lock it when complete. Lock Submission becomes available after every required criterion is locked.':'Scroll to view all criteria. Contestant identities and criteria headers stay visible. Lock commits one major criterion; Lock Submission sends the completed round.'}</p>
+      <p className="v-judge-sheet-help">{simplified?'Score each criterion, then lock it when complete. Submit Scores becomes available after every required criterion is locked.':'Scroll to view all criteria. Contestant identities and criteria headers stay visible. Lock commits one major criterion; Submit Scores sends the completed round.'}</p>
     </section>
   )
 }

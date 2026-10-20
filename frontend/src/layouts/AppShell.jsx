@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Menu, Bell, LogOut, ChevronLeft, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -9,6 +9,7 @@ import NotificationsModal from '@/components/ui/NotificationsModal'
 import GlobalSearch from '@/components/ui/GlobalSearch'
 import ProfileCard from '@/components/organizer/ProfileCard'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
+import { competitionNavigationHref } from '@/utils/competitionNavigation'
 
 // Human-readable labels for the account chip. Shown instead of the raw username
 // or email, which can be long — the role is short and tells the user which
@@ -55,19 +56,63 @@ function readCollapsedPref() {
   }
 }
 
+function sidebarItemActive(item, location, eventId) {
+  if (item.children) return item.children.some(child => sidebarItemActive(child, location, eventId))
+  return item.isActive ? item.isActive(location, eventId) : location.pathname.endsWith(`/${item.path}`)
+}
+
+function SidebarChildLink({ item, eventId, location, onNavigate }) {
+  const active = sidebarItemActive(item, location, eventId)
+  const [expanded, setExpanded] = useState(active)
+  const childrenId = useId()
+  const Icon = item.icon
+  const href = item.scoped
+    ? item.hrefTemplate?.(eventId) ?? `${item.basePath}/${eventId}/${item.path}`
+    : item.path
+  useEffect(() => { setExpanded(active) }, [active, location.pathname])
+
+  return <div>
+    <div className={`flex items-center rounded-md ${active ? 'bg-white/10 text-v-sidebar-active' : 'text-v-sidebar-text'}`}>
+      <Link
+        to={competitionNavigationHref(href, eventId, location)}
+        onClick={onNavigate}
+        className={`flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-xs transition-colors hover:bg-white/5 hover:text-white ${active ? 'font-medium' : ''}`}
+        aria-current={active ? item.children ? 'location' : 'page' : undefined}
+        title={item.label}
+      >
+        {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" strokeWidth={1.5} aria-hidden />
+          : <span className="h-1 w-1 shrink-0 rounded-full bg-current opacity-60" aria-hidden />}
+        <span className="truncate">{item.label}</span>
+      </Link>
+      {item.children && <button
+        type="button"
+        className="flex min-h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-white/5 hover:text-white"
+        aria-label={`${expanded ? 'Collapse' : 'Expand'} ${item.label}`}
+        aria-expanded={expanded}
+        aria-controls={childrenId}
+        onClick={() => setExpanded(!expanded)}
+      ><ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden /></button>}
+    </div>
+    {item.children && expanded && <div id={childrenId} role="group" aria-label={`${item.label} sections`} className="ml-3 mt-1 space-y-0.5 border-l border-white/10 pl-1">
+      {item.children.map(child => <SidebarChildLink key={child.label} item={child} eventId={eventId} location={location} onNavigate={onNavigate} />)}
+    </div>}
+  </div>
+}
+
 function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
+  const isChildActive = child => sidebarItemActive(child, location, eventId)
   const [expandedItem, setExpandedItem] = useState(() =>
     items.find((item) =>
-      item.children?.some((child) => location.pathname.endsWith(`/${child.path}`)),
+      item.children?.some(isChildActive),
     )?.label ?? '',
   )
 
   useEffect(() => {
     const activeParent = items.find((item) =>
-      item.children?.some((child) => location.pathname.endsWith(`/${child.path}`)),
+      item.children?.some(child => sidebarItemActive(child, location, eventId)),
     )
     if (activeParent) setExpandedItem(activeParent.label)
-  }, [items, location.pathname])
+  }, [items, location, eventId])
 
   const linkClass = (active) =>
     `group relative flex items-center rounded-lg text-sm transition-colors duration-150 ${
@@ -83,35 +128,9 @@ function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
       {items.map((item) => {
         const Icon = item.icon ?? null
         if (item.children) {
-          const activeChild = item.children.some((child) =>
-            location.pathname.endsWith(`/${child.path}`),
-          )
+          const activeChild = item.children.some(isChildActive)
           const expanded = expandedItem === item.label
-          const childLinks = item.children.map((child) => {
-            const ChildIcon = child.icon ?? null
-            const href = child.scoped
-              ? child.hrefTemplate?.(eventId) ?? `${child.basePath}/${eventId}/${child.path}`
-              : child.path
-            const active = location.pathname.endsWith(`/${child.path}`)
-            return (
-              <Link
-                key={child.label}
-                to={href}
-                onClick={onNavigate}
-                className={`flex min-h-8 items-center gap-2 rounded-md px-3 py-1.5 text-xs transition-colors ${
-                  active
-                    ? 'bg-white/10 font-medium text-v-sidebar-active'
-                    : 'text-v-sidebar-text hover:bg-white/5 hover:text-white'
-                }`}
-                aria-current={active ? 'page' : undefined}
-              >
-                {ChildIcon
-                  ? <ChildIcon className="h-3.5 w-3.5 shrink-0 opacity-80" strokeWidth={1.5} aria-hidden />
-                  : <span className="h-1 w-1 shrink-0 rounded-full bg-current opacity-60" aria-hidden />}
-                <span className="truncate">{child.label}</span>
-              </Link>
-            )
-          })
+          const childLinks = item.children.map(child => <SidebarChildLink key={child.label} item={child} eventId={eventId} location={location} onNavigate={onNavigate} />)
 
           if (item.scoped && !eventId) {
             return (
@@ -149,6 +168,8 @@ function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
               {expanded && (
                 <div
                   id={`nav-${item.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                  role="group"
+                  aria-label={`${item.label} navigation`}
                   className={
                     isCollapsed
                       ? 'absolute left-full top-0 z-50 ml-2 w-56 rounded-lg border border-white/10 bg-v-sidebar p-1.5 shadow-xl'
@@ -207,7 +228,7 @@ function NavLinks({ items, eventId, location, onNavigate, isCollapsed }) {
             : location.pathname === item.path
 
         return (
-          <Link key={item.label} to={href} onClick={onNavigate} className={linkClass(active)} aria-current={active ? 'page' : undefined}>
+          <Link key={item.label} to={competitionNavigationHref(href, eventId, location)} onClick={onNavigate} className={linkClass(active)} aria-current={active ? 'page' : undefined}>
             {Icon && <Icon className={`shrink-0 ${isCollapsed ? 'h-5 w-5' : 'h-4 w-4'}`} strokeWidth={1.5} aria-hidden />}
             {!isCollapsed && <span className="truncate">{item.label}</span>}
             {isCollapsed && (

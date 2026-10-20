@@ -11,8 +11,8 @@ export const EVENT_STAGES = {
     { key: 'analytics', label: 'Analytics', path: 'analytics' },
     { key: 'report', label: 'Report', path: 'report' },
   ],
-  // Order mirrors the regrouped sidebar (Setup → Run → Results) so the stepper
-  // and its footer next/prev walk the same round-first workflow.
+  // The setup wizard ends at Review & Publish. Live Control and result
+  // workspaces are operational areas, not additional setup steps.
   competition: [
     { key: 'details', label: 'Event Details', path: 'edit' },
     { key: 'branding', label: 'Branding', path: 'branding' },
@@ -21,10 +21,7 @@ export const EVENT_STAGES = {
     { key: 'workspace', label: 'Rounds & Scoring', path: 'workspace' },
     { key: 'contestants', label: 'Contestants / Entries', path: 'contestants' },
     { key: 'judges', label: 'Judges', path: 'judges' },
-    { key: 'review', label: 'Review & Create', path: 'review' },
-    { key: 'live', label: 'Live Control', path: 'live' },
-    { key: 'tabulation', label: 'Tabulation', path: 'tabulation' },
-    { key: 'rankings', label: 'Results & Analysis', path: 'rankings' },
+    { key: 'review', label: 'Review & Publish', path: 'review' },
   ],
   polling: [
     { key: 'details', label: 'Details', path: 'edit' },

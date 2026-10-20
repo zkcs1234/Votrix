@@ -1,10 +1,12 @@
+import {MemoryRouter} from 'react-router-dom'
 import {act,fireEvent,render,screen,waitFor} from '@testing-library/react'
 import {beforeEach,test,expect,vi} from 'vitest'
-const f=vi.hoisted(()=>({owned:vi.fn(),publish:vi.fn(),export:vi.fn(),listeners:new Map()}))
+const f=vi.hoisted(()=>({choices:vi.fn(),owned:vi.fn(),publish:vi.fn(),export:vi.fn(),listeners:new Map()}))
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'owner'}})}))
+vi.mock('@/services/competition-native.service',()=>({nativeCompetitionService:{choices:f.choices}}))
 vi.mock('@/services/competition-native-results.service',()=>({nativeResultsService:{owned:f.owned,publish:f.publish,export:f.export}}))
 vi.mock('@/services/socket.service',()=>({isConnected:()=>true,subscribe:(type,cb)=>{const group=f.listeners.get(type)??new Set();group.add(cb);f.listeners.set(type,group);return()=>group.delete(cb)}}))
-import Workspace from './NativeResultsWorkspace'
+import Workspace, {NativeResultsBoundary} from './NativeResultsWorkspace'
 const choices=[{competitionId:'a',competitionName:'Hip-Hop',roundId:null,roundName:'Single phase'},{competitionId:'b',competitionName:'Contemporary',roundId:null,roundName:'Single phase'}]
 const snapshot=c=>({eventId:'event',competitionId:c,roundId:null,viewerId:'owner',complete:true,sourceDigest:'digest',calculation:{id:`calc-${c}`,version:1},progress:[{judgeId:'judge',submitted:true}],statistics:{participants:2,eligibleParticipants:2,requiredJudges:1,submittedJudges:1},official:{method:'weighted_average',tiePolicy:'shared',precision:2,standings:[{participationId:`entry-${c}`,entryNumber:1,name:`Dancer ${c}`,rank:1,score:80,deductionTotal:0,deductionUnits:'points'}]},history:[],publication:null})
 let states
@@ -47,3 +49,21 @@ test('tabulation and official result exports require the current finalized versi
 })
 test('historical selection cannot publish/export as current; switching clears selected version',async()=>{states.a.history=[{calculationId:'old',version:1,current:false,results:{...states.a.official,standings:[{participationId:'old-entry',rank:1,name:'Old snapshot',score:70}]}}];await ready();fireEvent.change(screen.getByLabelText('Results version'),{target:{value:'old'}});expect(screen.getByText('Historical finalized standings')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Publish selected finalized version'})).toBeDisabled();fireEvent.change(screen.getByLabelText('Competition'),{target:{value:'b'}});await screen.findByText(/Dancer b/);expect(screen.queryByText('Old snapshot')).not.toBeInTheDocument()})
 test('manual official placements have no fabricated numeric summary meters',async()=>{states.a.official.method='manual';states.a.official.standings[0]={participationId:'manual',entryNumber:1,name:'Manual entry',rank:1,manual:true,score:null};await ready(true);expect(screen.getByText('Manual placement 1')).toBeInTheDocument();expect(document.querySelector('meter')).toBeNull()})
+
+
+test('the final-results handoff opens the requested authorized competition',async()=>{
+ vi.stubEnv('VITE_COMPETITION_NATIVE_RESULTS_ENABLED','true')
+ f.choices.mockResolvedValue({data:{contexts:choices,nativeEvent:true}})
+ render(<MemoryRouter initialEntries={['/report?competitionId=b']}><NativeResultsBoundary eventId="event" Legacy={()=><p>Legacy</p>}/></MemoryRouter>)
+ expect(await screen.findByRole('combobox',{name:'Competition'})).toHaveValue('b')
+ await waitFor(()=>expect(f.owned).toHaveBeenCalledWith('event','b',null))
+ expect(f.owned).not.toHaveBeenCalledWith('event','a',null)
+})
+
+test('final-results handoffs reject an unavailable competition',async()=>{
+ vi.stubEnv('VITE_COMPETITION_NATIVE_RESULTS_ENABLED','true')
+ f.choices.mockResolvedValue({data:{contexts:choices,nativeEvent:true}})
+ render(<MemoryRouter initialEntries={['/report?competitionId=foreign']}><NativeResultsBoundary eventId="event" Legacy={()=><p>Legacy</p>}/></MemoryRouter>)
+ expect(await screen.findByRole('alert')).toHaveTextContent('not available in the current results context')
+ expect(f.owned).not.toHaveBeenCalled()
+})

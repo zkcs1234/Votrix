@@ -76,6 +76,9 @@ const CompetitionAnalyticsPage = lazy(
 const CompetitionLiveControlPage = lazy(
   () => import('@/pages/organizer/competition/CompetitionLiveControlPage'),
 )
+const CompetitionPublishedPage = lazy(
+  () => import('@/pages/organizer/competition/CompetitionPublishedPage'),
+)
 const JudgeScoringPage = lazy(() => import('@/pages/voter/JudgeScoringPage'))
 
 const PollingDashboardPage = lazy(
@@ -235,9 +238,14 @@ export const routeConfig = [
       { path: 'events/:eventId/contestants', element: <CompetitionContestantsPage /> },
       { path: 'events/:eventId/judges', element: <CompetitionJudgesPage /> },
       { path: 'events/:eventId/review', element: <CompetitionReviewPage /> },
+      { path: 'events/:eventId/published', element: <CompetitionPublishedPage /> },
       { path: 'events/:eventId/rankings', element: <CompetitionRankingsPage /> },
       { path: 'events/:eventId/tabulation', element: <CompetitionTabulationPage /> },
       { path: 'events/:eventId/tabulation/:section', element: <CompetitionTabulationPage /> },
+      { path: 'events/:eventId/scoring', element: <CompetitionTabulationPage workspace="scoring" /> },
+      { path: 'events/:eventId/results', element: <CompetitionTabulationPage workspace="results" /> },
+      { path: 'events/:eventId/advancement', element: <CompetitionTabulationPage workspace="advancement" /> },
+      { path: 'events/:eventId/audit', element: <CompetitionTabulationPage workspace="audit" /> },
 { path: 'events/:eventId/analytics', element: <CompetitionAnalyticsPage /> },
       { path: 'events/:eventId/report', element: <CompetitionReportPage /> },
       { path: 'events/:eventId/live', element: <CompetitionLiveControlPage /> },

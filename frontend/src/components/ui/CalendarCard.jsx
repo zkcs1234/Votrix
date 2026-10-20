@@ -62,6 +62,21 @@ function startOfDay(d) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
+function ceilToMinute(date) {
+  const result = new Date(date)
+  const hasRemainingSeconds = result.getSeconds() > 0 || result.getMilliseconds() > 0
+  result.setSeconds(0, 0)
+  if (hasRemainingSeconds) result.setMinutes(result.getMinutes() + 1)
+  return result
+}
+
+function isBeforeMinimum(date, hour, minute, minimum) {
+  if (!date || !minimum) return false
+  const candidate = new Date(date)
+  candidate.setHours(hour, minute, 0, 0)
+  return candidate < minimum
+}
+
 function addDays(d, n) {
   const next = new Date(d)
   next.setDate(next.getDate() + n)
@@ -85,7 +100,7 @@ function applyQuickPick(pickId, defaultHour, defaultMinute) {
   const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), defaultHour, defaultMinute, 0, 0)
   switch (pickId) {
     case 'now':
-      return new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0)
+      return ceilToMinute(now)
     case 'today':
       return base
     case 'tomorrow':
@@ -118,6 +133,7 @@ export default function CalendarCard({
   twoStep = false,
   confirmDate = false,
   showShortcuts = true,
+  preventPast = false,
 }) {
   const wrapperRef = useRef(null)
   const popRef = useRef(null)
@@ -127,10 +143,17 @@ export default function CalendarCard({
   const [step, setStep] = useState('date')
   const [draftDate, setDraftDate] = useState(null)
   const [flipUp, setFlipUp] = useState(false)
-  const today = useMemo(() => startOfDay(new Date()), [])
+  const [currentTime, setCurrentTime] = useState(() => new Date())
+  const today = useMemo(() => startOfDay(currentTime), [currentTime])
   const selected = useMemo(() => parseLocalInputValue(value), [value])
-  const minDate = useMemo(() => (min ? parseLocalInputValue(min) : null), [min])
+  const minDate = useMemo(() => {
+    const parsed = min ? parseLocalInputValue(min) : null
+    return parsed ? ceilToMinute(parsed) : null
+  }, [min])
   const maxDate = useMemo(() => (max ? parseLocalInputValue(max) : null), [max])
+  const effectiveMinDateTime = useMemo(() => (
+    preventPast && (!minDate || currentTime > minDate) ? ceilToMinute(currentTime) : minDate
+  ), [currentTime, minDate, preventPast])
 
   const initialSelected = useMemo(() => parseLocalInputValue(value), []) // eslint-disable-line react-hooks/exhaustive-deps
   const initialView = initialSelected || today
@@ -170,8 +193,18 @@ export default function CalendarCard({
   }, [open, confirmDate])
 
   useEffect(() => {
+    if (!open || !preventPast) return undefined
+    const interval = window.setInterval(() => setCurrentTime(new Date()), 10000)
+    return () => window.clearInterval(interval)
+  }, [open, preventPast])
+
+  useEffect(() => {
     if (open && confirmDate && step === 'date') {
-      popRef.current?.querySelector('.v-cal-cell[aria-pressed="true"]')?.focus({ preventScroll: true })
+      const selectedDay = popRef.current?.querySelector('.v-cal-cell[aria-pressed="true"]')
+      const initialDay = popRef.current?.querySelector('.v-cal-cell[aria-current="date"]:not(:disabled)')
+        ?? popRef.current?.querySelector('.v-cal-cell:not(:disabled)')
+      const focusDay = selectedDay ?? initialDay
+      focusDay?.focus({ preventScroll: true })
     }
   }, [open, step, confirmDate])
 
@@ -228,9 +261,14 @@ export default function CalendarCard({
   }
 
   const handleDayClick = (day) => {
-    if (isOutsideRange(day, minDate, maxDate)) return
+    if (isOutsideRange(day, effectiveMinDateTime, maxDate)) return
     const next = new Date(day)
     next.setHours(hour, minute, 0, 0)
+    if (isBeforeMinimum(next, hour, minute, effectiveMinDateTime)) {
+      next.setHours(effectiveMinDateTime.getHours(), effectiveMinDateTime.getMinutes(), 0, 0)
+      setHour(next.getHours())
+      setMinute(next.getMinutes())
+    }
     if (twoStep) {
       setDraftDate(next)
       if (!confirmDate) setStep('time')
@@ -241,17 +279,24 @@ export default function CalendarCard({
 
   const handleHourChange = (raw) => {
     const h = Math.max(0, Math.min(23, Number(raw) || 0))
+    const date = twoStep ? draftDate : selected
+    const nextMinute = date && isSameDay(date, effectiveMinDateTime)
+      && h === effectiveMinDateTime.getHours() && minute < effectiveMinDateTime.getMinutes()
+      ? effectiveMinDateTime.getMinutes() : minute
+    if (isBeforeMinimum(date, h, nextMinute, effectiveMinDateTime)) return
     setHour(h)
+    if (nextMinute !== minute) setMinute(nextMinute)
     if (twoStep) return
     if (selected) {
       const next = new Date(selected)
-      next.setHours(h, minute, 0, 0)
+      next.setHours(h, nextMinute, 0, 0)
       emitChange(next)
     }
   }
 
   const handleMinuteChange = (raw) => {
     const m = Math.max(0, Math.min(59, Number(raw) || 0))
+    if (isBeforeMinimum(twoStep ? draftDate : selected, hour, m, effectiveMinDateTime)) return
     setMinute(m)
     if (twoStep) return
     if (selected) {
@@ -270,6 +315,7 @@ export default function CalendarCard({
 
   const openPicker = () => {
     if (disabled) return
+    setCurrentTime(new Date())
     if (!open && twoStep) {
       setStep('date')
       setDraftDate(selected)
@@ -297,7 +343,8 @@ export default function CalendarCard({
   const handleQuickPick = (pickId) => {
     const picked = applyQuickPick(pickId, defaultHour, defaultMinute)
     if (!picked) return
-    if (isOutsideRange(picked, minDate, maxDate)) return
+    if (isOutsideRange(picked, effectiveMinDateTime, maxDate)
+      || isBeforeMinimum(picked, picked.getHours(), picked.getMinutes(), effectiveMinDateTime)) return
     setViewMonth(startOfMonth(picked))
     setHour(picked.getHours())
     setMinute(picked.getMinutes())
@@ -332,7 +379,8 @@ export default function CalendarCard({
           } : undefined}
           onChange={(e) => {
             const parsed = parseLocalInputValue(e.target.value)
-            if (parsed) {
+            if (parsed && !isOutsideRange(parsed, effectiveMinDateTime, maxDate)
+              && !isBeforeMinimum(parsed, parsed.getHours(), parsed.getMinutes(), effectiveMinDateTime)) {
               emitChange(parsed)
               setViewMonth(startOfMonth(parsed))
               setHour(parsed.getHours())
@@ -374,36 +422,63 @@ export default function CalendarCard({
 
       {open && !disabled && (
         <div ref={popRef} id={pickerId} className={popClass} role="dialog" aria-label="Choose date and time">
-          {confirmDate && (
-            <ol className="v-cal-steps" aria-label="Date and time steps">
-              {['date', 'time'].map((item) => (
-                <li key={item} aria-current={step === item ? 'step' : undefined}>
-                  <span className="v-cal-step-dot" aria-hidden="true">
-                    {item === 'date' && step === 'time' && <Check className="h-3 w-3" strokeWidth={2} />}
-                  </span>
-                  {item === 'date' ? 'Date' : 'Time'}
-                </li>
-              ))}
-            </ol>
-          )}
           {twoStep && step === 'time' ? (
-            <ClockTimePicker date={draftDate} hour={hour} minute={minute}
-              polished={confirmDate}
-              onHourChange={handleHourChange} onMinuteChange={handleMinuteChange}
-              onBack={() => {
-                setViewMonth(startOfMonth(draftDate))
-                setStep('date')
-              }}
-              onDone={() => {
-                const next = new Date(draftDate)
-                next.setHours(hour, minute, 0, 0)
-                emitChange(next)
-                setOpen(false)
-                if (confirmDate) inputRef.current?.focus({ preventScroll: true })
-              }} />
+            <div className={confirmDate ? 'v-cal-step-content' : undefined}>
+              {confirmDate && (
+                <div className="v-cal-date-step-header">
+                  <p className="text-sm font-semibold text-v-text">Select time</p>
+                  <ol className="v-cal-steps" aria-label="Date and time steps">
+                    {['date', 'time'].map((item, index) => (
+                      <li key={item} aria-current={step === item ? 'step' : undefined}>
+                        <span className="v-cal-step-dot" aria-hidden="true">
+                          {item === 'date' && step === 'time'
+                            ? <Check className="h-3 w-3" strokeWidth={2} />
+                            : index + 1}
+                        </span>
+                        {item === 'date' ? 'Date' : 'Time'}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              <ClockTimePicker date={draftDate} hour={hour} minute={minute}
+                minDateTime={effectiveMinDateTime}
+                polished={confirmDate}
+                doneLabel={confirmDate ? 'Confirm' : 'Done'}
+                onHourChange={handleHourChange} onMinuteChange={handleMinuteChange}
+                onBack={() => {
+                  setViewMonth(startOfMonth(draftDate))
+                  setStep('date')
+                }}
+                onDone={() => {
+                  const next = new Date(draftDate)
+                  next.setHours(hour, minute, 0, 0)
+                  if (isOutsideRange(next, effectiveMinDateTime, maxDate)
+                    || isBeforeMinimum(next, hour, minute, effectiveMinDateTime)) return
+                  emitChange(next)
+                  setOpen(false)
+                  if (confirmDate) inputRef.current?.focus({ preventScroll: true })
+                }} />
+            </div>
           ) : (
-            <>
-              {twoStep && <p className={confirmDate ? 'text-sm font-semibold text-v-text' : 'text-center text-xs font-medium text-v-text-subtle'}>{confirmDate ? 'Select date' : '1. Select Date'}</p>}
+            <div className={confirmDate ? 'v-cal-step-content' : undefined}>
+              {twoStep && (confirmDate ? (
+                <div className="v-cal-date-step-header">
+                  <p className="text-sm font-semibold text-v-text">Select date</p>
+                  <ol className="v-cal-steps" aria-label="Date and time steps">
+                    {['date', 'time'].map((item, index) => (
+                      <li key={item} aria-current={step === item ? 'step' : undefined}>
+                        <span className="v-cal-step-dot" aria-hidden="true">
+                          {item === 'date' && step === 'time'
+                            ? <Check className="h-3 w-3" strokeWidth={2} />
+                            : index + 1}
+                        </span>
+                        {item === 'date' ? 'Date' : 'Time'}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ) : <p className="text-center text-xs font-medium text-v-text-subtle">1. Select Date</p>)}
               <div className="v-cal-header">
                 <button type="button" onClick={goPrevMonth} className="v-cal-nav" aria-label="Previous month">
                   <ChevronLeft className="h-4 w-4" strokeWidth={2} />
@@ -427,7 +502,7 @@ export default function CalendarCard({
                   const inMonth = day.getMonth() === viewMonth.getMonth()
                   const isToday = isSameDay(day, today)
                   const isSelected = isSameDay(day, twoStep ? draftDate : selected)
-                  const outside = isOutsideRange(day, minDate, maxDate)
+                  const outside = isOutsideRange(day, effectiveMinDateTime, maxDate)
                   const cellClass = [
                     'v-cal-cell',
                     inMonth ? '' : 'v-cal-cell-out',
@@ -459,7 +534,11 @@ export default function CalendarCard({
                     type="button"
                     className="v-cal-quick-btn"
                     onClick={() => handleQuickPick(pick.id)}
-                    disabled={isOutsideRange(applyQuickPick(pick.id, defaultHour, defaultMinute) || today, minDate, maxDate)}
+                    disabled={(() => {
+                      const picked = applyQuickPick(pick.id, defaultHour, defaultMinute)
+                      return !picked || isOutsideRange(picked, effectiveMinDateTime, maxDate)
+                        || isBeforeMinimum(picked, picked.getHours(), picked.getMinutes(), effectiveMinDateTime)
+                    })()}
                   >
                     {pick.label}
                   </button>
@@ -475,8 +554,9 @@ export default function CalendarCard({
                     </p>
                   </div>
                   <div className="flex justify-end">
-                    <Button size="sm" disabled={!draftDate || isOutsideRange(draftDate, minDate, maxDate)} onClick={() => setStep('time')}>
-                      Continue <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    <Button size="sm" disabled={!draftDate || isOutsideRange(draftDate, effectiveMinDateTime, maxDate)
+                      || isBeforeMinimum(draftDate, hour, minute, effectiveMinDateTime)} onClick={() => setStep('time')}>
+                      Time <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                   </div>
                 </div>
@@ -513,7 +593,7 @@ export default function CalendarCard({
                   </label>
                 </div>
               </div>}
-            </>
+            </div>
           )}
         </div>
       )}

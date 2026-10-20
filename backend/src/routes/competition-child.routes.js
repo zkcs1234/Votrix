@@ -34,6 +34,7 @@ router.post('/:competitionId/tabulation/deductions',asyncHandler(async(req,res)=
 router.post('/:competitionId/tabulation/qualification',asyncHandler(async(req,res)=>res.json({success:true,...await tabulation.qualificationNative(req.params.eventId,req.params.competitionId,req.user.id,req.body,false)})))
 router.post('/:competitionId/tabulation/qualification/confirm',asyncHandler(async(req,res)=>res.json({success:true,...await tabulation.qualificationNative(req.params.eventId,req.params.competitionId,req.user.id,req.body,true)})))
 router.get('/live-activity',asyncHandler(async(req,res)=>res.json({success:true,activity:await scoring.liveActivity(req.params.eventId,req.user.id)})))
+router.post('/live/activate',asyncHandler(async(req,res)=>res.json({success:true,...await scoring.activateLiveControl(req.params.eventId,req.user.id)})))
 router.get('/scoring-contexts', asyncHandler(async (req,res)=>res.json({success:true,...await scoring.scoringChoicesResponse(req.params.eventId,req.user.id,true)})))
 router.get('/creation-review', asyncHandler(async(req,res)=>res.json({success:true,...await native.creationParentReview(req.params.eventId,req.user.id)})))
 router.get('/:competitionId/live', asyncHandler(async (req,res)=>res.json({success:true,...await scoring.liveView(req.params.eventId,req.params.competitionId,req.user.id,req.query.roundId??null,true)})))

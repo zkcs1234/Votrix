@@ -3,6 +3,7 @@ import {NativeResultsBoundary} from '@/components/organizer/competition/NativeRe
 import { useParams } from 'react-router-dom'
 import { useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
+import PlacementBadge from '@/components/ui/PlacementBadge'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 import useCompetitionSync from '@/hooks/useCompetitionSync'
 import {
@@ -154,7 +155,7 @@ function LegacyCompetitionReportPage() {
                   <tbody>
                     {(round.standings ?? []).map((standing) => (
                       <tr key={standing.contestantId} className="border-b border-v-border last:border-0">
-                        <td className="px-3 py-3 text-v-text-muted">{standing.rank}</td>
+                        <td className="px-3 py-3"><PlacementBadge rank={standing.rank}/></td>
                         <td className="px-3 py-3 font-medium text-v-text">
                           #{standing.contestantNumber} {standing.contestantName}
                         </td>

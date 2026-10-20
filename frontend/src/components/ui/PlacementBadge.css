@@ -1,0 +1,6 @@
+.v-placement-badge { display: inline-flex; min-width: 2rem; min-height: 1.65rem; align-items: center; justify-content: center; gap: .2rem; border-radius: .4rem; padding: .2rem .45rem; font-size: .8rem; font-weight: 750; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v-placement-badge small { font-size: .6rem; font-weight: 650; }
+.v-placement-badge[data-placement='first'] { background: #fef3c7; color: #713f12; }
+.v-placement-badge[data-placement='second'] { background: #e2e8f0; color: #1e293b; }
+.v-placement-badge[data-placement='third'] { background: #ffedd5; color: #7c2d12; }
+.v-placement-badge[data-placement='other'] { background: #dbeafe; color: #1e3a8a; }

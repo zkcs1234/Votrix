@@ -1,6 +1,8 @@
 import { db } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { validateUUID } from '../utils/sanitize.js'
+import { assertOrganizerOwnsEvent } from './event.service.js'
+import { EVENT_STATUS } from '../utils/constants.js'
 import { nativeSetupEnabled } from '../modules/competition-native-configuration.js'
 import { emitToUser } from '../websocket/ws-emitter.js'
 
@@ -29,6 +31,24 @@ async function rpc(name, params) { const {data,error}=await db().rpc(name,params
 export async function scoringChoices(eventId,actor,owner=false) {
   boundary(eventId,null,actor,null)
   return rpc('competition_child_scoring_choices',{p_event:eventId,p_actor:actor,p_owner:owner})
+}
+export async function activateLiveControl(eventId,actor) {
+ boundary(eventId,null,actor,null)
+ const event=await assertOrganizerOwnsEvent(eventId,actor)
+ if(!event.competition_created_at)throw new ApiError(409,'Publish competition setup before opening Live Control')
+ if(event.status===EVENT_STATUS.ACTIVE)return {status:EVENT_STATUS.ACTIVE,changed:false}
+ if(event.status!==EVENT_STATUS.SCHEDULED)throw new ApiError(409,'Only a published event can be opened in Live Control')
+ const {data,error}=await db().from('events')
+  .update({status:EVENT_STATUS.ACTIVE})
+  .eq('id',eventId)
+  .eq('status',EVENT_STATUS.SCHEDULED)
+  .select('id,status')
+  .maybeSingle()
+ scoringError(error,'activate_competition_live_control')
+ if(data?.id===eventId)return {status:data.status,changed:true}
+ const current=await assertOrganizerOwnsEvent(eventId,actor)
+ if(current.status===EVENT_STATUS.ACTIVE)return {status:EVENT_STATUS.ACTIVE,changed:false}
+ throw new ApiError(409,'The event status changed before Live Control could be opened. Reload the event and try again.')
 }
 export async function activeSessionsForOrganizer(actor) {
   const {data,error}=await db().rpc('competition_child_active_sessions_for_organizer',{p_actor:actor})

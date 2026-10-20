@@ -1,7 +1,7 @@
 import { useParams, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, CalendarDays, Users, Star, Award, Play, Settings2, Rocket, FileText, BarChart3,
-  ClipboardList, Table2, SlidersHorizontal, ListOrdered, History,
+  Table2, ListOrdered, History,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
@@ -16,12 +16,14 @@ const navItems = [
   { label: 'Competition Scoring Events', path: '/organizer/competition/events', icon: CalendarDays },
 
   { section: 'Setup' },
+  { label: 'Event Details', path: 'edit', icon: Settings2, scoped: true, basePath: BASE },
+  { label: 'Branding', path: 'branding', icon: Settings2, scoped: true, basePath: BASE },
   { label: 'Competition Type', path: 'type', icon: Settings2, scoped: true, basePath: BASE },
   { label: 'Competitions / Categories', path: 'categories', icon: Settings2, scoped: true, basePath: BASE },
   { label: 'Rounds & Scoring', path: 'workspace', icon: Settings2, scoped: true, basePath: BASE },
   { label: 'Contestants & Entries', path: 'contestants', icon: Users, scoped: true, basePath: BASE },
   { label: 'Judges', path: 'judges', icon: Star, scoped: true, basePath: BASE },
-  { label: 'Review & Create', path: 'review', icon: Rocket, scoped: true, basePath: BASE },
+  { label: 'Review & Publish', path: 'review', icon: Rocket, scoped: true, basePath: BASE },
 
   { section: 'Run' },
   { label: 'Live Control', path: 'live', icon: Play, scoped: true, basePath: BASE },
@@ -33,17 +35,16 @@ const navItems = [
     scoped: true,
     basePath: BASE,
     children: [
-      { label: 'Overview', path: 'tabulation/overview', icon: LayoutDashboard, scoped: true, basePath: BASE },
-      { label: 'Judge Submissions', path: 'tabulation/submissions', icon: ClipboardList, scoped: true, basePath: BASE },
-      { label: 'Tabulation Matrix', path: 'tabulation/matrix', icon: Table2, scoped: true, basePath: BASE },
-      { label: 'Deductions & Adjustments', path: 'tabulation/deductions', icon: SlidersHorizontal, scoped: true, basePath: BASE },
-      { label: 'Validation', path: 'tabulation/validation', icon: ClipboardList, scoped: true, basePath: BASE },
-      { label: 'Results & Rankings', path: 'tabulation/results', icon: ListOrdered, scoped: true, basePath: BASE },
-      { label: 'Finalization', path: 'tabulation/finalization', icon: Award, scoped: true, basePath: BASE },
-      { label: 'Round Advancement', path: 'tabulation/advancement', icon: Rocket, scoped: true, basePath: BASE },
-      { label: 'Audit Trail', path: 'tabulation/audit', icon: History, scoped: true, basePath: BASE },
+      { label: 'Overview', path: 'tabulation/overview', icon: LayoutDashboard, scoped: true, basePath: BASE,
+        isActive: (location, eventId) => [ `${BASE}/${eventId}/tabulation`, `${BASE}/${eventId}/tabulation/overview` ].includes(location.pathname) },
     ],
   },
+  { label: 'Scoring', path: 'scoring', icon: Table2, scoped: true, basePath: BASE,
+    isActive: (location, eventId) => location.pathname === `${BASE}/${eventId}/scoring` },
+  { label: 'Results', path: 'results', icon: ListOrdered, scoped: true, basePath: BASE,
+    isActive: (location, eventId) => location.pathname === `${BASE}/${eventId}/results` },
+  { label: 'Round Advancement', path: 'advancement', icon: Rocket, scoped: true, basePath: BASE },
+  { label: 'Audit Trail', path: 'audit', icon: History, scoped: true, basePath: BASE },
   { label: 'Results & Analysis', path: 'rankings', icon: Award, scoped: true, basePath: BASE },
   { label: 'Analytics', path: 'analytics', icon: BarChart3, scoped: true, basePath: BASE },
   { label: 'Report', path: 'report', icon: FileText, scoped: true, basePath: BASE },

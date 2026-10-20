@@ -15,6 +15,10 @@ test('disabled native setup preserves the legacy dashboard entry path',()=>{
  render(<MemoryRouter><CompetitionDashboardPage/></MemoryRouter>)
  expect(screen.queryByRole('button',{name:'Manage competitions'})).not.toBeInTheDocument()
  expect(screen.getByRole('link',{name:'Campus event'})).toHaveAttribute('href','/organizer/competition/events/event-one/contestants')
+ expect(screen.queryByText('Scores submitted')).not.toBeInTheDocument()
+ expect(document.querySelector('.v-competition-dashboard-table')).toBeInTheDocument()
+ expect(document.querySelector('.v-event-stats-header')).toBeInTheDocument()
+ expect(document.querySelector('.v-filter-bar-single-row')).toBeInTheDocument()
 })
 test('enabled dashboard opens existing event-scoped setup instead of a parallel workflow',()=>{
  vi.stubEnv('VITE_COMPETITION_NATIVE_SETUP_ENABLED','true')

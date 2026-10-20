@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1000" viewBox="0 0 1440 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Competition workspace after Step 8</title>
+  <desc id="desc">A desktop organizer dashboard showing event setup complete and Live Control, Tabulation, and Results as separate work areas.</desc>
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5f7fc"/>
+      <stop offset="1" stop-color="#eef2f9"/>
+    </linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#282a70"/>
+      <stop offset="1" stop-color="#4a45a5"/>
+    </linearGradient>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="10" flood-color="#18213b" flood-opacity=".08"/>
+    </filter>
+    <style>
+      text { font-family: Inter, "Segoe UI", Arial, sans-serif; }
+      .muted { fill: #667085; }
+      .dark { fill: #20263a; }
+      .small { font-size: 13px; }
+      .label { font-size: 12px; font-weight: 700; letter-spacing: .7px; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="1000" fill="url(#page)"/>
+
+  <!-- Top bar -->
+  <rect width="1440" height="72" fill="#ffffff"/>
+  <path d="M0 71.5H1440" stroke="#e7eaf1"/>
+  <rect x="30" y="18" width="36" height="36" rx="11" fill="#39358f"/>
+  <path d="M40 43V29h5l4 7 4-7h5v14h-5v-6l-4 6-4-6v6z" fill="#fff"/>
+  <text x="78" y="43" font-size="19" font-weight="750" fill="#252744">Votrix</text>
+  <text x="206" y="43" font-size="14" class="muted">Organizer workspace</text>
+  <circle cx="1345" cy="36" r="17" fill="#ecebfb"/>
+  <text x="1345" y="41" text-anchor="middle" font-size="13" font-weight="700" fill="#39358f">JD</text>
+  <text x="1372" y="40" font-size="13" class="dark">Organizer</text>
+
+  <!-- Sidebar -->
+  <rect x="0" y="72" width="244" height="928" fill="#fff"/>
+  <path d="M243.5 72V1000" stroke="#e7eaf1"/>
+  <text x="28" y="116" class="label muted">EVENT WORKSPACE</text>
+  <rect x="16" y="137" width="210" height="44" rx="10" fill="#f1f0ff"/>
+  <rect x="29" y="150" width="17" height="17" rx="5" fill="#4d49a5"/>
+  <path d="M34 158h7M37.5 154.5v7" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
+  <text x="58" y="164" font-size="14" font-weight="650" fill="#39358f">Event Overview</text>
+
+  <rect x="29" y="201" width="17" height="17" rx="5" fill="#e9eaf1"/>
+  <path d="M34 207h7M34 211h7" stroke="#697386" stroke-width="1.5" stroke-linecap="round"/>
+  <text x="58" y="215" font-size="14" class="dark">Event Setup</text>
+  <rect x="171" y="199" width="48" height="22" rx="11" fill="#e7f7ef"/>
+  <text x="195" y="214" text-anchor="middle" font-size="10" font-weight="700" fill="#16794d">DONE</text>
+  <path d="M37 234v31" stroke="#d9dce7" stroke-width="2"/>
+  <circle cx="37" cy="240" r="4" fill="#2a9d68"/>
+  <text x="55" y="245" font-size="12" class="muted">Steps 1–8 complete</text>
+
+  <text x="28" y="302" class="label muted">RUN YOUR EVENT</text>
+  <rect x="29" y="322" width="17" height="17" rx="5" fill="#e9eaf1"/>
+  <path d="M34 330h7M37.5 326.5v7" stroke="#697386" stroke-width="1.5" stroke-linecap="round"/>
+  <text x="58" y="336" font-size="14" class="dark">Live Control</text>
+  <circle cx="204" cy="330" r="4" fill="#e1a027"/>
+
+  <rect x="29" y="367" width="17" height="17" rx="5" fill="#e9eaf1"/>
+  <path d="M34 371h7v9h-7zM35.5 374h4M35.5 377h4" fill="none" stroke="#697386" stroke-width="1.3" stroke-linejoin="round"/>
+  <text x="58" y="381" font-size="14" class="dark">Tabulation</text>
+  <circle cx="204" cy="375" r="4" fill="#c8ccd7"/>
+
+  <rect x="29" y="412" width="17" height="17" rx="5" fill="#e9eaf1"/>
+  <path d="M33 425v-6h3v6M38 425v-10h3v10" fill="none" stroke="#697386" stroke-width="1.4"/>
+  <text x="58" y="426" font-size="14" class="dark">Results</text>
+  <circle cx="204" cy="420" r="4" fill="#c8ccd7"/>
+
+  <rect x="19" y="908" width="206" height="67" rx="12" fill="#f7f8fb"/>
+  <circle cx="41" cy="931" r="10" fill="#e7f7ef"/>
+  <path d="m37 931 3 3 5-6" fill="none" stroke="#25895c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="59" y="930" font-size="12" font-weight="650" class="dark">Setup complete</text>
+  <text x="59" y="950" font-size="11" class="muted">You can return to setup anytime.</text>
+
+  <!-- Main content -->
+  <text x="286" y="119" font-size="13" font-weight="600" fill="#737b8d">Competitions</text>
+  <text x="370" y="119" font-size="13" fill="#a0a6b4">/</text>
+  <text x="388" y="119" font-size="13" class="dark">Campus Talent Showcase</text>
+
+  <!-- Hero completion panel -->
+  <g filter="url(#shadow)">
+    <rect x="282" y="147" width="1122" height="234" rx="20" fill="url(#hero)"/>
+  </g>
+  <circle cx="341" cy="208" r="31" fill="#ffffff" fill-opacity=".16"/>
+  <circle cx="341" cy="208" r="21" fill="#fff"/>
+  <path d="m331 208 7 7 14-15" fill="none" stroke="#24865b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="392" y="195" font-size="13" font-weight="700" letter-spacing="1.1" fill="#d8d8ff">EVENT SETUP COMPLETE</text>
+  <text x="392" y="230" font-size="29" font-weight="750" fill="#fff">Your competition is ready</text>
+  <text x="392" y="259" font-size="15" fill="#e3e3fa">All 8 setup steps are complete. Choose what you want to do next.</text>
+  <rect x="392" y="288" width="130" height="32" rx="16" fill="#ffffff" fill-opacity=".15"/>
+  <circle cx="410" cy="304" r="4" fill="#f4c45d"/>
+  <text x="423" y="309" font-size="12" font-weight="650" fill="#fff">SCHEDULED</text>
+  <text x="545" y="309" font-size="12" fill="#e2e2f5">Published · judging has not started</text>
+  <rect x="1124" y="288" width="235" height="50" rx="11" fill="#fff"/>
+  <text x="1242" y="309" text-anchor="middle" font-size="14" font-weight="700" fill="#39358f">View event details</text>
+  <path d="M1308 313h18m-6-6 6 6-6 6" fill="none" stroke="#39358f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <text x="284" y="430" font-size="20" font-weight="730" class="dark">What would you like to do?</text>
+  <text x="284" y="456" font-size="13" class="muted">These are event work areas—not additional setup steps.</text>
+
+  <!-- Live Control card -->
+  <g filter="url(#shadow)">
+    <rect x="282" y="481" width="353" height="235" rx="16" fill="#fff"/>
+  </g>
+  <rect x="305" y="503" width="46" height="46" rx="13" fill="#eeedff"/>
+  <circle cx="328" cy="526" r="9" fill="none" stroke="#49459d" stroke-width="2"/>
+  <path d="M328 512v5M328 535v5M314 526h5M337 526h5" stroke="#49459d" stroke-width="2" stroke-linecap="round"/>
+  <text x="305" y="582" font-size="18" font-weight="720" class="dark">Live Control</text>
+  <text x="305" y="608" font-size="13" class="muted">Manage rounds, judges, and the live</text>
+  <text x="305" y="627" font-size="13" class="muted">scoring session from one place.</text>
+  <rect x="305" y="654" width="305" height="42" rx="9" fill="#45419a"/>
+  <text x="457" y="680" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Open Live Control</text>
+  <path d="M566 675h18m-6-6 6 6-6 6" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Tabulation card -->
+  <g filter="url(#shadow)">
+    <rect x="660" y="481" width="353" height="235" rx="16" fill="#fff"/>
+  </g>
+  <rect x="683" y="503" width="46" height="46" rx="13" fill="#eaf5ff"/>
+  <path d="M697 515h18v22h-18zM701 521h10M701 526h10M701 531h7" fill="none" stroke="#2773aa" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="683" y="582" font-size="18" font-weight="720" class="dark">Tabulation</text>
+  <text x="683" y="608" font-size="13" class="muted">Review submitted scores, calculate</text>
+  <text x="683" y="627" font-size="13" class="muted">rankings, and advance qualifiers.</text>
+  <rect x="683" y="654" width="305" height="42" rx="9" fill="#f4f6fa" stroke="#e4e7ee"/>
+  <text x="835" y="680" text-anchor="middle" font-size="13" font-weight="650" fill="#555e70">Open Tabulation</text>
+  <path d="M944 675h18m-6-6 6 6-6 6" fill="none" stroke="#70798a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Results card -->
+  <g filter="url(#shadow)">
+    <rect x="1038" y="481" width="366" height="235" rx="16" fill="#fff"/>
+  </g>
+  <rect x="1061" y="503" width="46" height="46" rx="13" fill="#f3efff"/>
+  <path d="M1074 537v-11h5v11M1083 537v-18h5v18M1092 537v-7h5v7" fill="none" stroke="#7351a7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="1061" y="582" font-size="18" font-weight="720" class="dark">Results</text>
+  <text x="1061" y="608" font-size="13" class="muted">Publish the final standings when</text>
+  <text x="1061" y="627" font-size="13" class="muted">tabulation is complete.</text>
+  <rect x="1061" y="654" width="320" height="42" rx="9" fill="#f4f6fa" stroke="#e4e7ee"/>
+  <text x="1221" y="680" text-anchor="middle" font-size="13" font-weight="650" fill="#737b8d">Available after final tabulation</text>
+
+  <!-- Guidance panel -->
+  <rect x="282" y="744" width="1122" height="115" rx="14" fill="#fff" stroke="#e4e8f0"/>
+  <circle cx="315" cy="783" r="13" fill="#eef2ff"/>
+  <text x="315" y="788" text-anchor="middle" font-size="14" font-weight="750" fill="#4a4a9a">i</text>
+  <text x="340" y="779" font-size="14" font-weight="700" class="dark">A clear separation</text>
+  <text x="340" y="803" font-size="13" class="muted">Setup defines the event. Live Control runs it. Tabulation processes scores. Results share the final outcome.</text>
+  <text x="340" y="827" font-size="13" class="muted">You can leave this page and return later—your published event and progress are saved.</text>
+
+  <!-- Event summary -->
+  <rect x="282" y="882" width="1122" height="83" rx="14" fill="#fff" stroke="#e4e8f0"/>
+  <text x="305" y="912" class="label muted">EVENT</text>
+  <text x="305" y="940" font-size="14" font-weight="680" class="dark">Campus Talent Showcase</text>
+  <path d="M663 899v49M1005 899v49" stroke="#e9ebf1"/>
+  <text x="691" y="912" class="label muted">SCHEDULE</text>
+  <text x="691" y="940" font-size="14" font-weight="650" class="dark">Oct 24, 2026 · 9:00 AM</text>
+  <text x="1033" y="912" class="label muted">SETUP PROGRESS</text>
+  <text x="1033" y="940" font-size="14" font-weight="650" fill="#25895c">8 of 8 steps complete</text>
+</svg>

@@ -2,7 +2,19 @@ import { useEffect, useId, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import { ArrowLeft } from 'lucide-react'
 
-export default function ClockTimePicker({ date, hour, minute, onHourChange, onMinuteChange, onBack, onDone, polished = false }) {
+function isSameDay(date, other) {
+  return date && other
+    && date.getFullYear() === other.getFullYear()
+    && date.getMonth() === other.getMonth()
+    && date.getDate() === other.getDate()
+}
+
+function isTimeAllowed(date, hour, minute, minimum) {
+  if (!minimum || !isSameDay(date, minimum)) return true
+  return hour > minimum.getHours() || (hour === minimum.getHours() && minute >= minimum.getMinutes())
+}
+
+export default function ClockTimePicker({ date, hour, minute, minDateTime, onHourChange, onMinuteChange, onBack, onDone, polished = false, doneLabel = 'Done' }) {
   const [unit, setUnit] = useState('hour')
   const hourRef = useRef(null)
   const minuteRef = useRef(null)
@@ -14,11 +26,16 @@ export default function ClockTimePicker({ date, hour, minute, onHourChange, onMi
   const displayHour = hour % 12 || 12
   const selected = unit === 'hour' ? displayHour : minute
   const angle = (unit === 'hour' ? displayHour * 30 : minute * 6) * Math.PI / 180
+  const hourAllowed = (hour24) => !minDateTime || !isSameDay(date, minDateTime) || hour24 >= minDateTime.getHours()
+  const minuteAllowed = (minuteValue) => isTimeAllowed(date, hour, minuteValue, minDateTime)
   const choose = (value) => {
     if (unit === 'hour') {
-      onHourChange(value % 12 + (hour >= 12 ? 12 : 0))
+      const nextHour = value % 12 + (hour >= 12 ? 12 : 0)
+      if (!hourAllowed(nextHour)) return
+      onHourChange(nextHour)
       setUnit('minute')
     } else {
+      if (!minuteAllowed(value)) return
       onMinuteChange(value)
     }
   }
@@ -26,20 +43,37 @@ export default function ClockTimePicker({ date, hour, minute, onHourChange, onMi
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return
     event.preventDefault()
     const delta = ['ArrowUp', 'ArrowRight'].includes(event.key) ? 1 : -1
-    if (selectedUnit === 'hour') {
-      setUnit('hour')
-      const next = (displayHour - 1 + delta + 12) % 12 + 1
-      onHourChange(next % 12 + (hour >= 12 ? 12 : 0))
-    } else {
-      setUnit('minute')
-      onMinuteChange((minute + delta + 60) % 60)
+    const limit = selectedUnit === 'hour' ? 12 : 60
+    const current = selectedUnit === 'hour' ? displayHour : minute
+    for (let offset = 1; offset <= limit; offset += 1) {
+      const next = selectedUnit === 'hour'
+        ? (current - 1 + delta * offset + limit * 2) % limit + 1
+        : (current + delta * offset + limit * 2) % limit
+      const allowed = selectedUnit === 'hour'
+        ? hourAllowed((next % 12) + (hour >= 12 ? 12 : 0))
+        : minuteAllowed(next)
+      if (!allowed) continue
+      setUnit(selectedUnit)
+      if (selectedUnit === 'hour') onHourChange((next % 12) + (hour >= 12 ? 12 : 0))
+      else onMinuteChange(next)
+      break
     }
   }
+  const periodAllowed = (period) => !minDateTime || !isSameDay(date, minDateTime)
+    || Array.from({ length: 12 }, (_, index) => index + (period === 'PM' ? 12 : 0)).some(hourAllowed)
   const periodSelector = (
     <div className="v-clock-period flex justify-center gap-1" role="group" aria-label="AM or PM">
       {['AM', 'PM'].map((period) => (
         <button key={period} type="button" className="v-cal-quick-btn" aria-pressed={period === (hour >= 12 ? 'PM' : 'AM')}
-          onClick={() => onHourChange(hour % 12 + (period === 'PM' ? 12 : 0))}>
+          disabled={!periodAllowed(period)}
+          onClick={() => {
+            const periodHours = Array.from({ length: 12 }, (_, index) => index + (period === 'PM' ? 12 : 0))
+            const currentPeriodHour = hour % 12 + (period === 'PM' ? 12 : 0)
+            const nextHour = hourAllowed(currentPeriodHour)
+              ? currentPeriodHour
+              : periodHours.find(hourAllowed)
+            if (nextHour !== undefined) onHourChange(nextHour)
+          }}>
           {period}
         </button>
       ))}
@@ -49,7 +83,9 @@ export default function ClockTimePicker({ date, hour, minute, onHourChange, onMi
   return (
     <div className={`v-clock-picker ${polished ? 'v-clock-polished' : ''}`}>
       {!polished && <p className="text-center text-xs font-medium text-v-text-subtle">2. Select Time</p>}
-      <p className="text-center text-sm text-v-text">{date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p className={`v-clock-date text-center text-sm text-v-text ${polished ? 'v-clock-date-compact' : ''}`}>
+        {date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+      </p>
       <div className="v-clock-display flex items-center justify-center gap-2 text-v-text">
         <button ref={hourRef} type="button" className="v-clock-value" aria-label="Select hour" aria-pressed={unit === 'hour'} onClick={() => setUnit('hour')}
           aria-describedby={polished ? keyboardHintId : undefined}
@@ -70,7 +106,9 @@ export default function ClockTimePicker({ date, hour, minute, onHourChange, onMi
         </label>}
         {polished ? <span className="v-clock-display-period">{hour >= 12 ? 'PM' : 'AM'}</span> : periodSelector}
       </div>
-      <p className="text-center text-xs text-v-text-subtle" aria-live="polite">{unit === 'hour' ? 'Select an hour' : 'Select a minute'}</p>
+      <p className={`text-center text-xs text-v-text-subtle ${polished ? 'v-clock-hint-compact' : ''}`} aria-live="polite">
+        {unit === 'hour' ? 'Select an hour' : 'Select a minute'}
+      </p>
       {polished && <p id={keyboardHintId} className="sr-only">Use arrow keys to adjust the selected hour or minute.</p>}
       <div className="v-clock-face" role="group" aria-label={unit === 'hour' ? 'Hour clock' : 'Minute clock'}
         onPointerDown={(event) => {
@@ -100,6 +138,9 @@ export default function ClockTimePicker({ date, hour, minute, onHourChange, onMi
             <button key={`${unit}-${value}`} type="button" className="v-clock-number"
               style={{ left: `${50 + Math.sin(radians) * 38}%`, top: `${50 - Math.cos(radians) * 38}%` }}
               aria-label={`${unit === 'hour' ? 'Hour' : 'Minute'} ${value}`} aria-pressed={selected === value}
+              disabled={unit === 'hour'
+                ? !hourAllowed((value % 12) + (hour >= 12 ? 12 : 0))
+                : !minuteAllowed(value)}
               onClick={() => choose(value)}>
               {unit === 'hour' ? value : String(value).padStart(2, '0')}
             </button>
@@ -107,9 +148,9 @@ export default function ClockTimePicker({ date, hour, minute, onHourChange, onMi
         })}
       </div>
       {polished && periodSelector}
-      <div className="flex items-center justify-between gap-3">
+      <div className={`flex items-center justify-between gap-3 ${polished ? 'v-clock-actions-compact' : ''}`}>
         <Button variant="secondary" size="sm" onClick={onBack}>{polished && <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />}Back</Button>
-        <Button size="sm" onClick={onDone}>Done</Button>
+        <Button size="sm" onClick={onDone} disabled={!isTimeAllowed(date, hour, minute, minDateTime)}>{doneLabel}</Button>
       </div>
     </div>
   )

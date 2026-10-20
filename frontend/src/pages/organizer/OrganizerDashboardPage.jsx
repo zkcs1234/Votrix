@@ -159,7 +159,7 @@ export default function OrganizerDashboardPage() {
     <div className="space-y-6">
       {/* Live competition session banner */}
       {activeSessions.length > 0 && (
-        <div className="rounded-xl border border-v-primary/40 bg-v-primary-soft p-4 shadow-v-shadow">
+        <div role="status" aria-live="polite" className="rounded-xl border border-v-primary/40 bg-v-primary-soft p-4 shadow-v-shadow">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-v-primary/15 text-v-primary">
               <Trophy className="h-5 w-5" strokeWidth={1.75} />
@@ -171,7 +171,7 @@ export default function OrganizerDashboardPage() {
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-v-primary" />
                 </span>
                 <h3 className="text-base font-semibold text-v-text">
-                  {activeSessions.length > 1 ? 'Live competition sessions running' : 'Live competition session running'}
+                  {activeSessions.length > 1 ? 'Live scoring sessions ongoing' : 'Live scoring session ongoing'}
                 </h3>
               </div>
               <p className="mt-1 text-sm text-v-text-muted">
@@ -214,7 +214,7 @@ export default function OrganizerDashboardPage() {
                       className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-v-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-v-primary-hover"
                     >
                       <Play className="h-4 w-4" strokeWidth={2} />
-                      Rejoin live session
+                      Open Live Control
                     </Link>
                   </div>
                 ))}
@@ -267,7 +267,7 @@ export default function OrganizerDashboardPage() {
               Manage events, positions, candidates, and voters.
             </p>
 
-            <Link to="/organizer/election" className="v-btn-primary w-full mt-4 v-press">
+            <Link to="/organizer/election" className="v-btn-primary v-module-card__action w-full mt-4 v-press">
               <span>Manage Election</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -291,7 +291,7 @@ export default function OrganizerDashboardPage() {
               Contestants, criteria, judge scoring, and rankings.
             </p>
 
-            <Link to="/organizer/competition" className="v-btn-primary w-full mt-4 v-press">
+            <Link to="/organizer/competition" className="v-btn-primary v-module-card__action w-full mt-4 v-press">
               <span>Manage Competition</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -315,7 +315,7 @@ export default function OrganizerDashboardPage() {
               Build surveys, configure settings, and view analytics.
             </p>
 
-            <Link to="/organizer/polling" className="v-btn-primary w-full mt-4 v-press">
+            <Link to="/organizer/polling" className="v-btn-primary v-module-card__action w-full mt-4 v-press">
               <span>Create Poll</span>
               <ArrowRight className="h-4 w-4" />
             </Link>

@@ -30,10 +30,26 @@ function open(path = '/organizer/competition/events/new') {
     <Route path="/organizer/competition/events/:eventId/categories" element={<p>Created categories</p>} />
   </Routes></MemoryRouter>)
 }
+function chooseDateTime(label, date, hour, minute, period) {
+  fireEvent.click(screen.getByLabelText(new RegExp(`^${label}`)))
+  const now = new Date()
+  const monthOffset = (date.getFullYear() - now.getFullYear()) * 12 + date.getMonth() - now.getMonth()
+  for (let i = 0; i < Math.abs(monthOffset); i += 1) {
+    fireEvent.click(screen.getByRole('button', { name: monthOffset < 0 ? 'Previous month' : 'Next month' }))
+  }
+  fireEvent.click(screen.getByRole('button', { name: date.toDateString() }))
+  fireEvent.click(screen.getByRole('button', { name: 'Time' }))
+  fireEvent.click(screen.getByRole('button', { name: `Hour ${hour}` }))
+  fireEvent.click(screen.getByRole('button', { name: `Minute ${minute}` }))
+  fireEvent.click(screen.getByRole('button', { name: period }))
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+}
 function fillDetails() {
   fireEvent.change(screen.getByLabelText(/^Title/), { target: { value: 'Campus Finals' } })
-  fireEvent.change(screen.getByLabelText(/^Start Date/), { target: { value: '2026-10-20T09:00' } })
-  fireEvent.change(screen.getByLabelText(/^End Date/), { target: { value: '2026-10-20T17:00' } })
+  const date = new Date()
+  date.setDate(date.getDate() + 2)
+  chooseDateTime('Start Date', date, 9, 0, 'AM')
+  chooseDateTime('End Date', date, 5, 0, 'PM')
 }
 async function branding() {
   fireEvent.click(screen.getByRole('button', { name: 'Next: Branding' }))
@@ -68,7 +84,7 @@ it('Branding Back returns to populated Details without losing a selected banner'
   fireEvent.change(screen.getByLabelText('Event banner'), { target: { files: [file] } })
   fireEvent.click(screen.getByRole('button', { name: 'Back: Event Details' }))
   expect(screen.getByLabelText(/^Title/)).toHaveValue('Campus Finals')
-  expect(screen.getByLabelText(/^Start Date/)).toHaveValue('2026-10-20T09:00')
+  expect(screen.getByLabelText(/^Start Date/).value).toMatch(/9:00 AM/)
   await competitionType()
   fireEvent.click(screen.getByRole('button', { name: 'Next: Competitions / Categories' }))
   await screen.findByText('Created categories')

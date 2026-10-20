@@ -30,13 +30,14 @@ function renderForm() {
   </MemoryRouter>)
 }
 function chooseDateTime(fieldName, day, hour, minute, period) {
-  const date = new Date(day)
-  date.setHours(hour % 12 + (period === 'PM' ? 12 : 0), minute, 0, 0)
-  const pad = value => String(value).padStart(2, '0')
-  const value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
   const input = screen.getByLabelText(new RegExp(`^${fieldName}`))
-  expect(input).toHaveAttribute('type', 'datetime-local')
-  fireEvent.change(input, { target: { value } })
+  fireEvent.click(input)
+  fireEvent.click(screen.getByRole('button', { name: day.toDateString() }))
+  fireEvent.click(screen.getByRole('button', { name: 'Time' }))
+  fireEvent.click(screen.getByRole('button', { name: `Hour ${hour}` }))
+  fireEvent.click(screen.getByRole('button', { name: `Minute ${minute}` }))
+  fireEvent.click(screen.getByRole('button', { name: period }))
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
 }
 
 beforeEach(() => {

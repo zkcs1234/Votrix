@@ -38,15 +38,16 @@ export default function FilterBar({
   actions = null,
   className = '',
   inline = false,
+  singleRow = false,
 }) {
   return (
-    <div className={`${inline ? 'flex flex-wrap items-center gap-3' : 'flex flex-col gap-3'} ${className}`}>
+    <div className={`${singleRow ? 'v-filter-bar-single-row' : inline ? 'flex flex-wrap items-center gap-3' : 'flex flex-col gap-3'} ${className}`}>
       <div className={`${inline ? 'contents' : 'flex flex-wrap items-center gap-3'}`}>
         <SearchInput
           placeholder={searchPlaceholder}
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="max-w-xs"
+          className={singleRow ? 'v-filter-bar-single-row__search' : 'max-w-xs'}
         />
 
         {facetFields.map((field) => {

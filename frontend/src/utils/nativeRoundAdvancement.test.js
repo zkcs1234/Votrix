@@ -20,13 +20,25 @@ test('readiness includes organizer deduction resolution only when rules apply to
  expect(nativeRoundAdvancement(state,next).checks.some(([label])=>label==='Configured organizer deductions resolved')).toBe(false)
 })
 
-test('blocked advancement gives the next authorized action instead of leaving disabled buttons unexplained',()=>{
- const state={...view(),calculation:{verified:false,finalized:false},reviewPolicy:{active:true,reviewerName:'Assigned Reviewer'}}
- expect(nativeRoundAdvancement(state,next).blocker).toMatchObject({stage:'results',label:'Open Finalization',message:expect.stringContaining('Assigned Reviewer must verify')})
- expect(nativeRoundAdvancement({...state,reviewPolicy:null},next).blocker.message).toContain('Assign an active independent reviewer')
- expect(nativeRoundAdvancement({...state,calculation:{verified:true}},next).blocker).toMatchObject({stage:'results',label:'Finalize this round'})
+test('unverified current calculations can proceed directly to reasoned organizer finalization',()=>{
+ const state={...view(),calculation:{verified:false,finalized:false}}
+ expect(nativeRoundAdvancement(state,next).blocker).toMatchObject({stage:'results',label:'Finalize this round'})
+ expect(nativeRoundAdvancement(state,next).status).toBe('Calculated · ready to finalize')
+ expect(nativeRoundAdvancement(state,next).checks.map(([label])=>label)).not.toContain('Independently verified')
  expect(nativeRoundAdvancement({...state,calculation:null},next).blocker.stage).toBe('calculate')
  expect(nativeRoundAdvancement({...state,session:{status:'active'}},next).blocker.live).toBe(true)
  expect(nativeRoundAdvancement({...state,complete:false},next).blocker.stage).toBe('submissions')
  expect(nativeRoundAdvancement(view(),next).blocker).toBeNull()
+})
+
+
+test('a reopened session or unresolved deductions cannot use an old confirmed roster to proceed',()=>{
+ expect(nativeRoundAdvancement({...view(),session:{status:'active'}},next).canProceed).toBe(false)
+ const state={...view(),deductionsResolved:false,rules:{configuration_snapshot:{scoringConfig:{deductionRules:[{id:'late',roundId:'pre',amount:2}]}}}}
+ expect(nativeRoundAdvancement(state,next).canProceed).toBe(false)
+})
+
+test('reviewer assignment and activity do not block organizer finalization',()=>{
+ const state={...view(),calculation:{verified:false,finalized:false},reviewPolicy:{active:false}}
+ expect(nativeRoundAdvancement(state,next).blocker).toMatchObject({stage:'results',label:'Finalize this round'})
 })

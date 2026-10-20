@@ -20,6 +20,7 @@ export const nativeCompetitionService={
  enroll:(eventId,userIds)=>api.post(`${base(eventId,true)}/enrollments/pick`,{userIds:Array.isArray(userIds)?userIds:[userIds],notify:false}),
  role:(eventId,participantId,role)=>api.patch(`${base(eventId,true)}/enrollments/${participantId}`,{role}),
  choices:(eventId,owner=false)=>api.get(`${base(eventId,owner)}/scoring-contexts`),
+ activateLiveControl:eventId=>api.post(`${base(eventId,true)}/live/activate`),
  view:(eventId,competitionId,roundId,owner=false)=>api.get(`${base(eventId,owner)}/${competitionId}/live`,{params:roundId==null?{}:{roundId}}),
  control:(eventId,competitionId,action,body)=>api.post(`${base(eventId,true)}/${competitionId}/live/${action}`,body),
  activity:eventId=>api.get(`${base(eventId,true)}/live-activity`),

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, ChevronRight, Info, LockKeyhole, Plus, Settings2, Trash2 } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { nativeCompetitionService as service } from '@/services/competition-native.service'
 import { pageantService } from '@/services/pageant.service'
+import {fetchCompetitionSetupData, invalidateCompetitionSetupData, setCompetitionSetupData} from '@/services/competition-setup-cache'
 import Button from '@/components/ui/Button'
 import StageFooter from '@/components/ui/StageFooter'
 import { INPUT_CLASS } from '@/utils/uiClasses'
@@ -13,19 +14,29 @@ const typeLabel = type => COMPETITION_TYPES.find(([key]) => key === type)?.[1] ?
 const formatLabel = format => PARTICIPATION_FORMATS.find(([key]) => key === format)?.[1] ?? 'Individual'
 
 export default function CompetitionCategoriesPage({ typeOnly = false }) {
-  const { eventId } = useParams(), navigate = useNavigate()
-  const [event, setEvent] = useState(null), [children, setChildren] = useState([]), [divisions, setDivisions] = useState([])
-  const [type, setType] = useState(''), [customType, setCustomType] = useState('')
+  const { eventId } = useParams(), navigate = useNavigate(), location = useLocation()
+  const routePrefetch = !typeOnly && location.state?.categoriesPrefetch?.eventId === eventId
+    ? location.state.categoriesPrefetch
+    : null
+  const consumedPrefetch = useRef(false)
+  const [event, setEvent] = useState(routePrefetch?.event ?? null)
+  const [children, setChildren] = useState(routePrefetch?.children ?? [])
+  const [divisions, setDivisions] = useState(routePrefetch?.divisions ?? [])
+  const [type, setType] = useState(routePrefetch?.type ?? '')
+  const [customType, setCustomType] = useState(routePrefetch?.customType ?? '')
   const [name, setName] = useState(''), [format, setFormat] = useState('individual')
   const [customOpen, setCustomOpen] = useState(false)
-  const [error, setError] = useState(''), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false)
+  const [error, setError] = useState(''), [loading, setLoading] = useState(!routePrefetch), [busy, setBusy] = useState(false)
   const pending = useRef(null), operation = useRef(false)
 
   const load = useCallback(async () => {
-    const [ev, list] = await Promise.all([pageantService.getEvent(eventId), service.list(eventId)])
+    let [ev, list] = await Promise.all([
+      fetchCompetitionSetupData(eventId,'event',()=>pageantService.getEvent(eventId)),
+      fetchCompetitionSetupData(eventId,'competitions',()=>service.list(eventId)),
+    ])
     const savedType = ev.data.event.competitionType ?? ev.data.event.competition_type ?? ''
     const divisionList = savedType === 'pageant'
-      ? await pageantService.listDivisions(eventId)
+      ? await fetchCompetitionSetupData(eventId,'divisions',()=>pageantService.listDivisions(eventId))
       : { data: { divisions: [] } }
     let savedChildren = list.data.competitions ?? []
     if (savedType === 'pageant' && divisionList.data.divisions?.length && !savedChildren.some(child =>
@@ -37,22 +48,40 @@ export default function CompetitionCategoriesPage({ typeOnly = false }) {
         competitionType: 'pageant',
       })
       const refreshed = await service.list(eventId)
+      list = refreshed
       savedChildren = refreshed.data.competitions ?? []
     }
     setEvent(ev.data.event)
     setChildren(savedChildren)
     setDivisions(divisionList.data.divisions ?? [])
+    setCompetitionSetupData(eventId,'event',ev)
+    setCompetitionSetupData(eventId,'competitions',list)
+    if (savedType === 'pageant') setCompetitionSetupData(eventId,'divisions',divisionList)
     setType(COMPETITION_TYPES.some(([key]) => key === savedType) ? savedType : savedType ? 'other' : '')
     setCustomType(COMPETITION_TYPES.some(([key]) => key === savedType) ? '' : savedType)
     setError('')
   }, [eventId])
 
   useEffect(() => {
+    if (routePrefetch && !consumedPrefetch.current) {
+      consumedPrefetch.current = true
+      setEvent(routePrefetch.event)
+      setChildren(routePrefetch.children)
+      setDivisions(routePrefetch.divisions)
+      setType(routePrefetch.type)
+      setCustomType(routePrefetch.customType)
+      setError('')
+      setLoading(false)
+      navigate(location.pathname, { replace: true, state: null })
+      return
+    }
+    if (consumedPrefetch.current && !routePrefetch && location.pathname.endsWith('/categories')) return
+    consumedPrefetch.current = false
     let alive = true
     setLoading(true)
     load().catch(e => { if (alive) setError(message(e)) }).finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [load, typeOnly])
+  }, [eventId, load, location.pathname, location.state, navigate, routePrefetch, typeOnly])
 
   const nativeChildren = children.filter(c => c.origin === 'native')
   const pageantChild = nativeChildren.find(c => c.name.trim().toLowerCase() === 'pageant')
@@ -65,10 +94,19 @@ export default function CompetitionCategoriesPage({ typeOnly = false }) {
       ? 'At least one competition has frozen rules. Unfreeze or create a new draft before changing this setup.'
       : ''
 
-  const run = async action => {
+  const run = async (action, { onError } = {}) => {
     if (operation.current) return
     operation.current = true; setBusy(true); setError('')
-    try { await action(); await load() } catch (e) { setError(message(e)) }
+    try {
+      const shouldReload = await action()
+      if (shouldReload !== false) {
+        await invalidateCompetitionSetupData(eventId)
+        await load()
+      }
+    } catch (e) {
+      onError?.()
+      setError(message(e))
+    }
     finally { operation.current = false; setBusy(false) }
   }
 
@@ -76,54 +114,181 @@ export default function CompetitionCategoriesPage({ typeOnly = false }) {
     const next = type === 'other' ? customType.trim() : type
     if (!next) throw new Error('Choose a type and name any custom type.')
     const previous = event.competitionType ?? event.competition_type
-    if (next !== previous && children.length) {
-      if (!window.confirm('Changing type removes all draft competitions, their scoring, entry associations, and judge assignments. Shared event entrants are retained. Continue?')) return
+    const typeChanged = next !== previous
+    if (typeChanged && children.length) {
+      if (!window.confirm('Changing type removes all draft competitions, their scoring, entry associations, and judge assignments. Shared event entrants are retained. Continue?')) return false
       for (const child of children) await service.remove(eventId, child.id, { expectedSetupRevision: child.setup_revision, expectedInputRevision: child.input_revision })
     }
-    await pageantService.updateEvent(eventId, { competitionType: next })
-    navigate(`/organizer/competition/events/${eventId}/categories`)
+    const updated = typeChanged
+      ? await pageantService.updateEvent(eventId, { competitionType: next })
+      : null
+    const nextEvent = updated?.data?.event ?? { ...event, competitionType: next, competition_type: next }
+    let nextChildren = typeChanged ? [] : children
+    const nextDivisions = next === 'pageant'
+      ? previous === 'pageant'
+        ? divisions
+        : (await pageantService.listDivisions(eventId)).data.divisions ?? []
+      : []
+    if (next === 'pageant' && nextDivisions.length && !nextChildren.some(child =>
+      child.origin === 'native' && child.name.trim().toLowerCase() === 'pageant',
+    )) {
+      const created = await service.create(eventId, {
+        id: crypto.randomUUID(),
+        name: 'Pageant',
+        competitionType: 'pageant',
+      })
+      nextChildren = [...nextChildren, created.data.competition]
+    }
+    navigate(`/organizer/competition/events/${eventId}/categories`, {
+      state: {
+        categoriesPrefetch: {
+          eventId,
+          event: nextEvent,
+          children: nextChildren,
+          divisions: nextDivisions,
+          type: COMPETITION_TYPES.some(([key]) => key === next) ? next : 'other',
+          customType: COMPETITION_TYPES.some(([key]) => key === next) ? '' : next,
+        },
+      },
+    })
+    setCompetitionSetupData(eventId,'event',{data:{event:nextEvent}})
+    setCompetitionSetupData(eventId,'competitions',{data:{competitions:nextChildren}})
+    if (next === 'pageant') setCompetitionSetupData(eventId,'divisions',{data:{divisions:nextDivisions}})
+    return false
   })
 
-  const add = choice => run(async () => {
+  const add = choice => {
     const childName = choice.trim()
-    if (!childName) throw new Error('Enter a competition or category name.')
-    if (children.some(c => c.name.toLowerCase() === childName.toLowerCase())) throw new Error('This competition is already selected.')
+    if (!childName) { setError('Enter a competition or category name.'); return }
+    if (children.some(c => c.name.toLowerCase() === childName.toLowerCase())) { setError('This competition is already selected.'); return }
     if (pending.current?.name !== childName) pending.current = { id: crypto.randomUUID(), name: childName, competitionType: event.competitionType ?? event.competition_type }
-    const { data } = await service.create(eventId, pending.current)
-    await service.edit(eventId, data.competition.id, { name: childName, competitionType: pending.current.competitionType, participationFormat: type === 'pageant' ? 'individual' : format, expectedSetupRevision: data.competition.setup_revision })
-    pending.current = null; setName('')
-  })
-
-  const addPageantDivision = divisionName => run(async () => {
-    const normalizedName = divisionName.trim()
-    if (!normalizedName) throw new Error('Enter a division name.')
-    if (divisions.some(division => division.name.toLowerCase() === normalizedName.toLowerCase())) {
-      throw new Error('This division is already configured.')
+    const optimisticId = pending.current.id
+    const optimisticChild = {
+      ...pending.current,
+      origin: 'native',
+      participation_format: type === 'pageant' ? 'individual' : format,
+      setup_revision: null,
+      input_revision: null,
     }
-    if (!pageantChild) {
-      const request = pending.current?.name === 'Pageant'
-        ? pending.current
-        : { id: crypto.randomUUID(), name: 'Pageant', competitionType: 'pageant' }
-      pending.current = request
-      await service.create(eventId, request)
+    const previousChildren = children
+    setChildren(current => [...current.filter(child => child.id !== optimisticId), optimisticChild])
+    run(async () => {
+      const { data } = await service.create(eventId, pending.current)
+      const edited = await service.edit(eventId, data.competition.id, {
+        name: childName,
+        competitionType: pending.current.competitionType,
+        participationFormat: type === 'pageant' ? 'individual' : format,
+        expectedSetupRevision: data.competition.setup_revision,
+      })
+      const savedChild = edited?.data?.competition ?? {
+        ...data.competition,
+        participation_format: type === 'pageant' ? 'individual' : format,
+      }
+      setChildren(current => current.map(child =>
+        child.id === optimisticId ? savedChild : child,
+      ))
+      setCompetitionSetupData(eventId,'competitions',current => ({
+        ...current,
+        data: {
+          ...current?.data,
+          competitions: [...(current?.data?.competitions ?? children), savedChild],
+        },
+      }))
       pending.current = null
+      setName('')
+      return false
+    }, {
+      onError: () => setChildren(previousChildren),
+    })
+  }
+
+  const addPageantDivision = divisionName => {
+    const normalizedName = divisionName.trim()
+    if (!normalizedName) { setError('Enter a division name.'); return }
+    if (divisions.some(division => division.name.toLowerCase() === normalizedName.toLowerCase())) {
+      setError('This division is already configured.')
+      return
     }
-    if (!divisions.length && !(event.divisionsEnabled ?? event.divisions_enabled)) {
-      await pageantService.setDivisionsEnabled(eventId, true)
+    const optimisticDivision = { id: crypto.randomUUID(), name: normalizedName }
+    const previousDivisions = divisions
+    const previousChildren = children
+    setDivisions(current => [...current, optimisticDivision])
+    if (!pageantChild) {
+      setChildren(current => [...current, {
+        id: crypto.randomUUID(),
+        name: 'Pageant',
+        competitionType: 'pageant',
+        origin: 'native',
+        participation_format: 'individual',
+      }])
     }
-    await pageantService.createDivision(eventId, { name: normalizedName })
-    setName('')
-  })
+    run(async () => {
+      if (!pageantChild) {
+        const request = pending.current?.name === 'Pageant'
+          ? pending.current
+          : { id: crypto.randomUUID(), name: 'Pageant', competitionType: 'pageant' }
+        pending.current = request
+        const created = await service.create(eventId, request)
+        setChildren(current => current.map(child => child.name === 'Pageant' && !child.setup_revision
+          ? created.data.competition
+          : child))
+        setCompetitionSetupData(eventId,'competitions',current => ({
+          ...current,
+          data: {
+            ...current?.data,
+            competitions: [...(current?.data?.competitions ?? children), created.data.competition],
+          },
+        }))
+        pending.current = null
+      }
+      if (!divisions.length && !(event.divisionsEnabled ?? event.divisions_enabled)) {
+        await pageantService.setDivisionsEnabled(eventId, true)
+      }
+      const createdDivision = await pageantService.createDivision(eventId, { name: normalizedName })
+      setDivisions(current => current.map(division =>
+        division.id === optimisticDivision.id ? createdDivision.data.division : division,
+      ))
+      setCompetitionSetupData(eventId,'divisions',current => ({
+        ...current,
+        data: { ...current?.data, divisions: [...(current?.data?.divisions ?? divisions), createdDivision.data.division] },
+      }))
+      setName('')
+      return false
+    }, {
+      onError: () => {
+        setDivisions(previousDivisions)
+        setChildren(previousChildren)
+      },
+    })
+  }
 
   const removePageantDivision = division => {
     if (!division) return
     if (!window.confirm(`Remove the ${division.name} division? Divisions with registered contestants cannot be deleted.`)) return
-    run(() => pageantService.deleteDivision(eventId, division.id))
+    const previousDivisions = divisions
+    setDivisions(current => current.filter(item => item.id !== division.id))
+    run(async () => {
+      await pageantService.deleteDivision(eventId, division.id)
+      setCompetitionSetupData(eventId,'divisions',current => ({
+        ...current,
+        data: { ...current?.data, divisions: (current?.data?.divisions ?? divisions).filter(item => item.id !== division.id) },
+      }))
+      return false
+    }, { onError: () => setDivisions(previousDivisions) })
   }
 
   const remove = child => {
     if (window.confirm(`Remove ${child.name} and its scoring, entry associations, and assignments?`)) {
-      run(() => service.remove(eventId, child.id, { expectedSetupRevision: child.setup_revision, expectedInputRevision: child.input_revision }))
+      const previousChildren = children
+      setChildren(current => current.filter(item => item.id !== child.id))
+      run(async () => {
+        await service.remove(eventId, child.id, { expectedSetupRevision: child.setup_revision, expectedInputRevision: child.input_revision })
+        setCompetitionSetupData(eventId,'competitions',current => ({
+          ...current,
+          data: { ...current?.data, competitions: (current?.data?.competitions ?? children).filter(item => item.id !== child.id) },
+        }))
+        return false
+      }, { onError: () => setChildren(previousChildren) })
     }
   }
 

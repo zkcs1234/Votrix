@@ -1,14 +1,24 @@
 import {act,fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import {beforeEach,expect,test,vi} from 'vitest'
-import {MemoryRouter, Routes, Route, useParams, useLocation} from 'react-router-dom'
-const f=vi.hoisted(()=>({snapshot:vi.fn(),calculate:vi.fn(),transition:vi.fn(),appoint:vi.fn(),qualification:vi.fn(),deduction:vi.fn(),export:vi.fn(),owned:vi.fn(),downloadCsv:vi.fn(),downloadExcel:vi.fn(),downloadPdf:vi.fn(),downloadBlob:vi.fn(),listeners:new Map()}))
+import {MemoryRouter, Routes, Route, useParams, useLocation, Link} from 'react-router-dom'
+const f=vi.hoisted(()=>({choices:vi.fn(),snapshot:vi.fn(),calculate:vi.fn(),transition:vi.fn(),appoint:vi.fn(),qualification:vi.fn(),deduction:vi.fn(),export:vi.fn(),owned:vi.fn(),downloadCsv:vi.fn(),downloadExcel:vi.fn(),downloadPdf:vi.fn(),downloadBlob:vi.fn(),listeners:new Map()}))
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:{id:'owner'}})}))
+vi.mock('@/services/competition-native.service',()=>({nativeCompetitionService:{choices:f.choices}}))
 vi.mock('@/services/competition-native-tabulation.service',()=>({nativeTabulationService:{snapshot:f.snapshot,calculate:f.calculate,transition:f.transition,appoint:f.appoint,qualification:f.qualification,deduction:f.deduction}}))
 vi.mock('@/services/competition-native-results.service',()=>({nativeResultsService:{export:f.export,owned:f.owned}}))
 vi.mock('@/utils/exportReport',()=>({downloadCsv:f.downloadCsv,downloadExcel:f.downloadExcel,downloadPdf:f.downloadPdf}))
 vi.mock('@/utils/csvDownload',()=>({downloadBlob:f.downloadBlob}))
 vi.mock('@/services/socket.service',()=>({isConnected:()=>true,subscribe:(type,cb)=>{const group=f.listeners.get(type)??new Set();group.add(cb);f.listeners.set(type,group);return()=>group.delete(cb)}}))
-import Workspace from './NativeTabulationWorkspace'
+import NativeWorkspace from './NativeTabulationWorkspace'
+import CompetitionTabulationPage from '@/pages/organizer/competition/CompetitionTabulationPage'
+import TabulationWorkspaceNavigation from './TabulationWorkspaceNavigation'
+import { competitionNavigationHref } from '@/utils/competitionNavigation'
+const sections = {Overview:'overview','Judge Submissions':'submissions','Tabulation Matrix':'matrix',Deductions:'deductions',Calculation:'validation',Finalization:'finalization','Next Round':'advancement','Category Wrap-up':'advancement','Ranking & Tie Rules':'results','Audit Trail':'audit'}
+function Workspace(props) {
+ const location=useLocation()
+ const section=location.pathname.includes('/tabulation/')?location.pathname.split('/').pop():props.initialSection??'overview'
+ return <>{!props.reviewer&&<><nav aria-label="Tabulation sidebar">{Object.entries(sections).map(([name,path])=><Link key={name} to={competitionNavigationHref(`/organizer/competition/events/event/tabulation/${path}`,'event',location)} aria-current={section===path?'page':undefined}>{name}</Link>)}</nav><TabulationWorkspaceNavigation eventId={props.eventId} section={section}/></>}<NativeWorkspace {...props} initialSection={section}/></>
+}
 const choices=[{competitionId:'a',competitionName:'Hip-Hop',roundId:null,roundName:'Single phase'},{competitionId:'b',competitionName:'Contemporary',roundId:null,roundName:'Single phase'}]
 let states
 const snapshot=c=>({eventId:'event',competitionId:c,roundId:null,viewerId:'owner',complete:true,progress:[{judgeId:'judge1',judgeName:'Maria Santos',submitted:true,submissionId:`submission-${c}`,submittedAt:'2026-10-13T00:00:00Z'}],session:{id:`session-${c}`,status:'closed',entry_ids:[`entry-${c}`]},reviewPolicy:{active:true,reviewer_id:'reviewer',reviewerName:'John Reyes'},sourceDigest:'digest',deductionsResolved:true,deductions:[],entries:[{id:`entry-${c}`,name:`Dancer ${c}`,contestantNumber:1}],rules:{id:`rules-${c}`,configuration_snapshot:{structure:'single',rounds:[],criteria:[{id:`criterion-${c}`,name:'Technique',percentage:100,roundId:null,minorCriteria:[{id:`minor-${c}`,name:'Skill',minScore:0,maxScore:10}]}],scoringConfig:{calculationMethod:'weighted_average',decimalPlaces:2,deductionRules:[]}}},submissions:[{id:`submission-${c}`,judge_id:'judge1',session_id:`session-${c}`,rules_version:`rules-${c}`,round_id:null,submitted_at:'2026-10-13T00:00:00Z',sources:[{session_id:`session-${c}`,judge_id:'judge1',locked:true,entry_id:`entry-${c}`,criterion_id:`criterion-${c}`,scores:{[`minor-${c}`]:8}}]}],calculation:{id:`calc-${c}`,version:1,source_digest:'digest',verified:false,finalized:false,input_snapshot:{},output_snapshot:{results:[{contestantId:`entry-${c}`,rank:1,baseScore:80,deductionTotal:0,finalScore:80}],worksheets:[{entryId:`entry-${c}`,judgeId:'judge1',roundId:null,total:80,complete:true,criteria:[{criteriaId:`criterion-${c}`,name:'Technique',percentage:100,average:80,contribution:80,minors:[{id:`minor-${c}`,name:'Skill',raw:8,normalized:80}]}]}],entryCriteriaAverages:{[`single:entry-${c}`]:{roundId:null,entryId:`entry-${c}`,criteria:{[`criterion-${c}`]:80}}}}}})
@@ -16,10 +26,36 @@ beforeEach(()=>{vi.clearAllMocks();f.listeners.clear();states={a:snapshot('a'),b
 const emit=payload=>{for(const cb of f.listeners.get('competition:native-invalidated')??[])cb(payload)}
 const renderReady=async(reviewer=false)=>{render(<MemoryRouter><Workspace eventId="event" choices={choices} reviewer={reviewer}/></MemoryRouter>);await screen.findByRole('heading',{name:'Category overview'})}
 const openStage=name=>{
+ const sidebar=screen.queryByRole('navigation',{name:'Tabulation sidebar'})
+ if(sidebar){fireEvent.click(within(sidebar).getByRole('link',{name:['Judge Deductions','Organizer Deductions'].includes(name)?'Deductions':name,exact:true}));return}
  if(name==='Ranking & Tie Rules'){fireEvent.click(screen.getByRole('tab',{name:/^Finalization:/}));fireEvent.click(screen.getByRole('button',{name:'Results & Rankings'}));return}
  fireEvent.click(screen.getByRole('tab',{name:new RegExp(`^${name==='Calculation'?'Validation':name}:`)}))
 }
 const matrixAction=action=>{fireEvent.click(screen.getByRole('button',{name:'Actions for Dancer a'}));fireEvent.click(screen.getByRole('button',{name:action}))}
+
+test('organizers use the sidebar without duplicate top tabs', async()=>{
+ await renderReady()
+ expect(screen.queryByRole('tablist',{name:'Tabulation workflow'})).not.toBeInTheDocument()
+ openStage('Judge Submissions')
+ expect(screen.getByRole('heading',{name:'Judge submissions'})).toBeInTheDocument()
+ openStage('Audit Trail')
+ expect(screen.getByRole('heading',{name:'Audit trail'})).toBeInTheDocument()
+})
+
+test('reviewers retain workflow tabs because their workspace has no organizer sidebar', async()=>{
+ await renderReady(true)
+ expect(screen.getByRole('tablist',{name:'Tabulation workflow'})).toBeInTheDocument()
+ openStage('Judge Submissions')
+ expect(screen.getByRole('heading',{name:'Judge submissions'})).toBeInTheDocument()
+})
+
+test('an unconfigured deductions route explains its state without switching to Overview', async()=>{
+ await renderReady();openStage('Deductions')
+ expect(screen.getByText('No deductions are configured for this round.')).toBeInTheDocument()
+ expect(screen.getByRole('link',{name:'Deductions'})).toHaveAttribute('aria-current','page')
+ expect(screen.queryByRole('heading',{name:'Category overview'})).not.toBeInTheDocument()
+ expect(screen.queryByRole('button',{name:'Propose Deduction'})).not.toBeInTheDocument()
+})
 const exportEntry=name=>{fireEvent.click(screen.getByRole('button',{name:`Actions for ${name}`}));fireEvent.click(screen.getByRole('button',{name:'Export this entry'}))}
 
 test('subsection navigation preserves the selected original sheet without reloading the scoring context',async()=>{
@@ -84,7 +120,7 @@ test('tabulation honors the Pageant round selected by the Live Control handoff',
 })
 test('incomplete current sources hide historical worksheet values, aggregates, results and controls',async()=>{
  states.a.complete=false;states.a.progress[0].submitted=false;states.a.progress[0].issues=[{message:'A required criterion score is missing.',entryId:'entry-a',criterionId:'criterion-a'}]
- await renderReady();openStage('Judge Submissions');expect(screen.getByText('Missing submission')).toBeInTheDocument();expect(screen.queryByText(/Round overview/)).not.toBeInTheDocument();expect(screen.queryByRole('heading',{name:'Score and workflow issues'})).not.toBeInTheDocument();expect(screen.queryByText('80')).not.toBeInTheDocument();expect(screen.getByRole('tab',{name:'Validation: blocked'})).toBeDisabled()
+ await renderReady();openStage('Judge Submissions');expect(screen.getByText('Missing submission')).toBeInTheDocument();expect(screen.queryByText(/Round overview/)).not.toBeInTheDocument();expect(screen.queryByRole('heading',{name:'Score and workflow issues'})).not.toBeInTheDocument();expect(screen.queryByText('80')).not.toBeInTheDocument();openStage('Calculation');expect(screen.getByText(/Complete the required judge submissions and close scoring/)).toBeInTheDocument()
 })
 test('overview displays one compact contestant matrix and opens sources and calculation on demand',async()=>{
  await renderReady()
@@ -100,7 +136,7 @@ test('overview displays one compact contestant matrix and opens sources and calc
  expect(screen.getByText('How the total is calculated')).toBeInTheDocument()
  fireEvent.click(screen.getByRole('button',{name:'Close Breakdown'}))
  matrixAction('View original sheets')
- expect(screen.getByRole('tab',{name:/^Judge Submissions:/})).toHaveAttribute('aria-selected','true')
+ expect(within(screen.getByRole('navigation',{name:'Tabulation sidebar'})).getByRole('link',{name:'Judge Submissions'})).toHaveAttribute('aria-current','page')
  expect(screen.getByRole('table',{name:'Original submitted scores for Maria Santos'})).toBeInTheDocument()
  for(const title of ['Category overview','Contestant scores','Automatic score calculation','Independent review','Final results','Audit trail']) expect(screen.queryByRole('heading',{name:title,hidden:true})).not.toBeInTheDocument()
  expect(screen.getByText(/Current submission.*submission-a/)).toHaveTextContent('2026')
@@ -176,8 +212,8 @@ test('numeric results have no routine manual calculation action',async()=>{
 })
 test('single phase renders no round selector or qualification controls',async()=>{states.a.calculation.finalized=true;await renderReady();expect(screen.queryByLabelText('Round')).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Review qualification'})).not.toBeInTheDocument()})
 test('failed authoritative refresh removes worksheets and results instead of retaining a stale official view',async()=>{await renderReady();f.snapshot.mockRejectedValueOnce({response:{data:{message:'Current source permission revoked'}}});await act(async()=>emit({eventId:'event',competitionId:'a',roundId:null}));expect(screen.getByRole('alert')).toHaveTextContent('revoked');expect(screen.queryByText('Skill: 8')).not.toBeInTheDocument()})
-test('organizer finalization is explicit after independent verification',async()=>{
- states.a.calculation.verified=true;await renderReady();openStage('Finalization');expect(screen.getByRole('button',{name:'Finalize official calculation'})).toBeDisabled();fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Explicit reviewed finalization'}});fireEvent.click(screen.getByRole('button',{name:'Finalize official calculation'}));await waitFor(()=>expect(f.transition).toHaveBeenCalledWith('event','a',expect.objectContaining({calculationId:'calc-a',action:'finalize',reason:'Explicit reviewed finalization'})))
+test('organizer can finalize a current calculation directly with a reason',async()=>{
+ states.a.calculation.verified=false;await renderReady();openStage('Finalization');expect(screen.getByRole('button',{name:'Finalize official calculation'})).toBeDisabled();fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Organizer reviewed current standings'}});fireEvent.click(screen.getByRole('button',{name:'Finalize official calculation'}));await waitFor(()=>expect(f.transition).toHaveBeenCalledWith('event','a',expect.objectContaining({calculationId:'calc-a',action:'finalize',reason:'Organizer reviewed current standings'})))
 })
 test('individual judge CSV download uses the selected competition, round and original submission',async()=>{
  await renderReady();matrixAction('View original sheets');fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Download CSV'}))
@@ -204,7 +240,7 @@ test('combined score export is entry-by-entry and includes only backend calculat
 test('ranking comparison withholds estimated scores until backend calculation exists',async()=>{
  states.a.calculation=null
  await renderReady()
- expect(screen.getByRole('tab',{name:'Finalization: blocked'})).toBeDisabled()
+ openStage('Finalization');expect(screen.getByText(/A current official calculation is required/)).toBeInTheDocument()
  expect(screen.queryByRole('heading',{name:'Overall ranking and tie rules'})).not.toBeInTheDocument()
  expect(screen.queryByText('80')).not.toBeInTheDocument()
 })
@@ -212,7 +248,7 @@ test('stale calculations do not display prior standings or enable calculation de
  states.a.calculation=null;states.a.calculationStale=true
  await renderReady()
  expect(screen.queryByRole('button',{name:'View calculation'})).not.toBeInTheDocument()
- expect(screen.getByRole('tab',{name:'Finalization: blocked'})).toBeDisabled()
+ openStage('Finalization');expect(screen.getByText(/A current official calculation is required/)).toBeInTheDocument()
  expect(screen.queryByText('80')).not.toBeInTheDocument()
 })
 test('rank-based comparison displays backend judge ranks and the configured placement total',async()=>{
@@ -254,7 +290,24 @@ test('qualification review preserves automatic cutoff selection and confirmation
  f.qualification.mockResolvedValue({data:{automatic:['entry-a','entry-b'],policy:'top_n',fromRound:'pre',toRound:'final',standings:[{contestantId:'entry-a',rank:1},{contestantId:'entry-b',rank:1}]}})
  states.a.calculation.output_snapshot.results.push({contestantId:'entry-b',rank:1,baseScore:80,finalScore:80})
  states.a.entries.push({id:'entry-b',name:'Dancer b',contestantNumber:2});states.a.session.entry_ids.push('entry-b')
- render(<MemoryRouter><Workspace eventId="event" choices={rounds}/></MemoryRouter>);await screen.findByRole('tab',{name:'Next Round: available'});openStage('Next Round');fireEvent.click(screen.getByRole('button',{name:'Review Advancement'}));await screen.findByRole('button',{name:'Confirm reviewed qualifiers'});expect(screen.getAllByRole('checkbox')).toHaveLength(2);expect(screen.getAllByRole('checkbox').every((checkbox)=>checkbox.checked&&checkbox.disabled)).toBe(true);fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Explicit tied cutoff roster review'}});fireEvent.click(screen.getByRole('button',{name:'Confirm reviewed qualifiers'}));await waitFor(()=>expect(f.qualification).toHaveBeenCalledWith('event','a',expect.objectContaining({roundId:'pre',sourceDigest:'digest',calculationId:'calc-a',qualifierIds:['entry-a','entry-b'],acknowledged:true}),true));expect(f.calculate).not.toHaveBeenCalled()
+ render(<MemoryRouter><Workspace eventId="event" choices={rounds}/></MemoryRouter>);await screen.findByRole('heading',{name:'Category overview'});openStage('Next Round');fireEvent.click(screen.getByRole('button',{name:'Review Advancement'}));await screen.findByRole('button',{name:'Confirm reviewed qualifiers'});expect(screen.getAllByRole('checkbox')).toHaveLength(2);expect(screen.getAllByRole('checkbox').every((checkbox)=>checkbox.checked&&checkbox.disabled)).toBe(true);fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Explicit tied cutoff roster review'}});fireEvent.click(screen.getByRole('button',{name:'Confirm reviewed qualifiers'}));await waitFor(()=>expect(f.qualification).toHaveBeenCalledWith('event','a',expect.objectContaining({roundId:'pre',sourceDigest:'digest',calculationId:'calc-a',qualifierIds:['entry-a','entry-b'],acknowledged:true}),true));expect(f.calculate).not.toHaveBeenCalled()
+})
+test('qualifier confirmation explains the required decision reason and enables after five characters',async()=>{
+ const rounds=[{...choices[0],roundId:'pre',roundName:'Preliminary'},{...choices[0],roundId:'final',roundName:'Final'}]
+ states.a.roundId='pre';states.a.calculation.finalized=true;states.a.calculation.verified=false
+ states.a.rules.configuration_snapshot.structure='multiple'
+ states.a.rules.configuration_snapshot.rounds=[{id:'pre',name:'Preliminary',displayOrder:0,advancementType:'top_n',advancementValue:1},{id:'final',name:'Final',displayOrder:1}]
+ f.qualification.mockResolvedValue({data:{automatic:['entry-a'],policy:'top_n',fromRound:'pre',toRound:'final',standings:[{contestantId:'entry-a',rank:1}]}})
+ render(<MemoryRouter><Workspace eventId="event" choices={rounds}/></MemoryRouter>)
+ await screen.findByRole('heading',{name:'Category overview'})
+ openStage('Next Round')
+ fireEvent.click(screen.getByRole('button',{name:'Review Advancement'}))
+ const confirm=await screen.findByRole('button',{name:'Confirm reviewed qualifiers'})
+ expect(confirm).toBeDisabled()
+ expect(screen.getByText('Enter a decision reason of at least 5 characters to enable confirmation (0/5).')).toBeInTheDocument()
+ fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Top two qualify'}})
+ expect(screen.getByText('Reason entered. Confirm the roster to enable the next round.')).toBeInTheDocument()
+ expect(confirm).toBeEnabled()
 })
 test('manual advancement uses the existing reasoned qualifier decision for tied standings',async()=>{
  const rounds=[{...choices[0],roundId:'pre',roundName:'Preliminary'},{...choices[0],roundId:'final',roundName:'Final'}]
@@ -262,7 +315,7 @@ test('manual advancement uses the existing reasoned qualifier decision for tied 
  states.a.calculation.output_snapshot.results.push({contestantId:'entry-b',rank:1,baseScore:80,finalScore:80})
  states.a.entries.push({id:'entry-b',name:'Dancer b',contestantNumber:2});states.a.session.entry_ids.push('entry-b')
  f.qualification.mockResolvedValue({data:{automatic:[],policy:'manual',fromRound:'pre',toRound:'final',standings:[{contestantId:'entry-a',rank:1},{contestantId:'entry-b',rank:1}]}})
- render(<MemoryRouter><Workspace eventId="event" choices={rounds}/></MemoryRouter>);await screen.findByRole('tab',{name:'Next Round: available'});openStage('Next Round');expect(screen.getByText(/Manual advancement is configured/)).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Review Advancement'}));await screen.findByRole('button',{name:'Confirm reviewed qualifiers'});expect(screen.getAllByRole('checkbox').every((checkbox)=>!checkbox.disabled)).toBe(true)
+ render(<MemoryRouter><Workspace eventId="event" choices={rounds}/></MemoryRouter>);await screen.findByRole('heading',{name:'Category overview'});openStage('Next Round');expect(screen.getByText(/Manual advancement is configured/)).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Review Advancement'}));await screen.findByRole('button',{name:'Confirm reviewed qualifiers'});expect(screen.getAllByRole('checkbox').every((checkbox)=>!checkbox.disabled)).toBe(true)
 })
 function advancementFixture(finalized=true){
  const rounds=[{...choices[0],roundId:'pre',roundName:'Preliminary'},{...choices[0],roundId:'final',roundName:'Final'}]
@@ -282,9 +335,14 @@ test('advancement route is visible before finalization and explains pending requ
  expect(screen.getByRole('button',{name:'Open Final in Live Control'})).toBeDisabled()
  expect(screen.getByText('Final score contributions: Preliminary 30% + Final 70%.')).toBeInTheDocument()
  expect(screen.getByText('Next-round qualifiers confirmed: Pending')).toBeInTheDocument()
- expect(screen.getByText(/John Reyes must verify this calculation from their reviewer account/)).toBeInTheDocument()
- fireEvent.click(screen.getByRole('button',{name:'Open Finalization'}))
- expect(await screen.findByRole('heading',{name:'Independent review'})).toBeInTheDocument()
+ expect(screen.getByText(/Review the current standings, then finalize this round/)).toBeInTheDocument()
+ expect(screen.queryByText(/Independently verified: Pending/)).not.toBeInTheDocument()
+ fireEvent.click(screen.getByRole('button',{name:'Finalize this round'}))
+ expect(await screen.findByRole('heading',{name:'Final results'})).toBeInTheDocument()
+ const finalize=screen.getByRole('button',{name:'Finalize official calculation'})
+ expect(finalize).toBeDisabled()
+ fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Organizer reviewed Round 1 results'}})
+ expect(finalize).toBeEnabled()
  expect(screen.queryByRole('button',{name:'Verify calculation'})).not.toBeInTheDocument()
  expect(f.qualification).not.toHaveBeenCalled()
 })
@@ -302,7 +360,7 @@ test('advancement directs a verified round to finalization and enables review af
  fireEvent.click(finalize)
  await waitFor(()=>expect(f.transition).toHaveBeenCalledWith('event','a',expect.objectContaining({action:'finalize',reason:'Reviewed and approved Preliminary',roundId:'pre'})))
  await waitFor(()=>expect(screen.queryByRole('button',{name:'Finalize official calculation'})).not.toBeInTheDocument())
- fireEvent.click(screen.getByRole('tab',{name:/^Next Round:/}))
+ openStage('Next Round')
  expect(await screen.findByRole('button',{name:'Review Advancement'})).toBeEnabled()
  expect(screen.getByRole('button',{name:'Open Final in Live Control'})).toBeDisabled()
  expect(f.qualification).not.toHaveBeenCalled()
@@ -329,12 +387,16 @@ test('confirming the proposed qualifiers persists readiness and hands off to the
 })
 
 test.each([
- ['stale qualification',{qualificationCurrent:false},'The confirmed qualifier roster changed.'],
- ['foreign actor',{viewerId:'someone-else'},'Next-round source context mismatch'],
-])('next-round handoff rejects %s returned by the authoritative refresh',async(label,change,error)=>{
+ ['stale qualification',source=>({...source,advancement:{...source.advancement,qualificationCurrent:false}}),'The confirmed qualifier roster changed.'],
+ ['foreign actor',source=>({...source,viewerId:'someone-else'}),'Current-round source context mismatch'],
+])('next-round handoff rejects %s returned by the authoritative refresh',async(label,alterSource,error)=>{
  const rounds=advancementFixture()
  states.a.advancement={...states.a.advancement,qualificationCurrent:true,qualifiedEntryIds:['entry-a']}
- f.snapshot.mockImplementation(async(e,c,r)=>({data:r==='final'?{eventId:e,competitionId:c,roundId:r,viewerId:'owner',qualificationCurrent:true,...change}:{...structuredClone(states.a),roundId:r}}))
+ let sourceReads=0
+ f.snapshot.mockImplementation(async(e,c,r)=>{
+  const source={...structuredClone(states.a),eventId:e,competitionId:c,roundId:r,viewerId:'owner'}
+  return {data:r==='pre'&&++sourceReads>1?alterSource(source):source}
+ })
  function Routed(){const {section}=useParams();return <Workspace eventId="event" choices={rounds} initialSection={section}/>}
  render(<MemoryRouter initialEntries={['/organizer/competition/events/event/tabulation/advancement']}><Routes><Route path="/organizer/competition/events/:eventId/tabulation/:section" element={<Routed/>}/><Route path="/organizer/competition/events/:eventId/live" element={<h1>Final Live Control</h1>}/></Routes></MemoryRouter>)
  fireEvent.click(await screen.findByRole('button',{name:'Open Final in Live Control'}))
@@ -349,7 +411,7 @@ test('a published single-round category can proceed to the next category still n
   publication:competitionId==='a'?{action:'publish',current:true,calculationId:`calc-${competitionId}`}:null,
  }}))
  await renderReady()
- fireEvent.click(screen.getByRole('tab',{name:/^Category Wrap-up:/}))
+ openStage('Category Wrap-up')
  const proceed=await screen.findByRole('button',{name:'Proceed to Contemporary'})
  fireEvent.click(proceed)
  await waitFor(()=>expect(screen.getByRole('combobox',{name:'Competition'})).toHaveValue('b'))
@@ -362,7 +424,7 @@ test('a category handoff waits for terminal publication',async()=>{
   calculation:{id:`calc-${competitionId}`,finalized:true},publication:null,
  }}))
  await renderReady()
- fireEvent.click(screen.getByRole('tab',{name:/^Category Wrap-up:/}))
+ openStage('Category Wrap-up')
  expect(await screen.findByText(/publish the terminal round’s results before proceeding/)).toBeInTheDocument()
  expect(screen.queryByRole('button',{name:/^Proceed to Contemporary/})).not.toBeInTheDocument()
 })
@@ -375,7 +437,7 @@ test('a published single-category single-round competition has no category hando
  }}))
  render(<MemoryRouter><Workspace eventId="event" choices={[choices[0]]}/></MemoryRouter>)
  await screen.findByRole('heading',{name:'Category overview'})
- fireEvent.click(screen.getByRole('tab',{name:/^Category Wrap-up:/}))
+ openStage('Category Wrap-up')
  expect(await screen.findByText(/Every configured category has completed its rounds/)).toBeInTheDocument()
  expect(screen.queryByRole('button',{name:/^Proceed to/})).not.toBeInTheDocument()
 })
@@ -410,7 +472,7 @@ test('multiple-round categories hand off to the earliest unfinished round in the
  }}))
  render(<MemoryRouter><Workspace eventId="event" choices={contexts} initialChoice={contexts[1]}/></MemoryRouter>)
  await screen.findByRole('heading',{name:'Category overview'})
- fireEvent.click(screen.getByRole('tab',{name:/^Category Wrap-up:/}))
+ openStage('Category Wrap-up')
  fireEvent.click(await screen.findByRole('button',{name:'Proceed to Contemporary'}))
  await waitFor(()=>expect(screen.getByRole('combobox',{name:'Round'})).toHaveValue('b:b-pre'))
  expect(f.owned).toHaveBeenCalledWith('event','a','a-pre')
@@ -457,11 +519,9 @@ test('manual results retain explicit placement entry and do not offer a numeric 
 })
 
 
-test('automatic results remain available before reviewer assignment and appointment is available at finalization',async()=>{
+test('finalization no longer requires reviewer assignment or verification',async()=>{
  states.a.reviewPolicy=null
- states.a.reviewerOptions=[{participantId:'reviewer-enrollment',name:'John Reyes'}]
  f.calculate.mockImplementation(async()=>{states.a.calculation=snapshot('a').calculation;return {data:{}}})
- f.appoint.mockImplementation(async()=>{states.a.reviewPolicy={active:true,reviewer_id:'reviewer',reviewerName:'John Reyes'};return {data:{}}})
  await renderReady();openStage('Calculation')
  expect(screen.queryByRole('heading',{name:'Independent review'})).not.toBeInTheDocument()
  expect(screen.getByRole('heading',{name:'Automatic score calculation'})).toBeInTheDocument()
@@ -469,13 +529,17 @@ test('automatic results remain available before reviewer assignment and appointm
  expect(screen.getByRole('list',{name:'Configured criterion weights'})).toHaveTextContent('Technique')
  expect(screen.getAllByText('Up to Date').length).toBeGreaterThan(0)
  openStage('Finalization')
- expect(screen.getByRole('heading',{name:'Independent review'})).toBeInTheDocument()
- fireEvent.change(screen.getByLabelText('Independent reviewer'),{target:{value:'reviewer-enrollment'}})
- fireEvent.click(screen.getByRole('button',{name:'Assign Reviewer'}))
- await waitFor(()=>expect(f.appoint).toHaveBeenCalledWith('event','a','reviewer-enrollment'))
- await screen.findByText('John Reyes')
+ expect(screen.queryByRole('heading',{name:'Independent review'})).not.toBeInTheDocument()
+ expect(screen.queryByLabelText('Independent reviewer')).not.toBeInTheDocument()
+ expect(screen.queryByRole('button',{name:'Assign Reviewer'})).not.toBeInTheDocument()
+ expect(screen.queryByPlaceholderText('Add notes used to support a formal review decision.')).not.toBeInTheDocument()
  expect(screen.getByRole('heading',{name:'Final results'})).toBeInTheDocument()
- expect(screen.queryByRole('button',{name:'Finalize official calculation'})).not.toBeInTheDocument()
+ const finalize=screen.getByRole('button',{name:'Finalize official calculation'})
+ expect(finalize).toBeDisabled()
+ fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Reviewed current results directly'}})
+ expect(finalize).toBeEnabled()
+ expect(screen.getByText(/Finalization unlocks qualifier review/)).toBeInTheDocument()
+ expect(screen.queryByRole('button',{name:'Assign verification'})).not.toBeInTheDocument()
  expect(f.calculate).not.toHaveBeenCalled()
 })
 
@@ -505,7 +569,7 @@ test('calculation remains selected across a delayed authoritative refresh',async
  await act(async()=>emit({eventId:'event',competitionId:'a',roundId:null}))
  expect(screen.queryByRole('heading',{name:'Calculation summary'})).not.toBeInTheDocument()
  await act(async()=>release({data:states.a}))
- expect(screen.getByRole('tab',{name:'Validation: complete'})).toHaveAttribute('aria-selected','true')
+ expect(screen.getByRole('link',{name:'Calculation'})).toHaveAttribute('aria-current','page')
  expect(screen.getByRole('heading',{name:'Automatic score calculation'})).toBeInTheDocument()
 })
 
@@ -538,4 +602,147 @@ test('new organizer mode applies configured deductions without displaying legacy
  fireEvent.click(screen.getByRole('button',{name:'Apply Deduction'}))
  await waitFor(()=>expect(f.deduction).toHaveBeenCalledWith('event','a',expect.objectContaining({action:'propose',entryId:'entry-a',ruleKey:'late',reason:'Organizer recorded late entry'})))
  expect(f.appoint).not.toHaveBeenCalled()
+})
+
+
+
+function CurrentUrl(){const location=useLocation();return <output aria-label="Current URL">{location.pathname}{location.search}{location.hash}</output>}
+function continuousPage(path,contexts=choices){
+ vi.stubEnv('VITE_COMPETITION_NATIVE_TABULATION_ENABLED','true')
+ f.choices.mockResolvedValue({data:{contexts,nativeEvent:true}})
+ render(<MemoryRouter initialEntries={[path]}><CurrentUrl/><Routes>
+  <Route path="/organizer/competition/events/:eventId/scoring" element={<CompetitionTabulationPage workspace="scoring"/>}/>
+  <Route path="/organizer/competition/events/:eventId/results" element={<CompetitionTabulationPage workspace="results"/>}/>
+  <Route path="/organizer/competition/events/:eventId/advancement" element={<CompetitionTabulationPage workspace="advancement"/>}/>
+  <Route path="/organizer/competition/events/:eventId/audit" element={<CompetitionTabulationPage workspace="audit"/>}/>
+  <Route path="/organizer/competition/events/:eventId/tabulation/:section" element={<CompetitionTabulationPage/>}/>
+  <Route path="/organizer/competition/events/:eventId/live" element={<h1>Destination Live Control</h1>}/>
+ </Routes></MemoryRouter>)
+}
+
+test('Scoring and Results each render all three areas together using one shared snapshot',async()=>{
+ states.a.rules.configuration_snapshot.scoringConfig.deductionRules=[{id:'late',description:'Late start',amount:2,units:'points'}]
+ continuousPage('/organizer/competition/events/event/scoring?competitionId=a')
+ await screen.findByRole('heading',{name:'Judge submissions'})
+ expect(screen.getByRole('table',{name:'Contestant tabulation matrix'})).toHaveTextContent('Dancer a')
+ expect(screen.getByRole('button',{name:'Propose Deduction'})).toBeInTheDocument()
+ expect([...document.querySelectorAll('.v-tabulation-page-section')].map(n=>n.id)).toEqual(['tabulation-submissions','tabulation-matrix','tabulation-deductions'])
+ const links=within(screen.getByRole('navigation',{name:'Scoring page sections'}))
+ fireEvent.click(links.getByRole('link',{name:'Tabulation Matrix'}))
+ expect(screen.getByRole('heading',{name:'Judge submissions'})).toBeInTheDocument()
+ expect(screen.getByLabelText('Current URL')).toHaveTextContent('/scoring?competitionId=a#tabulation-matrix')
+ expect(f.snapshot).toHaveBeenCalledTimes(1)
+ fireEvent.click(screen.getByRole('button',{name:'Continue to Results'}))
+ await screen.findByRole('heading',{name:'Automatic score calculation'})
+ expect(screen.getByRole('heading',{name:'Overall ranking and tie rules'})).toBeInTheDocument()
+ expect(screen.getByRole('heading',{name:'Final results'})).toBeInTheDocument()
+ expect([...document.querySelectorAll('.v-tabulation-page-section')].map(n=>n.id)).toEqual(['tabulation-validation','tabulation-results','tabulation-finalization'])
+ expect(screen.getByRole('button',{name:'Finalize official calculation'})).toBeDisabled()
+ expect(screen.getByRole('button',{name:'Continue to Round Advancement'})).toBeDisabled()
+ expect(f.snapshot).toHaveBeenCalledTimes(1)
+ for(const mutation of [f.calculate,f.transition,f.deduction,f.qualification])expect(mutation).not.toHaveBeenCalled()
+})
+
+test.each([['submissions','scoring'],['matrix','scoring'],['deductions','scoring'],['validation','results'],['results','results'],['finalization','results']])('old %s links open the continuous %s page at their matching section',async(section,page)=>{
+ continuousPage(`/organizer/competition/events/event/tabulation/${section}?competitionId=a`)
+ await screen.findByRole('navigation',{name:`${page==='scoring'?'Scoring':'Results'} page sections`})
+ await waitFor(()=>expect(document.getElementById(`tabulation-${section}`)).toBeInTheDocument())
+ expect(screen.getByLabelText('Current URL')).toHaveTextContent(`/${page}?competitionId=a#tabulation-${section}`)
+ await waitFor(()=>expect(document.getElementById(`tabulation-${section}`)).toHaveFocus())
+ expect(document.querySelectorAll('.v-tabulation-page-section')).toHaveLength(3)
+})
+
+test('unavailable Results areas explain prerequisites independently on the same page',async()=>{
+ states.a.complete=false;states.a.progress[0].submitted=false
+ continuousPage('/organizer/competition/events/event/results?competitionId=a')
+ await screen.findByText(/Complete the required judge submissions and close scoring/)
+ expect(document.querySelectorAll('.v-tabulation-page-section')).toHaveLength(3)
+ expect(screen.queryByRole('button',{name:'Finalize official calculation'})).not.toBeInTheDocument()
+ expect(screen.getByRole('button',{name:'Continue to Round Advancement'})).toBeDisabled()
+})
+
+test('finalized Results proceed to separate advancement and preserve the confirmed destination round handoff',async()=>{
+ const rounds=advancementFixture()
+ states.a.advancement={...states.a.advancement,qualificationCurrent:true,qualifiedEntryIds:['entry-a']}
+ f.snapshot.mockImplementation(async(e,c,r)=>({data:r==='final'?{eventId:'event',competitionId:'a',roundId:'final',viewerId:'owner',qualificationCurrent:true}:{...structuredClone(states.a),roundId:r}}))
+ continuousPage('/organizer/competition/events/event/results?competitionId=a&roundId=pre',rounds)
+ fireEvent.click(await screen.findByRole('button',{name:'Continue to Round Advancement'}))
+ const proceed=await screen.findByRole('button',{name:'Proceed to Final'})
+ expect(proceed).toBeEnabled()
+ expect(screen.queryByRole('navigation',{name:'Results page sections'})).not.toBeInTheDocument()
+ fireEvent.click(proceed)
+ expect(await screen.findByRole('heading',{name:'Destination Live Control'})).toBeInTheDocument()
+ expect(screen.getByLabelText('Current URL')).toHaveTextContent('/live?competitionId=a&roundId=final')
+})
+
+test('a terminal round offers final results and Audit Trail stays a separate view',async()=>{
+ continuousPage('/organizer/competition/events/event/advancement?competitionId=a')
+ expect(await screen.findByRole('link',{name:'View Final Results'})).toHaveAttribute('href','/organizer/competition/events/event/report?competitionId=a')
+ expect(screen.queryByRole('button',{name:/Proceed to Final/})).not.toBeInTheDocument()
+})
+
+
+test('old audit links open the separate audit page with its recorded activity',async()=>{
+ continuousPage('/organizer/competition/events/event/tabulation/audit?competitionId=a')
+ expect(await screen.findByRole('heading',{name:'Audit trail'})).toBeInTheDocument()
+ expect(screen.getByLabelText('Current URL')).toHaveTextContent('/audit?competitionId=a')
+ expect(screen.queryByRole('navigation',{name:/page sections/})).not.toBeInTheDocument()
+})
+
+
+test('missing reviewer enrollment does not block organizer finalization',async()=>{
+ states.a.reviewPolicy=null;states.a.reviewerOptions=[]
+ continuousPage('/organizer/competition/events/event/results?competitionId=a')
+ const finalize=await screen.findByRole('button',{name:'Finalize official calculation'})
+ expect(finalize).toBeDisabled()
+ fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Organizer reviewed current results'}})
+ expect(finalize).toBeEnabled()
+ expect(screen.getByRole('button',{name:'Continue to Round Advancement'})).toBeDisabled()
+})
+
+test('inactive reviewers do not block finalization, while stale calculations remain blocked',async()=>{
+ states.a.calculation.verified=false;states.a.reviewPolicy.active=false
+ await renderReady();openStage('Finalization')
+ expect(screen.getByRole('button',{name:'Finalize official calculation'})).toBeDisabled()
+ states.a.calculationStale=true
+ await act(async()=>emit({eventId:'event',competitionId:'a',roundId:null}))
+ expect(screen.queryByRole('button',{name:'Finalize official calculation'})).not.toBeInTheDocument()
+})
+
+
+test('stale calculations cannot expose finalization or advance to another round',async()=>{
+ states.a.calculation.verified=true;states.a.calculation.finalized=true;states.a.calculationStale=true
+ continuousPage('/organizer/competition/events/event/results?competitionId=a')
+ await screen.findByRole('button',{name:'Continue to Round Advancement'})
+ expect(screen.getByRole('button',{name:'Continue to Round Advancement'})).toBeDisabled()
+ expect(screen.queryByRole('button',{name:'Finalize official calculation'})).not.toBeInTheDocument()
+})
+
+
+test('Round 1 can finalize directly, confirm qualifiers and hand off to Round 2',async()=>{
+ const rounds=advancementFixture(false)
+ states.a.reviewPolicy=null;states.a.calculation.verified=false
+ f.transition.mockImplementation(async(_e,_c,body)=>{if(body.action==='finalize')states.a.calculation.finalized=true;return {data:{}}})
+ f.qualification.mockImplementation(async(_e,_c,_body,confirm)=>{
+  if(confirm){states.a.advancement={...states.a.advancement,qualificationCurrent:true,qualifiedEntryIds:['entry-a']};return {data:{}}}
+  return {data:{fromRound:'pre',toRound:'final',policy:'top_n',automatic:['entry-a'],standings:[{contestantId:'entry-a',rank:1}]}}
+ })
+ f.snapshot.mockImplementation(async(_e,_c,r)=>({data:r==='final'?{eventId:'event',competitionId:'a',roundId:'final',viewerId:'owner',qualificationCurrent:true}:{...structuredClone(states.a),roundId:r}}))
+ continuousPage('/organizer/competition/events/event/results?competitionId=a&roundId=pre',rounds)
+ const finalize=await screen.findByRole('button',{name:'Finalize official calculation'})
+ expect(finalize).toBeDisabled()
+ fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Reviewed finalization of Round 1'}})
+ fireEvent.click(finalize)
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Continue to Round Advancement'})).toBeEnabled())
+ fireEvent.click(screen.getByRole('button',{name:'Continue to Round Advancement'}))
+ fireEvent.click(await screen.findByRole('button',{name:'Review Advancement'}))
+ const confirm=await screen.findByRole('button',{name:'Confirm reviewed qualifiers'})
+ expect(confirm).toBeDisabled()
+ fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Confirm reviewed Round 2 roster'}})
+ fireEvent.click(confirm)
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Proceed to Final'})).toBeEnabled())
+ fireEvent.click(screen.getByRole('button',{name:'Proceed to Final'}))
+ await screen.findByRole('heading',{name:'Destination Live Control'})
+ expect(screen.getByLabelText('Current URL')).toHaveTextContent('/live?competitionId=a&roundId=final')
+ expect(f.calculate).not.toHaveBeenCalled()
 })

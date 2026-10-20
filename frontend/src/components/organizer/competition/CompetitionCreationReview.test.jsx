@@ -3,16 +3,18 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import CompetitionCreationReview from './CompetitionCreationReview'
 import { nativeCompetitionService as service } from '@/services/competition-native.service'
+import {queryClient} from '@/app/queryClient'
 vi.mock('@/services/competition-native.service',()=>({nativeCompetitionService:Object.fromEntries(['parentReview','list','enrollments','foundation','entries','complete'].map(k=>[k,vi.fn()]))}))
 const parentReviewToken='a'.repeat(32)
 const children=[{id:'dance',event_id:'event',name:'Dance',setup_revision:4,input_revision:5},{id:'music',event_id:'event',name:'Music',setup_revision:7,input_revision:8}]
 const foundation=c=>({competition:{...c,origin:'native'},configuration:{structure:'single',rounds:[],criteria:[{id:'criterion',roundId:null,percentage:100}],scoringConfig:{calculationMethod:'weighted_average'}},criteriaReadiness:{allReady:true},assignments:[{participant_id:'judge',round_id:null}]})
 beforeEach(()=>{
+ queryClient.clear()
  vi.resetAllMocks();service.parentReview.mockResolvedValue({data:{parentReviewToken,event:{title:'Campus arts',competitionType:'other',startDate:'2030-01-01',endDate:'2030-01-02'}}})
  service.list.mockResolvedValue({data:{competitions:children.map(c=>({...c,origin:'native'}))}});service.enrollments.mockResolvedValue({data:{judges:[{id:'judge',role:'judge',isActive:true,accountStatus:'active'}]}})
  service.foundation.mockImplementation((_e,id)=>Promise.resolve({data:foundation(children.find(c=>c.id===id))}));service.entries.mockResolvedValue({data:{entries:[{id:'entry'}]}});service.complete.mockResolvedValue({data:{created:true}})
 })
-const show=()=>render(<MemoryRouter initialEntries={['/review']}><Routes><Route path="/review" element={<CompetitionCreationReview eventId="event"/>}/><Route path="/organizer/competition/events/event/live" element={<p>Live Control handoff</p>}/></Routes></MemoryRouter>)
+const show=()=>render(<MemoryRouter initialEntries={['/review']}><Routes><Route path="/review" element={<CompetitionCreationReview eventId="event"/>}/><Route path="/organizer/competition/events/event/published" element={<p>Event Published</p>}/><Route path="/organizer/competition/events/event/live" element={<p>Live Control handoff</p>}/></Routes></MemoryRouter>)
 describe('event-wide competition review',()=>{
  it('blocks the event when any independent competition lacks scoring',async()=>{
   service.foundation.mockImplementation((_e,id)=>Promise.resolve({data:{...foundation(children.find(c=>c.id===id)),criteriaReadiness:{allReady:id==='dance'}}}))
@@ -20,7 +22,7 @@ describe('event-wide competition review',()=>{
  })
  it('requires acknowledgment and sends every observed child revision before publication',async()=>{
   show();await screen.findByText('Dance');expect(screen.getByRole('button',{name:'Review & Publish Event'})).toBeDisabled();fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button',{name:'Review & Publish Event'}))
-  await screen.findByText('Live Control handoff');expect(service.complete).toHaveBeenCalledExactlyOnceWith('event',{acknowledged:true,parentReviewToken,competitions:[{id:'dance',setupRevision:4,inputRevision:5},{id:'music',setupRevision:7,inputRevision:8}]})
+  await screen.findByText('Event Published');expect(screen.queryByText('Live Control handoff')).not.toBeInTheDocument();expect(service.complete).toHaveBeenCalledExactlyOnceWith('event',{acknowledged:true,parentReviewToken,competitions:[{id:'dance',setupRevision:4,inputRevision:5},{id:'music',setupRevision:7,inputRevision:8}]})
  })
  it('reloads all branches and clears acknowledgment after a revision conflict',async()=>{
   service.complete.mockRejectedValue({response:{data:{message:'Competition setup changed'}}});show();await screen.findByText('Dance');fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button',{name:'Review & Publish Event'}))
@@ -49,7 +51,7 @@ describe('event-wide competition review',()=>{
   fireEvent.click(screen.getByRole('checkbox'))
   fireEvent.click(screen.getByRole('button',{name:'Review & Publish Event'}))
 
-  await screen.findByText('Live Control handoff')
+  await screen.findByText('Event Published')
   expect(service.complete).toHaveBeenCalledWith('event',{
    acknowledged:true,
    parentReviewToken,

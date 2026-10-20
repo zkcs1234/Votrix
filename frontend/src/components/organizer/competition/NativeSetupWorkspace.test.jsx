@@ -4,13 +4,14 @@ import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest'
 import NativeSetupWorkspace,{NativeSetupBoundary} from './NativeSetupWorkspace'
 import {nativeCompetitionService as service} from '@/services/competition-native.service'
 import {pageantService} from '@/services/pageant.service'
+import {queryClient} from '@/app/queryClient'
 vi.mock('@/services/competition-native.service',()=>({nativeCompetitionService:Object.fromEntries(['list','create','entries','addEntry','removeEntry','foundation','configure','assign','freeze','enrollments','pool','enroll','role'].map(k=>[k,vi.fn()]))}))
 vi.mock('@/services/pageant.service',()=>({pageantService:{getEvent:vi.fn(),listContestants:vi.fn(),getNextContestantNumber:vi.fn(),createContestant:vi.fn(),uploadContestantPhoto:vi.fn(),listDivisions:vi.fn(),setDivisionsEnabled:vi.fn(),createDivision:vi.fn(),deleteDivision:vi.fn()}}))
 const children=Array.from({length:5},(_,i)=>({id:`child-${i}`,event_id:'event',name:['Hip-Hop','Contemporary','Ballet','Ballroom','Folk'][i],origin:'native'}))
 const config={structure:'single',rounds:[],criteria:[{id:'criterion',roundId:null,name:'Technique',percentage:100,minScore:0,maxScore:100,minorCriteria:[]}],scoringConfig:{calculationMethod:'weighted_average',tiePolicy:'shared'}}
 const foundation=c=>({competition:{...c,setup_revision:8,input_revision:9,official_child_rules_id:null},configuration:structuredClone(config),assignments:[{id:'grant',participant_id:'enrollment',round_id:null}],criteriaReadiness:{allReady:true}})
 beforeEach(()=>{
- vi.resetAllMocks();service.list.mockResolvedValue({data:{competitions:children}});pageantService.getEvent.mockResolvedValue({data:{event:{status:'draft'}}});pageantService.listContestants.mockResolvedValue({data:{contestants:[{id:'master',name:'Shared entrant'}]}});pageantService.getNextContestantNumber.mockResolvedValue({data:{nextContestantNumber:1}});pageantService.listDivisions.mockResolvedValue({data:{divisions:[]}});pageantService.setDivisionsEnabled.mockResolvedValue({data:{}});pageantService.createDivision.mockResolvedValue({data:{}});pageantService.deleteDivision.mockResolvedValue({data:{}})
+ queryClient.clear();vi.resetAllMocks();service.list.mockResolvedValue({data:{competitions:children}});pageantService.getEvent.mockResolvedValue({data:{event:{status:'draft'}}});pageantService.listContestants.mockResolvedValue({data:{contestants:[{id:'master',name:'Shared entrant'}]}});pageantService.getNextContestantNumber.mockResolvedValue({data:{nextContestantNumber:1}});pageantService.listDivisions.mockResolvedValue({data:{divisions:[]}});pageantService.setDivisionsEnabled.mockResolvedValue({data:{}});pageantService.createDivision.mockResolvedValue({data:{}});pageantService.deleteDivision.mockResolvedValue({data:{}})
  service.entries.mockResolvedValue({data:{entries:[{id:'participation',contestant_id:'master',entry_number:1}]}});service.enrollments.mockResolvedValue({data:{judges:[{id:'enrollment',displayName:'Judge One',role:'judge',isActive:true,accountStatus:'active'}]}});service.pool.mockResolvedValue({data:{judges:[]}})
  service.foundation.mockImplementation((_event,id)=>Promise.resolve({data:foundation(children.find(c=>c.id===id))}));service.configure.mockResolvedValue({data:{}});service.freeze.mockResolvedValue({data:{}})
 })
@@ -30,6 +31,16 @@ describe('Native organizer setup connections',()=>{
   await waitFor(()=>expect(service.configure).toHaveBeenCalledWith('event','child-0',expect.objectContaining({configuration:expect.objectContaining({scoringConfig:expect.objectContaining({singleRoundName:'Dance Round'})}),expectedSetupRevision:8})))
   expect(await screen.findByText('Selected Competitions')).toBeInTheDocument()
   expect(screen.queryByLabelText('Single round name')).not.toBeInTheDocument()
+ })
+ it('shows the configuration hierarchy and prevents saving when required criteria are incomplete',async()=>{
+  service.foundation.mockImplementation(async(_event,id)=>({data:{...foundation(children.find(child=>child.id===id)),configuration:{...structuredClone(config),criteria:[]},criteriaReadiness:{allReady:false}}}))
+  render(<MemoryRouter initialEntries={['/?competitionId=child-0']}><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
+  expect(await screen.findByRole('heading',{name:'Hip-Hop'})).toBeInTheDocument()
+  expect(screen.getByRole('navigation',{name:'Breadcrumb'})).toHaveTextContent('Competitions')
+  expect(screen.getByText('Setup incomplete')).toBeInTheDocument()
+  expect(screen.getByRole('progressbar',{name:'Criterion weight allocation'})).toHaveAttribute('aria-valuenow','0')
+  expect(screen.getByRole('button',{name:'Save & Return to Competitions'})).toBeDisabled()
+  expect(screen.getByText(/Add 100% before continuing/)).toBeInTheDocument()
  })
  it('converts legacy relative minor weights to equivalent direct round percentages before saving',async()=>{
   const legacy=structuredClone(config)
@@ -133,6 +144,19 @@ describe('Native organizer setup connections',()=>{
   expect(service.foundation).toHaveBeenCalledTimes(children.length)
   expect(service.entries).toHaveBeenCalledTimes(children.length)
  })
+ it('reuses competition and foundation data when moving from Step 5 into Step 6',async()=>{
+  const workspace=render(<MemoryRouter><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
+  await screen.findByText('Selected Competitions')
+  expect(service.foundation).toHaveBeenCalledTimes(children.length)
+  workspace.unmount()
+
+  render(<MemoryRouter><NativeSetupWorkspace eventId="event" stage="contestants"/></MemoryRouter>)
+  await screen.findByText('Selected Competitions')
+
+  expect(service.list).not.toHaveBeenCalled()
+  expect(pageantService.getEvent).toHaveBeenCalledTimes(1)
+  expect(service.foundation).toHaveBeenCalledTimes(children.length)
+ })
  it('reuses the boundary competition list instead of fetching it again on first render',async()=>{
   vi.stubEnv('VITE_COMPETITION_NATIVE_SETUP_ENABLED','true')
   service.list.mockResolvedValue({data:{competitions:children.slice(0,2)}})
@@ -174,8 +198,8 @@ describe('Native organizer setup connections',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Cancel',exact:true}))
   fireEvent.click(screen.getByLabelText('Remove criterion Technique'));expect(confirmation).toHaveBeenCalled()
   confirmation.mockReturnValue(true);fireEvent.click(screen.getByLabelText('Remove criterion Technique'))
-  fireEvent.click(screen.getByRole('button',{name:'Save & Return to Competitions'}))
-  expect(await screen.findByRole('alert')).toHaveTextContent('Complete the following')
+  expect(screen.getByRole('button',{name:'Save & Return to Competitions'})).toBeDisabled()
+  expect(screen.getByText(/Add 100% before continuing/)).toBeInTheDocument()
   expect(service.configure).not.toHaveBeenCalled();confirmation.mockRestore()
  })
  it('restores the selected competition from old substep URLs while keeping settings collapsed',async()=>{

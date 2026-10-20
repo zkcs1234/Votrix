@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getStageProgressStatus, stagePath } from './eventStages'
+import { EVENT_STAGES, getNextStage, getStageProgressStatus, stagePath } from './eventStages'
 
 describe('getStageProgressStatus', () => {
   it.each(['election', 'competition', 'polling'])(
@@ -10,16 +10,23 @@ describe('getStageProgressStatus', () => {
         competition: 'contestants',
         polling: 'builder',
       }[module]
-      const resultStage = module === 'competition' ? 'rankings' : 'analytics'
-
       expect(
         getStageProgressStatus(module, firstSetupStage, { eventStatus: 'active' }),
       ).toBe('Completed')
-      expect(
-        getStageProgressStatus(module, resultStage, { eventStatus: 'active' }),
-      ).toBe('Available')
     },
   )
+
+  it('ends competition setup at Step 8 and keeps operations outside the stepper', () => {
+    expect(EVENT_STAGES.competition).toHaveLength(8)
+    expect(EVENT_STAGES.competition.at(-1)).toMatchObject({
+      key: 'review',
+      label: 'Review & Publish',
+    })
+    expect(getNextStage('competition', 'review')).toBeNull()
+    expect(EVENT_STAGES.competition.map(stage => stage.key)).not.toEqual(
+      expect.arrayContaining(['live', 'tabulation', 'rankings']),
+    )
+  })
 
   it('shows the current read-only stage as viewing without changing its completion state', () => {
     expect(

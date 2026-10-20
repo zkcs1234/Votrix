@@ -102,7 +102,7 @@ function LegacyCompetitionWorkspacePage() {
 
   useEffect(() => {
     void load().catch(() => {})
-  }, [load, activeTab, selectedRoundParam])
+  }, [load])
   useCompetitionSync(eventId, load)
 
   if (loading) {

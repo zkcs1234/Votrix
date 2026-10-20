@@ -46,6 +46,7 @@ describe('Organizer Overview events', () => {
       const table = await screen.findByRole('table', { name: 'Your Events' })
       expect(within(table).getAllByRole('row')).toHaveLength(Math.min(count, 4) + 1)
       expect(within(table).getAllByRole('link')).toHaveLength(Math.min(count, 4))
+      expect(within(table).getAllByRole('row')[0]).toHaveClass('v-events-table-header', 'bg-v-primary', 'text-white')
       expect(screen.queryByText('Existing event 4')).not.toBeInTheDocument()
     }
 

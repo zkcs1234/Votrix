@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import CompetitionCategoriesPage from './CompetitionCategoriesPage'
+import {queryClient} from '@/app/queryClient'
 
 const f = vi.hoisted(() => ({
   event: null,
@@ -36,6 +37,7 @@ vi.mock('@/services/competition-native.service', () => ({
 }))
 
 beforeEach(() => {
+  queryClient.clear()
   vi.clearAllMocks()
   f.event = { id: 'event', status: 'draft', competitionType: 'pageant', divisionsEnabled: false }
   f.children = []
@@ -69,6 +71,34 @@ function renderPage() {
     </MemoryRouter>,
   )
 }
+
+function renderTypeFlow() {
+  return render(
+    <MemoryRouter initialEntries={['/organizer/competition/events/event/type']}>
+      <Routes>
+        <Route path="/organizer/competition/events/:eventId/type" element={<CompetitionCategoriesPage typeOnly />} />
+        <Route path="/organizer/competition/events/:eventId/categories" element={<CompetitionCategoriesPage />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+test('passes loaded competition choices from type selection into Step 4 without fetching them again', async () => {
+  f.event.competitionType = 'dance'
+  renderTypeFlow()
+
+  const { pageantService } = await import('@/services/pageant.service')
+  const { nativeCompetitionService } = await import('@/services/competition-native.service')
+  const nextButton = await screen.findByRole('button', { name: /Next: Competitions \/ Categories/ })
+  const eventCallsBeforeNavigation = pageantService.getEvent.mock.calls.length
+  const listCallsBeforeNavigation = nativeCompetitionService.list.mock.calls.length
+  fireEvent.click(nextButton)
+  expect(await screen.findByRole('heading', { name: 'Choose your competitions' })).toBeInTheDocument()
+  expect(screen.queryByText(/Loading your saved competitions/)).not.toBeInTheDocument()
+  expect(await screen.findByText('Suggested choices')).toBeInTheDocument()
+  expect(pageantService.getEvent).toHaveBeenCalledTimes(eventCallsBeforeNavigation)
+  expect(nativeCompetitionService.list).toHaveBeenCalledTimes(listCallsBeforeNavigation)
+})
 
 test('pageant divisions create one Pageant scoring competition and count it once', async () => {
   renderPage()
@@ -113,10 +143,31 @@ test('non-pageant preset choices continue to create separate competitions', asyn
   renderPage()
 
   fireEvent.click(await screen.findByRole('checkbox', { name: 'Street Dance' }))
+  expect(screen.getByText('1 selected')).toBeInTheDocument()
   await waitFor(() => expect(f.createCompetition).toHaveBeenCalledWith(
     'event',
     expect.objectContaining({ name: 'Street Dance', competitionType: 'dance' }),
   ))
+  await waitFor(() => expect(f.editCompetition).toHaveBeenCalledTimes(1))
+  const { nativeCompetitionService } = await import('@/services/competition-native.service')
+  expect(nativeCompetitionService.list).toHaveBeenCalledTimes(1)
   expect(f.createDivision).not.toHaveBeenCalled()
   expect(f.listDivisions).not.toHaveBeenCalled()
+})
+
+test('shows a new competition as selected while the save request is still pending', async () => {
+  f.event.competitionType = 'dance'
+  let finishCreate
+  f.createCompetition.mockReturnValue(new Promise(resolve => { finishCreate = resolve }))
+  renderPage()
+  const { nativeCompetitionService } = await import('@/services/competition-native.service')
+  const card = await screen.findByRole('checkbox', { name: 'Street Dance' })
+
+  fireEvent.click(card)
+
+  expect(card).toBeChecked()
+  expect(screen.getByText('1 selected')).toBeInTheDocument()
+  expect(nativeCompetitionService.list).toHaveBeenCalledTimes(1)
+  finishCreate({ data: { competition: { id: 'street-dance', name: 'Street Dance', origin: 'native', setup_revision: 1 } } })
+  await waitFor(() => expect(f.editCompetition).toHaveBeenCalledTimes(1))
 })

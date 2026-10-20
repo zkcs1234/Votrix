@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960" role="img" aria-labelledby="title desc">
+  <title id="title">Judge competition selector sample</title>
+  <desc id="desc">A judge scoring page with event status and an expanded searchable competition selector showing several assigned competitions and rounds.</desc>
+  <defs>
+    <linearGradient id="banner" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#29245f"/>
+      <stop offset="1" stop-color="#5146b7"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="9" flood-color="#18213b" flood-opacity=".10"/>
+    </filter>
+    <style>
+      text { font-family: Inter, "Segoe UI", Arial, sans-serif; }
+      .ink { fill: #20263a; }
+      .muted { fill: #667085; }
+      .subtle { fill: #828b9b; }
+      .bold { font-weight: 700; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="960" fill="#f3f5f9"/>
+  <rect width="1440" height="66" fill="#fff"/>
+  <path d="M0 65.5H1440" stroke="#e4e8ef"/>
+  <rect x="36" y="16" width="34" height="34" rx="10" fill="#4f46e5"/>
+  <path d="M45 41V25h5l3 6 4-6h5v16h-5v-7l-4 6-3-6v7z" fill="#fff"/>
+  <text x="82" y="39" font-size="18" font-weight="750" fill="#232644">Votrix</text>
+  <text x="1354" y="38" text-anchor="end" font-size="13" class="muted">Judge workspace</text>
+  <circle cx="1384" cy="32" r="17" fill="#4f46e5"/>
+  <text x="1384" y="37" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">JD</text>
+
+  <!-- Event identity and session state -->
+  <g filter="url(#shadow)">
+    <rect x="44" y="96" width="1352" height="188" rx="18" fill="#fff"/>
+  </g>
+  <rect x="44" y="96" width="1352" height="5" rx="2.5" fill="url(#banner)"/>
+  <rect x="76" y="126" width="125" height="30" rx="8" fill="#f1f2f7" stroke="#e1e4eb"/>
+  <path d="M90 135h13v12H90zM88 138h2m13 0h2m-13-6 1-3m9 3-1-3" fill="none" stroke="#4a5367" stroke-width="1.5" stroke-linejoin="round"/>
+  <text x="112" y="146" font-size="12" font-weight="700" letter-spacing=".6" fill="#4a5367">COMPETITION</text>
+  <rect x="211" y="126" width="97" height="30" rx="8" fill="#f8f9fc" stroke="#dce1eb"/>
+  <circle cx="229" cy="141" r="5" fill="none" stroke="#515a6b" stroke-width="1.5"/>
+  <path d="M220 151c1-5 4-7 9-7 3 0 6 2 7 5m-1-10 3 3 5-5" fill="none" stroke="#515a6b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="245" y="146" font-size="12" font-weight="600" fill="#4a5367">Judge</text>
+  <rect x="1121" y="125" width="239" height="40" rx="20" fill="#fff8eb" stroke="#f2bd70"/>
+  <circle cx="1144" cy="145" r="9" fill="none" stroke="#c26a0a" stroke-width="1.8"/>
+  <path d="M1144 139v6l4 2" fill="none" stroke="#c26a0a" stroke-width="1.8" stroke-linecap="round"/>
+  <text x="1162" y="150" font-size="14" font-weight="700" fill="#a65306">Waiting to open</text>
+  <text x="76" y="199" font-size="26" font-weight="750" class="ink">INTRAMURALS DANCE COMPETITION</text>
+  <text x="76" y="230" font-size="13" class="muted">Your assigned judging work for this event</text>
+  <rect x="76" y="249" width="414" height="24" rx="12" fill="#edf7f1"/>
+  <circle cx="91" cy="261" r="4" fill="#25915c"/>
+  <text x="103" y="265" font-size="11" font-weight="650" fill="#23784f">10 assigned competitions · Select one to continue</text>
+
+  <!-- Workspace content -->
+  <text x="48" y="337" font-size="21" font-weight="730" class="ink">Judge scoring</text>
+  <text x="48" y="361" font-size="13" class="muted">Choose an assigned competition and round. Only your assigned work is listed.</text>
+
+  <!-- Expanded selector -->
+  <g filter="url(#shadow)">
+    <rect x="44" y="385" width="1352" height="465" rx="16" fill="#fff" stroke="#d8deea"/>
+  </g>
+  <text x="74" y="421" font-size="12" font-weight="750" letter-spacing=".75" fill="#515a6b">CURRENT ASSIGNMENT</text>
+  <text x="74" y="447" font-size="13" class="muted">Select a competition and round</text>
+  <rect x="74" y="462" width="1292" height="68" rx="11" fill="#f6f7ff" stroke="#5146b7" stroke-width="2"/>
+  <rect x="94" y="478" width="38" height="38" rx="10" fill="#e8e7ff"/>
+  <path d="M105 489h16v15h-16zM108 486v6m10-6v6m-10 1h10m-10 4h5" fill="none" stroke="#4f46bb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="148" y="489" font-size="11" font-weight="700" letter-spacing=".5" fill="#4c46a4">SELECTED COMPETITION</text>
+  <text x="148" y="512" font-size="17" font-weight="730" class="ink">Folk Dance</text>
+  <rect x="262" y="490" width="66" height="24" rx="12" fill="#e9e8ff"/>
+  <text x="295" y="506" text-anchor="middle" font-size="11" font-weight="700" fill="#48439b">FINAL</text>
+  <text x="1291" y="503" text-anchor="end" font-size="13" font-weight="650" fill="#4d5362">Change assignment</text>
+  <path d="m1311 495 7 7 7-7" fill="none" stroke="#5b6475" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Search/filter row -->
+  <text x="74" y="566" font-size="14" font-weight="700" class="ink">Your assignments</text>
+  <text x="1366" y="566" text-anchor="end" font-size="12" class="muted">Showing 10 assigned competitions</text>
+  <rect x="74" y="580" width="1292" height="42" rx="9" fill="#fff" stroke="#cfd5e1"/>
+  <circle cx="96" cy="600" r="7" fill="none" stroke="#697386" stroke-width="1.7"/>
+  <path d="m101 605 5 5" stroke="#697386" stroke-width="1.7" stroke-linecap="round"/>
+  <text x="118" y="605" font-size="13" class="subtle">Search your competitions…</text>
+
+  <!-- Rows -->
+  <rect x="74" y="638" width="1292" height="48" rx="9" fill="#eef2ff" stroke="#a9a5ef"/>
+  <circle cx="98" cy="662" r="11" fill="#4f46e5"/>
+  <path d="m93 662 3 3 7-7" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="122" y="658" font-size="14" font-weight="700" class="ink">Folk Dance</text>
+  <text x="122" y="676" font-size="11" class="muted">Final round</text>
+  <rect x="1185" y="649" width="145" height="26" rx="13" fill="#fff4dc"/>
+  <circle cx="1200" cy="662" r="3.5" fill="#cd810d"/>
+  <text x="1211" y="666" font-size="11" font-weight="650" fill="#9a5b09">Waiting to open</text>
+  <path d="m1342 658 4 4-4 4" fill="none" stroke="#5146b7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M74 699H1366" stroke="#e6e9f0"/>
+  <circle cx="98" cy="724" r="10" fill="#f0f2f7"/>
+  <text x="98" y="728" text-anchor="middle" font-size="11" font-weight="700" fill="#626d80">2</text>
+  <text x="122" y="720" font-size="14" font-weight="650" class="ink">Solo Singing</text>
+  <text x="122" y="738" font-size="11" class="muted">Preliminary round</text>
+  <rect x="1195" y="711" width="135" height="26" rx="13" fill="#eaf7ef"/>
+  <circle cx="1210" cy="724" r="3.5" fill="#268955"/>
+  <text x="1221" y="728" font-size="11" font-weight="650" fill="#23764b">Ready to score</text>
+  <path d="m1342 720 4 4-4 4" fill="none" stroke="#747d8f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M74 761H1366" stroke="#e6e9f0"/>
+  <circle cx="98" cy="786" r="10" fill="#f0f2f7"/>
+  <text x="98" y="790" text-anchor="middle" font-size="11" font-weight="700" fill="#626d80">3</text>
+  <text x="122" y="782" font-size="14" font-weight="650" class="ink">Group Modern Dance</text>
+  <text x="122" y="800" font-size="11" class="muted">Final round</text>
+  <rect x="1194" y="773" width="136" height="26" rx="13" fill="#f2f3f7"/>
+  <circle cx="1209" cy="786" r="3.5" fill="#838c9c"/>
+  <text x="1220" y="790" font-size="11" font-weight="650" fill="#626b7c">Not yet open</text>
+  <path d="m1342 782 4 4-4 4" fill="none" stroke="#747d8f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Hint -->
+  <rect x="44" y="873" width="1352" height="58" rx="12" fill="#eef2ff" stroke="#d8ddfb"/>
+  <circle cx="72" cy="902" r="10" fill="#dcdcff"/>
+  <text x="72" y="907" text-anchor="middle" font-size="13" font-weight="750" fill="#4f46b7">i</text>
+  <text x="94" y="898" font-size="13" font-weight="650" fill="#34376d">Your list stays manageable</text>
+  <text x="94" y="917" font-size="12" fill="#555f82">Search filters your assignments. Each row shows its round and current availability; the rest of the page stays focused on the selected competition.</text>
+</svg>
