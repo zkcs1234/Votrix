@@ -21,7 +21,7 @@ import { isSetupLocked } from '@/utils/constants'
 import Button from '@/components/ui/Button'
 
 import { COMPETITION_TYPES } from '../../../../../shared/competition-creation-flow.js'
-import EventStepper from '@/components/ui/EventStepper'
+import WizardSteps from '@/components/ui/WizardSteps'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
@@ -365,16 +365,7 @@ useEffect(() => {
   return (
     <div data-module="competition-scoring" className="mx-auto max-w-6xl space-y-6">
       <>
-          <div className="v-card-sm overflow-hidden p-3 sm:p-4">
-            <EventStepper
-              module="competition"
-              currentKey={step}
-              eventId={isNew ? 'new' : eventId}
-              completedKeys={step === 'type' ? ['details', 'branding'] : step === 'branding' ? ['details'] : []}
-              navigationDisabled={saving}
-              onLocalStageSelect={setStep}
-            />
-          </div>
+          <WizardSteps module="competition" currentKey={step} />
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="competition" frozen={Boolean(officialRulesId)} />}
 
