@@ -164,17 +164,13 @@ export default function ElectionAnalyticsPage() {
       </AnalyticsSection>
 
       <AnalyticsSection
-        title="Participation by program"
-        description="Turnout among registered voters in each program."
+        title="Participation by program & year"
+        description="Turnout among registered voters broken down by program and by year & section."
       >
-        <ParticipationTable rows={programParticipation} />
-      </AnalyticsSection>
-
-      <AnalyticsSection
-        title="Participation by year & section"
-        description="The system stores year and section together as one managed cohort field."
-      >
-        <ParticipationTable rows={yearSectionParticipation} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ParticipationTable rows={programParticipation} />
+          <ParticipationTable rows={yearSectionParticipation} />
+        </div>
       </AnalyticsSection>
 
       {ballotSections.length > 1 && ballotSections.map((section) => (
