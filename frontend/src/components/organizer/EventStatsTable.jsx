@@ -1,9 +1,16 @@
 import { Link } from 'react-router-dom'
 import Card from '@/components/ui/Card'
-import Badge, { statusTone } from '@/components/ui/Badge'
+import Badge from '@/components/ui/Badge'
 import FilterBar from '@/components/ui/FilterBar'
 import useTableFilter from '@/hooks/useTableFilter'
 
+const STATUS_TONE = {
+  active: 'success',
+  scheduled: 'default',
+  draft: 'default',
+  completed: 'default',
+  cancelled: 'danger',
+}
 
 /**
  * Per-event participation table. Every rate/cohort belongs to one event here —
@@ -54,13 +61,8 @@ export default function EventStatsTable({
   return (
     <Card padding={false} className={renderAction ? 'min-w-0' : ''}>
       {events.length > 0 && (
-<<<<<<< HEAD
         <div className={`${toolbarLayout === 'single-row' ? 'v-event-stats-header' : 'flex flex-wrap items-center gap-x-6 gap-y-3'} border-b border-v-border px-6 py-4`}>
           <h3 className="font-semibold text-v-text">{title}</h3>
-=======
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-v-border px-6 py-4">
-          <h3 className="font-display text-base font-bold text-v-text">{title}</h3>
->>>>>>> main
           <FilterBar
             className="min-w-0 flex-1"
             singleRow={toolbarLayout === 'single-row'}
@@ -83,7 +85,7 @@ export default function EventStatsTable({
 
       {events.length === 0 && (
         <div className="border-b border-v-border px-6 py-4">
-          <h3 className="font-display text-base font-bold text-v-text">{title}</h3>
+          <h3 className="font-semibold text-v-text">{title}</h3>
         </div>
       )}
 
@@ -120,7 +122,7 @@ export default function EventStatsTable({
                       )}
                     </td>
                     <td>
-                      <Badge tone={statusTone(e.status)} dot className="capitalize">{e.status}</Badge>
+                      <Badge tone={STATUS_TONE[e.status] ?? 'default'}>{e.status}</Badge>
                     </td>
                     <td className="text-right tabular-nums text-v-text-muted">{e.registered}</td>
                     <td className="text-right tabular-nums text-v-text-muted">{e.participated}</td>
