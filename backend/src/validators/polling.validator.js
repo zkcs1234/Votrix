@@ -17,11 +17,29 @@ export function validatePollEvent(body, isCreate = false) {
   if (body.description !== undefined) payload.description = body.description?.trim() || null
   if (body.startDate !== undefined) payload.startDate = body.startDate
   if (body.endDate !== undefined) payload.endDate = body.endDate
+  if (body.pollExpiresAt !== undefined) {
+    if (
+      body.pollExpiresAt !== null &&
+      body.pollExpiresAt !== '' &&
+      (typeof body.pollExpiresAt !== 'string' || Number.isNaN(new Date(body.pollExpiresAt).getTime()))
+    ) {
+      throw new ApiError(400, 'Invalid poll expiration date')
+    }
+    payload.pollExpiresAt = body.pollExpiresAt || null
+  }
   if (body.pollAnonymous !== undefined) payload.pollAnonymous = Boolean(body.pollAnonymous)
   if (body.pollAllowMultipleSubmissions !== undefined) {
     payload.pollAllowMultipleSubmissions = Boolean(body.pollAllowMultipleSubmissions)
   }
 
+  if (payload.pollExpiresAt && body.startDate !== undefined && body.endDate !== undefined) {
+    const expirationTime = new Date(payload.pollExpiresAt).getTime()
+    const startTime = new Date(body.startDate).getTime()
+    const endTime = new Date(body.endDate).getTime()
+    if (Number.isNaN(startTime) || Number.isNaN(endTime) || expirationTime < startTime || expirationTime > endTime) {
+      throw new ApiError(400, 'Poll expiration must be between the start and end dates')
+    }
+  }
 
   return payload
 }

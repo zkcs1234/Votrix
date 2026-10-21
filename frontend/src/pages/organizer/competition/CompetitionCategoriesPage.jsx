@@ -293,7 +293,7 @@ export default function CompetitionCategoriesPage({ typeOnly = false }) {
   }
 
   if (typeOnly) {
-    return <section className="mx-auto max-w-2xl space-y-6 pb-20">
+    return <section data-module="competition-scoring" className="mx-auto max-w-2xl space-y-6 pb-20">
       <header className="space-y-2">
         <p className="text-sm font-semibold text-v-primary">Step 3 of 6</p>
         <h1 className="v-page-title">What kind of competition is this?</h1>
@@ -319,7 +319,7 @@ export default function CompetitionCategoriesPage({ typeOnly = false }) {
   }
 
   const presets = COMPETITION_PRESETS[type] ?? []
-  return <section className="mx-auto max-w-5xl space-y-7 pb-20">
+  return <section data-module="competition-scoring" className="mx-auto max-w-5xl space-y-7 pb-20">
     <header className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

@@ -146,14 +146,14 @@ export async function getOrganizerDashboard(organizerId) {
   let nativeActiveSessions = []
   let nativeActiveEventIds = new Set()
   if (eventIds.length) {
-    const [contestantsRes, judgeRowsRes, scoresRes, sessionsRes, nativeSessions] = await Promise.all([
+    const [contestantsRes, judgeRowsRes, scoresRes, sessionsRes, nativeSessions, roundSubmissionsRes, lockedScoresRes] = await Promise.all([
       getClient()
         .from(DB_TABLES.CONTESTANTS)
         .select('*', { count: 'exact', head: true })
         .in('event_id', eventIds),
       getClient()
         .from(DB_TABLES.EVENT_PARTICIPANTS)
-        .select('event_id, has_scored')
+        .select('event_id, user_id, has_scored')
         .in('event_id', eventIds)
         .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
       getClient()
@@ -166,12 +166,22 @@ export async function getOrganizerDashboard(organizerId) {
         .in('event_id', eventIds)
         .eq('status', 'active'),
       activeSessionsForOrganizer(organizerId),
+      getClient()
+        .from('competition_round_submissions')
+        .select('event_id, judge_id, status')
+        .in('event_id', eventIds)
+        .eq('status', 'submitted'),
+      getClient()
+        .from('competition_session_judge_scores')
+        .select('event_id, judge_id')
+        .in('event_id', eventIds),
     ])
 
     if (contestantsRes.error) throw new ApiError(500, contestantsRes.error.message)
     if (judgeRowsRes.error) throw new ApiError(500, judgeRowsRes.error.message)
     if (scoresRes.error) throw new ApiError(500, scoresRes.error.message)
     if (sessionsRes.error) throw new ApiError(500, sessionsRes.error.message)
+    // roundSubmissionsRes and lockedScoresRes errors are acceptable (tables may not exist in older setups)
 
     totalContestants = contestantsRes.count ?? 0
     scoresSubmitted = scoresRes.count ?? 0
@@ -180,14 +190,47 @@ export async function getOrganizerDashboard(organizerId) {
     activeSessions += nativeActiveSessions.length
     nativeActiveEventIds = new Set(nativeActiveSessions.map((session) => session.eventId))
 
+    // Build a map of judges who have submitted rounds (native system)
+    const nativeSubmittedJudges = new Map() // event_id -> Set(judge_id)
+    if (!roundSubmissionsRes.error && roundSubmissionsRes.data) {
+      console.log('[Dashboard] Round submissions found:', roundSubmissionsRes.data.length)
+      for (const submission of roundSubmissionsRes.data) {
+        if (!nativeSubmittedJudges.has(submission.event_id)) {
+          nativeSubmittedJudges.set(submission.event_id, new Set())
+        }
+        nativeSubmittedJudges.get(submission.event_id).add(submission.judge_id)
+      }
+      console.log('[Dashboard] Native submitted judges by event:', Array.from(nativeSubmittedJudges.entries()).map(([k,v]) => [k, Array.from(v)]))
+    } else if (roundSubmissionsRes.error) {
+      console.log('[Dashboard] Round submissions query error:', roundSubmissionsRes.error.message)
+    }
+
+    // Build a map of judges who have locked scores (alternative indicator of participation)
+    const judgesWithLockedScores = new Map() // event_id -> Set(judge_id)
+    if (!lockedScoresRes.error && lockedScoresRes.data) {
+      console.log('[Dashboard] Locked scores found:', lockedScoresRes.data.length)
+      for (const score of lockedScoresRes.data) {
+        if (!judgesWithLockedScores.has(score.event_id)) {
+          judgesWithLockedScores.set(score.event_id, new Set())
+        }
+        judgesWithLockedScores.get(score.event_id).add(score.judge_id)
+      }
+      console.log('[Dashboard] Judges with locked scores by event:', Array.from(judgesWithLockedScores.entries()).map(([k,v]) => [k, Array.from(v)]))
+    }
+
     for (const row of judgeRowsRes.data ?? []) {
       const bucket = perEvent.get(row.event_id)
       if (!bucket) continue
       bucket.judges += 1
       totalJudges += 1
-      if (row.has_scored) {
+      
+      // Check if judge has completed: has_scored flag OR submitted round OR has locked scores
+      const hasSubmittedRound = nativeSubmittedJudges.get(row.event_id)?.has(row.user_id) ?? false
+      const hasLockedScores = judgesWithLockedScores.get(row.event_id)?.has(row.user_id) ?? false
+      if (row.has_scored || hasSubmittedRound || hasLockedScores) {
         bucket.completed += 1
         completedJudges += 1
+        console.log(`[Dashboard] Judge ${row.user_id} completed for event ${row.event_id} (has_scored=${row.has_scored}, hasSubmittedRound=${hasSubmittedRound}, hasLockedScores=${hasLockedScores})`)
       }
     }
 

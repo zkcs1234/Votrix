@@ -189,8 +189,8 @@ export default function CreateOrganizerModal({ isOpen, onClose, onSuccess, organ
           </div>
 
           <fieldset className="space-y-3 border-t border-v-border pt-4">
-            <legend className="v-label">Voter access</legend>
-            <p className="v-caption">Choose which voters this organizer can manage.</p>
+            <legend className="v-label">Student access scope</legend>
+            <p className="v-caption">Select which student programs and sections this organizer can access.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex items-start gap-2 text-sm text-v-text">
                 <input type="radio" name="organizer-scope" value="all" checked={form.scopeType === 'all'} onChange={set('scopeType')} className="mt-1 accent-v-primary" required />

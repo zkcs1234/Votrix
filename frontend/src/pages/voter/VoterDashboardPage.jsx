@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CalendarCheck2, Zap, CheckCircle2, CalendarDays, Vote, Trophy, BarChart2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { CalendarCheck2, Zap, CheckCircle2, CalendarDays, ArrowRight } from 'lucide-react'
 import { voterService, PARTICIPANT_TYPE_META } from '@/services/voter.service'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -7,67 +8,104 @@ import {
   SkeletonStatCard,
 } from '@/components/ui/Skeleton'
 import StatCard from '@/components/ui/StatCard'
-import VoterEventCard from '@/components/voter/VoterEventCard'
 import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
-import Badge from '@/components/ui/Badge'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import useCompetitionSync from '@/hooks/useCompetitionSync'
 import useLatestRequest from '@/hooks/useLatestRequest'
 import Button from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
 import {nativeCompetitionService} from '@/services/competition-native.service'
+import VoterStatusBadge from '@/components/voter/VoterStatusBadge'
+import VoterEventCard from '@/components/voter/VoterEventCard'
 
-const ROLE_ICONS = {
-  ELECTION_VOTER: Vote,
-  COMPETITION_JUDGE: Trophy,
-  POLLING_RESPONDENT: BarChart2,
+const ROLE_PHRASES = {
+  ELECTION_VOTER: 'Elections',
+  COMPETITION_JUDGE: 'competition judging',
+  POLLING_RESPONDENT: 'polls',
 }
 
-function RoleSummaryCard({ participantType, count, icon: Icon, label }) {
-  if (!count || count === 0) return null
-  const roleBadgeLabel =
-    participantType === 'ELECTION_VOTER'
-      ? 'Voter'
-      : participantType === 'COMPETITION_JUDGE'
-        ? 'Judge'
-        : 'Respondent'
-
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-v-border bg-v-surface p-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-v-surface-elevated">
-        <Icon className="h-5 w-5 text-v-text" strokeWidth={1.5} />
-      </div>
-      <div>
-        <p className="text-sm font-medium text-v-text">{label}</p>
-        <p className="text-xs text-v-text-subtle">
-          {count} event{count !== 1 ? 's' : ''}
-        </p>
-      </div>
-      <Badge variant="outline" size="sm" className="ml-auto">
-        {roleBadgeLabel}
-      </Badge>
-    </div>
-  )
+function formatOrganization(org) {
+  if (!org) return 'Organization not specified'
+  if (typeof org === 'string') return org
+  return org.name || org.organizationName || 'Organization not specified'
 }
 
-function EventSection({ title, description, events }) {
+function EventSection({ title, description, events, variant = 'cards' }) {
   if (!events?.length) return null
 
   return (
     <section>
-      <div className="mb-3">
-        <h3 className="v-section-title">{title}</h3>
-        {description && <p className="v-caption">{description}</p>}
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 className="v-section-title">{title}</h2>
+          {description && <p className="v-caption mt-0.5">{description}</p>}
+        </div>
+        {variant === 'cards' && (
+          <span className="text-sm font-semibold tabular-nums text-v-text-muted">{events.length}</span>
+        )}
       </div>
-      <ul className="space-y-2">
-        {events.map((event) => (
-          <li key={event.dashboardKey??`${event.eventType}-${event.id}`}>
-            <VoterEventCard event={event} />
-          </li>
-        ))}
-      </ul>
+      {variant !== 'completed' ? (
+        <div className="space-y-2">
+          {events.map((event) => <VoterEventCard key={event.dashboardKey ?? `${event.eventType}-${event.id}`} event={event} />)}
+        </div>
+      ) : (
+        <div className="v-table-wrap">
+          <table className="v-table min-w-160">
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>{variant === 'assigned' ? 'Role' : 'Status'}</th>
+                <th>{variant === 'assigned' ? 'Opens' : 'Action'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((event) => (
+                <tr key={event.dashboardKey ?? `${event.eventType}-${event.id}`}>
+                  <td>
+                    <p className="font-medium text-v-text">{event.title}</p>
+                    <p className="mt-0.5 text-xs text-v-text-subtle">{formatOrganization(event.organization)}</p>
+                  </td>
+                  <td>
+                    {variant === 'assigned'
+                      ? PARTICIPANT_TYPE_META[event.participantType]?.label ?? 'Participant'
+                      : <VoterStatusBadge bucket="completed" label={event.statusLabel || 'Completed'} />}
+                  </td>
+                  <td>
+                    {event.actionPath ? (
+                      <Link
+                        to={event.actionPath}
+                        className="inline-flex min-h-9 items-center gap-1 text-sm font-medium text-v-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary"
+                      >
+                        {event.eventType === 'election' && event.canViewResults
+                          ? 'View permitted results'
+                          : event.eventType === 'polling'
+                            ? 'Response recorded'
+                            : event.eventType === 'election'
+                              ? 'Ballot recorded'
+                              : 'Scores submitted'}
+                        <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                      </Link>
+                    ) : (
+                      <span className="text-sm text-v-text-muted">
+                        {event.eventType === 'election' && event.canViewResults
+                          ? 'View permitted results'
+                          : event.eventType === 'polling'
+                            ? 'Response recorded'
+                            : event.eventType === 'election'
+                              ? 'Ballot recorded'
+                              : 'Scores submitted'}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   )
 }
@@ -128,7 +166,7 @@ export default function VoterDashboardPage() {
           <div className="h-8 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
           <div className="mt-2 h-4 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <SkeletonStatCard />
           <SkeletonStatCard />
           <SkeletonStatCard />
@@ -156,55 +194,27 @@ export default function VoterDashboardPage() {
     }
   }
 
-  const ROLE_PHRASES = {
-    ELECTION_VOTER: 'Elections',
-    COMPETITION_JUDGE: 'competition judging',
-    POLLING_RESPONDENT: 'polls',
-  }
   const rolePhrases = Object.keys(ROLE_PHRASES).filter((type) => roleCounts[type] > 0)
-  const overviewSubject =
-    rolePhrases.length > 0
-      ? rolePhrases.map((type) => ROLE_PHRASES[type]).join(', ').replace(/, ([^,]*)$/, ' and $1')
-      : 'Elections, competition judging, and polls'
+  const overviewSubject = rolePhrases.length > 0
+    ? rolePhrases.map((type) => ROLE_PHRASES[type]).join(', ').replace(/, ([^,]*)$/, ' and $1')
+    : 'Elections, competition judging, and polls'
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="v-card-md">
-        <h2 className="v-page-title">Your events</h2>
-        <p className="v-caption mt-2">
-          Signed in as <span className="text-v-text-muted">{[user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email}</span>
-        </p>
-        <p className="v-caption mt-1">
-          {overviewSubject} assigned to you appear below.
-        </p>
-      </div>
-
-      {Object.keys(roleCounts).length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-v-text-subtle">Your roles</p>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {Object.entries(PARTICIPANT_TYPE_META).map(([type, meta]) => {
-              const count = roleCounts[type] || 0
-              if (count === 0) return null
-              const Icon = ROLE_ICONS[type] ?? Vote
-              return (
-                <RoleSummaryCard
-                  key={type}
-                  participantType={type}
-                  count={count}
-                  icon={Icon}
-                  label={meta.label}
-                />
-              )
-            })}
-          </div>
-        </div>
-      )}
+      <PageHeader
+        title="Your events"
+        description={
+          <>
+            Signed in as <span className="text-v-text-muted">{[user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email}</span>.{' '}
+            {overviewSubject} assigned to you appear below.
+          </>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Assigned" value={stats.assigned} valueClassName="v-stat-accent" icon={CalendarCheck2} />
-        <StatCard label="Active now" value={stats.active} valueClassName="v-stat-success" icon={Zap} />
-        <StatCard label="Completed" value={stats.completed} valueClassName="v-stat-muted" icon={CheckCircle2} />
+        <StatCard label="Active events" value={stats.active} valueClassName="v-stat-success" icon={Zap} />
+        <StatCard label="Assigned events" value={stats.assigned} valueClassName="v-stat-accent" icon={CalendarCheck2} />
+        <StatCard label="Completed events" value={stats.completed} valueClassName="v-stat-muted" icon={CheckCircle2} />
         <StatCard label="Total" value={stats.total} valueClassName="text-v-text" icon={CalendarDays} />
       </div>
 
@@ -216,14 +226,16 @@ export default function VoterDashboardPage() {
 
       <EventSection
         title="Assigned events"
-        description="You are enrolled but voting, scoring, or the poll is not open yet."
+        description="Available when the schedule opens."
         events={data?.assigned}
+        variant="assigned"
       />
 
       <EventSection
         title="Completed events"
-        description="You have finished your participation for these events."
+        description="Results are shown only when available and permitted."
         events={data?.completed}
+        variant="completed"
       />
 
       {/* Election results section */}
@@ -250,7 +262,8 @@ export default function VoterDashboardPage() {
 
       {stats.total === 0 && (
         <Card padding="sm" className="text-center">
-          <p className="v-caption">No events assigned to you yet. Check back when an organizer invites you.</p>
+          <p className="text-sm font-medium text-v-text">No events assigned yet</p>
+          <p className="v-caption mt-1">Check back when an organizer invites you to participate.</p>
         </Card>
       )}
     </div>

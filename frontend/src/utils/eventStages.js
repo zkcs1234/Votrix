@@ -67,6 +67,21 @@ export function getStageProgressStatus(
 export function stagePath(module, stageKey, eventId) {
   const base = MODULE_BASE_PATH[module]
   if (!base) return null
+
+  const operationalRoutes = {
+    competition: {
+      live: 'live',
+      tabulation: 'tabulation',
+      rankings: 'rankings',
+    },
+  }
+
+  const operationalPath = operationalRoutes[module]?.[stageKey]
+  if (operationalPath) {
+    if (eventId === 'new') return null
+    return `${base}/${eventId}/${operationalPath}`
+  }
+
   const stages = EVENT_STAGES[module] ?? []
   const stage = stages.find((s) => s.key === stageKey)
   if (!stage) return null

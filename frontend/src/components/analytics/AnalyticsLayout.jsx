@@ -10,6 +10,7 @@ import PageHeader from '@/components/ui/PageHeader'
 export default function AnalyticsLayout({
   title,
   description,
+  moduleLabel,
   fullReportTo,
   fullReportLabel = 'Full report →',
   children,
@@ -27,7 +28,7 @@ export default function AnalyticsLayout({
     : undefined
 
   return (
-    <div className="space-y-8">
+    <div data-module={moduleLabel} className="space-y-8">
       <PageHeader title={title} description={description} actions={actions} />
       {children}
     </div>

@@ -13,11 +13,12 @@ export default function ReportDocument({
   subtitle,
   generatedAt,
   actions,
+  moduleLabel,
   maxWidthClass = 'max-w-4xl',
   children,
 }) {
   return (
-    <div className={`mx-auto ${maxWidthClass} space-y-8 print:space-y-6`}>
+    <div data-module={moduleLabel} className={`mx-auto ${maxWidthClass} space-y-8 print:space-y-6`}>
       <div className="flex flex-wrap items-start justify-between gap-4 print:flex-col">
         <ReportHeader
           title={title}

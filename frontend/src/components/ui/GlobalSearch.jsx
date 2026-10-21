@@ -59,6 +59,9 @@ function renderResultRow(item, index, selectedIndex, setSelectedIndex, onClick) 
   )
 }
 
+const SHORTCUT_LABEL =
+  typeof navigator !== 'undefined' && /mac/i.test(navigator.platform || '') ? '⌘K' : 'Ctrl K'
+
 export default function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -226,18 +229,21 @@ export default function GlobalSearch() {
       {/* Desktop Toggle */}
       <button
         type="button"
-        className="hidden md:flex items-center gap-2.5 px-3.5 py-2 rounded-full border border-v-border bg-v-surface-elevated text-v-text-subtle hover:text-v-text hover:border-v-border-strong transition cursor-text w-64 text-left focus:outline-none focus:ring-2 focus:ring-v-primary/40 focus:border-v-primary/50"
+        className="hidden lg:flex items-center gap-2.5 px-3 min-h-10 rounded-lg border border-v-border-strong bg-v-surface text-v-text-subtle hover:text-v-text hover:border-v-primary/50 transition cursor-text w-72 text-left focus:outline-none focus:ring-2 focus:ring-v-primary/40 focus:border-v-primary/50"
         onClick={toggleOpen}
         aria-label="Search"
       >
         <Search className="h-4 w-4 shrink-0" strokeWidth={2} />
-        <span className="text-sm flex-1 truncate">Search…</span>
+        <span className="text-sm flex-1 truncate">Search pages and records</span>
+        <kbd className="shrink-0 rounded border border-v-border bg-v-surface-elevated px-1.5 py-0.5 font-mono text-[11px] font-semibold text-v-text-muted">
+          {SHORTCUT_LABEL}
+        </kbd>
       </button>
 
       {/* Mobile Toggle */}
       <button
         type="button"
-        className="md:hidden rounded-full border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated focus:outline-none focus:ring-2 focus:ring-v-primary/40"
+        className="lg:hidden rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated pointer-coarse:min-h-11 pointer-coarse:min-w-11 focus:outline-none focus:ring-2 focus:ring-v-primary/40"
         onClick={toggleOpen}
         aria-label="Open global search"
       >

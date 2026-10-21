@@ -6,6 +6,7 @@ import StatCard from '@/components/ui/StatCard'
 import PageHeader from '@/components/ui/PageHeader'
 import Button from '@/components/ui/Button'
 import EventStatsTable from '@/components/organizer/EventStatsTable'
+import ParticipationSnapshot from '@/components/organizer/ParticipationSnapshot'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
@@ -64,13 +65,22 @@ export default function PollingDashboardPage() {
         <StatCard label="Responses submitted" value={data?.stats?.responsesSubmitted ?? 0} icon={Send} />
       </div>
 
+      <ParticipationSnapshot
+        events={data?.eventBreakdown ?? []}
+        module="polling"
+        title="Participation by poll"
+        description="Highest respondent participation rates across your polls."
+      />
+
       <EventStatsTable
+        tableClassName="v-polling-dashboard-table"
         title="Participation by poll"
         events={data?.eventBreakdown ?? []}
         linkFor={(e) => `/organizer/polling/events/${e.id}/builder`}
         registeredLabel="Respondents"
         participatedLabel="Responded"
         rateLabel="Participation"
+        toolbarLayout="single-row"
         emptyMessage="No events available. Create your first event to begin."
       />
     </div>

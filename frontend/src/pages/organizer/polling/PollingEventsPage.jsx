@@ -5,9 +5,11 @@ import { pollingService } from '@/services/polling.service'
 import { isSetupLocked } from '@/utils/constants'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
+import FormAlert from '@/components/ui/FormAlert'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import useDraft from '@/hooks/useDraft'
 import DraftBanner from '@/components/organizer/DraftBanner'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function PollPreviewModal({ eventId, eventTitle, onClose }) {
   const [questions, setQuestions] = useState(null)
@@ -101,14 +103,21 @@ function PollPreviewModal({ eventId, eventTitle, onClose }) {
 export default function PollingEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [previewEventId, setPreviewEventId] = useState(null)
   const { hasDraft, draft, deleteDraft } = useDraft('polling')
 
-  const load = () => {
-    pollingService
-      .listEvents()
-      .then(({ data }) => setEvents(data.events ?? []))
-      .finally(() => setLoading(false))
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const { data } = await pollingService.listEvents()
+      setEvents(data.events ?? [])
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not load polls'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -145,12 +154,9 @@ export default function PollingEventsPage() {
 
       <div className="flex justify-between">
         <h2 className="text-xl font-semibold text-v-text">Polls</h2>
-        <Link
-          to="/organizer/polling/events/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white"
-        >
+        <Link to="/organizer/polling/events/new" className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white">
           <Plus className="h-4 w-4" strokeWidth={2} />
-          New poll
+          New event
         </Link>
       </div>
 
@@ -163,8 +169,22 @@ export default function PollingEventsPage() {
         />
       )}
 
+      {error ? (
+        <div className="space-y-3">
+          <FormAlert variant="error">{error}</FormAlert>
+          <Button variant="secondary" onClick={load}>Retry loading polls</Button>
+        </div>
+      ) : (
+        <>
+      {events.length === 0 && (
+        <div className="v-card-md">
+          <p className="font-semibold text-v-text">No polls yet.</p>
+          <p className="mt-1 text-sm text-v-text-muted">Create a poll to start collecting responses.</p>
+        </div>
+      )}
+
       {events.map((event) => (
-        <div
+        <article
           key={event.id}
           className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-border bg-v-surface p-5"
         >
@@ -175,7 +195,7 @@ export default function PollingEventsPage() {
             >
               {event.title}
             </Link>
-            <div className="mt-1 text-sm text-v-text-subtle capitalize">
+            <div className="mt-1 text-sm capitalize text-v-text-subtle">
               {event.status === 'draft' ? 'Setup — not published' : event.status}
             </div>
           </div>
@@ -213,8 +233,10 @@ export default function PollingEventsPage() {
               )}
             </Link>
           </div>
-        </div>
+        </article>
       ))}
+        </>
+      )}
     </div>
   )
 }

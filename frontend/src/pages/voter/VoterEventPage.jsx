@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -7,9 +7,10 @@ import FormAlert from '@/components/ui/FormAlert'
 import ElectionPositionSection from '@/components/voter/election/ElectionPositionSection'
 import Button from '@/components/ui/Button'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
-import { useAuth } from '@/hooks/useAuth'
+import VoterDashboardLink from '@/components/voter/VoterDashboardLink'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function validateSelections(positions, selections) {
   let hasAtLeastOneVote = false
@@ -68,15 +69,13 @@ function BallotSubmittedScreen({ ballot, eventId }) {
   }, [ballot?.canViewResults, eventId])
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div data-module="election" className="mx-auto max-w-2xl space-y-6">
       <div className="v-card-lg text-center border-v-success">
         <p className="v-page-title text-v-success">Ballot submitted</p>
         <p className="v-caption mt-2">
           Your {ballot?.event?.title} ballots have been recorded and locked.
         </p>
-        <Link to="/participant" className="v-btn-tertiary mt-6 inline-block">
-          Back to dashboard
-        </Link>
+        <VoterDashboardLink className="mt-5" />
       </div>
 
       {ballot?.canViewResults && (
@@ -106,8 +105,6 @@ function BallotSubmittedScreen({ ballot, eventId }) {
 
 export default function VoterEventPage() {
   const { eventId } = useParams()
-  const { user } = useAuth()
-  const voterName = [user?.firstName, user?.lastName].filter(Boolean).join(' ')
   const [ballot, setBallot] = useState(null)
   const draftKey = getDraftStorageKey(
     'electionDraft',
@@ -142,15 +139,23 @@ export default function VoterEventPage() {
     localStorage.setItem(draftKey, JSON.stringify(selections))
   }, [ballot?.ballotSectionId, draftKey, loadedDraftKey, selections])
 
-  useEffect(() => {
-    electionService
-      .getBallot(eventId)
-      .then(({ data }) => {
-        setBallot(data)
-        if (data.hasVoted) setDone(true)
-      })
-      .finally(() => setLoading(false))
+  const loadBallot = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data } = await electionService.getBallot(eventId)
+      setBallot(data)
+      if (data.hasVoted) setDone(true)
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load ballot'))
+    } finally {
+      setLoading(false)
+    }
   }, [eventId])
+
+  useEffect(() => {
+    void loadBallot()
+  }, [loadBallot])
 
   const positions = useMemo(() => ballot?.positions ?? [], [ballot])
   const completedSections = ballot?.sections?.filter((section) => section.completed).length ?? 0
@@ -273,25 +278,32 @@ export default function VoterEventPage() {
     )
   }
 
+  if (error && !ballot) {
+    return (
+      <div data-module="election" className="mx-auto max-w-lg space-y-4">
+        <FormAlert variant="error">{error}</FormAlert>
+        <Button variant="secondary" onClick={loadBallot}>Retry loading ballot</Button>
+      </div>
+    )
+  }
+
   if (done || ballot?.hasVoted) {
     return <BallotSubmittedScreen ballot={ballot} eventId={eventId} />
   }
 
   if (ballot && !ballot.sections?.length) {
-    return <div className="v-card-md text-center">
+    return <div data-module="election" className="v-card-md text-center">
       <p className="v-body-text">No positions are available for you in this election.</p>
-      <Link to="/participant" className="v-btn-tertiary mt-4 inline-block">Back to dashboard</Link>
+      <VoterDashboardLink className="mt-4" />
     </div>
   }
 
   if (!ballot?.votingOpen) {
     return (
-      <div className="mx-auto max-w-lg v-card-md text-center">
+      <div data-module="election" className="mx-auto max-w-lg v-card-md text-center">
         <p className="v-body-text">Voting is not open for this event yet.</p>
         <p className="v-caption mt-2">Check back when the organizer opens voting.</p>
-        <Link to="/participant" className="v-btn-tertiary mt-4 inline-block">
-          Back to dashboard
-        </Link>
+        <VoterDashboardLink className="mt-5" />
       </div>
     )
   }
@@ -306,7 +318,7 @@ export default function VoterEventPage() {
       progress bar and submit footer cannot both stay on screen on mobile.
     */
     <FullscreenVotingShell>
-    <div className="fixed inset-0 z-50 flex flex-col h-dvh bg-v-surface">
+    <div data-module="election" className="fixed inset-0 z-50 flex h-dvh flex-col bg-v-surface">
       {/* ===== FIXED TOP: Floating progress card (does not scroll) ===== */}
       {!isReviewing && (
         <div className="shrink-0">
@@ -340,12 +352,7 @@ export default function VoterEventPage() {
       {/* ===== SCROLLABLE MIDDLE: header + ballot content scroll here ===== */}
       <div className="flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8">
-          <VoterEventHeader event={ballot.event} eyebrow="Election ballot">
-            {voterName && <p className="text-sm font-medium text-white/75">Voting as {voterName}</p>}
-            {ballot.currentSection && (
-              <p className="mt-1 text-base font-semibold text-white">{ballot.currentSection.name}</p>
-            )}
-          </VoterEventHeader>
+          <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
 
           {sectionNotice && !isReviewing && (
             <p role="status" className="rounded-lg border border-v-success/30 bg-v-success/10 px-4 py-3 text-sm text-v-success">

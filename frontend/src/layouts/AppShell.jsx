@@ -332,6 +332,8 @@ function SidebarContent({
 export default function AppShell({
   title,
   moduleLabel,
+  headerLabel,
+  sidebarCaption,
   homeLink = '/',
   navItems = [],
   eventId,
@@ -366,6 +368,8 @@ export default function AppShell({
   const { user, clearSession } = useAuth()
   const profileDropdownRef = useRef(null)
   const isOrganizer = user?.role === 'organizer'
+
+  const caption = sidebarCaption ?? (isOrganizer ? user?.organizationName : undefined)
 
   const closeMobile = () => setMobileOpen(false)
 
@@ -507,11 +511,16 @@ export default function AppShell({
       onNavigate={closeMobile}
       isCollapsed={isDesktop ? isCollapsed : false}
       onToggleCollapse={isDesktop ? toggleCollapse : undefined}
+      caption={caption}
     />
   )
 
   return (
-    <div className="flex min-h-screen bg-v-bg" style={{ '--sidebar-width': showSidebar ? (isCollapsed ? '4.5rem' : '16rem') : '0px' }}>
+    <div
+      data-module={moduleLabel?.toLowerCase().replace(/\s+/g, '-')}
+      className="flex min-h-screen bg-v-bg"
+      style={{ '--sidebar-width': showSidebar ? (isCollapsed ? 'var(--v-rail-w)' : 'var(--v-sidebar-w)') : '0px' }}
+    >
       {showSidebar && (
         <aside
           className={`hidden shrink-0 bg-v-sidebar lg:block sticky top-0 self-start h-screen min-h-screen overflow-y-auto transition-[width,padding] duration-200 ease-in-out ${
@@ -542,7 +551,7 @@ export default function AppShell({
           {showSidebar && (
             <button
               type="button"
-              className="flex-shrink-0 rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated lg:hidden"
+              className="shrink-0 rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Open menu"
               aria-expanded={mobileOpen}
@@ -561,11 +570,22 @@ export default function AppShell({
                 Back to dashboard
               </Link>
             )}
-            <h1 className="truncate text-base font-semibold text-v-text sm:text-lg">
-              {title}
-            </h1>
-            {moduleLabel && (
-              <p className="truncate text-xs text-v-text-subtle">{moduleLabel}</p>
+            {showSidebar ? (
+              <>
+                <h1 className="truncate text-base font-semibold text-v-text sm:text-lg">
+                  {headerLabel ?? title}
+                </h1>
+                {moduleLabel && <p className="truncate text-xs text-v-text-subtle">{moduleLabel}</p>}
+              </>
+            ) : (
+              // Figma participant header: wordmark + context, no sidebar or search.
+              <div className="flex min-w-0 items-center gap-2">
+                <VotrixLogo size="sm" linkTo={homeLink} />
+                <span className="text-v-text-subtle" aria-hidden="true">/</span>
+                <h1 className="truncate text-sm font-semibold text-v-text sm:text-base">
+                  {headerLabel ?? title}
+                </h1>
+              </div>
             )}
           </div>
 
@@ -575,14 +595,17 @@ export default function AppShell({
               <button
                 type="button"
                 onClick={() => setNotificationsOpen((prev) => !prev)}
-                className={`relative rounded-lg border border-v-border p-2 transition hover:bg-v-surface-elevated ${
+                className={`relative flex items-center gap-2 rounded-lg border border-v-border p-2 transition hover:bg-v-surface-elevated pointer-coarse:min-h-11 pointer-coarse:min-w-11 lg:px-3 ${
                   notificationsOpen ? 'bg-v-surface-elevated text-v-text' : 'text-v-text-muted'
                 }`}
                 aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
               >
                 <Bell className="h-5 w-5" strokeWidth={1.5} />
+                <span className="hidden text-sm font-medium lg:inline" aria-hidden="true">
+                  Notifications{unreadCount > 0 ? ` (${unreadCount > 99 ? '99+' : unreadCount})` : ''}
+                </span>
                 {unreadCount > 0 && (
-                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-v-danger px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-v-danger px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white lg:hidden">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}

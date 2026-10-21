@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Lock, ShieldCheck, ArrowRight, SkipForward } from 'lucide-react'
+
 import FormAlert from '@/components/ui/FormAlert'
 import { changePasswordSchema } from '@/schemas/auth.schemas'
 import { authService } from '@/services/auth.service'
@@ -13,6 +14,7 @@ import { isParticipantRole, USER_ROLES } from '@/utils/constants'
 import AuthFormField from '@/components/auth/AuthFormField'
 import SubmitButton from '@/components/auth/SubmitButton'
 import PasswordInput from '@/components/ui/PasswordInput'
+import Button from '@/components/ui/Button'
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate()
@@ -105,6 +107,7 @@ export default function ChangePasswordPage() {
         <AuthFormField
           label="Current password"
           id="currentPassword"
+          required
           error={errors.currentPassword?.message}
         >
           <PasswordInput
@@ -114,7 +117,13 @@ export default function ChangePasswordPage() {
           />
         </AuthFormField>
 
-        <AuthFormField label="New password" id="newPassword" error={errors.newPassword?.message}>
+        <AuthFormField
+          label="New password"
+          id="newPassword"
+          required
+          hint="At least 8 characters."
+          error={errors.newPassword?.message}
+        >
           <PasswordInput
             id="newPassword"
             autoComplete="new-password"
@@ -125,6 +134,8 @@ export default function ChangePasswordPage() {
         <AuthFormField
           label="Confirm new password"
           id="confirmPassword"
+          required
+          hint="Passwords must match."
           error={errors.confirmPassword?.message}
         >
           <PasswordInput
@@ -153,18 +164,16 @@ export default function ChangePasswordPage() {
               <span className="bg-v-bg px-2 text-v-text-subtle">Or</span>
             </div>
           </div>
-
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="lg"
+            className="mt-4 flex w-full items-center justify-center gap-2 border border-v-border bg-transparent text-v-text-subtle hover:bg-v-surface hover:text-v-text"
             onClick={onSkip}
-            disabled={skipLoading}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-v-border bg-transparent px-4 py-2.5 text-sm font-medium text-v-text-subtle transition-colors hover:bg-v-surface hover:text-v-text disabled:opacity-50"
+            loading={skipLoading}
           >
             {skipLoading ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-v-text-subtle border-t-transparent" />
-                <span>Continuing...</span>
-              </>
+              'Continuing...'
             ) : (
               <>
                 <SkipForward className="h-4 w-4" strokeWidth={2} />
@@ -172,7 +181,7 @@ export default function ChangePasswordPage() {
                 <ArrowRight className="h-4 w-4" strokeWidth={2} />
               </>
             )}
-          </button>
+          </Button>
           <p className="mt-2 text-center text-xs text-v-text-subtle">
             You can change your password anytime from your account settings.
           </p>

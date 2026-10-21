@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge'
 import FormAlert from '@/components/ui/FormAlert'
 import SearchInput from '@/components/ui/SearchInput'
 import StatCard from '@/components/ui/StatCard'
+import PageHeader from '@/components/ui/PageHeader'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
@@ -373,14 +374,11 @@ export default function VotersPanel({ pool = 'election' }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="v-page-title">{pluralLabel}</h1>
-          <p className="v-caption">
-            Manage this participant type. Organizers enroll eligible accounts into specific events.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <PageHeader
+        title={pluralLabel}
+        description="Manage this participant type. Organizers enroll eligible accounts into specific events."
+        actions={
+          <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={downloadTemplate}>
             <Download className="h-4 w-4" strokeWidth={1.5} /> Template
           </Button>
@@ -394,16 +392,17 @@ export default function VotersPanel({ pool = 'election' }) {
           <Button onClick={() => setModal({ mode: 'add' })}>
             <UserPlus className="h-4 w-4" strokeWidth={2} /> Add participant
           </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard label={`${pluralLabel} (this view)`} value={total} icon={Users} />
         <StatCard label="Active" value={summary.active} icon={UserCheck} />
         <StatCard label="Suspended" value={summary.suspended} icon={ShieldOff} />
       </div>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div className="grid gap-3 sm:grid-cols-2 lg:flex lg:items-center">
         <SearchInput
           placeholder="Search name, email, or school ID"
           value={search}
@@ -443,7 +442,7 @@ export default function VotersPanel({ pool = 'election' }) {
           </div>
         ) : (
           <div className="v-table-wrap">
-            <table className="v-table">
+            <table className="v-table min-w-[900px]">
               <thead>
                 <tr>
                   <th>School ID</th><th>Name</th><th>Email</th><th>Program</th><th>Year &amp; Section</th><th>Status</th><th className="text-right">Actions</th>

@@ -49,6 +49,20 @@ it.each([0, 1, 2, 8])('renders %i events with existing routes and no extra data 
   expect(electionService.getBallotPreview).not.toHaveBeenCalled()
 })
 
+it('shows load failures with a retry instead of a false empty state', async () => {
+  electionService.listEvents
+    .mockRejectedValueOnce({ response: { status: 503, data: { message: 'Election data unavailable' } } })
+    .mockResolvedValueOnce({ data: { events: [] } })
+
+  render(<MemoryRouter><ElectionEventsPage /></MemoryRouter>)
+
+  expect(await screen.findByText('Election data unavailable')).toBeInTheDocument()
+  expect(screen.queryByText('No election events yet.')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Retry loading elections' }))
+  expect(await screen.findByText('No election events yet.')).toBeInTheDocument()
+  expect(electionService.listEvents).toHaveBeenCalledTimes(2)
+})
+
 it('keeps draft setup navigation, real descriptions, and status information', async () => {
   renderEvents([{ id: 'draft', title: 'Draft event', status: 'draft',
     description: 'Existing description', electionStatus: 'setup',

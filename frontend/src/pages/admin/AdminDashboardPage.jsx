@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Users, CalendarDays, UserCheck, UserPlus, Zap, CheckSquare,
-  Settings, ArrowRight, LayoutDashboard,
+  Vote, Trophy, BarChart2, CheckCircle2, AlertCircle, XCircle,
 } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
+import { format, parseISO } from 'date-fns'
 import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
 import StatCard from '@/components/ui/StatCard'
@@ -21,10 +21,66 @@ import { adminService } from '@/services/admin.service'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 
+const formatActivityTime = (timestamp) =>
+  new Date(timestamp).toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+// Operational health summary built from the existing system-health endpoint.
+function HealthSummary({ health, unavailable }) {
+  if (unavailable) {
+    return (
+      <FormAlert variant="warning" title="Health status unavailable">
+        The health check could not be reached. Open System Health to retry.
+      </FormAlert>
+    )
+  }
+  if (!health) {
+    return <div className="h-16 animate-pulse rounded-lg bg-v-surface-elevated" aria-hidden />
+  }
+
+  const overall = health.overall
+  const variant = overall === 'healthy' ? 'success' : overall === 'degraded' ? 'warning' : 'error'
+  const title =
+    overall === 'healthy'
+      ? 'All core services operational'
+      : overall === 'degraded'
+        ? 'Some services are degraded'
+        : 'Service outage detected'
+  const checked = health.checkedAt ? ` Last checked ${format(parseISO(health.checkedAt), 'd MMM yyyy, HH:mm')}.` : ''
+
+  return (
+    <div className="space-y-3">
+      <FormAlert variant={variant} title={title}>
+        {`${(health.services ?? []).map((svc) => svc.service).join(', ')}${checked ? `.${checked}` : ''}`}
+      </FormAlert>
+      <ul className="divide-y divide-v-border text-sm">
+        {(health.services ?? []).map((svc) => {
+          const Icon = svc.status === 'healthy' ? CheckCircle2 : svc.status === 'degraded' ? AlertCircle : XCircle
+          const tone = svc.status === 'healthy' ? 'text-v-success' : svc.status === 'degraded' ? 'text-v-warning' : 'text-v-danger'
+          return (
+            <li key={svc.service} className="flex items-center justify-between gap-3 py-2">
+              <span className="capitalize text-v-text">{svc.service}</span>
+              <span className={`inline-flex items-center gap-1.5 font-medium capitalize ${tone}`}>
+                <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
+                {svc.status}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
 export default function AdminDashboardPage() {
-  const { user } = useAuth()
   const [dashboard, setDashboard] = useState(null)
   const [analytics, setAnalytics] = useState(null)
+  const [health, setHealth] = useState(null)
+  const [healthUnavailable, setHealthUnavailable] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -58,6 +114,23 @@ export default function AdminDashboardPage() {
     }
   }, [])
 
+  // Health is secondary: it loads independently so a slow or failing check
+  // never blocks or breaks the rest of the dashboard.
+  useEffect(() => {
+    let alive = true
+    adminService
+      .getSystemHealth()
+      .then(({ data }) => {
+        if (alive) setHealth(data)
+      })
+      .catch(() => {
+        if (alive) setHealthUnavailable(true)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   // Real-time updates via WebSocket - no more polling!
   useSocketEvent('platform:stats-updated', () => {
     adminService.getDashboard().then(({ data }) => setDashboard(data))
@@ -71,7 +144,7 @@ export default function AdminDashboardPage() {
   // Show skeleton after 300ms
   if (loading || showLoader) {
     return (
-      <div className="space-y-6">
+      <div className="v-dashboard space-y-6">
         <div className="v-card-md">
           <div className="h-8 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
           <div className="mt-2 h-4 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
@@ -126,137 +199,134 @@ export default function AdminDashboardPage() {
   const monthlyEvents = analytics?.charts?.monthlyEvents ?? []
   const participantGrowth = analytics?.charts?.participantGrowth ?? analytics?.charts?.voterGrowth ?? []
 
+  const electionEvents = stats?.totalElectionEvents ?? 0
+  const competitionEvents = stats?.totalPageantEvents ?? 0
+  const pollingEvents = stats?.totalPollingEvents ?? 0
+  const eventCount = (n) => `${n} event${n === 1 ? '' : 's'}`
+
   return (
-    <div className="space-y-6">
+    <div className="v-dashboard space-y-6">
       <PageHeader
         title="Admin dashboard"
-        description={`Signed in as ${user?.username ?? 'admin'}`}
+        description="Platform-wide oversight, account administration and operational health."
         actions={
-          <div className="flex flex-wrap justify-end gap-2">
-            <Link to="/admin/users?tab=organizers">
-              <Button size="sm">
-                <UserPlus className="h-4 w-4" strokeWidth={2} />
-                Add organizer
-              </Button>
-            </Link>
+          <>
             <Link to="/admin/users?tab=participants">
-              <Button size="sm" variant="secondary">
+              <Button variant="secondary">
                 <UserPlus className="h-4 w-4" strokeWidth={2} />
                 Add participant
               </Button>
             </Link>
-          </div>
+            <Link to="/admin/users?tab=organizers">
+              <Button>
+                <UserPlus className="h-4 w-4" strokeWidth={2} />
+                Add organizer
+              </Button>
+            </Link>
+          </>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Total organizers" value={stats?.totalOrganizers ?? 0} icon={Users} />
-        <StatCard label="Total events" value={stats?.totalEvents ?? 0} icon={CalendarDays} />
-        <StatCard label="Participant accounts" value={stats?.totalParticipants ?? stats?.totalVoters ?? 0} hint="Election voters, competition judges & polling respondents" icon={UserCheck} />
-        <StatCard label="Active events" value={stats?.activeEvents ?? 0} icon={Zap} />
-        <StatCard label="Votes cast" value={stats?.totalVotesCast ?? 0} icon={CheckSquare} />
+        <StatCard
+          label="Total organizers"
+          value={stats?.totalOrganizers ?? 0}
+          hint={stats?.activeOrganizations != null ? `${stats.activeOrganizations} active organizations` : undefined}
+          icon={Users}
+        />
+        <StatCard label="Total events" value={stats?.totalEvents ?? 0} hint="Across all modules" icon={CalendarDays} />
+        <StatCard
+          label="Participant accounts"
+          value={stats?.totalParticipants ?? stats?.totalVoters ?? 0}
+          hint="Shared account pool"
+          icon={UserCheck}
+        />
+        <StatCard label="Active events" value={stats?.activeEvents ?? 0} hint="Currently in progress" icon={Zap} />
+        <StatCard label="Votes cast" value={stats?.totalVotesCast ?? 0} hint="Recorded selections" icon={CheckSquare} />
       </div>
 
+      {/* Administrators oversee events platform-wide but cannot open organizer
+          workspaces, so each module card leads to the global event directory. */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Link
-          to="/admin/organizers"
-          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
-        >
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
-            <h3 className="v-section-title">Organizers</h3>
-          </div>
-          <p className="v-caption">
-            {stats?.totalOrganizers ?? 0} total accounts
-          </p>
-        </Link>
-        <Link
-          to="/admin/events"
-          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
-        >
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
-            <h3 className="v-section-title">Events</h3>
-          </div>
-          <p className="v-caption">
-            {stats?.totalEvents ?? 0} across all modules
-          </p>
-        </Link>
-        <Link
-          to="/admin/settings"
-          className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong"
-        >
-          <div className="flex items-center gap-2">
-            <Settings className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
-            <h3 className="v-section-title">Settings</h3>
-          </div>
-          <p className="v-caption">System configuration</p>
-        </Link>
+        {[
+          { icon: Vote, title: 'Election', description: 'Ballots, positions and voter turnout.', count: electionEvents },
+          { icon: Trophy, title: 'Competition', description: 'Scoring, live control and tabulation.', count: competitionEvents },
+          { icon: BarChart2, title: 'Polling', description: 'Questions, responses and insights.', count: pollingEvents },
+        ].map(({ icon: Icon, title, description, count }) => (
+          <Link key={title} to="/admin/events" className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong">
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
+              <h3 className="v-section-title">{title}</h3>
+            </div>
+            <p className="v-caption">{description}</p>
+            <p className="v-caption">{eventCount(count)}</p>
+          </Link>
+        ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Card padding="sm">
-          <div className="flex items-center gap-2">
-            <LayoutDashboard className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
-            <h3 className="v-section-title">Quick actions</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="v-section-title">Recent platform activity</h3>
+            <Link to="/admin/audit-logs" className="text-sm font-semibold text-v-primary hover:underline">
+              View all →
+            </Link>
           </div>
-          <ul className="mt-3 space-y-1 text-sm">
-            <li>
-              <Link
-                to="/admin/users?tab=organizers"
-                className="v-btn-tertiary inline-flex items-center gap-1.5"
-              >
-                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                Add organizer account
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/admin/users?tab=participants"
-                className="v-btn-tertiary inline-flex items-center gap-1.5"
-              >
-                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                Add participant account
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/admin/events"
-                className="v-btn-tertiary inline-flex items-center gap-1.5"
-              >
-                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                View all events
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/admin/audit-logs"
-                className="v-btn-tertiary inline-flex items-center gap-1.5"
-              >
-                <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                Review audit logs
-              </Link>
-            </li>
-          </ul>
-        </Card>
-
-        <Card padding="sm">
-          <h3 className="v-section-title">Recent activity</h3>
           {!recentActivity.length ? (
             <p className="v-caption mt-3">No recent activity</p>
           ) : (
-            <ul className="mt-3 space-y-1 text-sm">
-              {recentActivity.slice(0, 3).map((item, idx) => (
-                <li key={`${item.type}-${item.timestamp}-${idx}`} className="rounded-lg border border-v-border px-3 py-1.5">
-                  <p className="v-body-text">{item.label}</p>
-                  <p className="v-caption">
-                    {new Date(item.timestamp).toLocaleString()}
-                  </p>
+            <div className="v-table-wrap mt-3">
+              <table className="v-table">
+                <thead>
+                  <tr>
+                    <th>Activity</th>
+                    <th className="text-right">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentActivity.slice(0, 5).map((item, idx) => (
+                    <tr key={`${item.type}-${item.timestamp}-${idx}`}>
+                      <td className="text-v-text">{item.label}</td>
+                      <td className="whitespace-nowrap text-right text-v-text-subtle">
+                        {formatActivityTime(item.timestamp)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        <div className="space-y-4">
+          <Card padding="sm">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="v-section-title">Operational health</h3>
+              <Link to="/admin/health" className="text-sm font-semibold text-v-primary hover:underline">
+                Open System Health →
+              </Link>
+            </div>
+            <div className="mt-3">
+              <HealthSummary health={health} unavailable={healthUnavailable} />
+            </div>
+          </Card>
+
+          <Card padding="sm">
+            <h3 className="v-section-title">Events by module</h3>
+            <ul className="mt-3 divide-y divide-v-border text-sm">
+              {[
+                ['Elections', electionEvents],
+                ['Competitions', competitionEvents],
+                ['Polling', pollingEvents],
+              ].map(([label, count]) => (
+                <li key={label} className="flex items-center justify-between py-2">
+                  <span className="text-v-text">{label}</span>
+                  <span className="font-medium tabular-nums text-v-text-muted">{eventCount(count)}</span>
                 </li>
               ))}
             </ul>
-          )}
-        </Card>
+          </Card>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

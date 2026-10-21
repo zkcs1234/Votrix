@@ -45,6 +45,7 @@ describe('Election Dashboard', () => {
     const table = await screen.findByRole('table')
     expect(screen.getByText('Votes recorded').closest('.v-card-sm')).toHaveTextContent('3')
     expect(screen.queryByText('Votes cast')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Participation by event')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Election Events' })).toBeInTheDocument()
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent))
       .toEqual(['Event', 'Status', 'Registered', 'Voted', 'Turnout'])

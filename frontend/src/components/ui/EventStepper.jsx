@@ -15,6 +15,7 @@ export default function EventStepper({
   eventStatus = null,
   onLocalStageSelect,
   navigationDisabled = false,
+  interactive = true,
 }) {
   const stages = EVENT_STAGES[module] ?? []
   const currentIndex = stages.findIndex((s) => s.key === currentKey)
@@ -35,8 +36,8 @@ export default function EventStepper({
           const isDone = status === 'Completed' && !isCurrent
           const isAvailable = status === 'Available'
           const href = eventId ? stagePath(module, stage.key, eventId) : null
-          const canVisit = (href || onLocalStageSelect && completedKeys.includes(stage.key)) && !isCurrent && (eventId !== 'new' || isDone)
-          const localSelection = onLocalStageSelect && ['details', 'branding', 'type'].includes(stage.key)
+          const canVisit = interactive && (href || onLocalStageSelect && completedKeys.includes(stage.key)) && !isCurrent && (eventId !== 'new' || isDone)
+          const localSelection = onLocalStageSelect && ['details', 'branding', 'type', 'settings'].includes(stage.key)
 
           const circleClass = isCurrent
             ? 'border-v-primary bg-v-primary text-white ring-4 ring-v-primary-soft'
@@ -53,7 +54,7 @@ export default function EventStepper({
                 : 'text-v-text-subtle'
 
           const inner = (
-            <span className="flex min-w-[7.5rem] flex-1 flex-col">
+            <span className="flex min-w-30 flex-1 flex-col">
               <span className="flex items-center">
                 <span
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors ${circleClass}`}

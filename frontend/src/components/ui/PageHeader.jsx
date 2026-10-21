@@ -1,3 +1,5 @@
+// Figma page header: 24px display title + one-line description, primary
+// action(s) aligned to the right and wrapping under the title on narrow screens.
 export default function PageHeader({ title, description, actions }) {
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+﻿@import 'tailwindcss';
 
 @layer components {
   .v-competition-workflow h1 { @apply text-2xl font-semibold text-v-text; }
@@ -98,13 +98,24 @@
     --v-text: #111827;
     --v-text-muted: #374151;
     --v-text-subtle: #6b7280;
+
+    /* Shell dimensions (Figma: sidebar 256 / rail 72 / header 72) */
+    --v-sidebar-w: 16rem;
+    --v-rail-w: 4.5rem;
+    --v-header-h: 4.5rem;
+    --v-radius-control: 0.5rem;
+    --v-radius-card: 0.75rem;
+    --v-radius-dialog: 1rem;
+    --v-on-primary: #ffffff;
     --v-sidebar: #111827;
     --v-sidebar-text: #d1d5db;
     --v-sidebar-active: #ffffff;
-      --v-primary: #4f46e5;          /* Votrix Indigo */
+    --v-primary: #4f46e5;
     --v-primary-hover: #4338ca;
-    --v-primary-soft: #eef2ff;     /* tinted background */
-    --v-brand-accent: #7c3aed;     /* gradient end-stop (violet) */
+    --v-primary-soft: #eef2ff;
+    --v-info: #4f46e5;
+    --v-info-bg: #eef2ff;
+    --v-brand-accent: #7c3aed;
     --v-brand-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
     --v-success: #059669;
     --v-success-bg: #ecfdf5;
@@ -121,6 +132,28 @@
     --v-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.06);
     --gradient-vote: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
     --gradient-comp: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    --gradient-poll: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  }
+
+  [data-module='competition-scoring'] {
+    --v-primary: #4f46e5;
+    --v-primary-hover: #4338ca;
+    --v-primary-soft: #eef2ff;
+    --v-info: #4f46e5;
+    --v-info-bg: #eef2ff;
+    --v-brand-accent: #7c3aed;
+    --v-brand-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    --gradient-comp: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  }
+
+  [data-module='polling'] {
+    --v-primary: #4f46e5;
+    --v-primary-hover: #4338ca;
+    --v-primary-soft: #eef2ff;
+    --v-info: #4f46e5;
+    --v-info-bg: #eef2ff;
+    --v-brand-accent: #7c3aed;
+    --v-brand-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
     --gradient-poll: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
   }
 
@@ -150,14 +183,14 @@
 
   /* Card variants */
   .v-card {
-    border-radius: 0.75rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
   }
 
   .v-card-sm {
-    border-radius: 0.75rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
@@ -165,7 +198,7 @@
   }
 
   .v-card-md {
-    border-radius: 0.75rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
@@ -173,14 +206,14 @@
   }
 
   .v-card-lg {
-    border-radius: 0.75rem;
+    border-radius: var(--v-radius-card);
     border: 1px solid var(--v-border);
     background-color: var(--v-surface);
     box-shadow: var(--v-shadow);
     padding: 2rem;
   }
 
-  /* Elevated card — uses the larger shadow tier, suitable for featured content */
+  /* Elevated card â€” uses the larger shadow tier, suitable for featured content */
   .v-card-elevated {
     border-radius: 0.75rem;
     border: 1px solid var(--v-border);
@@ -188,7 +221,7 @@
     box-shadow: var(--v-shadow-md);
   }
 
-  /* Hoverable card — adds lift + shadow-md on hover. Use on clickable cards. */
+  /* Hoverable card â€” adds lift + shadow-md on hover. Use on clickable cards. */
   .v-card-hover {
     border-radius: 0.75rem;
     border: 1px solid var(--v-border);
@@ -208,9 +241,9 @@
     box-shadow: var(--v-shadow);
   }
 
-  /* Flat card — no border, no shadow. Useful inside an already-elevated container. */
+  /* Flat card â€” no border, no shadow. Useful inside an already-elevated container. */
   .v-card-flat {
-    border-radius: 0.75rem;
+    border-radius: var(--v-radius-card);
     background-color: var(--v-surface-elevated);
   }
 
@@ -246,7 +279,7 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--v-danger) 30%, transparent);
   }
 
-  /* DateTime input wrapper — keeps calendar icon aligned with text inputs */
+  /* DateTime input wrapper â€” keeps calendar icon aligned with text inputs */
   .v-datetime {
     position: relative;
     display: flex;
@@ -334,7 +367,7 @@
     background-color: var(--v-surface-elevated);
   }
 
-  /* Custom CalendarCard — replaces native datetime-local */
+  /* Custom CalendarCard â€” replaces native datetime-local */
   .v-cal {
     position: relative;
     width: 100%;
@@ -976,6 +1009,112 @@
     width: 16.66%;
   }
 
+  /* Election Dashboard Table - Same design as competition */
+  .v-election-dashboard-table {
+    border: 2px solid var(--v-border-strong);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .v-election-dashboard-table .v-table {
+    table-layout: fixed;
+  }
+
+  .v-election-dashboard-table .v-table th,
+  .v-election-dashboard-table .v-table td {
+    border-right: 1px solid var(--v-border-strong);
+    border-bottom: 1px solid var(--v-border-strong);
+    vertical-align: middle;
+  }
+
+  .v-election-dashboard-table .v-table th {
+    background-color: var(--v-primary);
+    color: #fff !important;
+    border-bottom: 2px solid var(--v-primary-hover);
+    font-weight: 700;
+  }
+
+  .v-election-dashboard-table .v-table th:last-child,
+  .v-election-dashboard-table .v-table td:last-child {
+    border-right: 0;
+  }
+
+  .v-election-dashboard-table .v-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .v-election-dashboard-table .v-table th:first-child,
+  .v-election-dashboard-table .v-table td:first-child {
+    width: 34%;
+  }
+
+  .v-election-dashboard-table .v-table th:nth-child(2),
+  .v-election-dashboard-table .v-table td:nth-child(2) {
+    width: 16%;
+  }
+
+  .v-election-dashboard-table .v-table th:nth-child(3),
+  .v-election-dashboard-table .v-table td:nth-child(3),
+  .v-election-dashboard-table .v-table th:nth-child(4),
+  .v-election-dashboard-table .v-table td:nth-child(4),
+  .v-election-dashboard-table .v-table th:nth-child(5),
+  .v-election-dashboard-table .v-table td:nth-child(5) {
+    width: 16.66%;
+  }
+
+  /* Polling Dashboard Table - Same design as competition */
+  .v-polling-dashboard-table {
+    border: 2px solid var(--v-border-strong);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .v-polling-dashboard-table .v-table {
+    table-layout: fixed;
+  }
+
+  .v-polling-dashboard-table .v-table th,
+  .v-polling-dashboard-table .v-table td {
+    border-right: 1px solid var(--v-border-strong);
+    border-bottom: 1px solid var(--v-border-strong);
+    vertical-align: middle;
+  }
+
+  .v-polling-dashboard-table .v-table th {
+    background-color: var(--v-primary);
+    color: #fff !important;
+    border-bottom: 2px solid var(--v-primary-hover);
+    font-weight: 700;
+  }
+
+  .v-polling-dashboard-table .v-table th:last-child,
+  .v-polling-dashboard-table .v-table td:last-child {
+    border-right: 0;
+  }
+
+  .v-polling-dashboard-table .v-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .v-polling-dashboard-table .v-table th:first-child,
+  .v-polling-dashboard-table .v-table td:first-child {
+    width: 34%;
+  }
+
+  .v-polling-dashboard-table .v-table th:nth-child(2),
+  .v-polling-dashboard-table .v-table td:nth-child(2) {
+    width: 16%;
+  }
+
+  .v-polling-dashboard-table .v-table th:nth-child(3),
+  .v-polling-dashboard-table .v-table td:nth-child(3),
+  .v-polling-dashboard-table .v-table th:nth-child(4),
+  .v-polling-dashboard-table .v-table td:nth-child(4),
+  .v-polling-dashboard-table .v-table th:nth-child(5),
+  .v-polling-dashboard-table .v-table td:nth-child(5) {
+    width: 16.66%;
+  }
+
   .v-event-stats-header {
     display: flex;
     flex-wrap: wrap;
@@ -1039,7 +1178,7 @@
     line-height: 1.25;
   }
 
-  /* Display heading — for hero surfaces (login, marketing, empty-states). */
+  /* Display heading â€” for hero surfaces (login, marketing, empty-states). */
   .v-display {
     font-family: var(--font-display);
     font-weight: 800;
@@ -1050,7 +1189,7 @@
     text-wrap: balance;
   }
 
-  /* Numeric stat — use for vote counts, scores, percentages. */
+  /* Numeric stat â€” use for vote counts, scores, percentages. */
   .v-stat-number {
     font-family: var(--font-mono);
     font-weight: 600;
@@ -1121,7 +1260,7 @@
     padding: 0.5rem 1rem;
     transition: all 0.15s;
     background-color: var(--v-primary);
-    color: var(--v-text);
+    color: white !important;
     border: none;
     cursor: pointer;
   }
@@ -1130,7 +1269,12 @@
     background-color: var(--v-primary-hover);
   }
 
-  /* Brand gradient button — used for hero CTAs and "Get started" actions */
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--v-primary);
+    outline-offset: 2px;
+  }
+
+  /* Brand gradient button â€” used for hero CTAs and "Get started" actions */
   .v-btn-brand {
     display: inline-flex;
     align-items: center;
@@ -1295,7 +1439,7 @@
   .v-module-card__icon {
     width: 1.25rem;
     height: 1.25rem;
-    color: var(--v-text-muted);
+    color: var(--v-primary);
     margin-bottom: 0.375rem;
   }
 
@@ -1420,7 +1564,7 @@
 
   /* ===== Motion utilities ===== */
 
-  /* Page fade-in — apply to route Outlet containers.
+  /* Page fade-in â€” apply to route Outlet containers.
      NOTE: use the standalone `translate` property (not `transform`) so a
      persistent value on the scroll container does NOT create a containing
      block for `position: fixed` descendants. `transform` would demote
@@ -1472,7 +1616,7 @@
     }
   }
 
-  /* Button press feedback — drop on any button or clickable element. */
+  /* Button press feedback â€” drop on any button or clickable element. */
   .v-press {
     transition: transform var(--duration-fast) var(--ease-out);
   }
@@ -1481,7 +1625,7 @@
     transform: scale(0.97);
   }
 
-  /* Skeleton shimmer — for loading placeholders. */
+  /* Skeleton shimmer â€” for loading placeholders. */
   .v-skeleton {
     background: linear-gradient(
       90deg,
@@ -1572,8 +1716,21 @@
     color: var(--v-text) !important;
   }
 
-  .v-events-table-header [role="columnheader"] {
-    color: #fff !important;
+  /* The remap above exists for legacy dark panels turned light. Anything that
+     sits on a filled/dark background must keep real white text, otherwise
+     primary buttons, step circles and sidebar items lose their contrast. */
+  .bg-v-primary.text-white:not(:disabled),
+  .bg-v-primary-hover.text-white:not(:disabled),
+  .bg-v-danger.text-white:not(:disabled),
+  .bg-v-success.text-white:not(:disabled),
+  .bg-v-brand-accent.text-white:not(:disabled),
+  .bg-emerald-500.text-white,
+  .bg-amber-500.text-white,
+  .bg-blue-600.text-white,
+  .bg-v-sidebar .text-white,
+  .v-on-dark .text-white,
+  .v-on-dark.text-white {
+    color: var(--v-on-primary) !important;
   }
 
   .text-slate-200,
@@ -1625,5 +1782,71 @@
     --tw-gradient-from: var(--v-bg) !important;
     --tw-gradient-to: var(--v-bg) !important;
     --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  /* White text on all blue/primary backgrounds for better contrast */
+  .bg-v-primary,
+  .bg-v-primary-hover,
+  .bg-indigo-600,
+  .bg-indigo-500,
+  .bg-indigo-700,
+  .bg-indigo-800,
+  .hover\:bg-indigo-500:hover,
+  .hover\:bg-indigo-600:hover {
+    color: white !important;
+  }
+
+  /* White text for all children in blue backgrounds */
+  .bg-v-primary *,
+  .bg-indigo-600 *,
+  .bg-indigo-500 * {
+    color: white !important;
+  }
+
+  /* Ensure table headers with primary background have white text */
+  .v-table th.bg-v-primary,
+  .v-competition-dashboard-table th,
+  .v-election-dashboard-table th,
+  .v-polling-dashboard-table th,
+  thead.bg-v-primary th,
+  thead.bg-indigo-600 th,
+  thead.bg-indigo-500 th,
+  th.bg-v-primary,
+  th.bg-indigo-600,
+  th.bg-indigo-500,
+  td.bg-v-primary,
+  td.bg-indigo-600 {
+    color: white !important;
+  }
+
+  /* Buttons and links with primary background */
+  button.bg-v-primary,
+  button.bg-indigo-600,
+  button.bg-indigo-500,
+  a.bg-v-primary,
+  a.bg-indigo-600,
+  a.bg-indigo-500 {
+    color: white !important;
+  }
+
+  /* Ensure .v-btn-primary always has white text */
+  .v-btn-primary,
+  .v-btn-primary * {
+    color: white !important;
+  }
+
+  /* Override conflicting text colors on elements that HAVE blue background */
+  .bg-v-primary.text-v-text,
+  .bg-v-primary.text-black,
+  .bg-v-primary .text-v-text,
+  .bg-v-primary .text-black,
+  .bg-v-primary .text-gray-900,
+  .bg-indigo-600.text-v-text,
+  .bg-indigo-600.text-black,
+  .bg-indigo-600 .text-v-text,
+  .bg-indigo-600 .text-black,
+  .bg-indigo-500.text-v-text,
+  .bg-indigo-500.text-black {
+    color: white !important;
   }
 }

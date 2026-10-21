@@ -5,10 +5,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { pageantService } from '@/services/pageant.service'
 import { pageantEventSchemaStep1, isoToLocalInput, localInputToIso } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import DateTimeInput from '@/components/ui/DateTimeInput'
+import CalendarCard from '@/components/ui/CalendarCard'
 import Card from '@/components/ui/Card'
 import { getNextStage, stagePath } from '@/utils/eventStages'
-import SaveStatus from '@/components/ui/SaveStatus'
+import StageFooter from '@/components/ui/StageFooter'
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
@@ -64,7 +64,7 @@ export default function CompetitionEventFormPage() {
   // existing event whose setup is locked (scheduled/active/…) is read-only.
   const readOnly = !isNew && (loading || loadFailed || isSetupLocked(eventStatus) || Boolean(officialRulesId))
 
-const { markComplete, reset: resetProgress } = useEventProgress(
+const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'competition',
     eventId,
   )
@@ -362,26 +362,45 @@ useEffect(() => {
   if (loadFailed) return <div role="alert" className="v-card p-5 space-y-3"><p className="v-error-text">{error}</p><Button variant="secondary" onClick={() => setLoadAttempt(value => value + 1)}>Retry loading event</Button></div>
 
   return (
-    <div className="space-y-6">
+    <div data-module="competition-scoring" className="space-y-6">
       <>
-          <EventStepper module="competition" currentKey={step} eventId={isNew ? 'new' : eventId} completedKeys={step === 'type' ? ['details', 'branding'] : step === 'branding' ? ['details'] : []} navigationDisabled={saving} onLocalStageSelect={setStep} />
+          <EventStepper
+            module="competition"
+            currentKey={step}
+            eventId={eventId || 'new'}
+            completedKeys={completedKeys}
+            eventStatus={eventStatus}
+            readOnly={readOnly}
+            interactive={false}
+          />
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="competition" frozen={Boolean(officialRulesId)} />}
 
-          <div className="w-full">
-            <header>
-              <h2 className="v-page-title mb-2">
-                {isNew ? 'Create Competition Scoring Event' : readOnly ? 'View Competition Scoring Event' : 'Edit Competition Scoring Event'}
-              </h2>
-              <p className="v-helper-text">
-                Complete the eight setup steps, then review and create your event. Each competition keeps its own scoring, entries, judges, and results.
-              </p>
-            </header>
-          </div>
+          <header>
+            <h2 className="v-page-title">
+              {isNew ? 'Create Competition Scoring Event' : readOnly ? 'View Competition Scoring Event' : 'Edit Competition Scoring Event'}
+            </h2>
+            <p className="v-helper-text">
+              Complete the setup steps, then review and create your event. Each competition keeps its own scoring, entries, judges, and results.
+            </p>
+          </header>
 
-          <div className="w-full">
+          <div className="grid grid-cols-1 gap-6">
+          <div className="min-w-0">
             {error && <p role="alert" className="v-error-text">{error}</p>}
             <Card padding="md">
+            <div className="mb-5">
+              <h3 className="v-section-title">
+                {step === 'branding' ? 'Event banner' : step === 'type' ? 'Competition type' : 'Event information'}
+              </h3>
+              <p className="v-caption mt-0.5">
+                {step === 'branding'
+                  ? 'Optional banner used in the participant event header and previews.'
+                  : step === 'type'
+                    ? 'Choose the competition type before creating categories.'
+                    : 'Only draft setup is editable.'}
+              </p>
+            </div>
             <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 m-0">
             {step === 'details' && (
           <form className="space-y-4" onSubmit={handleNext}>
@@ -424,17 +443,23 @@ useEffect(() => {
                   control={control}
                   name="startDate"
                   render={({ field }) => (
-                    <DateTimeInput
+                    <CalendarCard
                       id="startDate"
                       hasError={Boolean(errors.startDate)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       name={field.name}
+                      max={formValues.endDate || undefined}
+                      required
+                      disabled={saving || readOnly}
+                      twoStep
+                      confirmDate
+                      ariaDescribedBy={errors.startDate ? 'startDate-error' : undefined}
                     />
                   )}
                 />
-                {errors.startDate && <p className="v-error-text">{errors.startDate.message}</p>}
+                {errors.startDate && <p id="startDate-error" className="v-error-text">{errors.startDate.message}</p>}
               </div>
 
               <div className="v-form-field">
@@ -445,17 +470,23 @@ useEffect(() => {
                   control={control}
                   name="endDate"
                   render={({ field }) => (
-                    <DateTimeInput
+                    <CalendarCard
                       id="endDate"
                       hasError={Boolean(errors.endDate)}
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       name={field.name}
+                      min={formValues.startDate || undefined}
+                      required
+                      disabled={saving || readOnly}
+                      twoStep
+                      confirmDate
+                      ariaDescribedBy={errors.endDate ? 'endDate-error' : undefined}
                     />
                   )}
                 />
-                {errors.endDate && <p className="v-error-text">{errors.endDate.message}</p>}
+                {errors.endDate && <p id="endDate-error" className="v-error-text">{errors.endDate.message}</p>}
               </div>
             </div>
           </form>
@@ -520,30 +551,31 @@ useEffect(() => {
         </fieldset>
       </Card>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-v-border pt-4">
-          <div className="flex items-center gap-3">
-            {step !== 'details' && (
-              <Button type="button" variant="secondary" disabled={saving} onClick={() => { setError(null); setStep(step === 'type' ? 'branding' : 'details') }}>
-                Back: {step === 'type' ? 'Branding' : 'Event Details'}
-              </Button>
-            )}
-            {!readOnly && <SaveStatus status={saveStatus} lastSavedAt={lastSavedAt} />}
-          </div>
-          {readOnly ? (
-            <Button type="button" onClick={() => {
+        <StageFooter
+          module="competition"
+          currentKey={step}
+          eventId={eventId || 'new'}
+          saving={saving}
+          saveStatus={readOnly ? 'idle' : saveStatus}
+          lastSavedAt={readOnly ? null : lastSavedAt}
+          showSidebarHint={false}
+          backLabel={step === 'type' ? 'Back: Branding' : 'Back: Event Details'}
+          onBack={() => { setError(null); setStep(step === 'type' ? 'branding' : 'details') }}
+          nextLabel={step === 'details' ? 'Next: Branding' : step === 'branding' ? 'Next: Competition Type' : 'Next: Competitions / Categories'}
+          onNext={() => {
+            if (readOnly) {
               if (step === 'details') setStep('branding')
-
               else {
                 const next = getNextStage('competition', step)
                 if (next) navigate(stagePath('competition', next.key, eventId))
               }
-            }}>Next</Button>
-          ) : (
-            <Button type="button" disabled={saving} onClick={step === 'details' ? handleNext : step === 'branding' ? handleNextBranding : handleNextType}>
-              {saving ? 'Saving...' : step === 'details' ? 'Next: Branding' : step === 'branding' ? 'Next: Competition Type' : 'Next: Competitions / Categories'}
-            </Button>
-          )}
-        </div>
+            } else if (step === 'details') handleNext()
+            else if (step === 'branding') handleNextBranding()
+            else handleNextType()
+          }}
+        />
+          </div>
+
           </div>
         </>
 

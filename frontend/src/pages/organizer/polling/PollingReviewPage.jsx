@@ -83,8 +83,8 @@ export default function PollingReviewPage() {
   if (loading) return <p className="v-caption">Loading…</p>
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div data-module="polling" className="mx-auto max-w-5xl space-y-6">
+      <div className="v-card-md">
         <h2 className="v-page-title">Review &amp; Publish</h2>
           <p className="v-helper-text mt-1">
           Publishing finishes setup and hands the poll to its schedule. It does not open the poll
@@ -92,8 +92,8 @@ export default function PollingReviewPage() {
         </p>
       </div>
 
-      <div className="v-card-sm">
-        <h3 className="v-label mb-3">{title || 'Untitled poll'}</h3>
+      <div className="v-card-md">
+        <h3 className="v-section-title mb-3">{title || 'Untitled poll'}</h3>
         <dl className="grid gap-3 sm:grid-cols-2">
           <SummaryStat label="Questions" value={questionsCount} />
           <SummaryStat label="Registered respondents" value={respondentsCount} />
@@ -174,7 +174,7 @@ export default function PollingReviewPage() {
 
 function SummaryStat({ label, value }) {
   return (
-    <div className="rounded-lg border border-v-border px-3 py-2">
+    <div className="rounded-xl border border-v-border bg-v-surface-elevated px-4 py-3">
       <dt className="v-caption">{label}</dt>
       <dd className="text-lg font-semibold text-v-text">{value}</dd>
     </div>

@@ -17,7 +17,13 @@ import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 import { ENTRY_TYPES, orderedRounds, participationFor, entryParticipation, roundAcceptsEntry } from '../../../../../shared/competition-participation.js'
 
 const blank = { name:'', number:1, divisionId:'', entryType:'individual', entryLabel:'' }
-export default function CompetitionContestantsPage() { return <NativeSetupBoundary Legacy={LegacyCompetitionContestantsPage}/> }
+export default function CompetitionContestantsPage() {
+  return (
+    <div data-module="competition-scoring" className="mx-auto max-w-7xl">
+      <NativeSetupBoundary Legacy={LegacyCompetitionContestantsPage} />
+    </div>
+  )
+}
 function LegacyCompetitionContestantsPage() {
   const { eventId } = useParams()
   const { success, error:toastError } = useToast()
@@ -121,11 +127,14 @@ function LegacyCompetitionContestantsPage() {
   const qualification = entry => { const state=entryParticipation(foundation,entry,selectedRoundId); return <><span>{state.status}</span>{state.source && state.assigned.some(r=>r.id===selectedRoundId) && <span className="mt-1 block text-xs text-v-text-subtle">Confirmed from {participation.sources.find(r=>r.id===state.source.round_id)?.name} · source {state.source.calculation_id?.slice(0,8)} · rules {state.source.rules_version?.slice(0,8)}</span>}</> }
   const membershipNames = entry => entryParticipation(foundation,entry,selectedRoundId).assigned.map(r=>r.name).join(', ') || 'None'
   return <div className="min-w-0 space-y-5">
-    <header><h2 className="text-xl font-semibold text-v-text">Contestants &amp; Entries</h2><p className="mt-1 text-sm text-v-text-subtle">Register participants, manage competition entries, and prepare round assignments.</p></header>
+    <header className="v-card-md">
+      <h2 className="font-display text-xl font-bold tracking-tight text-v-text sm:text-2xl">Contestants &amp; Entries</h2>
+      <p className="mt-1 text-sm leading-6 text-v-text-muted">Register participants, manage competition entries, and prepare round assignments.</p>
+    </header>
     {loadError && <div role="alert" className="v-card p-4"><p className="v-error-text">{loadError}</p><Button variant="secondary" onClick={()=>load().catch(()=>{})}>Reload saved entries</Button></div>}
     {readOnly && foundation && <ReadOnlyEventBanner status={foundation.event.status} noun="competition" frozen={Boolean(foundation.event?.official_rules_id ?? foundation.event?.officialRulesId)} />}
     <div className={`grid min-w-0 items-start gap-5 ${!readOnly ? 'xl:grid-cols-[minmax(270px,0.7fr)_minmax(0,2fr)]' : ''}`}>
-      {!readOnly && <form ref={formRef} onSubmit={save} className="v-card min-w-0 scroll-mt-24 space-y-4 p-4 sm:p-5" noValidate aria-label="Entry registration">
+      {!readOnly && <form ref={formRef} onSubmit={save} className="v-card-md min-w-0 scroll-mt-24 space-y-4 p-4 sm:p-5" noValidate aria-label="Entry registration">
         <h3 className="font-semibold text-v-text">{editing ? 'Edit entry' : 'Register an entry'}</h3>
         <fieldset disabled={blocked} className="min-w-0 space-y-4">
           <div><label className={LABEL_CLASS} htmlFor="entry-type">Entry type</label><select id="entry-type" className={`${INPUT_CLASS} w-full`} value={values.entryType} onChange={e=>set('entryType',e.target.value)}>{editing && values.entryType==='legacy' && <option value="legacy">Existing type unchanged</option>}{ENTRY_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</select></div>

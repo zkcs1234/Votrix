@@ -8,10 +8,11 @@ import { isSetupLocked, isParticipantsLocked } from '@/utils/constants'
  *
  * @param {{ getEvent: (id: string) => Promise<{ data: { event: { status?: string } } }> }} service
  * @param {string} eventId
- * @returns {{ status: string|null, loading: boolean, setupLocked: boolean, rosterLocked: boolean, reload: () => void }}
+ * @returns {{ status: string|null, title: string|null, loading: boolean, setupLocked: boolean, rosterLocked: boolean, reload: () => void }}
  */
 export default function useEventStatus(service, eventId) {
   const [status, setStatus] = useState(null)
+  const [title, setTitle] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const reload = useCallback(async () => {
@@ -22,6 +23,7 @@ export default function useEventStatus(service, eventId) {
     try {
       const { data } = await service.getEvent(eventId)
       setStatus(data.event?.status ?? null)
+      setTitle(data.event?.title ?? null)
     } catch (err) {
       console.error('Failed to load event status:', err)
     } finally {
@@ -35,6 +37,7 @@ export default function useEventStatus(service, eventId) {
 
   return {
     status,
+    title,
     loading,
     setupLocked: isSetupLocked(status),
     rosterLocked: isParticipantsLocked(status),

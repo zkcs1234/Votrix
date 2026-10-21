@@ -8,6 +8,7 @@ import ReadinessItem from '@/components/organizer/ReadinessItem'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { EVENT_STATUS, canUnpublishEventStatus } from '@/utils/constants'
+import { groupHasCandidatesForEveryPosition } from '@/utils/electionGroupProgress'
 
 // Review & Publish is the final setup stage. Publishing a draft hands it to the
 // schedule (draft -> scheduled) and locks setup.
@@ -17,6 +18,7 @@ export default function ElectionReviewPage() {
   const [event, setEvent] = useState(null)
   const [positionsCount, setPositionsCount] = useState(0)
   const [candidatesCount, setCandidatesCount] = useState(0)
+  const [groupReadiness, setGroupReadiness] = useState([])
   const [votersCount, setVotersCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [publishing, setPublishing] = useState(false)
@@ -27,15 +29,31 @@ export default function ElectionReviewPage() {
 
   const load = useCallback(async () => {
     try {
-      const [{ data: ev }, { data: pos }, { data: cand }, { data: vot }] = await Promise.all([
+      const [{ data: ev }, { data: sectionData }, { data: vot }] = await Promise.all([
         electionService.getEvent(eventId),
-        electionService.listPositions(eventId),
-        electionService.listCandidates(eventId),
+        electionService.listBallotSections(eventId),
         electionService.listVoters(eventId),
       ])
+      const sections = sectionData.sections ?? []
+      const readiness = await Promise.all(sections.map(async (section) => {
+        const [positionResult, candidateResult] = await Promise.all([
+          electionService.listPositions(eventId, section.id),
+          electionService.listCandidates(eventId, null, section.id),
+        ])
+        const positions = positionResult.data.positions ?? []
+        const candidates = candidateResult.data.candidates ?? []
+        return {
+          id: section.id,
+          name: section.name,
+          positionsCount: positions.length,
+          candidatesCount: candidates.length,
+          ready: groupHasCandidatesForEveryPosition(positions, candidates),
+        }
+      }))
       setEvent(ev.event ?? null)
-      setPositionsCount(Array.isArray(pos.positions) ? pos.positions.length : 0)
-      setCandidatesCount(Array.isArray(cand.candidates) ? cand.candidates.length : 0)
+      setGroupReadiness(readiness)
+      setPositionsCount(readiness.reduce((count, group) => count + group.positionsCount, 0))
+      setCandidatesCount(readiness.reduce((count, group) => count + group.candidatesCount, 0))
       setVotersCount(Array.isArray(vot.voters) ? vot.voters.length : 0)
     } catch (err) {
       console.error('Failed to load review data:', err)
@@ -52,7 +70,7 @@ export default function ElectionReviewPage() {
   const isDraft = status === EVENT_STATUS.DRAFT
   const canUnpublish = canUnpublishEventStatus(status)
   // Publishing no longer requires voters — they are invited after publish.
-  const publishReady = positionsCount > 0 && candidatesCount > 0
+  const publishReady = groupReadiness.length > 0 && groupReadiness.every((group) => group.ready)
 
   const handlePublish = async () => {
     if (!publishReady) return
@@ -111,9 +129,17 @@ export default function ElectionReviewPage() {
             You need the ballot in place before publishing. Voters can be registered and invited
             afterwards.
           </p>
-          <ul className="space-y-1.5">
-            <ReadinessItem ok={positionsCount > 0} label="At least one position" />
-            <ReadinessItem ok={candidatesCount > 0} label="At least one candidate" />
+          <ul className="space-y-3">
+            {!groupReadiness.length && <ReadinessItem ok={false} label="Create at least one election group" />}
+            {groupReadiness.map((group) => (
+              <li key={group.id} className="space-y-1.5">
+                <p className="text-sm font-medium text-v-text">{group.name}</p>
+                <ul className="space-y-1.5">
+                  <ReadinessItem ok={group.positionsCount > 0} label="At least one position" />
+                  <ReadinessItem ok={group.ready} label="Every position has at least one candidate" />
+                </ul>
+              </li>
+            ))}
           </ul>
         </div>
       )}

@@ -36,7 +36,13 @@ const WORKSPACE_TABS = ['rounds', 'criteria', 'divisions', 'scoring', 'structure
 // Phase 4 — Competition Scoring Foundation workspace.
 // Single page that exposes the dynamic structure of an event:
 // categories, rounds, criteria, contestants, judges, and scoring config.
-export default function CompetitionWorkspacePage() { return <NativeSetupBoundary Legacy={LegacyCompetitionWorkspacePage}/> }
+export default function CompetitionWorkspacePage() {
+  return (
+    <div data-module="competition-scoring">
+      <NativeSetupBoundary Legacy={LegacyCompetitionWorkspacePage} />
+    </div>
+  )
+}
 function LegacyCompetitionWorkspacePage() {
   const { eventId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()

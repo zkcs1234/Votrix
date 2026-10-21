@@ -7,11 +7,19 @@ import SearchInput from '@/components/ui/SearchInput'
 import useCompetitionSync from '@/hooks/useCompetitionSync'
 import useLatestRequest from '@/hooks/useLatestRequest'
 import FormAlert from '@/components/ui/FormAlert'
+import PageHeader from '@/components/ui/PageHeader'
 import useTableFilter from '@/hooks/useTableFilter'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import {NativeResultsBoundary} from '@/components/organizer/competition/NativeResultsWorkspace'
 
-export default function CompetitionRankingsPage(){const {eventId}=useParams();return <NativeResultsBoundary eventId={eventId} Legacy={LegacyCompetitionRankingsPage} analytics/>}
+export default function CompetitionRankingsPage() {
+  const { eventId } = useParams()
+  return (
+    <div data-module="competition-scoring" className="mx-auto max-w-7xl">
+      <NativeResultsBoundary eventId={eventId} Legacy={LegacyCompetitionRankingsPage} analytics />
+    </div>
+  )
+}
 function LegacyCompetitionRankingsPage() {
   const { eventId } = useParams()
   const [data, setData] = useState(null)
@@ -72,9 +80,13 @@ function LegacyCompetitionRankingsPage() {
     <div className="space-y-6">
       <p role="status" className="v-caption">{connected ? 'Live updates connected' : 'Live updates interrupted; checking saved rankings every 15 seconds.'}</p>
       {error && <FormAlert variant="error">{error}</FormAlert>}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold text-v-text">{data?.isOfficial ? 'Official rankings' : 'Live rankings preview'}</h2>
-        <div className="flex flex-wrap items-center gap-3">
+      <PageHeader
+        title={data?.isOfficial ? 'Official rankings' : 'Live rankings preview'}
+        description={data?.isOfficial
+          ? 'Published standings based on the approved competition tabulation.'
+          : 'Current standings are a live preview and have not been published.'}
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
           <SearchInput
             placeholder="Search contestant"
             value={search}
@@ -119,8 +131,9 @@ function LegacyCompetitionRankingsPage() {
           <button type="button" onClick={load} className="text-sm text-v-text-subtle hover:text-v-text-muted">
             Refresh
           </button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       <p className="text-sm text-v-text-subtle">
         {data?.isOfficial
@@ -136,9 +149,9 @@ function LegacyCompetitionRankingsPage() {
         {rankingRows.map((r) => (
           <div
             key={r.contestantId}
-            className="flex gap-4 rounded-2xl border border-v-border bg-v-surface p-5"
+            className="v-card-md flex gap-4 p-4 sm:p-5"
           >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-v-surface-elevated text-lg font-bold text-v-text-muted">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-v-primary-soft text-lg font-bold text-v-primary">
               {r.rank}
             </div>
             {r.photo && (

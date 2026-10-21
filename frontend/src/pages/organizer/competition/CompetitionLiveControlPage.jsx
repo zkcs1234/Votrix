@@ -409,8 +409,8 @@ function LegacyCompetitionLiveControlPage() {
       {session?.rulesVersion && <CompetitionLiveWorkflowPanel eventId={eventId} session={session} event={event} foundation={foundation} reload={loadSession} onStepChange={setControlStep} readOnly={event?.competitionLifecycle==='results_published'||eventStatus==='archived'}/>}
       {!session.rulesVersion && <>
       {/* Session Status Bar */}
-      <div className="flex items-center justify-between rounded-xl border border-v-border bg-v-surface-elevated px-6 py-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 rounded-xl border border-v-primary/20 bg-gradient-to-r from-v-primary-soft/40 via-v-surface to-v-surface px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
           <Badge
             variant={
               status === SESSION_STATUS.ACTIVE
@@ -427,7 +427,7 @@ function LegacyCompetitionLiveControlPage() {
             {new Date(session.startedAt).toLocaleTimeString()}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {status === SESSION_STATUS.ACTIVE && (
             <Button size="sm" variant="secondary" onClick={() => performAction('pause', 'pause')} loading={actionLoading === 'pause'}>
               <Pause className="h-4 w-4 mr-1" /> Pause
@@ -458,9 +458,9 @@ function LegacyCompetitionLiveControlPage() {
       {/* Current Stage & Contestant */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Current Round/Stage */}
-        <div className="rounded-xl border border-v-border bg-v-surface p-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 rounded-xl border border-v-primary/15 bg-v-surface p-4 shadow-sm sm:p-6">
           <div>
-            <h3 className="mb-1 text-sm font-medium text-v-text-muted uppercase tracking-wider">Live Stage</h3>
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-v-primary">Live Stage</h3>
             <div className="mb-2">
               <p className="text-xl font-bold text-v-text">
                 {session.hasRounds
@@ -561,7 +561,7 @@ function LegacyCompetitionLiveControlPage() {
                       disabled={actionLoading === 'setCriteria'}
                       className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
                         c.active
-                          ? 'border border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                          ? 'border border-v-success/40 bg-v-success/10 text-v-success'
                           : 'border border-v-border text-v-text-subtle hover:bg-v-surface-elevated'
                       }`}
                       title={
@@ -610,7 +610,7 @@ function LegacyCompetitionLiveControlPage() {
                       ? 'Close the round first'
                       : undefined
                   }
-                  className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 transition hover:bg-amber-500/20 disabled:opacity-50"
+                  className="w-full rounded-lg border border-v-warning/40 bg-v-warning/10 px-3 py-2 text-xs font-medium text-v-warning transition hover:bg-v-warning/15 disabled:opacity-50"
                 >
                   {finalizeLoading
                     ? 'Loading…'
@@ -639,7 +639,7 @@ function LegacyCompetitionLiveControlPage() {
           const allOpen = roster.length > 0 && openCount === roster.length
           const gateBusy = String(actionLoading || '').startsWith('openContestants:')
           return (
-            <div className="rounded-xl border border-v-border bg-v-surface p-6">
+            <div className="rounded-xl border border-v-primary/15 bg-v-surface p-4 shadow-sm sm:p-6">
               <div className="mb-1 flex items-center justify-between gap-2">
                 <h3 className="text-sm font-medium text-v-text-muted uppercase tracking-wider">
                   Scoring access{session.hasRounds ? ' — this round' : ''}
@@ -698,7 +698,7 @@ function LegacyCompetitionLiveControlPage() {
                                 title={c.open ? 'Open for scoring — click to lock' : 'Locked — click to open'}
                                 className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition disabled:opacity-60 ${
                                   c.open
-                                    ? 'border-emerald-500/40 bg-emerald-500/10'
+                                    ? 'border-v-success/40 bg-v-success/10'
                                     : 'border-v-border bg-v-surface-elevated/40 hover:bg-v-surface-elevated'
                                 }`}
                               >
@@ -713,7 +713,7 @@ function LegacyCompetitionLiveControlPage() {
                                 </span>
                                 <span
                                   className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                                    c.open ? 'bg-emerald-500/20 text-emerald-300' : 'bg-v-surface text-v-text-subtle border border-v-border'
+                                    c.open ? 'bg-v-success/10 text-v-success' : 'bg-v-surface text-v-text-subtle border border-v-border'
                                   }`}
                                 >
                                   {c.open ? 'Open' : 'Locked'}
@@ -834,7 +834,7 @@ function StageOrderControl({ arrangement, setArrangement, divisions, preview, on
   const update = (key, value) => setArrangement((current) => ({ ...current, [key]: value }))
 
   return (
-    <div className="rounded-xl border border-v-border bg-v-surface p-6">
+    <div className="rounded-xl border border-v-primary/15 bg-v-surface p-4 shadow-sm sm:p-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <ListOrdered className="mt-0.5 h-5 w-5 shrink-0 text-v-primary" aria-hidden />
@@ -852,7 +852,7 @@ function StageOrderControl({ arrangement, setArrangement, divisions, preview, on
         Judge assignments remain managed on the Judges page.
       </div>
       {locked && (
-        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">
+        <div className="mb-4 rounded-lg border border-v-warning/30 bg-v-warning/10 px-3 py-2 text-xs text-v-warning">
           Stage order is locked because scoring has started. Existing judge assignments and scores are not changed.
         </div>
       )}
@@ -908,8 +908,8 @@ function StageOrderControl({ arrangement, setArrangement, divisions, preview, on
       </div>
 
       {preview && (
-        <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-300">Stage order preview</p>
+        <div className="mt-4 rounded-lg border border-v-warning/30 bg-v-warning/10 p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-v-warning">Stage order preview</p>
           <ol className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
             {preview.contestants.map((contestant, index) => (
               <li key={contestant.id} className="rounded-md border border-v-border bg-v-surface-elevated px-3 py-2 text-sm text-v-text">
@@ -945,11 +945,11 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelByI
   const fullyLockedCount = submitted.length
 
   return (
-    <div className="rounded-xl border border-v-border bg-v-surface p-6">
+    <div className="rounded-xl border border-v-primary/15 bg-v-surface p-4 shadow-sm sm:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-medium text-v-text-muted uppercase tracking-wider">Judge Progress</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-v-primary">Judge Progress</h3>
         {totalCells > 0 && (
-          <span className="text-xs text-v-text-subtle">
+          <span className="rounded-full bg-v-primary-soft px-2.5 py-1 text-xs font-medium text-v-primary">
             {fullyLockedCount}/{totalCells} fully locked
             {progress?.roundSubmissions && `; ${progress.roundSubmissions.length}/${judges.length} rounds submitted`}
           </span>
@@ -964,14 +964,14 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelByI
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-max text-sm">
             <thead>
               <tr className="border-b border-v-border">
-                <th className="sticky left-0 z-10 bg-v-surface py-2 pr-4 text-left font-medium text-v-text-muted">
+                <th className="sticky left-0 z-10 min-w-40 bg-v-surface py-2 pr-4 text-left font-semibold text-v-text-muted">
                   Contestant
                 </th>
                 {judges.map((j) => (
-                  <th key={j.judgeId} className="px-2 py-2 text-center font-medium text-v-text-muted">
+                  <th key={j.judgeId} className="min-w-24 px-2 py-2 text-center font-semibold text-v-text-muted">
                     <span className="block max-w-24 truncate">{j.displayName || 'Judge'}</span>
                     {j.allowedEntryIds && <span className="block text-xs">{j.roundSubmitted ? `Submitted v${j.submissionVersion}` : 'Not submitted'}</span>}
                   </th>
@@ -1008,7 +1008,7 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelByI
                                 onClick={() => onUnlock(c.id, j.judgeId)}
                                 disabled={cellBusy || rowBusy}
                                 title="Fully locked — click to reopen this judge's whole score"
-                                className="group inline-flex items-center justify-center rounded-md p-1 text-v-success hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50"
+                                className="group inline-flex items-center justify-center rounded-md p-1 text-v-success transition hover:bg-v-warning/10 hover:text-v-warning focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary disabled:opacity-50"
                               >
                                 <CheckCircle className="h-4 w-4 group-hover:hidden" />
                                 <LockOpen className="hidden h-4 w-4 group-hover:block" />
@@ -1019,7 +1019,7 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelByI
                                 onClick={() => onUnlock(c.id, j.judgeId)}
                                 disabled={cellBusy || rowBusy}
                                 title="Partially locked — click to reopen this judge's whole score"
-                                className="inline-flex items-center justify-center rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+                                className="inline-flex items-center justify-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-v-warning hover:bg-v-warning/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary disabled:opacity-50"
                               >
                                 {count}/{criteriaTotal}
                               </button>
@@ -1048,7 +1048,7 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelByI
                           type="button"
                           onClick={() => onUnlock(c.id, null)}
                           disabled={rowBusy}
-                          className="ml-2 rounded-md border border-v-border px-2 py-0.5 text-[11px] text-v-text-muted hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50"
+                          className="ml-2 rounded-md border border-v-border px-2 py-0.5 text-[11px] text-v-text-muted transition hover:border-v-warning/40 hover:bg-v-warning/10 hover:text-v-warning focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary disabled:opacity-50"
                         >
                           {rowBusy ? '…' : 'Reopen all'}
                         </button>
@@ -1083,7 +1083,7 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelByI
                                             onClick={() => onUnlock(c.id, j.judgeId, cr.id)}
                                             disabled={busy}
                                             title="Reopen this criterion for this judge"
-                                            className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300 hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-300 disabled:opacity-50"
+                                            className="inline-flex items-center gap-1 rounded-full border border-v-success/40 bg-v-success/10 px-2 py-0.5 text-[11px] text-v-success transition hover:border-v-warning/40 hover:bg-v-warning/10 hover:text-v-warning focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary disabled:opacity-50"
                                           >
                                             <LockOpen className="h-3 w-3" /> {cr.name}
                                           </button>
@@ -1113,27 +1113,27 @@ function JudgeProgressGrid({ progress, onUnlock, actionLoading, divisionLabelByI
 
 function PageHeader({ eventId, title }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="v-card-md flex flex-wrap items-center justify-between gap-3 border-v-primary/15 bg-gradient-to-br from-v-surface to-v-primary-soft/25">
       <div>
-        <h2 className="text-xl font-semibold text-v-text">Competition Scoring</h2>
-        <p className="mt-1 text-sm text-v-text-subtle">{title}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-v-primary">Competition Scoring · Live Control</p>
+        <h2 className="mt-1 text-xl font-semibold tracking-tight text-v-text">{title}</h2>
       </div>
-      <div className="flex gap-2 text-sm">
+      <div className="flex flex-wrap gap-2 text-sm">
         <Link
           to={`/organizer/competition/events/${eventId}/contestants`}
-          className="rounded-lg border border-v-border px-3 py-1.5 text-v-text-muted hover:bg-v-surface-elevated"
+          className="inline-flex items-center rounded-lg border border-v-border bg-v-surface px-3 py-2 text-v-text-muted transition hover:border-v-primary/40 hover:bg-v-primary-soft/40 hover:text-v-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary"
         >
           <Users className="h-4 w-4 inline mr-1" /> Contestants
         </Link>
         <Link
           to={`/organizer/competition/events/${eventId}/judges`}
-          className="rounded-lg border border-v-border px-3 py-1.5 text-v-text-muted hover:bg-v-surface-elevated"
+          className="inline-flex items-center rounded-lg border border-v-border bg-v-surface px-3 py-2 text-v-text-muted transition hover:border-v-primary/40 hover:bg-v-primary-soft/40 hover:text-v-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary"
         >
           <Star className="h-4 w-4 inline mr-1" /> Judges
         </Link>
         <Link
           to={`/organizer/competition/events/${eventId}/rankings`}
-          className="rounded-lg border border-v-border px-3 py-1.5 text-v-text-muted hover:bg-v-surface-elevated"
+          className="inline-flex items-center rounded-lg border border-v-border bg-v-surface px-3 py-2 text-v-text-muted transition hover:border-v-primary/40 hover:bg-v-primary-soft/40 hover:text-v-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary"
         >
           Rankings
         </Link>

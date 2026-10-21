@@ -97,6 +97,7 @@ export default function PollingAnalyticsPage() {
 
   return (
     <AnalyticsLayout
+      moduleLabel="polling"
       title="Poll analytics"
       description="Respondents, response rate, question statistics, and rating distributions."
       fullReportTo={`/organizer/polling/events/${eventId}/report`}
@@ -109,17 +110,13 @@ export default function PollingAnalyticsPage() {
       <AnalyticsStatsGrid stats={stats} columns={4} />
 
       <AnalyticsSection
-        title="Participation by program"
-        description="Response rate among registered respondents in each program."
+        title="Participation by program & year"
+        description="Response rate among registered respondents broken down by program and by year & section."
       >
-        <ParticipationTable rows={programParticipation} />
-      </AnalyticsSection>
-
-      <AnalyticsSection
-        title="Participation by year & section"
-        description="The system stores year and section together as one managed cohort field."
-      >
-        <ParticipationTable rows={yearSectionParticipation} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ParticipationTable rows={programParticipation} />
+          <ParticipationTable rows={yearSectionParticipation} />
+        </div>
       </AnalyticsSection>
 
       <AnalyticsSection

@@ -186,12 +186,9 @@ export default function CompetitionEventsPage() {
 
       <div className="flex justify-between">
         <h2 className="text-xl font-semibold text-v-text">Competition Scoring events</h2>
-        <Link
-          to="/organizer/competition/events/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white"
-        >
+        <Link to="/organizer/competition/events/new" className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white">
           <Plus className="h-4 w-4" strokeWidth={2} />
-New event
+          New event
         </Link>
       </div>
 
@@ -204,10 +201,15 @@ New event
         />
       )}
       {error && <div role="alert" className="v-card p-4 space-y-2"><p className="v-error-text">{error}</p><Button variant="secondary" onClick={load}>Retry loading competitions</Button></div>}
-      {!error && events.length === 0 && <p className="v-caption">No competitions yet. Create an event to begin setup.</p>}
+      {!error && events.length === 0 && (
+        <div className="v-card-md">
+          <p className="font-semibold text-v-text">No competitions yet.</p>
+          <p className="mt-1 text-sm text-v-text-muted">Create an event to begin setup.</p>
+        </div>
+      )}
 
       {events.map((event) => (
-        <div
+        <article
           key={event.id}
           className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-border bg-v-surface p-5"
         >
@@ -218,7 +220,7 @@ New event
             >
               {event.title}
             </Link>
-            <div className="mt-1 text-sm text-v-text-subtle capitalize">
+            <div className="mt-1 text-sm capitalize text-v-text-subtle">
               {event.status === 'draft' ? 'Setup — not published' : event.status}
             </div>
           </div>
@@ -263,7 +265,7 @@ New event
               )}
             </Link>
           </div>
-        </div>
+        </article>
       ))}
     </div>
   )

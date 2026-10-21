@@ -77,6 +77,21 @@ function mapPollEvent(row) {
   }
 }
 
+function assertPollExpirationWithinSchedule(pollExpiresAt, startDate, endDate) {
+  if (!pollExpiresAt) return
+
+  const expiration = new Date(pollExpiresAt)
+  if (Number.isNaN(expiration.getTime())) {
+    throw new ApiError(400, 'Invalid poll expiration date')
+  }
+
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || expiration < start || expiration > end) {
+    throw new ApiError(400, 'Poll expiration must be between the start and end dates')
+  }
+}
+
 function mapQuestion(row, options = [], typeDef = null) {
   const out = {
     id: row.id,
@@ -584,6 +599,7 @@ export async function listPollEvents(organizerId, { limit = 200, offset = 0 } = 
 }
 
 export async function createPollEvent(organizerId, payload) {
+  assertPollExpirationWithinSchedule(payload.pollExpiresAt, payload.startDate, payload.endDate)
   const org = await getOrCreatePollingOrganization(organizerId)
 
   const { data, error } = await getClient()
@@ -601,6 +617,7 @@ export async function createPollEvent(organizerId, payload) {
       polling_enabled: false,
       poll_anonymous: Boolean(payload.pollAnonymous),
       poll_allow_multiple_submissions: Boolean(payload.pollAllowMultipleSubmissions),
+      poll_expires_at: payload.pollExpiresAt ?? null,
     })
     .select('*')
     .single()
@@ -626,6 +643,11 @@ export async function updatePollEvent(eventId, organizerId, payload) {
   const event = await assertPollingEvent(eventId, organizerId)
   assertSetupEditable(event)
   assertEventUpdateAllowed(event, payload)
+  assertPollExpirationWithinSchedule(
+    payload.pollExpiresAt !== undefined ? payload.pollExpiresAt : event.poll_expires_at,
+    payload.startDate ?? event.start_date,
+    payload.endDate ?? event.end_date,
+  )
 
   // Capture old image_asset_id before updating so we can clean it up if replaced
   const oldAssetId = event.image_asset_id ?? null
@@ -639,6 +661,7 @@ export async function updatePollEvent(eventId, organizerId, payload) {
   if (payload.pollAllowMultipleSubmissions !== undefined) {
     updates.poll_allow_multiple_submissions = payload.pollAllowMultipleSubmissions
   }
+  if (payload.pollExpiresAt !== undefined) updates.poll_expires_at = payload.pollExpiresAt
   if (payload.banner !== undefined) updates.banner = payload.banner
   if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
 
@@ -1465,7 +1488,7 @@ export async function getPollAnalytics(eventId, organizerId) {
 
   const { data: participantRows, error: participantErr } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('has_responded, users!inner (program, year_section)')
+    .select('id, has_responded, users!inner (id, email, first_name, last_name, school_id, program, year_section)')
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
 
@@ -1548,6 +1571,36 @@ export async function getPollAnalytics(eventId, organizerId) {
     }
   })
 
+  const scope = organizerId ? await getOrganizerScope(organizerId) : null
+  const scoped = scope ? !isAllAccess(scope) : false
+
+  let scopedParticipants = participantRows ?? []
+  if (scoped) {
+    scopedParticipants = scopedParticipants.filter((row) =>
+      isStudentInScope(scope, { program: row.users?.program, yearSection: row.users?.year_section })
+    )
+  }
+
+  const respondentParticipation = scopedParticipants.map((row) => ({
+    id: row.id,
+    schoolId: row.users?.school_id ?? null,
+    firstName: row.users?.first_name ?? '',
+    lastName: row.users?.last_name ?? '',
+    program: row.users?.program ?? 'Unspecified',
+    yearSection: row.users?.year_section ?? 'Unspecified',
+    hasResponded: Boolean(row.has_responded),
+  }))
+
+  respondentParticipation.sort((a, b) => {
+    const progCmp = a.program.localeCompare(b.program, undefined, { numeric: true })
+    if (progCmp !== 0) return progCmp
+    const secCmp = a.yearSection.localeCompare(b.yearSection, undefined, { numeric: true })
+    if (secCmp !== 0) return secCmp
+    const lastCmp = a.lastName.localeCompare(b.lastName, undefined, { numeric: true })
+    if (lastCmp !== 0) return lastCmp
+    return a.firstName.localeCompare(b.firstName, undefined, { numeric: true })
+  })
+
   return {
     totalSubmissions: totalSubmissions ?? 0,
     enrolledRespondents: enrolledRespondents ?? 0,
@@ -1555,6 +1608,7 @@ export async function getPollAnalytics(eventId, organizerId) {
     pollAnonymous: anonymous,
     participationByProgram: participationBy('program'),
     participationByYearSection: participationBy('year_section'),
+    respondentParticipation,
     responseActivity: Array.from(activityByDay.entries()).map(([period, responses]) => ({ period, responses })),
     averageCompletionTimeSeconds,
     questions: questionAnalytics,

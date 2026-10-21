@@ -2,6 +2,9 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import PageantLayout from './PageantLayout'
+import ElectionLayout from './ElectionLayout'
+import PollingLayout from './PollingLayout'
+import TabulationWorkspaceNavigation from '@/components/organizer/competition/TabulationWorkspaceNavigation'
 
 const user = { id: 'owner', role: 'organizer', username: 'Organizer' }
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user }) }))
@@ -23,6 +26,13 @@ function mount(path) {
   render(<MemoryRouter initialEntries={[path]}><Routes>
     <Route path="/organizer/competition/events/:eventId" element={<PageantLayout />}>
       <Route path="*" element={<Page />} />
+    </Route>
+  </Routes></MemoryRouter>)
+}
+function mountSetupLayout(Layout, base, path) {
+  render(<MemoryRouter initialEntries={[path]}><Routes>
+    <Route path={`${base}/:eventId`} element={<Layout />}>
+      <Route path="*" element={<p>Setup form</p>} />
     </Route>
   </Routes></MemoryRouter>)
 }
@@ -64,4 +74,15 @@ test('Tabulation is a single direct destination, without an Overview child', asy
   expect(screen.getByRole('status', { name: 'Current page' })).toHaveTextContent(`${base}/tabulation${context}`)
   expect(within(sidebar).queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument()
   expect(within(sidebar).getByRole('link', { name: 'TABULATION' })).toHaveAttribute('aria-current', 'page')
+})
+
+test.each([
+  [PageantLayout, '/organizer/competition/events'],
+  [ElectionLayout, '/organizer/election/events'],
+  [PollingLayout, '/organizer/polling/events'],
+])('exposes valid Event Details and Branding routes for a new event', async (Layout, base) => {
+  await act(async () => mountSetupLayout(Layout, base, `${base}/new`))
+  expect(screen.getByRole('link', { name: 'Event Details' })).toHaveAttribute('href', `${base}/new`)
+  expect(screen.getByRole('link', { name: 'Branding' })).toHaveAttribute('href', `${base}/new/branding`)
+  expect(screen.getByRole('link', { name: 'Event Details' })).toHaveAttribute('aria-current', 'page')
 })

@@ -16,7 +16,13 @@ import useCompetitionSync from '@/hooks/useCompetitionSync'
 // Review & Publish sits between Judges and Live Control. Publishing a draft hands
 // it to the schedule (draft → scheduled) and locks setup; scoring itself is
 // started later from Live Control. Versioned publication freezes the setup.
-export default function CompetitionReviewPage() { return <NativeSetupBoundary Legacy={LegacyCompetitionReviewPage}/> }
+export default function CompetitionReviewPage() {
+  return (
+    <div data-module="competition-scoring" className="mx-auto max-w-5xl">
+      <NativeSetupBoundary Legacy={LegacyCompetitionReviewPage} />
+    </div>
+  )
+}
 function LegacyCompetitionReviewPage() {
   const { eventId } = useParams()
   const navigate = useNavigate()
@@ -90,7 +96,7 @@ function LegacyCompetitionReviewPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="v-card-md">
         <h2 className="v-page-title">Review &amp; Publish</h2>
         <p className="v-helper-text mt-1">
           Publishing finishes setup and hands the event to its schedule. It does not start scoring —
@@ -99,8 +105,8 @@ function LegacyCompetitionReviewPage() {
         </p>
       </div>
 
-      <div className="v-card-sm">
-        <h3 className="v-label mb-3">{event?.title || 'Untitled event'}</h3>
+      <div className="v-card-md">
+        <h3 className="v-section-title mb-3">{event?.title || 'Untitled event'}</h3>
         <dl className="grid gap-3 sm:grid-cols-3">
           <SummaryStat label="Contestants" value={contestantsCount} />
           <SummaryStat label="Judges" value={judgesCount} />

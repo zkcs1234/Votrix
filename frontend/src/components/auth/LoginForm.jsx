@@ -4,8 +4,8 @@ import AuthFormField from '@/components/auth/AuthFormField'
 import Input from '@/components/ui/Input'
 import PasswordInput from '@/components/ui/PasswordInput'
 import SubmitButton from '@/components/auth/SubmitButton'
-import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
+import Card from '@/components/ui/Card'
 
 export default function LoginForm({
   title,
@@ -18,20 +18,20 @@ export default function LoginForm({
   showForgot = false,
 }) {
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full">
       <h2 className="v-page-title">{title}</h2>
       <p className="v-caption mt-2 leading-relaxed">{description}</p>
 
       <Card padding="md" className="mt-6">
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
-          <AuthFormField label="Email" id="email" error={errors.email?.message}>
+          <AuthFormField label="Email" id="email" required error={errors.email?.message}>
             <div className="relative">
               <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
               <Input id="email" type="email" autoComplete="email" className="pl-9" {...register('email')} />
             </div>
           </AuthFormField>
 
-          <AuthFormField label="Password" id="password" error={errors.password?.message}>
+          <AuthFormField label="Password" id="password" required error={errors.password?.message}>
             <PasswordInput id="password" autoComplete="current-password" {...register('password')} />
           </AuthFormField>
 
@@ -45,10 +45,7 @@ export default function LoginForm({
               Remember me
             </label>
             {showForgot && (
-              <Link
-                to="/forgot-password"
-                className="v-btn-tertiary text-sm"
-              >
+              <Link to="/forgot-password" className="v-btn-tertiary text-sm">
                 Forgot password?
               </Link>
             )}
@@ -56,7 +53,7 @@ export default function LoginForm({
 
           {error && <FormAlert variant="error">{error}</FormAlert>}
 
-          <SubmitButton loading={loading} className="w-full">
+          <SubmitButton loading={loading}>
             <LogIn className="h-4 w-4" strokeWidth={2} />
             Sign in
           </SubmitButton>

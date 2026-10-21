@@ -17,10 +17,10 @@ import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react'
  */
 
 const styles = {
-  success: 'border-v-success/25 bg-v-success-bg text-v-success',
-  error: 'border-v-danger/25 bg-v-danger-bg text-v-danger',
-  warning: 'border-v-warning/25 bg-v-warning-bg text-v-warning',
-  info: 'border-v-border bg-v-surface text-v-text',
+  success: 'border-v-success/30 bg-v-success-bg text-v-success',
+  error: 'border-v-danger/30 bg-v-danger-bg text-v-danger',
+  warning: 'border-v-warning/30 bg-v-warning-bg text-v-warning',
+  info: 'border-v-primary/25 bg-v-info-bg text-v-info',
 }
 
 const icons = {
@@ -53,7 +53,7 @@ export default function FormAlert({
 
   return (
     <div
-      className={`flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm ${styles[variant]} ${className}`}
+      className={`flex items-start gap-2.5 rounded-lg border px-3.5 py-3 text-sm ${styles[variant]} ${className}`}
       role={roles[variant] ?? 'status'}
     >
       <Icon className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />

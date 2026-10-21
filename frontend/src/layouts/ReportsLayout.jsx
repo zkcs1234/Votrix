@@ -1,8 +1,10 @@
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, LayoutDashboard } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 
 const navItems = [
-  { label: 'Overview', path: '/organizer/reports', icon: BarChart3 },
+  { section: 'Workspace' },
+  { label: 'Overview', path: '/organizer', icon: LayoutDashboard },
+  { label: 'Reports', path: '/organizer/reports', icon: BarChart3 },
 ]
 
 export default function ReportsLayout() {
@@ -10,6 +12,7 @@ export default function ReportsLayout() {
     <AppShell
       title="Analytics & reports"
       moduleLabel="Reports"
+      headerLabel="Organizer"
       homeLink="/organizer/reports"
       navItems={navItems}
       footerLink={{ to: '/organizer', label: '← Organizer home' }}

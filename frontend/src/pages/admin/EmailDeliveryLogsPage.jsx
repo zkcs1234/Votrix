@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import FormAlert from '@/components/ui/FormAlert'
+import PageHeader from '@/components/ui/PageHeader'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 
 const PAGE_SIZE = 50
@@ -66,16 +67,16 @@ export default function EmailDeliveryLogsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="v-page-title">Email Delivery</h1>
-          <p className="v-caption">Provider send and delivery status history. Provider credentials and raw payloads are not shown.</p>
-        </div>
-        <Button variant="secondary" onClick={() => setRefreshKey((key) => key + 1)} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        title="Email Delivery"
+        description="Provider send and delivery status history. Provider credentials and raw payloads are not shown."
+        actions={
+          <Button variant="secondary" onClick={() => setRefreshKey((key) => key + 1)} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        }
+      />
 
       <Card>
         <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -127,7 +128,7 @@ export default function EmailDeliveryLogsPage() {
         ) : (
           <>
             <div className="v-table-wrap">
-              <table className="v-table">
+              <table className="v-table min-w-[900px]">
                 <thead>
                   <tr>
                     <th>Time</th><th>Recipient</th><th>Workflow</th><th>Subject</th><th>Status</th><th>Details</th>

@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import ElectionEventFormPage from './ElectionEventFormPage'
 
@@ -65,6 +65,17 @@ it('accepts native date inputs and submits the ISO payload only on Create & cont
     title: 'Picker acceptance election', description: '',
     startDate: day.toISOString(), endDate: end.toISOString(), resultsVisibility: 'public',
   })
+})
+
+it('shows the shared numbered setup progress on election details', () => {
+  renderForm()
+  const progress = screen.getByRole('navigation', { name: 'Event setup progress' })
+  expect(within(progress).getByText('Details')).toBeInTheDocument()
+  expect(within(progress).getByText('Branding')).toBeInTheDocument()
+  expect(within(progress).queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Next: Branding' })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'Your setup journey' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'Draft protection' })).not.toBeInTheDocument()
 })
 
 it('retains the existing same-day end-before-start validation', async () => {

@@ -233,6 +233,17 @@ export function buildElectionReportSheets(report) {
       })),
     },
     {
+      name: 'Voter participation',
+      rows: (report?.voterParticipation ?? []).map((v) => ({
+        'Student ID': v.schoolId || 'N/A',
+        'Last Name': v.lastName || '',
+        'First Name': v.firstName || '',
+        'Program': v.program || '',
+        'Year & Section': v.yearSection || '',
+        'Status': v.hasVoted ? 'Voted' : 'Not voted',
+      })),
+    },
+    {
       name: 'Candidates',
       rows: (voteSummary.candidateResults ?? []).map((c) => ({
         position: c.positionName ?? '',
@@ -271,6 +282,16 @@ export function buildElectionReportCsvRows(report) {
         votePercentage: c.votePercentage,
       })
     }
+  }
+  for (const v of report?.voterParticipation ?? []) {
+    rows.push({
+      reportSection: 'Voter participation',
+      schoolId: v.schoolId || 'N/A',
+      name: `${v.lastName ? `${v.lastName}, ` : ''}${v.firstName || ''}`.trim(),
+      program: v.program || '',
+      yearSection: v.yearSection || '',
+      status: v.hasVoted ? 'Voted' : 'Not voted',
+    })
   }
   return rows
 }

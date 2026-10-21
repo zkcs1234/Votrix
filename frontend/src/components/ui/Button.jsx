@@ -1,11 +1,14 @@
+// Figma "Button / Primary · Secondary · Ghost · Destructive" specimens.
+// Radius 8px, 40px desktop height (44px on coarse pointers), visible focus ring.
 const variants = {
   primary:
     'bg-v-primary text-white hover:bg-v-primary-hover focus-visible:ring-v-primary disabled:opacity-50',
   brand:
-    'bg-v-primary text-white hover:bg-v-primary-hover focus-visible:ring-v-primary disabled:opacity-50 shadow-sm hover:shadow-md hover:-translate-y-px active:translate-y-0',
+    'bg-v-primary text-white hover:bg-v-primary-hover focus-visible:ring-v-primary shadow-sm hover:shadow-md hover:-translate-y-px active:translate-y-0',
   secondary:
     'border border-v-border-strong bg-v-surface text-v-text hover:bg-v-surface-elevated',
-  ghost: 'text-v-text-muted hover:bg-v-surface-elevated',
+  ghost:
+    'text-v-text-muted hover:bg-v-surface-elevated',
   danger:
     'bg-v-danger text-white hover:opacity-90 focus-visible:ring-v-danger disabled:opacity-50',
 }
@@ -30,9 +33,9 @@ export default function Button({
     <button
       type={type}
       disabled={disabled || loading}
-      className={`v-press inline-flex items-center justify-center gap-2 rounded-lg font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-v-bg ${variants[variant]} ${sizes[size]} ${className}`}
+      aria-busy={loading || undefined}
+      className={`v-press inline-flex items-center justify-center gap-2 rounded-lg font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-v-bg ${variants[variant] ?? variants.primary} ${sizes[size] ?? sizes.md} ${className}`}
       {...props}
-
     >
       {loading && (
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />

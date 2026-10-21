@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Trophy, UserPlus, Upload, Download, Pencil, ShieldOff, UserCheck, ChevronDown, UserMinus } from 'lucide-react'
+import { Trophy, UserPlus, Upload, Download, Pencil, ShieldOff, UserCheck, ChevronDown } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -8,6 +8,7 @@ import Badge from '@/components/ui/Badge'
 import FormAlert from '@/components/ui/FormAlert'
 import SearchInput from '@/components/ui/SearchInput'
 import StatCard from '@/components/ui/StatCard'
+import PageHeader from '@/components/ui/PageHeader'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
@@ -77,7 +78,7 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
   }
 
   return (
-    <Modal open onClose={onClose} title={isEdit ? 'Edit Competition Judge' : 'Add Competition Judge'} size="md">
+    <Modal open onClose={onClose} title={isEdit ? 'Edit Judge' : 'Add Judge'} size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="v-label">Email</label>
@@ -159,7 +160,7 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
 
         <div className="flex justify-end gap-2 border-t border-v-border pt-4">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={saving}>{isEdit ? 'Save changes' : 'Add Competition Judge'}</Button>
+          <Button type="submit" loading={saving}>{isEdit ? 'Save changes' : 'Add Judge'}</Button>
         </div>
       </form>
     </Modal>
@@ -241,8 +242,6 @@ export default function JudgesPanel() {
   const [statusFilter, setStatusFilter] = useState('active')
   const [modal, setModal] = useState(null)
   const [statusTarget, setStatusTarget] = useState(null)
-  const [removeTarget, setRemoveTarget] = useState(null)
-  const [removing, setRemoving] = useState(false)
   const [preview, setPreview] = useState(null)
   const [registering, setRegistering] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -328,28 +327,13 @@ export default function JudgesPanel() {
     setSavingId(judge.id)
     try {
       await adminService.updateJudgeStatus(judge.id, accountStatus)
-      success(`Competition Judge account ${accountStatus}`)
+      success(`Judge account ${accountStatus}`)
       setStatusTarget(null)
       await fetchJudges()
     } catch (err) {
       toastError(getErrorMessage(err, 'Failed to update status'))
     } finally {
       setSavingId(null)
-    }
-  }
-
-  const handleRemoveFromPool = async () => {
-    if (!removeTarget) return
-    setRemoving(true)
-    try {
-      await adminService.removeJudgeMembership(removeTarget.id)
-      success('Competition Judge removed from this pool')
-      setRemoveTarget(null)
-      await fetchJudges()
-    } catch (err) {
-      toastError(getErrorMessage(err, 'Failed to remove judge membership'))
-    } finally {
-      setRemoving(false)
     }
   }
 
@@ -366,14 +350,11 @@ export default function JudgesPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="v-page-title">Competition Judges</h1>
-          <p className="v-caption">
-            Register competition judges. Organizers pick them from this pool when setting up a competition.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <PageHeader
+        title="Competition Judges"
+        description="Register competition judges. Organizers pick them from this pool when setting up a competition."
+        actions={
+          <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={downloadTemplate}>
             <Download className="h-4 w-4" strokeWidth={1.5} /> Template
           </Button>
@@ -385,18 +366,19 @@ export default function JudgesPanel() {
           </Button>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFile} />
           <Button onClick={() => setModal({ mode: 'add' })}>
-            <UserPlus className="h-4 w-4" strokeWidth={2} /> Add participant
+            <UserPlus className="h-4 w-4" strokeWidth={2} /> Add Judge
           </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard label="Competition Judges (this view)" value={total} icon={Trophy} />
         <StatCard label="Active" value={summary.active} icon={UserCheck} />
         <StatCard label="Suspended" value={summary.suspended} icon={ShieldOff} />
       </div>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div className="grid gap-3 sm:grid-cols-2 lg:flex lg:items-center">
         <SearchInput
           placeholder="Search name or email"
           value={search}
@@ -426,7 +408,7 @@ export default function JudgesPanel() {
           </div>
         ) : (
           <div className="v-table-wrap">
-            <table className="v-table">
+            <table className="v-table min-w-[760px]">
               <thead>
                 <tr>
                   <th>Name</th><th>Email</th><th>Expertise</th><th>Status</th><th className="text-right">Actions</th>
@@ -461,9 +443,6 @@ export default function JudgesPanel() {
                             Archive
                           </Button>
                         )}
-                        <Button size="sm" variant="ghost" onClick={() => setRemoveTarget(v)} title="Remove Competition Judge pool membership">
-                          <UserMinus className="h-4 w-4" strokeWidth={1.5} /> Remove from pool
-                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -489,24 +468,11 @@ export default function JudgesPanel() {
           name: fullName(statusTarget.user),
           email: statusTarget.user.email,
         } : null}
-        accountType="Competition Judge"
+        accountType="Judge"
         onClose={() => setStatusTarget(null)}
         onConfirm={() => handleStatus(statusTarget.user, statusTarget.accountStatus)}
         loading={Boolean(savingId)}
       />
-
-      <Modal open={Boolean(removeTarget)} onClose={() => setRemoveTarget(null)} title="Remove Competition Judge membership?" size="sm">
-        <div className="space-y-4">
-          <p className="text-sm text-v-text">
-            {removeTarget ? `${fullName(removeTarget)} (${removeTarget.email}) will no longer be available for future competition selection.` : ''}
-          </p>
-          <p className="v-caption">The account, its other participant types, and existing event history remain unchanged. Existing event enrollment is not removed.</p>
-          <div className="flex justify-end gap-2 border-t border-v-border pt-4">
-            <Button type="button" variant="secondary" onClick={() => setRemoveTarget(null)}>Cancel</Button>
-            <Button type="button" variant="danger" onClick={handleRemoveFromPool} loading={removing}>Remove from pool</Button>
-          </div>
-        </div>
-      </Modal>
 
       {preview && (
         <CsvPreviewModal

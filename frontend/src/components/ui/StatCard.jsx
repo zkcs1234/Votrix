@@ -1,3 +1,4 @@
+// Figma stat tile: small caption on top, large number, optional supporting hint.
 export default function StatCard({
   label,
   value,

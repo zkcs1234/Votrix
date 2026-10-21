@@ -1,9 +1,6 @@
 .v-judge-sheet {
-  --judge-header-bg: #192C65;
-  --judge-subheader-bg: #7186B3;
-  --judge-medium-navy-shadow: #8F9BBC;
-  --judge-grid-border: var(--judge-medium-navy-shadow);
-  border: 1.5px solid var(--judge-grid-border);
+  --judge-grid-border: color-mix(in srgb, var(--v-primary) 14%, var(--v-border));
+  border: 1px solid var(--judge-grid-border);
   border-radius: 12px;
   background: var(--v-surface);
   overflow: hidden;
@@ -12,10 +9,8 @@
 .v-judge-sheet-scroll:focus-visible { outline: 2px solid var(--v-primary); outline-offset: -2px; }
 .v-judge-sheet table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; color: var(--v-text); }
 .v-judge-sheet caption { padding: 0; }
-.v-judge-sheet thead { position: sticky; top: 0; z-index: 20; background: var(--judge-header-bg); }
-.v-judge-sheet th, .v-judge-sheet td { border-right: 1.5px solid var(--judge-grid-border); border-bottom: 1.5px solid var(--judge-grid-border); }
-.v-judge-sheet thead th { border-color: var(--judge-medium-navy-shadow); background: var(--judge-header-bg); color: #fff; }
-.v-judge-sheet thead tr:nth-child(2) th { background: var(--judge-subheader-bg); }
+.v-judge-sheet thead { position: sticky; top: 0; z-index: 20; background: var(--v-surface-elevated); }
+.v-judge-sheet th, .v-judge-sheet td { border-right: 1px solid var(--judge-grid-border); border-bottom: 1px solid var(--judge-grid-border); }
 .v-judge-sheet tr > :last-child { border-right: 0; }
 .v-judge-sheet tbody tr:last-child > * { border-bottom: 0; }
 .v-judge-sheet th { background: var(--v-surface-elevated); }
@@ -23,17 +18,10 @@
 .v-judge-major-name { display: block; color: var(--v-primary); font-size: 11px; line-height: 1.5; font-weight: 700; text-transform: uppercase; letter-spacing: .025em; }
 .v-judge-major-weight { display: block; color: var(--v-primary); font-size: 15px; line-height: 1.5; font-weight: 700; }
 .v-judge-closed-label { display: block; font-size: 10px; color: var(--v-text-subtle); font-weight: 400; }
-.v-judge-sheet thead .v-judge-major-name,
-.v-judge-sheet thead .v-judge-major-weight,
-.v-judge-sheet thead .v-judge-closed-label,
-.v-judge-sheet thead .v-judge-range,
-.v-judge-sheet thead .v-judge-deduction-header-item > strong { color: #fff; }
-.v-judge-sheet thead tr:nth-child(2) th { color: #101828; font-size: 12px; font-weight: 650; }
-.v-judge-sheet thead tr:nth-child(2) .v-judge-range { color: #101828; font-size: 11px; font-weight: 600; }
 .v-judge-sheet .v-judge-minor { min-width: 132px; max-width: 180px; padding: 11px 10px; text-align: center; font-size: 11px; line-height: 1.45; font-weight: 500; }
 .v-judge-range { display: block; margin-top: 4px; color: var(--v-text-subtle); font-size: 11px; font-weight: 400; }
 .v-judge-sheet .v-judge-contestant { position: sticky; left: 0; z-index: 10; width: 240px; min-width: 240px; max-width: 240px; padding: 16px 14px; }
-.v-judge-sheet thead .v-judge-contestant { z-index: 30; text-align: left; background: var(--judge-header-bg); }
+.v-judge-sheet thead .v-judge-contestant { z-index: 30; text-align: left; background: var(--v-surface-elevated); }
 .v-judge-sheet tbody td { background: var(--judge-row-bg, var(--v-surface)); }
 .v-judge-sheet .v-judge-score-cell { padding: 16px 10px; text-align: center; vertical-align: top; }
 .v-judge-sheet .v-judge-status { width: 116px; min-width: 116px; padding: 12px 8px; text-align: center; }
@@ -51,8 +39,9 @@
 .v-judge-deduction-readonly li { display: grid; gap: .1rem; }
 .v-judge-sheet .v-judge-deduction-col { width: 19%; }
 .v-judge-identity { display: flex; align-items: center; gap: 10px; }
-.v-judge-sheet .v-judge-number { display: flex; flex: 0 0 44px; flex-direction: column; align-items: center; justify-content: center; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 3px; border-radius: 2px; background: var(--judge-number-bg, #526A9E); color: var(--judge-number-color, #fff); font-size: 13px; font-weight: 750; line-height: 1.35; }
-.v-judge-sheet .v-judge-number small { color: #fff; font-size: 10px; font-weight: 600; }
+.v-judge-number { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 36px; min-height: 44px; padding: 4px; border-radius: 8px; background: color-mix(in srgb, var(--judge-accent, var(--v-primary)) 13%, var(--v-surface)); color: var(--judge-accent, var(--v-primary)); font-size: 13px; font-weight: 700; line-height: 1.4; }
+.v-judge-number small { font-size: 10px; font-weight: 500; }
+.v-judge-sheet tr[data-division-tone='neutral'] .v-judge-number { color: var(--v-text-muted); }
 .v-judge-photo { width: 40px; height: 44px; flex-shrink: 0; border-radius: 8px; object-fit: cover; background: var(--v-surface-elevated); }
 .v-judge-name { font-size: 12px; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
 .v-judge-division-label { display: block; width: fit-content; margin-top: 3px; padding: 1px 7px; border-radius: 5px; color: var(--judge-accent, var(--v-text-muted)); background: color-mix(in srgb, var(--judge-accent, var(--v-primary)) 10%, var(--v-surface)); font-size: 10px; font-weight: 650; }

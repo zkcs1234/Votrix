@@ -197,6 +197,7 @@ export async function getElectionReport(eventId, organizerId) {
     },
     participationByProgram: analytics.participationByProgram ?? [],
     participationByYearSection: analytics.participationByYearSection ?? [],
+    voterParticipation: analytics.voterParticipation ?? [],
     voteSummary: {
       liveTotalVotes: analytics.liveTotalVotes,
       candidateResults: analytics.candidateResults,
@@ -298,6 +299,7 @@ export async function getPollingReport(eventId, organizerId) {
     },
     participationByProgram: analytics.participationByProgram ?? [],
     participationByYearSection: analytics.participationByYearSection ?? [],
+    respondentParticipation: analytics.respondentParticipation ?? [],
     responseActivity: analytics.responseActivity ?? [],
     questions: analytics.questions,
   }

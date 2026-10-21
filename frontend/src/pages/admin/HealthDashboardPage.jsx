@@ -4,7 +4,9 @@ import { RefreshCw, CheckCircle2, XCircle, AlertCircle, Database, Cloud, Mail } 
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import Badge from '@/components/ui/Badge'
 import FormAlert from '@/components/ui/FormAlert'
+import PageHeader from '@/components/ui/PageHeader'
 
 const SERVICE_ICONS = {
   database: Database,
@@ -22,6 +24,11 @@ function statusBg(status) {
   if (status === 'healthy') return 'border-v-success/30 bg-v-success-bg'
   if (status === 'degraded') return 'border-v-warning/30 bg-v-warning-bg'
   return 'border-v-danger/30 bg-v-danger-bg'
+}
+
+function StatusBadge({ status }) {
+  const tone = status === 'healthy' ? 'success' : status === 'degraded' ? 'warning' : status === 'down' ? 'danger' : 'default'
+  return <Badge tone={tone} dot className="capitalize">{status || 'Unknown'}</Badge>
 }
 
 export default function HealthDashboardPage() {
@@ -44,18 +51,25 @@ export default function HealthDashboardPage() {
 
   useEffect(() => { fetchHealth() }, [fetchHealth])
 
+  const database = health?.services?.find((service) => service.service === 'database')
+  const schemaStatus = database?.schemaReady === true
+    ? { label: 'Ready', tone: 'success' }
+    : database?.schemaReady === false
+      ? { label: 'Needs migrations', tone: 'warning' }
+      : { label: 'Not reported', tone: 'default' }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="v-page-title">System Health</h1>
-          <p className="v-caption">Live status of platform services.</p>
-        </div>
-        <Button size="sm" variant="secondary" onClick={fetchHealth} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={2} />
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        title="System Health"
+        description="Live status of platform services."
+        actions={
+          <Button size="sm" variant="secondary" onClick={fetchHealth} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={2} />
+            Refresh
+          </Button>
+        }
+      />
 
       {error && (
         <FormAlert variant="error">{error}</FormAlert>
@@ -72,7 +86,7 @@ export default function HealthDashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {loading && !health
           ? Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-28 animate-pulse rounded-xl bg-v-surface-elevated" />
@@ -87,9 +101,6 @@ export default function HealthDashboardPage() {
                       <div>
                         <p className="font-medium capitalize text-v-text">{svc.service}</p>
                         {svc.message && <p className="v-caption mt-0.5">{svc.message}</p>}
-                        {svc.schemaReady === false && (
-                          <p className="v-caption mt-0.5 text-v-warning">Schema not ready — run migrations</p>
-                        )}
                       </div>
                     </div>
                     <StatusIcon status={svc.status} />
@@ -98,6 +109,36 @@ export default function HealthDashboardPage() {
               )
             })}
       </div>
+
+      {health && (
+        <section aria-labelledby="schema-readiness-title" className="space-y-3">
+          <div>
+            <h2 id="schema-readiness-title" className="text-base font-semibold text-v-text">Database schema readiness</h2>
+            <p className="v-caption mt-1">Readiness reflects the checks reported by the health service.</p>
+          </div>
+          <Card padding="sm">
+            <div className="v-table-wrap">
+              <table className="v-table min-w-120">
+                <thead>
+                  <tr><th>Check</th><th>Status</th><th>Details</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="font-medium text-v-text">Database connection</td>
+                    <td><StatusBadge status={database?.status ?? 'unknown'} /></td>
+                    <td>{database?.message || 'No additional details reported.'}</td>
+                  </tr>
+                  <tr>
+                    <td className="font-medium text-v-text">Database schema</td>
+                    <td><Badge tone={schemaStatus.tone}>{schemaStatus.label}</Badge></td>
+                    <td>{database?.schemaReady === false ? 'Run the database migrations before using the platform.' : 'Schema readiness is only shown when reported by the health service.'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </section>
+      )}
     </div>
   )
 }

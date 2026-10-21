@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import { validatePollAnswers } from '@/utils/pollValidation'
 import { getDraftStorageKey } from '@/utils/draftStorage'
@@ -8,8 +8,10 @@ import FormAlert from '@/components/ui/FormAlert'
 import Button from '@/components/ui/Button'
 import PollQuestionField from '@/components/voter/polling/PollQuestionField'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
+import VoterDashboardLink from '@/components/voter/VoterDashboardLink'
 import { useAuth } from '@/hooks/useAuth'
 import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
+import { getErrorMessage } from '@/utils/getErrorMessage'
 
 export default function VoterPollPage() {
   const { eventId } = useParams()
@@ -45,12 +47,17 @@ export default function VoterPollPage() {
     }
   }, [draftRestored])
 
-  const loadPoll = useCallback(() => {
-    return pollingService.getPoll(eventId).then(({ data }) => {
+  const loadPoll = useCallback(async () => {
+    setError(null)
+    try {
+      const { data } = await pollingService.getPoll(eventId)
       setPoll(data)
       if (!data.canSubmit && data.submissionCount > 0) setDone(true)
       return data
-    })
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load poll'))
+      return null
+    }
   }, [eventId])
 
   useEffect(() => {
@@ -108,8 +115,11 @@ export default function VoterPollPage() {
     setDone(false)
     setAnswers({})
     setLoading(true)
-    await loadPoll()
-    setLoading(false)
+    try {
+      await loadPoll()
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (loading) {
@@ -120,9 +130,23 @@ export default function VoterPollPage() {
     )
   }
 
+  if (error && !poll) {
+    return (
+      <div data-module="polling" className="mx-auto max-w-lg space-y-4">
+        <FormAlert variant="error">{error}</FormAlert>
+        <Button variant="secondary" onClick={() => {
+          setLoading(true)
+          loadPoll().finally(() => setLoading(false))
+        }}>
+          Retry loading poll
+        </Button>
+      </div>
+    )
+  }
+
   if (done) {
     return (
-      <div className="mx-auto max-w-lg rounded-2xl border border-v-success/30 bg-v-success-bg p-8 text-center">
+      <div data-module="polling" className="mx-auto max-w-lg rounded-2xl border border-v-success/30 bg-v-success-bg p-8 text-center">
         <p className="text-lg font-semibold text-v-success">Response submitted</p>
         <p className="mt-2 text-sm text-v-text-subtle">
           Thank you for completing {poll?.event?.title}.
@@ -131,21 +155,19 @@ export default function VoterPollPage() {
           <button
             type="button"
             onClick={handleAnother}
-            className="mt-4 text-v-text-muted text-sm hover:text-v-text"
+            className="mt-4 rounded-lg px-3 py-2 text-sm font-medium text-v-primary hover:bg-v-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary"
           >
             Submit another response
           </button>
         )}
-        <Link to="/participant" className="mt-6 block text-v-text-muted hover:text-v-text">
-          Back to dashboard
-        </Link>
+        <VoterDashboardLink className="mt-5" />
       </div>
     )
   }
 
   if (!poll?.pollOpen) {
     return (
-      <div className="mx-auto max-w-lg v-card p-8 text-center">
+      <div data-module="polling" className="mx-auto max-w-lg v-card p-8 text-center">
         <p className="text-v-text">This poll is closed or has expired.</p>
         {poll?.event?.startDate && poll?.event?.endDate && (
           <p className="mt-2 text-sm text-v-text-subtle">
@@ -163,20 +185,16 @@ export default function VoterPollPage() {
           </p>
         )}
 
-        <Link to="/participant" className="mt-4 inline-block text-v-text-muted">
-          Back to dashboard
-        </Link>
+        <VoterDashboardLink className="mt-5" />
       </div>
     )
   }
 
   if (!poll?.canSubmit) {
     return (
-      <div className="mx-auto max-w-lg v-card p-8 text-center">
+      <div data-module="polling" className="mx-auto max-w-lg v-card p-8 text-center">
         <p className="text-v-text">You have already responded to this poll.</p>
-        <Link to="/participant" className="mt-4 inline-block text-v-text-muted">
-          Back to dashboard
-        </Link>
+        <VoterDashboardLink className="mt-5" />
       </div>
     )
   }
@@ -192,7 +210,7 @@ export default function VoterPollPage() {
       visible on mobile.
     */
     <FullscreenVotingShell>
-    <form onSubmit={handleSubmit} className="fixed inset-0 z-50 flex flex-col h-[100dvh] bg-v-surface">
+    <form onSubmit={handleSubmit} data-module="polling" className="fixed inset-0 z-50 flex h-dvh flex-col bg-v-surface">
       {/* ===== FIXED TOP: Floating progress card (does not scroll) ===== */}
       <div className="shrink-0">
         <div className="mx-auto max-w-2xl px-4 pt-3 pb-1 md:px-8">
@@ -235,9 +253,9 @@ export default function VoterPollPage() {
           )}
 
           <VoterEventHeader event={poll.event} eyebrow="Poll">
-            {voterName && <p className="text-sm font-medium text-white/75">Responding as {voterName}</p>}
+            {voterName && <p>Responding as {voterName}</p>}
             {poll.event.pollAnonymous && (
-              <p className="text-xs font-medium text-white/70">Your responses are anonymous.</p>
+              <p>Your responses are anonymous.</p>
             )}
           </VoterEventHeader>
 

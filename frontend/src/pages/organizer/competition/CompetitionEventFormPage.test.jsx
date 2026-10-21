@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import CompetitionEventFormPage from './CompetitionEventFormPage'
 import { pageantService } from '@/services/pageant.service'
@@ -70,6 +70,16 @@ it('competition type is a separate required third step and validates a custom ty
   fireEvent.click(screen.getByRole('button', { name: 'Next: Competitions / Categories' }))
   await screen.findByText('Enter a competition type.')
   expect(draftService.publishDraft).not.toHaveBeenCalled()
+})
+it('shows the numbered setup progress on event details without bypassing form navigation', () => {
+  open()
+  const progress = screen.getByRole('navigation', { name: 'Event setup progress' })
+  expect(within(progress).getByText('Event Details')).toBeInTheDocument()
+  expect(within(progress).getByText('Branding')).toBeInTheDocument()
+  expect(within(progress).queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Next: Branding' })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'Your setup journey' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'Draft protection' })).not.toBeInTheDocument()
 })
 it('failed draft save retains Details and typed values for retry', async () => {
   drafts.saveDraft.mockRejectedValueOnce({ response: { data: { message: 'Draft service unavailable' } } })

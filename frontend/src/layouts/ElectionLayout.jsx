@@ -1,18 +1,22 @@
 import { useParams, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, CalendarDays, Users, BarChart3, MapPin, Rocket, FileText,
+  LayoutDashboard, CalendarDays, Users, BarChart3, MapPin, Rocket, FileText, Settings2,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
+import { stagePath } from '@/utils/eventStages'
 
 // Grouped into Setup → Results so the sidebar follows the workflow order,
 // matching the Competition module's grouped layout. Routes are unchanged.
 const BASE = '/organizer/election/events'
 const navItems = [
+  { section: 'Overview' },
   { label: 'Dashboard', path: '/organizer/election', icon: LayoutDashboard },
   { label: 'Events', path: '/organizer/election/events', icon: CalendarDays },
 
   { section: 'Setup' },
+  { label: 'Event Details', path: 'edit', icon: Settings2, scoped: true, basePath: BASE, hrefTemplate: (eventId) => stagePath('election', 'details', eventId), isActive: (location, eventId) => location.pathname === stagePath('election', 'details', eventId) },
+  { label: 'Branding', path: 'branding', icon: Settings2, scoped: true, basePath: BASE, hrefTemplate: (eventId) => stagePath('election', 'branding', eventId) },
   { label: 'Positions', path: 'positions', icon: MapPin, scoped: true, basePath: BASE },
   { label: 'Candidates', path: 'candidates', icon: Users, scoped: true, basePath: BASE },
   { label: 'Voters', path: 'voters', icon: Users, scoped: true, basePath: BASE },
@@ -36,6 +40,7 @@ export default function ElectionLayout() {
     <AppShell
       title="Election management"
       moduleLabel="Election"
+      headerLabel="Election"
       homeLink="/organizer/election"
       navItems={items}
       eventId={eventId}
