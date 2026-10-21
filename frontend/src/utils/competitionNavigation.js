@@ -1,6 +1,6 @@
 export function competitionNavigationHref(href, eventId, location) {
   const base = `/organizer/competition/events/${eventId}/`
-  const isWorkspace = path => ['live', 'scoring', 'results', 'advancement', 'audit', 'tabulation'].some(section => path === `${base}${section}`) || path.startsWith(`${base}tabulation/`)
+  const isWorkspace = path => ['live', 'scoring', 'results', 'adjustments', 'advancement', 'audit', 'tabulation'].some(section => path === `${base}${section}`) || path.startsWith(`${base}tabulation/`)
   if (!isWorkspace(location.pathname) || !isWorkspace(href)) return href
   const current = new URLSearchParams(location.search)
   const context = new URLSearchParams()

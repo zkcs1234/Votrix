@@ -137,6 +137,19 @@ test('existing Pageant divisions get one shared scoring competition on selection
   expect(screen.getByRole('heading', { name: 'Pageant' })).toBeInTheDocument()
 })
 
+test('published Pageant setup stays readable without creating a missing scoring competition', async () => {
+  f.event = { id: 'event', status: 'scheduled', competitionType: 'pageant', divisionsEnabled: true }
+  f.divisions = [{ id: 'women', name: 'Women' }, { id: 'men', name: 'Men' }]
+  renderPage()
+
+  expect(await screen.findByText('0 selected')).toBeInTheDocument()
+  expect(screen.getByText('This event is no longer a draft, so its competition setup is locked.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Add a custom division/ })).toBeDisabled()
+  expect(screen.getByRole('checkbox', { name: 'Women' })).toBeDisabled()
+  expect(f.createCompetition).not.toHaveBeenCalled()
+  expect(f.createDivision).not.toHaveBeenCalled()
+})
+
 test('non-pageant preset choices continue to create separate competitions', async () => {
   f.event.competitionType = 'dance'
   f.listDivisions.mockClear()

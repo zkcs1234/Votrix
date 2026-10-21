@@ -368,6 +368,18 @@ it('guards the hidden category route as read-only for frozen official rules', as
   expect(screen.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled()
   expect(pageantService.createCategory).not.toHaveBeenCalled()
 })
+it('keeps a published rounds and scoring workspace navigable but read-only', async () => {
+  foundation.event.status = 'scheduled'
+  useEventStatus.mockReturnValue({ status: 'scheduled', setupLocked: true, loading: false })
+  await openWorkspace()
+
+  expect(screen.queryByRole('form', { name: 'Create Round' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: 'Criteria', exact: true }))
+  expect(await screen.findByRole('heading', { name: 'Scoring Criteria' })).toBeInTheDocument()
+  expect(pageantService.createRound).not.toHaveBeenCalled()
+  expect(pageantService.createCriteria).not.toHaveBeenCalled()
+})
+
 it('uses one atomic division reorder call and reports failure without partial PATCH writes', async () => {
   foundation.event.divisions_enabled = true
   foundation.divisions = [{ id: 'a', name: 'Men', isActive: true }, { id: 'b', name: 'Women', isActive: true }]

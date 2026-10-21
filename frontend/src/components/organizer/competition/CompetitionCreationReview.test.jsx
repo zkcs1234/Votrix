@@ -16,6 +16,24 @@ beforeEach(()=>{
 })
 const show=()=>render(<MemoryRouter initialEntries={['/review']}><Routes><Route path="/review" element={<CompetitionCreationReview eventId="event"/>}/><Route path="/organizer/competition/events/event/published" element={<p>Event Published</p>}/><Route path="/organizer/competition/events/event/live" element={<p>Live Control handoff</p>}/></Routes></MemoryRouter>)
 describe('event-wide competition review',()=>{
+ it('allows publication retry after setup freezes but the event remains a draft',async()=>{
+  service.complete.mockRejectedValueOnce({response:{data:{message:'Competition creation completed, but publication failed. Retry Review & Publish to finish.'}}})
+  const draft={title:'Campus arts',competitionType:'other',startDate:'2030-01-01',endDate:'2030-01-02',status:'draft'}
+  service.parentReview.mockResolvedValueOnce({data:{parentReviewToken,event:draft}})
+   .mockResolvedValue({data:{parentReviewToken,event:{...draft,competitionCreatedAt:'2030-01-01T00:00:00Z'}}})
+  show();await screen.findByText('Dance')
+  fireEvent.click(screen.getByRole('checkbox'))
+  fireEvent.click(screen.getByRole('button',{name:'Review & Publish Event'}))
+  await screen.findByText(/Competition creation completed, but publication failed/)
+  expect(screen.getByRole('checkbox')).not.toBeChecked()
+  expect(screen.queryByText(/This published event setup is read-only/)).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Reload review'}))
+  await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  fireEvent.click(screen.getByRole('checkbox'))
+  fireEvent.click(screen.getByRole('button',{name:'Review & Publish Event'}))
+  await screen.findByText('Event Published')
+  expect(service.complete).toHaveBeenCalledTimes(2)
+ })
  it('blocks the event when any independent competition lacks scoring',async()=>{
   service.foundation.mockImplementation((_e,id)=>Promise.resolve({data:{...foundation(children.find(c=>c.id===id)),criteriaReadiness:{allReady:id==='dance'}}}))
   show();await screen.findByText('Complete scoring criteria and calculation settings.');expect(screen.getByRole('button',{name:'Review & Publish Event'})).toBeDisabled();expect(service.complete).not.toHaveBeenCalled()
@@ -31,6 +49,15 @@ describe('event-wide competition review',()=>{
  it('prevents completion without an authoritative parent review token',async()=>{
   service.parentReview.mockResolvedValue({data:{event:{title:'Campus arts'}}})
   show();await screen.findByText('Reload the event review before publishing');expect(screen.getByRole('button',{name:'Review & Publish Event'})).toBeDisabled();expect(service.complete).not.toHaveBeenCalled()
+ })
+ it('keeps a published event reviewable without offering another publish action',async()=>{
+  service.parentReview.mockResolvedValue({data:{event:{title:'Campus arts',competitionType:'other',startDate:'2030-01-01',endDate:'2030-01-02',status:'scheduled'}}})
+  show()
+  expect(await screen.findByText('Dance')).toBeInTheDocument()
+  expect(screen.getByText('This published event setup is read-only. Review the saved event and competition details below.')).toBeInTheDocument()
+  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button',{name:'Review & Publish Event'})).not.toBeInTheDocument()
+  expect(service.complete).not.toHaveBeenCalled()
  })
  it('reviews one Pageant competition instead of legacy division competition records',async()=>{
   const pageant={id:'pageant',event_id:'event',name:'Pageant',competition_type:'pageant',setup_revision:5,input_revision:7,origin:'native'}

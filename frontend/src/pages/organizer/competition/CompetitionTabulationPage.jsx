@@ -3,16 +3,19 @@ import { Navigate, useLocation, useParams } from 'react-router-dom'
 import CompetitionTabulationWorkspace from '@/components/organizer/competition/CompetitionTabulationWorkspace'
 import { NativeTabulationBoundary } from '@/components/organizer/competition/NativeTabulationWorkspace'
 import TabulationWorkspaceNavigation from '@/components/organizer/competition/TabulationWorkspaceNavigation'
-import { TABULATION_WORKSPACES, tabulationWorkspace, tabulationDestination } from '@/utils/tabulationNavigation'
+import { TABULATION_SECTIONS, TABULATION_WORKSPACES, tabulationDestination } from '@/utils/tabulationNavigation'
 
 export default function CompetitionTabulationPage({ workspace = null }) {
-  const { eventId, section = 'overview' } = useParams()
+  const { eventId, section } = useParams()
   const location = useLocation()
+  const activeWorkspace = workspace ?? 'tabulation'
   const group = TABULATION_WORKSPACES.find(item => item.id === workspace)
   const anchor = location.hash.replace('#tabulation-', '')
   const initialSection = group
     ? group.sections.find(item => item.id === anchor)?.id ?? group.sections[0].id
-    : workspace ?? section
+    : activeWorkspace === 'adjustments' ? 'deductions'
+      : activeWorkspace === 'tabulation' ? TABULATION_SECTIONS.find(item => item.id === anchor)?.id ?? 'overview'
+        : activeWorkspace ?? 'overview'
 
   useEffect(() => {
     if (!location.hash.startsWith('#tabulation-')) return
@@ -29,11 +32,16 @@ export default function CompetitionTabulationPage({ workspace = null }) {
     return () => observer.disconnect()
   }, [location.hash, location.pathname])
 
-  if (!workspace && (tabulationWorkspace(section) || ['advancement', 'audit'].includes(section))) {
+  if (workspace === 'scoring') {
+    return <Navigate replace to={tabulationDestination(eventId, 'scoring', location.search)} />
+  }
+  if (!workspace && section) {
     return <Navigate replace to={tabulationDestination(eventId, section, location.search)} />
   }
   return <div className="v-results-workspace min-w-0 space-y-4">
-    <TabulationWorkspaceNavigation eventId={eventId} section={initialSection} workspace={workspace} />
-    <NativeTabulationBoundary eventId={eventId} initialSection={initialSection} workspace={workspace} Legacy={CompetitionTabulationWorkspace} />
+    {(workspace === 'results' || workspace === 'advancement') && (
+      <TabulationWorkspaceNavigation eventId={eventId} section={initialSection} workspace={workspace} />
+    )}
+    <NativeTabulationBoundary eventId={eventId} initialSection={initialSection} workspace={activeWorkspace} Legacy={CompetitionTabulationWorkspace} />
   </div>
 }

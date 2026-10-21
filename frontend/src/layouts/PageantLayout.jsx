@@ -1,7 +1,7 @@
 import { useParams, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, CalendarDays, Users, Star, Award, Play, Settings2, Rocket, FileText, BarChart3,
-  Table2, ListOrdered, History,
+  LayoutDashboard, CalendarDays, Users, Star, Award, Play, Settings2, Rocket,
+  ListOrdered, SlidersHorizontal,
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
@@ -31,24 +31,17 @@ const navItems = [
 
   { section: 'Results & Reporting' },
   {
-    label: 'Tabulation',
+    label: 'TABULATION',
+    path: 'tabulation',
     icon: Award,
     scoped: true,
     basePath: BASE,
-    children: [
-      { label: 'Overview', path: 'tabulation/overview', icon: LayoutDashboard, scoped: true, basePath: BASE,
-        isActive: (location, eventId) => [ `${BASE}/${eventId}/tabulation`, `${BASE}/${eventId}/tabulation/overview` ].includes(location.pathname) },
-    ],
+    isActive: (location, eventId) => location.pathname === `${BASE}/${eventId}/tabulation` || location.pathname.startsWith(`${BASE}/${eventId}/tabulation/`),
   },
-  { label: 'Scoring', path: 'scoring', icon: Table2, scoped: true, basePath: BASE,
-    isActive: (location, eventId) => location.pathname === `${BASE}/${eventId}/scoring` },
-  { label: 'Results', path: 'results', icon: ListOrdered, scoped: true, basePath: BASE,
+  { label: 'RESULTS', path: 'results', icon: ListOrdered, scoped: true, basePath: BASE,
     isActive: (location, eventId) => location.pathname === `${BASE}/${eventId}/results` },
-  { label: 'Round Advancement', path: 'advancement', icon: Rocket, scoped: true, basePath: BASE },
-  { label: 'Audit Trail', path: 'audit', icon: History, scoped: true, basePath: BASE },
-  { label: 'Results & Analysis', path: 'rankings', icon: Award, scoped: true, basePath: BASE },
-  { label: 'Analytics', path: 'analytics', icon: BarChart3, scoped: true, basePath: BASE },
-  { label: 'Report', path: 'report', icon: FileText, scoped: true, basePath: BASE },
+  { label: 'ADJUSTMENTS', path: 'adjustments', icon: SlidersHorizontal, scoped: true, basePath: BASE,
+    isActive: (location, eventId) => location.pathname === `${BASE}/${eventId}/adjustments` },
 ]
 
 export default function PageantLayout() {

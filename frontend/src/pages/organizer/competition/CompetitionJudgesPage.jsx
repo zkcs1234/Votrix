@@ -12,7 +12,7 @@ import JudgeAssignmentPanel from '@/components/organizer/competition/JudgeAssign
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
-import { isParticipantsLocked } from '@/utils/constants'
+import { isSetupLocked } from '@/utils/constants'
 import useCompetitionSync from '@/hooks/useCompetitionSync'
 import useLatestRequest from '@/hooks/useLatestRequest'
 
@@ -52,7 +52,7 @@ function LegacyCompetitionJudgesPage() {
   const beginPoolRead = useLatestRequest(`${eventId}:${search}`)
   const { success, error: showError } = useToast()
 
-  const rosterLocked = loading || !foundation || Boolean(loadError) || isParticipantsLocked(eventStatus) || Boolean(foundation?.event?.official_rules_id ?? foundation?.event?.officialRulesId) || (eventStatus !== 'draft' && !!foundation?.scoringConfig?.confirmed)
+  const rosterLocked = loading || !foundation || Boolean(loadError) || isSetupLocked(eventStatus) || Boolean(foundation?.event?.official_rules_id ?? foundation?.event?.officialRulesId)
   const mutationBusy = picking || Boolean(removingId) || Boolean(roleBusy)
 
   const reload = useCallback(async () => {

@@ -1,0 +1,32 @@
+.ds-settings { --ds-accent: var(--rs-accent, #173568); display: grid; gap: .75rem; min-width: 0; }
+.ds-heading { display: grid; gap: .25rem; }
+.ds-heading .rs-title { font-size: 1rem; }
+.ds-heading p { margin: 0; font-size: .8125rem; line-height: 1.45; }
+.ds-controls { display: grid; gap: .75rem; min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.ds-options { display: grid; gap: .625rem; min-width: 0; }
+.ds-default,.ds-option { position: relative; display: grid; align-items: center; gap: .75rem; margin: 0; border: 1px solid var(--v-border-strong); border-radius: .75rem; background: var(--v-surface); color: var(--v-text); cursor: pointer; box-shadow: none; }
+.ds-default { grid-template-columns: 1.25rem minmax(0,1fr); padding: .625rem .75rem; font-size: .8125rem; }
+.ds-default-label { color: var(--v-text-subtle); }
+.ds-choice-input { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ds-default-check { display: grid; place-items: center; width: 1.25rem; height: 1.25rem; border: 1px solid var(--v-border-strong); border-radius: .3rem; }
+.ds-choice-input:checked + .ds-default-check { border-color: var(--ds-accent); color: #fff; background: var(--ds-accent); }
+.ds-option { grid-template-columns: 2.25rem minmax(0,1fr) 1.25rem; min-height: 4rem; padding: .625rem .75rem; transition: border-color .15s, background-color .15s; }
+.ds-option:hover { border-color: var(--ds-accent); }
+.ds-option[data-selected=true] { border-color: var(--ds-accent); background: color-mix(in srgb, var(--ds-accent) 5%, var(--v-surface)); }
+.ds-icon { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: .625rem; color: var(--ds-accent); background: color-mix(in srgb, var(--ds-accent) 8%, var(--v-surface)); }
+.ds-option[data-selected=true] .ds-icon { color: #fff; background: var(--ds-accent); }
+.ds-copy { display: grid; gap: .2rem; min-width: 0; }
+.ds-option-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .375rem .625rem; }
+.ds-option-heading strong { font-size: .875rem; font-weight: 600; }
+.ds-default-badge { border-radius: 999px; padding: .125rem .5rem; color: var(--ds-accent); background: color-mix(in srgb, var(--ds-accent) 10%, var(--v-surface)); font-size: .6875rem; font-weight: 600; }
+.ds-description { color: var(--v-text-muted); font-size: .8125rem; line-height: 1.45; overflow-wrap: anywhere; }
+.ds-selection { display: grid; place-items: center; width: 1.25rem; height: 1.25rem; border: 1px solid var(--v-border-strong); border-radius: 50%; }
+.ds-option[data-selected=true] .ds-selection { border-color: var(--ds-accent); color: #fff; background: var(--ds-accent); }
+.ds-default:focus-within,.ds-option:focus-within { outline: 2px solid var(--ds-accent); outline-offset: 2px; }
+.ds-default:has(input:disabled),.ds-controls:disabled .ds-option { cursor: not-allowed; opacity: .65; }
+.ds-controls > button { justify-self: start; margin: 0; }
+@media (max-width: 480px) {
+  .ds-default,.ds-option { gap: .5rem; padding: .625rem; }
+  .ds-option { grid-template-columns: 2rem minmax(0,1fr) 1.25rem; }
+  .ds-icon { width: 2rem; height: 2rem; }
+}

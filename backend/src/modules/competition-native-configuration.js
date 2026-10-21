@@ -12,7 +12,8 @@ const name = value => typeof value === 'string' && value.trim().length > 0 && va
 export function validateNativeConfiguration(raw) {
   keys(raw, ['structure', 'rounds', 'criteria', 'scoringConfig'])
   if (!['single', 'multiple'].includes(raw.structure) || !Array.isArray(raw.rounds) || !Array.isArray(raw.criteria)) fail('Choose a single phase or multiple rounds')
-  if (raw.structure === 'single' && raw.rounds.length || raw.structure === 'multiple' && raw.rounds.length < 1) fail('A single phase has no rounds; round-based setup requires at least one named round')
+  if (raw.structure === 'single' && raw.rounds.length) fail('A single phase has no rounds')
+  if (raw.structure === 'multiple' && raw.rounds.length < 2) fail('A multiple-round setup requires at least two named rounds')
   const config = raw.scoringConfig
   keys(config, ['calculationMethod', 'criterionBasis', 'minorWeightBasis', 'tiePolicy', 'decimalPlaces', 'dropHighest', 'dropLowest', 'manualBasis', 'deductionRules', 'deductionMode', 'numericCarryBasis', 'inputDecimalPlaces', 'defaultMinScore', 'defaultMaxScore', 'singleRoundName'])
   if (config.criterionBasis !== undefined && !['percentage', 'points'].includes(config.criterionBasis)) fail('Choose Percentage or Points criterion scoring basis')

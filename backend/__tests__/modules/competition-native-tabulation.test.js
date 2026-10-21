@@ -1,6 +1,22 @@
 import {expect,test} from 'vitest'
 import {calculateNativeSnapshot,nativeDeductionsEnabled,nativeQualifierProposal} from '../../src/modules/competition-native-tabulation.js'
 const snapshot=(method='weighted_average')=>({eventId:'event',competitionId:'child',roundId:null,complete:true,session:{id:'session',round_id:null,entry_ids:['one','two']},rules:{id:'rules',configuration_snapshot:{structure:'single',rounds:[],criteria:[{id:'criterion',roundId:null,name:'Technique',percentage:100,minScore:0,maxScore:10,minorCriteria:[{id:'minor',name:'Skill',minScore:0,maxScore:10}]}],scoringConfig:{calculationMethod:method,decimalPlaces:2,dropLowest:1,dropHighest:0,tiePolicy:'shared',manualBasis:'Approved placements'}},participation_snapshot:[{id:'one',contestant_id:'master',entry_number:1},{id:'two',contestant_id:'master2',entry_number:2}],assignment_snapshot:['judge1','judge2','judge3'].map(judgeId=>({judgeId,judgeRole:'judge',round_id:null}))},submissions:['judge1','judge2','judge3'].map((judge_id,i)=>({id:`submission${i}`,judge_id,rules_version:'rules',sources:[{entry_id:'one',criterion_id:'criterion',scores:{minor:[8,7,6][i]},locked:true},{entry_id:'two',criterion_id:'criterion',scores:{minor:5},locked:true}]})),deductions:[]})
+
+test.each(['weighted_average','rank_based'])('Preliminary inherits %s independently of a different Final method',method=>{
+ const s=snapshot(method),cfg=s.rules.configuration_snapshot
+ s.roundId='pre';s.session.round_id='pre';cfg.structure='multiple'
+ cfg.criteria[0].roundId='pre'
+ cfg.rounds=[
+  {id:'pre',displayOrder:0,progression:'back_to_zero',advancementType:'top_n',advancementValue:1},
+  {id:'final',displayOrder:1,progression:'back_to_zero',calculationMethod:method==='rank_based'?'weighted_average':'rank_based'},
+ ]
+ const before=calculateNativeSnapshot(s).output
+ expect(before.results.map(row=>row.contestantId)).toEqual(['one','two'])
+ expect(before.results.map(row=>row.rank)).toEqual([1,2])
+ expect(nativeQualifierProposal(s,{finalized:true,output_snapshot:before}).automatic).toEqual(['one'])
+ cfg.rounds[1].calculationMethod=method
+ expect(calculateNativeSnapshot(s).output.results).toEqual(before.results)
+})
 function pageant(method='rank_based'){
  const s=snapshot(method)
  s.rules.participation_snapshot.push({id:'woman1',entry_number:3},{id:'woman2',entry_number:4})

@@ -254,6 +254,7 @@ export default function CompetitionScoringForm({
                           rules={rules}
                           records={deductionRecords}
                           disabled={critLocked || closed || !open || busy}
+                          disabledReason={sheet.submission?'Scores submitted. Ask the organizer to reopen them for a correction.':critLocked?'Deductions are locked with this criterion. Ask the organizer to reopen it for a correction.':sheet.session?.status==='paused'?'Scoring is paused. Wait for the organizer to resume it.':closed?'Scoring is not open for this contestant.':!open?'This criterion is not open for scoring.':busy?'Saving this criterion…':undefined}
                           entryLocked={!!cont.lockedCriteria?.length}
                           onChange={(records) => onDeductionChange(cont.id, crit.id, records)}
                         />
@@ -275,7 +276,7 @@ export default function CompetitionScoringForm({
           })}</tbody>
         </table>
       </div>
-      <p className="v-judge-sheet-help">{simplified?'Score each criterion, then lock it when complete. Submit Scores becomes available after every required criterion is locked.':'Scroll to view all criteria. Contestant identities and criteria headers stay visible. Lock commits one major criterion; Submit Scores sends the completed round.'}</p>
+      <p className="v-judge-sheet-help">{simplified?'Score each criterion, then lock it when complete. Submit Scores becomes available after every required criterion is locked.':'Scroll to view all criteria. Contestant identities and criteria headers stay visible. Lock commits one major criterion; Submit Scores sends the completed round.'}{showDeductionColumn&&' Apply round-wide deductions before locking any criterion. Deductions are recorded separately; original score inputs stay unchanged.'}</p>
     </section>
   )
 }
@@ -288,7 +289,12 @@ function contestantPresentation(contestant, sheet) {
   const { tone } = division
   const accent = tone === 'female' ? '#db2777' : tone === 'male' ? '#2563eb' : division.color
   const indicator = tone === 'female' ? 'F' : tone === 'male' ? 'M' : divisionName.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase()
-  return { tone, indicator, divisionName, style: accent ? { '--judge-accent': accent, '--judge-row-bg': `color-mix(in srgb, ${accent} 6%, var(--v-surface))` } : undefined }
+  const badgeStyle = tone === 'female'
+    ? { '--judge-number-bg': '#fce7f3', '--judge-number-color': '#9d174d' }
+    : tone === 'male'
+      ? { '--judge-number-bg': '#4f46e5', '--judge-number-color': '#fff' }
+      : {}
+  return { tone, indicator, divisionName, style: accent ? { '--judge-accent': accent, '--judge-row-bg': `color-mix(in srgb, ${accent} 6%, var(--v-surface))`, ...badgeStyle } : undefined }
 }
 
 // `target` is the thing being scored — a minor criterion (normal path) or, for a

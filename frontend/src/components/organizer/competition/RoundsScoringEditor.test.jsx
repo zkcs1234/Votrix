@@ -1,14 +1,14 @@
 import {useState} from 'react'
 import {render,screen,fireEvent,cleanup,within} from '@testing-library/react'
 import {afterEach,expect,test,vi} from 'vitest'
-import RoundsScoringEditor,{JudgePreview} from './RoundsScoringEditor'
+import RoundsScoringEditor,{JudgePreview,RoundConfigurationList} from './RoundsScoringEditor'
 const initial=()=>({structure:'single',rounds:[],criteria:[{id:'major',roundId:null,name:'Technique',percentage:100,minScore:0,maxScore:10,minorCriteria:[{id:'minor',name:'Execution',minScore:0,maxScore:10}]}],scoringConfig:{calculationMethod:'weighted_average',tiePolicy:'shared',decimalPlaces:2,inputDecimalPlaces:1,deductionRules:[]}})
 function Editor({step='criteria',configuration=initial(),observe=()=>{}}){const [value,setValue]=useState(configuration);return <RoundsScoringEditor value={value} onChange={v=>{setValue(v);observe(v)}} step={step}/>}
 afterEach(()=>{cleanup();vi.restoreAllMocks()})
 test('single round converts to explicit rounds without deleting criterion or minor identities',()=>{
  const observe=vi.fn();render(<Editor step="structure" observe={observe}/>);fireEvent.click(screen.getByLabelText('Multiple Rounds'))
  const value=observe.mock.lastCall[0];expect(value.rounds).toHaveLength(1);expect(value.criteria[0].id).toBe('major');expect(value.criteria[0].roundId).toBe(value.rounds[0].id);expect(value.criteria[0].minorCriteria[0].id).toBe('minor')
- fireEvent.click(screen.getByText('+ Add Another Round'));expect(observe.mock.lastCall[0].rounds).toHaveLength(2);expect(observe.mock.lastCall[0].rounds[0].nextRoundId).toBe(observe.mock.lastCall[0].rounds[1].id)
+ fireEvent.click(screen.getByText('+ Add Round'));expect(observe.mock.lastCall[0].rounds).toHaveLength(2);expect(observe.mock.lastCall[0].rounds[0].nextRoundId).toBe(observe.mock.lastCall[0].rounds[1].id)
 })
 test('round modes use accessible selection cards and retain the selected mode',()=>{
  render(<Editor step="structure"/>)
@@ -18,10 +18,57 @@ test('round modes use accessible selection cards and retain the selected mode',(
  expect(screen.getByRole('heading',{name:'Your Rounds'})).toBeInTheDocument()
  expect(screen.getByLabelText('Round 1 name')).toBeInTheDocument()
 })
+test('round selector omits the add-round control',()=>{
+ const value=initial()
+ value.structure='multiple'
+ value.rounds=[{id:'round-final',name:'Final',displayOrder:0,progression:'back_to_zero'},{id:'round-next',name:'Unnamed round',displayOrder:1,progression:'back_to_zero'}]
+ value.criteria=value.criteria.map(c=>({...c,roundId:'round-final'}))
+ render(<Editor step="configuration" configuration={value}/>)
+ const selector=screen.getByRole('group',{name:'Select Round'})
+ expect(within(selector).getByRole('button',{name:/Final/})).toBeInTheDocument()
+ expect(within(selector).queryByRole('button',{name:'Add round'})).not.toBeInTheDocument()
+})
+test('round overview aligns action columns and distinguishes configured status',()=>{
+ const value=initial()
+ value.structure='multiple'
+ value.rounds=[
+  {id:'round-one',name:'Preliminary',displayOrder:0,progression:'back_to_zero'},
+  {id:'round-two',name:'Final',displayOrder:1,progression:'back_to_zero'},
+ ]
+ value.criteria[0].roundId='round-one'
+ render(<RoundConfigurationList value={value} savedConfiguration={value} onConfigure={()=>{}} onEditStructure={()=>{}}/>)
+ const list=screen.getByRole('list')
+ const rows=within(list).getAllByRole('listitem')
+ expect(rows[0]).toHaveAttribute('data-configured','true')
+ expect(within(rows[0]).getByText('Configured')).toHaveAttribute('data-ready','true')
+ expect(rows[1]).toHaveAttribute('data-configured','false')
+ expect(within(rows[1]).getByText('Not configured')).toHaveAttribute('data-ready','false')
+ expect(within(rows[0]).getByRole('button',{name:'Edit Preliminary scoring criteria'})).toBeInTheDocument()
+ expect(within(rows[1]).getByRole('button',{name:'Configure Final scoring criteria'})).toBeInTheDocument()
+})
+test('Other Settings matches the four-card design and opens its editor in place',()=>{
+ render(<Editor step="configuration"/>)
+ const settings=screen.getByRole('region',{name:'Other settings'})
+ expect(within(settings).getByRole('heading',{name:'Other Settings'})).toBeInTheDocument()
+ for(const [name,tone] of [['Deductions','danger'],['Tie Rules','info'],['Scoring Method','success'],['Score Input','warning']]){
+  const card=within(settings).getByText(name,{exact:true}).closest('details')
+  expect(card).toHaveAttribute('data-tone',tone)
+  expect(card).not.toHaveAttribute('open')
+ }
+ const scoringMethod=within(settings).getByText('Scoring Method',{exact:true}).closest('details')
+ fireEvent.click(within(scoringMethod).getByText('Edit'))
+ expect(scoringMethod).toHaveAttribute('open')
+ expect(within(scoringMethod).getByRole('combobox',{name:'Calculation method'})).toBeInTheDocument()
+ expect(within(settings).getByRole('heading',{name:'Other Settings'})).toBeInTheDocument()
+})
 test('criterion weight feedback and progress update from the current draft total',()=>{
  const value=initial();value.criteria=[]
  render(<Editor configuration={value}/>)
  expect(screen.getByRole('progressbar',{name:'Criterion weight allocation'})).toHaveAttribute('aria-valuenow','0')
+ const basis=screen.getByRole('combobox',{name:'Select a scoring basis'})
+ expect(basis).toHaveValue('percentage')
+ expect(within(basis).getByRole('option',{name:'Percentage (%) — weights add up to 100%'})).toBeInTheDocument()
+ expect(within(basis).getByRole('option',{name:'Points — maximum score per criterion'})).toBeInTheDocument()
  fireEvent.click(screen.getByRole('button',{name:'Add Criterion',exact:true}))
  fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:'Technique'}})
  fireEvent.change(screen.getByLabelText('Major criterion weight (%)'),{target:{value:'60'}})
@@ -30,6 +77,67 @@ test('criterion weight feedback and progress update from the current draft total
  expect(screen.getByText('Add 40% before continuing.')).toBeInTheDocument()
  expect(screen.getByRole('button',{name:'Edit criterion Technique'})).toBeInTheDocument()
 })
+test('criteria table exposes the reference columns and a remaining-weight summary',()=>{
+ render(<Editor/>)
+ const table=screen.getByRole('table')
+ expect(within(table).getByRole('columnheader',{name:'No.'})).toBeInTheDocument()
+ expect(within(table).getByRole('columnheader',{name:'Actions'})).toBeInTheDocument()
+ expect(within(table).getByText('01')).toBeInTheDocument()
+ expect(screen.getByText('Weight fully assigned')).toBeInTheDocument()
+ expect(screen.getByRole('button',{name:'Add Criterion',exact:true})).toBeInTheDocument()
+})
+test('criterion validation marks only the invalid name and weight inputs',()=>{
+ const value=initial()
+ value.criteria=[]
+ render(<Editor configuration={value}/>)
+ fireEvent.click(screen.getByRole('button',{name:'Add Criterion',exact:true}))
+ fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:'Stage Presence & Poise'}})
+ fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}))
+ expect(screen.getByRole('alert')).toHaveTextContent('Enter a name and a weight greater than zero')
+ expect(screen.getByLabelText('Major criterion name')).not.toHaveAttribute('aria-invalid','true')
+ expect(screen.getByLabelText('Major criterion weight (%)')).toHaveAttribute('aria-invalid','true')
+ fireEvent.change(screen.getByLabelText('Major criterion weight (%)'),{target:{value:'35'}})
+ expect(screen.getByLabelText('Major criterion weight (%)')).not.toHaveAttribute('aria-invalid','true')
+})
+test('criterion validation marks invalid direct score ranges',()=>{
+ const value=initial()
+ value.criteria=[]
+ render(<Editor configuration={value}/>)
+ fireEvent.click(screen.getByRole('button',{name:'Add Criterion',exact:true}))
+ fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:'Dance'}})
+ fireEvent.change(screen.getByLabelText('Major criterion weight (%)'),{target:{value:'40'}})
+ fireEvent.change(screen.getByLabelText('Dance score range'),{target:{value:'custom'}})
+ fireEvent.change(screen.getByLabelText('Dance maximum'),{target:{value:'1'}})
+ fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}))
+ expect(screen.getByRole('alert')).toHaveTextContent('valid score range')
+ expect(screen.getByLabelText('Dance score range')).toHaveAttribute('aria-invalid','true')
+ expect(screen.getByLabelText('Dance minimum')).toHaveAttribute('aria-invalid','true')
+ expect(screen.getByLabelText('Dance maximum')).toHaveAttribute('aria-invalid','true')
+})
+test('criterion validation highlights invalid name, score-range, and minor-weight fields',()=>{
+ const value=initial()
+ value.criteria=[]
+ value.scoringConfig.minorWeightBasis='relative'
+ render(<Editor configuration={value}/>)
+ fireEvent.click(screen.getByRole('button',{name:'Add Criterion',exact:true}))
+ fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}))
+ expect(screen.getByLabelText('Major criterion name')).toHaveAttribute('aria-invalid','true')
+ expect(screen.getByLabelText('Major criterion weight (%)')).toHaveAttribute('aria-invalid','true')
+ fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:'Dance'}})
+ fireEvent.click(screen.getByLabelText('Yes, add minor criteria'))
+ fireEvent.click(screen.getByRole('button',{name:'Add minor criterion'}))
+ fireEvent.change(screen.getByLabelText('Dance minor criterion name'),{target:{value:'Footwork'}})
+ fireEvent.change(screen.getByLabelText('Dance minor score range'),{target:{value:'custom'}})
+ fireEvent.change(screen.getByLabelText('Dance minor maximum'),{target:{value:'1'}})
+ fireEvent.click(screen.getByRole('button',{name:'Add',exact:true}))
+ expect(screen.getByLabelText('Dance minor score range')).toHaveAttribute('aria-invalid','true')
+ expect(screen.getByLabelText('Dance minor minimum')).toHaveAttribute('aria-invalid','true')
+ expect(screen.getByLabelText('Dance minor maximum')).toHaveAttribute('aria-invalid','true')
+ fireEvent.change(screen.getByLabelText('Dance minor maximum'),{target:{value:'10'}})
+ fireEvent.click(screen.getByRole('button',{name:'Add',exact:true}))
+ fireEvent.click(screen.getByLabelText('Use weights'))
+ expect(screen.getByLabelText('Footwork minor weight (%)')).toHaveAttribute('aria-invalid','true')
+})
 test('major editor rejects duplicate names and over-allocation before changing saved criteria',()=>{
  const observe=vi.fn();render(<Editor observe={observe}/>);fireEvent.click(screen.getByRole('button',{name:'Add Criterion',exact:true}));fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:' technique '}});fireEvent.change(screen.getByLabelText('Major criterion weight (%)'),{target:{value:'20'}});fireEvent.click(screen.getByRole('button',{name:'Save Criterion',exact:true}));expect(screen.getByRole('alert')).toHaveTextContent('already exists');expect(observe).not.toHaveBeenCalled()
  fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:'Performance'}});fireEvent.click(screen.getByRole('button',{name:'Save Criterion',exact:true}));expect(screen.getByRole('alert')).toHaveTextContent('cannot exceed 100%')
@@ -37,24 +145,27 @@ test('major editor rejects duplicate names and over-allocation before changing s
 test('points basis shows maximum possible total and point-specific criterion fields',()=>{
  const value=initial();value.criteria=[];value.scoringConfig.criterionBasis='percentage'
  const observe=vi.fn();render(<Editor configuration={value} observe={observe}/>)
- fireEvent.change(screen.getByLabelText('Criterion scoring basis'),{target:{value:'points'}})
+ fireEvent.change(screen.getByRole('combobox',{name:'Select a scoring basis'}),{target:{value:'points'}})
  expect(observe.mock.lastCall[0].scoringConfig.calculationMethod).toBe('sum')
+ expect(screen.getByRole('combobox',{name:'Select a scoring basis'})).toHaveValue('points')
+ expect(screen.getByRole('combobox',{name:'Select a scoring basis'})).toHaveAccessibleDescription('Major criteria use maximum point allocations. Judges enter one score per major criterion.')
  fireEvent.click(screen.getByRole('button',{name:'Add Criterion',exact:true}))
  expect(screen.getByLabelText('Maximum Points')).toBeInTheDocument()
  expect(screen.queryByLabelText('Major criterion weight (%)')).not.toBeInTheDocument()
  fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:'Technique'}})
  fireEvent.change(screen.getByLabelText('Maximum Points'),{target:{value:'10'}})
  fireEvent.click(screen.getByRole('button',{name:'Save Criterion',exact:true}))
- expect(screen.getByRole('status')).toHaveTextContent('Maximum: 10 points')
+ expect(screen.getByRole('status')).toHaveTextContent('Total points: 10 pts')
 })
 test('minor edit retains identity and removal requires confirmation',()=>{
  const observe=vi.fn();render(<Editor observe={observe}/>);fireEvent.click(screen.getByRole('button',{name:'Edit criterion Technique'}));fireEvent.click(screen.getByRole('button',{name:'Edit minor Execution'}));fireEvent.change(screen.getByLabelText('Technique minor criterion name'),{target:{value:'Timing'}});fireEvent.click(screen.getByRole('button',{name:'Update',exact:true}));fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}));expect(observe.mock.lastCall[0].criteria[0].minorCriteria[0]).toMatchObject({id:'minor',name:'Timing',minScore:0,maxScore:10})
  vi.spyOn(window,'confirm').mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Edit criterion Technique'}));fireEvent.click(screen.getByLabelText('Remove minor Timing'));expect(observe).toHaveBeenCalledTimes(1)
 })
 
-test.each([['1-100',1,100,0],['1-10',1,10,0],['decimal',0,10,1]])('minor range preset %s configures judge bounds and precision', (preset,minScore,maxScore,decimalPlaces)=>{
+test.each([['1-100',1,100],['1-10',1,10],['decimal',0,10]])('minor range preset %s configures bounds while inheriting competition precision', (preset,minScore,maxScore)=>{
  const observe=vi.fn();render(<Editor observe={observe}/>);fireEvent.click(screen.getByRole('button',{name:'Edit criterion Technique'}));fireEvent.click(screen.getByRole('button',{name:'Add minor criterion'}));fireEvent.change(screen.getByLabelText('Technique minor criterion name'),{target:{value:'Overall Impact'}});fireEvent.change(screen.getByLabelText('Technique minor score range'),{target:{value:preset}});fireEvent.click(screen.getByRole('button',{name:'Add',exact:true}));fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}))
- expect(observe.mock.lastCall[0].criteria[0].minorCriteria[1]).toMatchObject({name:'Overall Impact',minScore,maxScore,decimalPlaces})
+ expect(observe.mock.lastCall[0].criteria[0].minorCriteria[1]).toMatchObject({name:'Overall Impact',minScore,maxScore})
+ expect(observe.mock.lastCall[0].criteria[0].minorCriteria[1]).not.toHaveProperty('decimalPlaces')
  fireEvent.click(screen.getByRole('button',{name:'Edit criterion Technique'}));expect(within(screen.getByText('Overall Impact').closest('.rs-minor-item')).getByText(`${minScore}–${maxScore}`)).toBeInTheDocument()
 })
 
@@ -62,7 +173,7 @@ test('custom scales preserve configured bounds without displaying extra range or
  const value=initial();value.criteria[0].minorCriteria[0]={...value.criteria[0].minorCriteria[0],minScore:2,maxScore:20,decimalPlaces:2}
  const observe=vi.fn();render(<Editor configuration={value} observe={observe}/>);fireEvent.click(screen.getByRole('button',{name:'Edit criterion Technique'}));fireEvent.click(screen.getByRole('button',{name:'Add minor criterion'}));fireEvent.change(screen.getByLabelText('Technique minor criterion name'),{target:{value:'Timing'}});fireEvent.change(screen.getByLabelText('Technique minor score range'),{target:{value:'1-10'}});fireEvent.change(screen.getByLabelText('Technique minor score range'),{target:{value:'custom'}})
  expect(screen.getByLabelText('Technique minor minimum')).toBeInTheDocument();expect(screen.getByLabelText('Technique minor maximum')).toBeInTheDocument();expect(screen.queryByLabelText('Technique minor input precision')).not.toBeInTheDocument()
- fireEvent.click(screen.getByRole('button',{name:'Add',exact:true}));fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}));expect(observe.mock.lastCall[0].criteria[0].minorCriteria[1]).toMatchObject({minScore:2,maxScore:20,decimalPlaces:2});expect(observe.mock.lastCall[0].criteria[0].minorCriteria[0]).toEqual(value.criteria[0].minorCriteria[0])
+ fireEvent.click(screen.getByRole('button',{name:'Add',exact:true}));fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}));expect(observe.mock.lastCall[0].criteria[0].minorCriteria[1]).toMatchObject({minScore:2,maxScore:20});expect(observe.mock.lastCall[0].criteria[0].minorCriteria[1]).not.toHaveProperty('decimalPlaces');expect(observe.mock.lastCall[0].criteria[0].minorCriteria[0]).toEqual(value.criteria[0].minorCriteria[0])
 })
 
 test('overall minor weights are direct round shares and total the major percentage',()=>{

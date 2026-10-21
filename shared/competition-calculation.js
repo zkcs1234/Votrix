@@ -71,7 +71,7 @@ export function calculateOfficial(rules, submissions, { roundId = null, deductio
   if (!OFFICIAL_METHODS.includes(defaultMethod) || ['manual','undecided'].includes(defaultMethod)) throw new Error('Numeric calculation requires confirmed numeric rules')
   const target=rules.rounds.find(r=>r.id===roundId), carry=target?.progression==='carry_forward'
   const final = rules.rounds.find(r=>r.id===rules.scoringConfig.finalRoundId) ?? rules.rounds.filter(r => r.purpose === 'final').at(-1) ?? (rules.rounds.length===1?rules.rounds[0]:null)
-  const method = target?.calculationMethod ?? final?.calculationMethod ?? defaultMethod
+  const method = (roundId ? target?.calculationMethod : final?.calculationMethod) ?? defaultMethod
   const rounds = roundId ? rules.rounds.filter(r => carry ? r.displayOrder<=target.displayOrder && r.purpose!=='special' : r.id === roundId) : rules.rounds.length ? rules.rounds.filter(r => final?.progression==='back_to_zero' ? r.id===final.id : r.purpose!=='special' && (!final || final.progression!=='carry_forward' || r.displayOrder<=final.displayOrder)) : [{ id: null, weight: 100 }]
   const missing = [], worksheets = [], roundResults = []
   for (const round of rounds) {

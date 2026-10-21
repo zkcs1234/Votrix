@@ -244,6 +244,7 @@ export const routeConfig = [
       { path: 'events/:eventId/tabulation/:section', element: <CompetitionTabulationPage /> },
       { path: 'events/:eventId/scoring', element: <CompetitionTabulationPage workspace="scoring" /> },
       { path: 'events/:eventId/results', element: <CompetitionTabulationPage workspace="results" /> },
+      { path: 'events/:eventId/adjustments', element: <CompetitionTabulationPage workspace="adjustments" /> },
       { path: 'events/:eventId/advancement', element: <CompetitionTabulationPage workspace="advancement" /> },
       { path: 'events/:eventId/audit', element: <CompetitionTabulationPage workspace="audit" /> },
 { path: 'events/:eventId/analytics', element: <CompetitionAnalyticsPage /> },

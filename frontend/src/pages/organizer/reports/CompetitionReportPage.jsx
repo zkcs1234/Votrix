@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/Skeleton'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
-export default function CompetitionReportPage(){const {eventId}=useParams();return <NativeResultsBoundary eventId={eventId} Legacy={LegacyCompetitionReportPage}/>}
+export default function CompetitionReportPage(){const {eventId}=useParams();return <NativeResultsBoundary eventId={eventId} Legacy={LegacyCompetitionReportPage} reportMode/>}
 function LegacyCompetitionReportPage() {
   const { eventId } = useParams()
   const { report, loading, refresh, lastUpdated, error, reportError } = useModuleAnalytics({

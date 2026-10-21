@@ -3,14 +3,14 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { evaluateCriteriaReadiness } from '../../../../../shared/competition-criteria-readiness.js'
 import { scoringRuleReadiness } from '../../../../../shared/competition-rule-configuration.js'
-import { Undo2, Lock, CheckCircle2 } from 'lucide-react'
+import { Lock, CheckCircle2 } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import Button from '@/components/ui/Button'
 import StageFooter from '@/components/ui/StageFooter'
 import ReadinessItem from '@/components/organizer/ReadinessItem'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
-import { EVENT_STATUS, canUnpublishEventStatus } from '@/utils/constants'
+import { EVENT_STATUS } from '@/utils/constants'
 import useCompetitionSync from '@/hooks/useCompetitionSync'
 
 // Review & Publish sits between Judges and Live Control. Publishing a draft hands
@@ -38,7 +38,6 @@ function LegacyCompetitionReviewPage() {
   const requestRef = useRef(0)
   const [loading, setLoading] = useState(true)
   const [publishing, setPublishing] = useState(false)
-  const [unpublishing, setUnpublishing] = useState(false)
   const { success, error: showError } = useToast()
 
   const showLoader = useDelayedLoading(loading, 300)
@@ -75,11 +74,10 @@ function LegacyCompetitionReviewPage() {
   const status = event?.status ?? null
   const frozen = Boolean(event?.officialRulesId)
   const isDraft = status === EVENT_STATUS.DRAFT && !frozen
-  const canUnpublish = !frozen && canUnpublishEventStatus(status)
   const publishReady = !loadError && scoringReadiness?.readyForPublication && criteriaReadiness?.allReady && contestantsCount > 0 && judgesCount > 0 && criteriaCount > 0 && rulesConfirmed && acknowledged
 
   const handlePublish = async () => {
-    if (!publishReady || publishing || unpublishing) return
+    if (!publishReady || publishing) return
     setPublishing(true)
     try {
       await pageantService.publishEvent(eventId,{acknowledged})
@@ -90,20 +88,6 @@ function LegacyCompetitionReviewPage() {
       await load()
     } finally {
       setPublishing(false)
-    }
-  }
-
-  const handleUnpublish = async () => {
-    if (!canUnpublish || publishing || unpublishing) return
-    setUnpublishing(true)
-    try {
-      await pageantService.unpublishEvent(eventId)
-      success('Event moved back to draft. You can edit setup again.')
-      await load()
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to unpublish event')
-    } finally {
-      setUnpublishing(false)
     }
   }
 
@@ -169,27 +153,12 @@ function LegacyCompetitionReviewPage() {
             <p className="text-xs text-v-text-muted mt-0.5">
               {frozen
                 ? 'Published rules and setup are frozen. Use the authorized scoring amendment procedure for supported rule changes; approval and fresh judging are required.'
-                : canUnpublish
-                ? 'Setup is locked. Unpublish to make corrections, or continue to Live Control to run scoring.'
-                : 'Setup and the judge roster are locked.'}
+                : 'Setup and the judge roster are locked. Review the saved steps or continue to Live Control.'}
             </p>
-            {frozen && <div className="mt-3 flex flex-wrap gap-3"><Button onClick={() => navigate(`/organizer/competition/events/${eventId}/live`)}>Go to Live Control</Button><Link className="text-sm underline self-center" to={`/organizer/competition/events/${eventId}/tabulation`}>Authorized scoring amendments in Tabulation</Link></div>}
-            {canUnpublish && (
-              <div className="mt-3 flex flex-wrap gap-3">
-                <Button
-                  variant="secondary"
-                  onClick={handleUnpublish}
-                  loading={unpublishing}
-                  disabled={unpublishing}
-                >
-                  <Undo2 className="h-4 w-4" strokeWidth={1.5} />
-                  Unpublish to draft
-                </Button>
-                <Button onClick={() => navigate(`/organizer/competition/events/${eventId}/live`)}>
-                  Go to Live Control
-                </Button>
-              </div>
-            )}
+            <div className="mt-3 flex flex-wrap gap-3">
+              <Button onClick={() => navigate(`/organizer/competition/events/${eventId}/live`)}>Go to Live Control</Button>
+              {frozen && <Link className="text-sm underline self-center" to={`/organizer/competition/events/${eventId}/tabulation`}>Authorized scoring amendments in Tabulation</Link>}
+            </div>
           </div>
         </div>
       )}

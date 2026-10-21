@@ -326,4 +326,5 @@
 }
 .v-judge-deduction-rule { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: .35rem; margin-top: .5rem; padding: .35rem .45rem; border: 1px solid var(--v-border); border-radius: .5rem; font-size: .75rem; }
 .v-judge-deduction-option { display: flex; min-width: 0; align-items: center; }
+.v-judge-deduction-feedback { grid-column: 1 / -1; color: var(--v-text-muted); font-size: .6875rem; line-height: 1.4; overflow-wrap: anywhere; }
 .v-judge-deduct-button { flex: 0 0 auto; min-width: 0; min-height: 1.5rem; padding: .15rem .45rem !important; border-radius: .35rem !important; font-size: .6875rem !important; line-height: .9rem; }

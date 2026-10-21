@@ -107,6 +107,155 @@ ${sheetEntries}
   downloadBlob(blob, filename.endsWith('.xls') ? filename : `${filename}.xls`)
 }
 
+const escapeStyledXml = value => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&apos;')
+
+const safeSheetName = (name, index) => {
+  const cleaned = String(name || `Judge ${index + 1}`)
+    .replaceAll('\\', ' ')
+    .replaceAll('/', ' ')
+    .replaceAll('?', ' ')
+    .replaceAll('*', ' ')
+    .replaceAll(':', ' ')
+    .replaceAll('[', ' ')
+    .replaceAll(']', ' ')
+    .trim()
+    .slice(0, 31)
+  return cleaned || `Judge ${index + 1}`
+}
+
+export function buildJudgeScoreSheetData(sources, context, judgeSelection = 'all') {
+  const configuration = sources.rules?.configuration_snapshot
+  if (!sources.complete || !configuration || !sources.session?.entry_ids?.length) {
+    throw new Error('Complete current judge sheets are required for this export.')
+  }
+  const roundId = context.roundId ?? null
+  const scoringConfig = configuration.scoringConfig ?? {}
+  const pointsBasis = scoringConfig.criterionBasis === 'points'
+  const criteria = (configuration.criteria ?? []).filter(criterion => (criterion.roundId ?? null) === roundId)
+  if (!criteria.length) throw new Error('No scoring criteria are configured for the selected round.')
+  const entries = sources.session.entry_ids.map(id => sources.entries?.find(entry => entry.id === id))
+  if (entries.some(entry => !entry)) throw new Error('A current contestant identity is missing from the judge score sheet.')
+  const judges = (sources.progress ?? []).filter(judge =>
+    judge.submitted && (judgeSelection === 'all' || judge.judgeId === judgeSelection),
+  )
+  if (!judges.length) throw new Error('No submitted judge sheet is available for this export.')
+  const method = configuration.rounds?.find(round => round.id === roundId)?.calculationMethod
+    ?? scoringConfig.calculationMethod
+  const methodName = ({
+    weighted_average: pointsBasis ? 'Average Score' : 'Weighted Mean',
+    sum: 'Total Score',
+    rank_based: 'Rank-Based Placement (raw ratings shown)',
+    manual: 'Manual Official Results',
+    highest_score: 'Highest Judge Score',
+    lowest_removal: 'Average after judge score removal',
+  })[method] ?? 'Not configured'
+  const criterionRows = criteria.flatMap(criterion => {
+    if (pointsBasis || !criterion.minorCriteria?.length) {
+      return [{
+        name: criterion.name,
+        weight: pointsBasis ? null : Number(criterion.percentage),
+        maxPoints: pointsBasis ? Number(criterion.maxScore) : null,
+        criterionId: criterion.id,
+        targetId: criterion.id,
+      }]
+    }
+    return criterion.minorCriteria.map(target => ({
+      name: `${criterion.name} — ${target.name}`,
+      weight: target.percentage == null
+        ? Number(criterion.percentage) / criterion.minorCriteria.length
+        : scoringConfig.minorWeightBasis === 'overall'
+          ? Number(target.percentage)
+          : Number(criterion.percentage) * Number(target.percentage) / 100,
+      maxPoints: null,
+      criterionId: criterion.id,
+      targetId: target.id,
+    }))
+  })
+  const usedSheetNames = new Set()
+  return judges.map((judge, index) => {
+    const submissions = (sources.submissions ?? []).filter(submission =>
+      submission.judge_id === judge.judgeId
+      && (submission.round_id ?? null) === roundId
+      && submission.rules_version === sources.rules.id
+      && submission.session_id === sources.session.id,
+    )
+    if (submissions.length !== 1 || submissions[0].id !== judge.submissionId) {
+      throw new Error(`The current submitted sheet for ${judge.judgeName ?? 'this judge'} is unavailable.`)
+    }
+    const submission = submissions[0]
+    const rows = criterionRows.map(row => {
+      const scores = entries.map(entry => {
+        const matchingSources = (submission.sources ?? []).filter(source =>
+          source.entry_id === entry.id && source.criterion_id === row.criterionId,
+        )
+        if (matchingSources.length !== 1) throw new Error(`The submitted score source for ${entry.name} is ambiguous.`)
+        const value = matchingSources[0].scores?.[row.targetId]
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+          throw new Error(`A submitted score for ${entry.name} is unavailable.`)
+        }
+        return value
+      })
+      return { ...row, scores }
+    })
+    const baseSheetName = safeSheetName(judge.judgeName, index)
+    let sheetName = baseSheetName
+    let suffix = 2
+    while (usedSheetNames.has(sheetName.toLowerCase())) {
+      const suffixText = ` (${suffix++})`
+      sheetName = `${baseSheetName.slice(0, 31 - suffixText.length)}${suffixText}`
+    }
+    usedSheetNames.add(sheetName.toLowerCase())
+    return {
+      name: sheetName,
+      judgeName: judge.judgeName ?? `Judge ${index + 1}`,
+      methodName,
+      rows,
+      entries: entries.map((entry, entryIndex) => ({
+        label: `Entry ${entryIndex + 1}\n${entry.name}`,
+      })),
+      total: criterionRows.reduce((sum, row) => sum + (pointsBasis ? row.maxPoints : row.weight), 0),
+      totalLabel: pointsBasis ? 'TOTAL MAX POINTS' : 'TOTAL WEIGHT',
+      weightHeader: pointsBasis ? 'MAX POINTS' : 'WEIGHT',
+      pointsBasis,
+      eventName: context.eventName ?? sources.eventName ?? 'Event',
+      competitionName: context.competitionName ?? sources.competitionName ?? 'Competition',
+      roundName: context.roundName ?? sources.roundName ?? 'Round',
+    }
+  })
+}
+
+export function downloadJudgeScoreSheetsExcel(filename, sheets) {
+  if (!sheets?.length) throw new Error('No judge score sheets are available for this export.')
+  const workbookSheets = sheets.map(sheet => {
+    const columnCount = 2 + sheet.entries.length
+    const cell = (value, style = 'Default', mergeAcross = null) =>
+      `<Cell ss:StyleID="${style}"${mergeAcross == null ? '' : ` ss:MergeAcross="${mergeAcross}"`}><Data ss:Type="${typeof value === 'number' && Number.isFinite(value) ? 'Number' : 'String'}">${escapeStyledXml(value)}</Data></Cell>`
+    const rows = [
+      `<Row ss:Height="32">${cell('VOTRIX  |  OFFICIAL JUDGE SCORE SHEET', 'Title', columnCount - 1)}</Row>`,
+      `<Row>${cell('Event', 'MetadataLabel')}${cell(sheet.eventName, 'MetadataValue')}</Row>`,
+      `<Row>${cell('Competition', 'MetadataLabel')}${cell(sheet.competitionName, 'MetadataValue')}</Row>`,
+      `<Row>${cell('Round', 'MetadataLabel')}${cell(sheet.roundName, 'MetadataValue')}</Row>`,
+      `<Row>${cell('Judge', 'MetadataLabel')}${cell(sheet.judgeName, 'MetadataValue')}</Row>`,
+      `<Row>${cell('Scoring method', 'MetadataLabel')}${cell(sheet.methodName, 'MetadataValue')}</Row>`,
+      '<Row/>',
+      `<Row ss:Height="38">${cell('SCORING CRITERIA', 'TableHeader')}${cell(sheet.weightHeader, 'TableHeader')}${sheet.entries.map(entry => cell(entry.label, 'TableHeader')).join('')}</Row>`,
+      ...sheet.rows.map(row =>
+        `<Row ss:Height="27">${cell(row.name)}${cell(sheet.pointsBasis ? row.maxPoints : `${Number(row.weight).toFixed(2).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')}%`, 'Weight')}${row.scores.map(score => cell(score, 'Score')).join('')}</Row>`,
+      ),
+      `<Row ss:Height="24">${cell(sheet.totalLabel, 'TotalLabel')}${cell(sheet.pointsBasis ? sheet.total : `${Number(sheet.total).toFixed(2).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')}%`, 'TotalValue')}${Array.from({ length: columnCount - 2 }, () => cell('', 'TotalValue')).join('')}</Row>`,
+    ]
+    const widths = `<Column ss:Width="270"/><Column ss:Width="82"/>${sheet.entries.map(() => '<Column ss:Width="140"/>').join('')}`
+    return `<Worksheet ss:Name="${escapeStyledXml(sheet.name)}"><Table>${widths}${rows.join('')}</Table><WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><PageSetup><Layout x:Orientation="Landscape"/></PageSetup><Print><ValidPrinterInfo/><FitWidth>1</FitWidth><FitHeight>0</FitHeight></Print><Selected/></WorksheetOptions></Worksheet>`
+  }).join('')
+  const xml = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Styles><Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Arial" ss:Size="11"/><Alignment ss:Vertical="Center"/></Style><Style ss:ID="Title"><Font ss:FontName="Arial" ss:Size="16" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#172B56" ss:Pattern="Solid"/><Alignment ss:Vertical="Center" ss:Horizontal="Left"/></Style><Style ss:ID="MetadataLabel"><Font ss:Bold="1"/><Alignment ss:Vertical="Center"/></Style><Style ss:ID="MetadataValue"><Alignment ss:Vertical="Center"/></Style><Style ss:ID="TableHeader"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#2455D6" ss:Pattern="Solid"/><Alignment ss:Vertical="Center" ss:Horizontal="Center" ss:WrapText="1"/></Style><Style ss:ID="Weight"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style><Style ss:ID="Score"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style><Style ss:ID="TotalLabel"><Font ss:Bold="1"/><Interior ss:Color="#DCEBFF" ss:Pattern="Solid"/><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#B7CEF7"/></Borders></Style><Style ss:ID="TotalValue"><Font ss:Bold="1"/><Interior ss:Color="#DCEBFF" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#B7CEF7"/></Borders></Style></Styles>${workbookSheets}</Workbook>`
+  downloadBlob(new Blob([xml], { type: 'application/vnd.ms-excel' }), filename.endsWith('.xls') ? filename : `${filename}.xls`)
+}
+
 /* ----------------------- PDF ----------------------- */
 
 /**

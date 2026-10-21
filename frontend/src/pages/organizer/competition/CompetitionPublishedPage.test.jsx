@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 const parentReview = vi.hoisted(() => vi.fn())
@@ -14,7 +14,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-test('shows the separate event work areas and their readiness guidance after setup', () => {
+test('shows the completion message and only the Live Control and event workspace actions', () => {
   render(
     <MemoryRouter initialEntries={[{
       pathname: '/organizer/competition/events/event/published',
@@ -32,20 +32,14 @@ test('shows the separate event work areas and their readiness guidance after set
   )
 
   expect(screen.getByRole('heading', { name: 'Campus arts showcase' })).toBeInTheDocument()
-  expect(screen.getByText('Scheduled · Published')).toBeInTheDocument()
   expect(screen.getByText(/All 8 setup steps are complete/)).toBeInTheDocument()
-  expect(screen.getByText('Live Control, Tabulation, and Results are event work areas—not extra setup steps.')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Go to Live Control' })).toHaveAttribute('href', '/organizer/competition/events/event/live')
-  expect(screen.getByRole('link', { name: 'Open Tabulation' })).toHaveAttribute('href', '/organizer/competition/events/event/tabulation/overview')
-  expect(screen.getByRole('link', { name: 'Open Results' })).toHaveAttribute('href', '/organizer/competition/events/event/results')
-  expect(screen.getByText(/Final calculations require the required scores to be submitted/)).toBeInTheDocument()
-  expect(screen.getByText(/Official results become available after scores are calculated and finalized/)).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Review event setup' })).toHaveAttribute('href', '/organizer/competition/events/event/review')
-  expect(screen.getByRole('link', { name: 'Return to competition events' })).toHaveAttribute('href', '/organizer/competition/events')
+  expect(screen.getByRole('link', { name: 'Proceed to Live Control' })).toHaveAttribute('href', '/organizer/competition/events/event/live')
+  expect(screen.getByRole('link', { name: /Exit to Events/ })).toHaveAttribute('href', '/organizer/competition/events/event/workspace')
+  expect(within(screen.getByRole('main')).getAllByRole('link')).toHaveLength(2)
   expect(parentReview).not.toHaveBeenCalled()
 })
 
-test('loads published event details when the confirmation page is opened directly', async () => {
+test('loads the event title when the completion page is opened directly', async () => {
   parentReview.mockResolvedValue({
     data: { event: { title: 'Loaded event', status: 'scheduled' } },
   })
@@ -58,6 +52,6 @@ test('loads published event details when the confirmation page is opened directl
   )
 
   expect(await screen.findByRole('heading', { name: 'Loaded event' })).toBeInTheDocument()
-  expect(screen.getByText('Scheduled · Published')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Proceed to Live Control' })).toBeInTheDocument()
   expect(parentReview).toHaveBeenCalledWith('event')
 })
