@@ -1154,7 +1154,7 @@
     padding: 0.5rem 1rem;
     transition: all 0.15s;
     background-color: var(--v-primary);
-    color: var(--v-text);
+    color: white !important;
     border: none;
     cursor: pointer;
   }
@@ -1690,6 +1690,13 @@
     color: white !important;
   }
 
+  /* White text for all children in blue backgrounds */
+  .bg-v-primary *,
+  .bg-indigo-600 *,
+  .bg-indigo-500 * {
+    color: white !important;
+  }
+
   /* Ensure table headers with primary background have white text */
   .v-table th.bg-v-primary,
   .v-competition-dashboard-table th,
@@ -1714,19 +1721,9 @@
     color: white !important;
   }
 
-  /* Child elements within primary backgrounds - ONLY direct bg classes */
-  .bg-v-primary > span,
-  .bg-v-primary > p,
-  .bg-v-primary > div,
-  .bg-v-primary > a,
-  .bg-indigo-600 > span,
-  .bg-indigo-600 > p,
-  .bg-indigo-600 > div,
-  .bg-indigo-600 > a,
-  .bg-indigo-500 > span,
-  .bg-indigo-500 > p,
-  .bg-indigo-500 > div,
-  .bg-indigo-500 > a {
+  /* Ensure .v-btn-primary always has white text */
+  .v-btn-primary,
+  .v-btn-primary * {
     color: white !important;
   }
 
