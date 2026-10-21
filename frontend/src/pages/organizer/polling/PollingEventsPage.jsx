@@ -156,7 +156,7 @@ export default function PollingEventsPage() {
         <h2 className="text-xl font-semibold text-v-text">Polls</h2>
         <Link to="/organizer/polling/events/new" className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white">
           <Plus className="h-4 w-4" strokeWidth={2} />
-          New poll
+          New event
         </Link>
       </div>
 

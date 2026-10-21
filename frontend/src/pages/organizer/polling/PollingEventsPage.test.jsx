@@ -25,7 +25,7 @@ it('shows an actionable empty state when there are no polls', async () => {
   render(<MemoryRouter><PollingEventsPage /></MemoryRouter>)
 
   expect(await screen.findByText('No polls yet.')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'New poll' }))
+  expect(screen.getByRole('link', { name: 'New event' }))
     .toHaveAttribute('href', '/organizer/polling/events/new')
 })
 
