@@ -11,18 +11,16 @@ import {
 } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 import CalendarCard from '@/components/ui/CalendarCard'
-import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { getNextStage, stagePath } from '@/utils/eventStages'
-import SaveStatus from '@/components/ui/SaveStatus'
+import StageFooter from '@/components/ui/StageFooter'
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
 import useSilentDraftAutosave from '@/hooks/useSilentDraftAutosave'
 import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
-import WizardSteps from '@/components/ui/WizardSteps'
-import EventSetupAside from '@/components/organizer/EventSetupAside'
+import EventStepper from '@/components/ui/EventStepper'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import { isSetupLocked } from '@/utils/constants'
 
@@ -57,7 +55,7 @@ const { eventId } = useParams()
   // existing poll whose setup is locked (scheduled/active/…) is read-only.
   const readOnly = !isNew && isSetupLocked(eventStatus)
 
-  const { markComplete, reset: resetProgress } = useEventProgress(
+  const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'polling',
     eventId,
   )
@@ -209,7 +207,7 @@ useEffect(() => {
   }, [eventId, isNew, reset, markComplete])
 
   const handleNextDetails = async (e) => {
-    e.preventDefault()
+    e?.preventDefault?.()
     const isValid = await trigger(['title', 'startDate', 'endDate'])
     if (!isValid) return
 
@@ -234,7 +232,7 @@ useEffect(() => {
   }
 
   const handleNextBranding = async (e) => {
-    e.preventDefault()
+    e?.preventDefault?.()
     setSaving(true)
     setError(null)
     try {
@@ -265,7 +263,7 @@ useEffect(() => {
   }
 
   const handleSaveSettings = async (e) => {
-    e.preventDefault()
+    e?.preventDefault?.()
     setSaving(true)
     setError(null)
     try {
@@ -374,9 +372,17 @@ useEffect(() => {
   if (loading) return <p className="v-caption">Loading...</p>
 
   return (
-    <div data-module="polling" className="mx-auto max-w-6xl space-y-6">
+    <div data-module="polling" className="space-y-6">
       <>
-          <WizardSteps module="polling" currentKey={step} />
+          <EventStepper
+            module="polling"
+            currentKey={step}
+            eventId={eventId || 'new'}
+            completedKeys={completedKeys}
+            eventStatus={eventStatus}
+            readOnly={readOnly}
+            interactive={false}
+          />
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="poll" />}
 
@@ -384,12 +390,12 @@ useEffect(() => {
             <h2 className="v-page-title">
               {isNew ? 'Create poll' : 'Poll settings'}
             </h2>
-            <p className="mt-1 text-sm text-v-text-subtle">
-              Define the event context and schedule before configuring the experience.
+            <p className="v-helper-text">
+              Fill out the poll basics, branding, and settings. Use the sidebar to jump between sections.
             </p>
           </header>
 
-          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="grid grid-cols-1 gap-6">
           <div className="min-w-0">
             <Card padding="md">
             <div className="mb-5">
@@ -538,33 +544,32 @@ useEffect(() => {
         </fieldset>
       </Card>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-v-border pt-4">
-          <div className="flex items-center gap-3">
-            {step !== 'details' && (
-              <Button type="button" variant="secondary" disabled={saving} onClick={() => { setError(null); setStep(step === 'settings' ? 'branding' : 'details') }}>
-                Back: {step === 'settings' ? 'Branding' : 'Details'}
-              </Button>
-            )}
-            {!readOnly && <SaveStatus status={saveStatus} lastSavedAt={lastSavedAt} />}
-          </div>
-          {readOnly ? (
-            <Button type="button" onClick={() => {
+        <StageFooter
+          module="polling"
+          currentKey={step}
+          eventId={eventId || 'new'}
+          saving={saving}
+          saveStatus={readOnly ? 'idle' : saveStatus}
+          lastSavedAt={readOnly ? null : lastSavedAt}
+          showSidebarHint={false}
+          backLabel={step === 'settings' ? 'Back: Branding' : 'Back: Details'}
+          onBack={() => { setError(null); setStep(step === 'settings' ? 'branding' : 'details') }}
+          nextLabel={step === 'details' ? 'Next: Branding' : step === 'branding' ? 'Next: Settings' : isNew ? 'Create & continue' : 'Next: Builder'}
+          onNext={() => {
+            if (readOnly) {
               if (step === 'details') setStep('branding')
               else if (step === 'branding') setStep('settings')
               else {
                 const next = getNextStage('polling', step)
                 if (next) navigate(stagePath('polling', next.key, eventId))
               }
-            }}>Next</Button>
-          ) : (
-            <Button type="button" disabled={saving} onClick={step === 'details' ? handleNextDetails : step === 'branding' ? handleNextBranding : handleSaveSettings}>
-              {saving ? 'Saving...' : step === 'details' ? 'Next: Branding' : step === 'branding' ? 'Next: Settings' : isNew ? 'Create & continue' : 'Next: Builder'}
-            </Button>
-          )}
-        </div>
+            } else if (step === 'details') handleNextDetails()
+            else if (step === 'branding') handleNextBranding()
+            else handleSaveSettings()
+          }}
+        />
           </div>
 
-          <EventSetupAside module="polling" />
           </div>
         </>
 

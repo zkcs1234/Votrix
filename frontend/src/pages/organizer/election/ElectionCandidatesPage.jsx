@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import { SkeletonGrid } from '@/components/ui/Skeleton'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 import FilterBar from '@/components/ui/FilterBar'
+import StageFooter from '@/components/ui/StageFooter'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
+import ElectionGroupStepper from '@/components/organizer/ElectionGroupStepper'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import useEventStatus from '@/hooks/useEventStatus'
 import useTableFilter from '@/hooks/useTableFilter'
+import { stagePath } from '@/utils/eventStages'
+import { firstIncompleteSectionId, groupHasCandidatesForEveryPosition } from '@/utils/electionGroupProgress'
 
 import { INPUT_CLASS } from '@/utils/uiClasses'
 const inputClass = INPUT_CLASS
@@ -90,7 +95,9 @@ const EMPTY_FORM = { name: '', biography: '', platform: '', party: '' }
 
 function ElectionCandidatesPageContent() {
   const { eventId } = useParams()
+  const navigate = useNavigate()
   const [sections, setSections] = useState([])
+  const [completedSectionIds, setCompletedSectionIds] = useState([])
   const [sectionId, setSectionId] = useState('')
   const [positions, setPositions] = useState([])
   const [candidates, setCandidates] = useState([])
@@ -133,8 +140,13 @@ function ElectionCandidatesPageContent() {
         electionService.listCandidates(eventId, null, sectionId),
       ])
       if (request !== requestRef.current) return
-      setPositions(posRes.data.positions ?? [])
-      setCandidates(candRes.data.candidates ?? [])
+      const nextPositions = posRes.data.positions ?? []
+      const nextCandidates = candRes.data.candidates ?? []
+      setPositions(nextPositions)
+      setCandidates(nextCandidates)
+      setCompletedSectionIds((current) => groupHasCandidatesForEveryPosition(nextPositions, nextCandidates)
+        ? [...new Set([...current, sectionId])]
+        : current.filter((id) => id !== sectionId))
     } catch (err) {
       console.error('Failed to load candidates:', err)
     } finally {
@@ -143,12 +155,22 @@ function ElectionCandidatesPageContent() {
   }, [eventId, sectionId])
 
   useEffect(() => {
-    electionService.listBallotSections(eventId).then(({ data }) => {
+    electionService.listBallotSections(eventId).then(async ({ data }) => {
       const nextSections = data.sections ?? []
+      const summaries = await Promise.all(nextSections.map(async (section) => {
+        const [positionResult, candidateResult] = await Promise.all([
+          electionService.listPositions(eventId, section.id),
+          electionService.listCandidates(eventId, null, section.id),
+        ])
+        return {
+          id: section.id,
+          ready: groupHasCandidatesForEveryPosition(positionResult.data.positions ?? [], candidateResult.data.candidates ?? []),
+        }
+      }))
+      const completedIds = summaries.filter((summary) => summary.ready).map((summary) => summary.id)
       setSections(nextSections)
-      setSectionId((current) =>
-        nextSections.some((section) => section.id === current) ? current : nextSections[0]?.id ?? '',
-      )
+      setCompletedSectionIds(completedIds)
+      setSectionId(firstIncompleteSectionId(nextSections, completedIds))
     })
   }, [eventId])
 
@@ -210,6 +232,23 @@ function ElectionCandidatesPageContent() {
   }
 
   const positionName = (id) => positions.find((p) => p.id === id)?.name ?? '—'
+  const sectionIndex = sections.findIndex((section) => section.id === sectionId)
+  const previousSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null
+  const nextSection = sectionIndex >= 0 ? sections[sectionIndex + 1] : null
+  const currentGroupReady = completedSectionIds.includes(sectionId) || groupHasCandidatesForEveryPosition(positions, candidates)
+  const handleGroupBack = () => {
+    if (!previousSection) return
+    setSectionId(previousSection.id)
+    setPositionId('')
+  }
+  const handleGroupNext = () => {
+    if (nextSection) {
+      setSectionId(nextSection.id)
+      setPositionId('')
+      return
+    }
+    navigate(stagePath('election', 'voters', eventId))
+  }
 
   if (loading && !showLoader) {
     return null
@@ -226,31 +265,15 @@ function ElectionCandidatesPageContent() {
   }
 
   return (
-    <div data-module="election" className="mx-auto max-w-7xl">
+    <div data-module="election" className="mx-auto max-w-7xl pb-24">
+    <div className="mb-4">
+      <ElectionGroupStepper sections={sections} currentId={sectionId} completedIds={completedSectionIds} onSelect={(id) => { setSectionId(id); setPositionId('') }} />
+    </div>
     <ManagementWorkspace
       title="Candidate Management"
       subtitle="Add candidates to ballot positions, maintain their profiles, and review the full slate."
       formPanel={
         <div className="space-y-4">
-        <div className="v-card p-4">
-          <label className="mb-1 block text-sm text-v-text-muted" htmlFor="candidate-section">
-            Election Group
-          </label>
-          <select
-            id="candidate-section"
-            className={inputClass}
-            value={sectionId}
-            onChange={(e) => {
-              setSectionId(e.target.value)
-              setPositionId('')
-            }}
-          >
-            <option value="">Select an election group</option>
-            {sections.map((section) => (
-              <option key={section.id} value={section.id}>{section.name}</option>
-            ))}
-          </select>
-        </div>
         {setupLocked ? (
           <ReadOnlyEventBanner status={status} noun="election" />
         ) : (
@@ -361,6 +384,20 @@ function ElectionCandidatesPageContent() {
         </div>
       }
     />
+    {!setupLocked && (
+      <StageFooter
+        module="election"
+        currentKey="candidates"
+        eventId={eventId}
+        saving={saving || loading}
+        showSidebarHint={false}
+        backLabel={previousSection ? `Back: ${previousSection.name}` : undefined}
+        onBack={previousSection ? handleGroupBack : undefined}
+        nextLabel={nextSection ? `Next: ${nextSection.name}` : sections.length ? 'Next: Voters' : 'Add an election group first'}
+        onNext={handleGroupNext}
+        nextDisabled={!sectionId || !currentGroupReady || saving || loading}
+      />
+    )}
     </div>
   )
 }

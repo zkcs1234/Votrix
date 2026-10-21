@@ -1,84 +1,94 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { GraduationCap, Trophy } from 'lucide-react'
 import OrganizerManagementPage from './OrganizerManagementPage'
-import VotersPanel from '@/components/admin/VotersPanel'
+import StudentsPanel from '@/components/admin/StudentsPanel'
 import JudgesPanel from '@/components/admin/JudgesPanel'
-import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 
-// Participant type pools remain separate views over shared user accounts.
 const TABS = [
   { value: 'organizers', label: 'Organizers' },
   { value: 'participants', label: 'Participants' },
 ]
 
+// New simplified categories: Students (voter + respondent) and Judges
+const PARTICIPANT_CATEGORIES = [
+  { id: 'students', label: 'Students', icon: GraduationCap },
+  { id: 'judges', label: 'Judges', icon: Trophy },
+]
+
 export default function UserManagementPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
-  const legacyParticipantTypes = {
-    voters: 'election-voter',
-    judges: 'competition-judge',
-    respondents: 'polling-respondent',
+  
+  // Handle legacy URL parameters
+  const legacyTypeMapping = {
+    'election-voter': 'students',
+    'polling-respondent': 'students',
+    'competition-judge': 'judges',
+    voters: 'students',
+    respondents: 'students',
+    judges: 'judges',
   }
-  const participantTypes = [
-    { id: 'election-voter', label: 'Election Voters' },
-    { id: 'competition-judge', label: 'Competition Judges' },
-    { id: 'polling-respondent', label: 'Polling Respondents' },
-  ]
-  const requestedType = searchParams.get('type') || legacyParticipantTypes[requestedTab]
-  const initialParticipantType = participantTypes.some((type) => type.id === requestedType)
-    ? requestedType
-    : participantTypes[0].id
-  const initialTab = requestedTab === 'participants' || legacyParticipantTypes[requestedTab]
+  
+  const requestedCategory = searchParams.get('category') || legacyTypeMapping[searchParams.get('type')] || legacyTypeMapping[requestedTab]
+  const initialCategory = PARTICIPANT_CATEGORIES.some((cat) => cat.id === requestedCategory)
+    ? requestedCategory
+    : PARTICIPANT_CATEGORIES[0].id
+  
+  const initialTab = requestedTab === 'participants' || legacyTypeMapping[requestedTab]
     ? 'participants'
     : 'organizers'
+  
   const [tab, setTab] = useState(initialTab)
-  const [participantType, setParticipantType] = useState(initialParticipantType)
+  const [category, setCategory] = useState(initialCategory)
 
   const selectTab = (nextTab) => {
     setTab(nextTab)
     setSearchParams(nextTab === 'participants'
-      ? { tab: nextTab, type: participantType }
+      ? { tab: nextTab, category }
       : { tab: nextTab })
   }
 
-  const selectParticipantType = (nextType) => {
-    setParticipantType(nextType)
-    setSearchParams({ tab: 'participants', type: nextType })
+  const selectCategory = (nextCategory) => {
+    setCategory(nextCategory)
+    setSearchParams({ tab: 'participants', category: nextCategory })
   }
 
   return (
     <div className="space-y-6">
-      {tab === 'participants' && (
-        <div data-module={participantType === 'competition-judge' ? 'competition-scoring' : participantType === 'polling-respondent' ? 'polling' : 'election'}>
-          <PageHeader
-            title="User management"
-            description="Manage organizer accounts and participant pools."
-          />
-        </div>
-      )}
       <Tabs tabs={TABS} value={tab} onChange={selectTab} label="User management" />
 
       {tab === 'organizers' && <OrganizerManagementPage />}
       {tab === 'participants' && (
-        <div data-module={participantType === 'competition-judge' ? 'competition-scoring' : participantType === 'polling-respondent' ? 'polling' : 'election'} className="space-y-5">
+        <div 
+          data-module={category === 'judges' ? 'competition-scoring' : 'election'} 
+          className="space-y-5"
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="v-section-title">Participant type</h2>
-              <p className="v-caption mt-1">These are types within the Participant role. One account may have more than one type.</p>
+              <h2 className="v-section-title">Participant Category</h2>
+              <p className="v-caption mt-1">
+                Students automatically participate in elections and polls. 
+                Judges score competitions only.
+              </p>
             </div>
             <Tabs
-              tabs={participantTypes.map((type) => ({ value: type.id, label: type.label }))}
-              value={participantType}
-              onChange={selectParticipantType}
-              label="Participant type"
+              tabs={PARTICIPANT_CATEGORIES.map((cat) => ({ 
+                value: cat.id, 
+                label: cat.label,
+                icon: cat.icon 
+              }))}
+              value={category}
+              onChange={selectCategory}
+              label="Participant category"
+              variant="segmented"
               className="w-full sm:w-auto"
             />
           </div>
 
-          {participantType === 'election-voter' && <VotersPanel key="election-voters" pool="election" />}
-          {participantType === 'competition-judge' && <JudgesPanel key="competition-judges" />}
-          {participantType === 'polling-respondent' && <VotersPanel key="polling-respondents" pool="polling" />}
+          {category === 'students' && <StudentsPanel key="students" />}
+          {category === 'judges' && <JudgesPanel key="judges" />}
         </div>
       )}
     </div>

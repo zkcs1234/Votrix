@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import VoterEventPage from './VoterEventPage'
+import VoterEventHeader from '@/components/voter/VoterEventHeader'
 
 const mocks = vi.hoisted(() => ({ getBallot: vi.fn() }))
 
@@ -16,6 +17,13 @@ vi.mock('@/hooks/useAuth', () => ({
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+})
+
+test('event header shows the event title and styled back-to-dashboard link', () => {
+  render(<MemoryRouter><VoterEventHeader event={{ title: 'Campus Election' }} eyebrow="Election ballot" /></MemoryRouter>)
+  expect(screen.getByRole('heading', { name: 'Campus Election' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/participant')
+  expect(screen.getByText('Election ballot')).toBeInTheDocument()
 })
 
 test('shows ballot load errors and recovers when retry succeeds', async () => {

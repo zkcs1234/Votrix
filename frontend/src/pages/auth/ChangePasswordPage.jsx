@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { Lock, ShieldCheck, ArrowRight, SkipForward } from 'lucide-react'
 
 import FormAlert from '@/components/ui/FormAlert'
 import { changePasswordSchema } from '@/schemas/auth.schemas'
@@ -92,10 +93,13 @@ export default function ChangePasswordPage() {
 
   return (
     <div>
-      <h2 className="v-page-title">Secure your account</h2>
-      <p className="mt-2 text-sm leading-relaxed text-v-text-subtle">
+      <div className="flex items-center gap-2">
+        <Lock className="h-5 w-5 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
+        <h2 className="text-xl font-semibold text-v-text">Change your password</h2>
+      </div>
+      <p className="mt-2 text-sm text-v-text-subtle">
         {canSkip
-          ? 'Replace your temporary password before continuing.'
+          ? 'Set a personal password to secure your account, or continue with your temporary password.'
           : `You must set a new password before accessing your ${role} dashboard.`}
       </p>
 
@@ -143,21 +147,40 @@ export default function ChangePasswordPage() {
 
         {error && <FormAlert variant="error">{error}</FormAlert>}
 
-        <SubmitButton loading={loading}>Update password</SubmitButton>
+        <SubmitButton loading={loading}>
+          <ShieldCheck className="h-4 w-4" strokeWidth={2} />
+          Set new password
+        </SubmitButton>
       </form>
 
       {/* Skip option for voters and organizers */}
       {canSkip && (
-        <div className="mt-4">
+        <div className="mt-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-v-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-v-bg px-2 text-v-text-subtle">Or</span>
+            </div>
+          </div>
           <Button
             type="button"
-            variant="secondary"
+            variant="ghost"
             size="lg"
-            className="w-full"
+            className="mt-4 flex w-full items-center justify-center gap-2 border border-v-border bg-transparent text-v-text-subtle hover:bg-v-surface hover:text-v-text"
             onClick={onSkip}
             loading={skipLoading}
           >
-            {skipLoading ? 'Continuing...' : 'Continue with temporary password'}
+            {skipLoading ? (
+              'Continuing...'
+            ) : (
+              <>
+                <SkipForward className="h-4 w-4" strokeWidth={2} />
+                <span>Continue with temporary password</span>
+                <ArrowRight className="h-4 w-4" strokeWidth={2} />
+              </>
+            )}
           </Button>
           <p className="mt-2 text-center text-xs text-v-text-subtle">
             You can change your password anytime from your account settings.

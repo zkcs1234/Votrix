@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Clock3 } from 'lucide-react'
+import { useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import { validatePollAnswers } from '@/utils/pollValidation'
 import { getDraftStorageKey } from '@/utils/draftStorage'
@@ -9,6 +8,7 @@ import FormAlert from '@/components/ui/FormAlert'
 import Button from '@/components/ui/Button'
 import PollQuestionField from '@/components/voter/polling/PollQuestionField'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
+import VoterDashboardLink from '@/components/voter/VoterDashboardLink'
 import { useAuth } from '@/hooks/useAuth'
 import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
 import { getErrorMessage } from '@/utils/getErrorMessage'
@@ -146,12 +146,9 @@ export default function VoterPollPage() {
 
   if (done) {
     return (
-      <div data-module="polling" className="v-card-md mx-auto max-w-lg border-v-success/30 bg-v-success-bg text-center">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-v-surface text-v-success">
-          <CheckCircle2 className="h-6 w-6" strokeWidth={1.8} aria-hidden />
-        </span>
-        <p className="mt-4 text-lg font-semibold text-v-success">Response submitted</p>
-        <p className="mt-2 text-sm leading-relaxed text-v-text-muted">
+      <div data-module="polling" className="mx-auto max-w-lg rounded-2xl border border-v-success/30 bg-v-success-bg p-8 text-center">
+        <p className="text-lg font-semibold text-v-success">Response submitted</p>
+        <p className="mt-2 text-sm text-v-text-subtle">
           Thank you for completing {poll?.event?.title}.
         </p>
         {poll?.event?.pollAllowMultipleSubmissions && poll?.pollOpen && (
@@ -163,23 +160,17 @@ export default function VoterPollPage() {
             Submit another response
           </button>
         )}
-        <Link to="/participant" className="v-btn-tertiary mt-5 inline-flex items-center justify-center gap-2">
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          Back to dashboard
-        </Link>
+        <VoterDashboardLink className="mt-5" />
       </div>
     )
   }
 
   if (!poll?.pollOpen) {
     return (
-      <div data-module="polling" className="v-card-md mx-auto max-w-lg text-center">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-v-primary-soft text-v-primary">
-          <Clock3 className="h-6 w-6" strokeWidth={1.8} aria-hidden />
-        </span>
-        <p className="mt-4 text-lg font-semibold text-v-text">This poll is closed or has expired.</p>
+      <div data-module="polling" className="mx-auto max-w-lg v-card p-8 text-center">
+        <p className="text-v-text">This poll is closed or has expired.</p>
         {poll?.event?.startDate && poll?.event?.endDate && (
-          <p className="mt-2 text-sm leading-relaxed text-v-text-muted">
+          <p className="mt-2 text-sm text-v-text-subtle">
             This poll was open from{' '}
             {new Date(poll.event.startDate).toLocaleString(undefined, {
               dateStyle: 'medium',
@@ -194,25 +185,16 @@ export default function VoterPollPage() {
           </p>
         )}
 
-        <Link to="/participant" className="v-btn-tertiary mt-5 inline-flex items-center justify-center gap-2">
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          Back to dashboard
-        </Link>
+        <VoterDashboardLink className="mt-5" />
       </div>
     )
   }
 
   if (!poll?.canSubmit) {
     return (
-      <div data-module="polling" className="v-card-md mx-auto max-w-lg text-center">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-v-primary-soft text-v-primary">
-          <CheckCircle2 className="h-6 w-6" strokeWidth={1.8} aria-hidden />
-        </span>
-        <p className="mt-4 text-lg font-semibold text-v-text">You have already responded to this poll.</p>
-        <Link to="/participant" className="v-btn-tertiary mt-5 inline-flex items-center justify-center gap-2">
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          Back to dashboard
-        </Link>
+      <div data-module="polling" className="mx-auto max-w-lg v-card p-8 text-center">
+        <p className="text-v-text">You have already responded to this poll.</p>
+        <VoterDashboardLink className="mt-5" />
       </div>
     )
   }
@@ -228,11 +210,11 @@ export default function VoterPollPage() {
       visible on mobile.
     */
     <FullscreenVotingShell>
-    <form onSubmit={handleSubmit} data-module="polling" className="fixed inset-0 z-50 flex h-[100dvh] flex-col bg-v-bg">
+    <form onSubmit={handleSubmit} data-module="polling" className="fixed inset-0 z-50 flex h-dvh flex-col bg-v-surface">
       {/* ===== FIXED TOP: Floating progress card (does not scroll) ===== */}
       <div className="shrink-0">
         <div className="mx-auto max-w-2xl px-4 pt-3 pb-1 md:px-8">
-          <div className="v-card-sm border-t-4 border-t-v-primary p-3 shadow-v-shadow-md">
+          <div className="v-card-sm p-3 shadow-v-shadow-md">
             <div className="flex items-center justify-between gap-2 text-sm">
               <span className="text-v-text-muted">
                 {answeredCount} of {questions.length} answered
@@ -271,9 +253,9 @@ export default function VoterPollPage() {
           )}
 
           <VoterEventHeader event={poll.event} eyebrow="Poll">
-            {voterName && <p className="text-sm font-medium text-white/75">Responding as {voterName}</p>}
+            {voterName && <p>Responding as {voterName}</p>}
             {poll.event.pollAnonymous && (
-              <p className="text-xs font-medium text-white/70">Your responses are anonymous.</p>
+              <p>Your responses are anonymous.</p>
             )}
           </VoterEventHeader>
 

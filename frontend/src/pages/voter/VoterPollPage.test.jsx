@@ -36,3 +36,26 @@ test('shows poll load errors and recovers when retry succeeds', async () => {
   expect(await screen.findByText('This poll is closed or has expired.')).toBeInTheDocument()
   expect(mocks.getPoll).toHaveBeenCalledTimes(2)
 })
+
+test('shows the poll title and styled back-to-dashboard link', async () => {
+  mocks.getPoll.mockResolvedValue({
+    data: {
+      pollOpen: true,
+      canSubmit: true,
+      questions: [],
+      event: { title: 'Campus Survey', pollAnonymous: true },
+    },
+  })
+
+  render(
+    <MemoryRouter initialEntries={['/participant/polling/events/poll-1']}>
+      <Routes>
+        <Route path="/participant/polling/events/:eventId" element={<VoterPollPage />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+
+  expect(await screen.findByRole('heading', { name: 'Campus Survey' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/participant')
+  expect(screen.getByText('Your responses are anonymous.')).toBeInTheDocument()
+})

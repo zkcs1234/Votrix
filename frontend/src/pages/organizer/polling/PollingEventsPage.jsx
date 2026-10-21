@@ -6,8 +6,6 @@ import { isSetupLocked } from '@/utils/constants'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import FormAlert from '@/components/ui/FormAlert'
-import PageHeader from '@/components/ui/PageHeader'
-import Badge, { statusTone } from '@/components/ui/Badge'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import useDraft from '@/hooks/useDraft'
 import DraftBanner from '@/components/organizer/DraftBanner'
@@ -154,16 +152,13 @@ export default function PollingEventsPage() {
         />
       )}
 
-      <PageHeader
-        title="Polls"
-        description="Manage poll setup, preview questions, and continue building respondent experiences."
-        actions={
-          <Link to="/organizer/polling/events/new" className="v-btn-primary">
-            <Plus className="h-4 w-4" strokeWidth={2} />
-            New poll
-          </Link>
-        }
-      />
+      <div className="flex justify-between">
+        <h2 className="text-xl font-semibold text-v-text">Polls</h2>
+        <Link to="/organizer/polling/events/new" className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm text-white">
+          <Plus className="h-4 w-4" strokeWidth={2} />
+          New poll
+        </Link>
+      </div>
 
       {hasDraft && (
         <DraftBanner
@@ -191,26 +186,24 @@ export default function PollingEventsPage() {
       {events.map((event) => (
         <article
           key={event.id}
-          className="v-card-md flex min-w-0 flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center"
+          className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-border bg-v-surface p-5"
         >
-          <div className="min-w-0">
+          <div>
             <Link
               to={`/organizer/polling/events/${event.id}/builder`}
-              className="break-words text-lg font-semibold text-v-text hover:text-v-primary"
+              className="text-lg font-medium text-v-text hover:text-v-text"
             >
               {event.title}
             </Link>
-            <div className="mt-1.5">
-              <Badge tone={statusTone(event.status)} dot className="capitalize">
-                {event.status === 'draft' ? 'Setup — not published' : event.status}
-              </Badge>
+            <div className="mt-1 text-sm capitalize text-v-text-subtle">
+              {event.status === 'draft' ? 'Setup — not published' : event.status}
             </div>
           </div>
-          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setPreviewEventId(event.id)}
-              className="v-btn-secondary"
+              className="inline-flex items-center gap-1 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated"
             >
               <Eye className="h-3.5 w-3.5" strokeWidth={2} />
               Preview
@@ -218,14 +211,14 @@ export default function PollingEventsPage() {
             {event.status === 'draft' && (
               <Link
                 to={`/organizer/polling/events/${event.id}/builder`}
-                className="v-btn-primary"
+                className="rounded-lg border border-v-primary bg-v-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-v-primary-hover"
               >
                 Continue setup
               </Link>
             )}
             <Link
               to={`/organizer/polling/events/${event.id}/edit`}
-              className="v-btn-secondary"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-v-border-strong px-3 py-1.5 text-sm text-v-text-muted"
             >
               {isSetupLocked(event.status) ? (
                 <>

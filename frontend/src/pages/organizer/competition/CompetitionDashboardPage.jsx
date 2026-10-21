@@ -35,7 +35,7 @@ export default function CompetitionDashboardPage() {
   // Show skeleton after 300ms
   if (isLoading || showLoader) {
     return (
-      <div className="v-dashboard space-y-6">
+      <div className="space-y-6">
         <div className="h-8 w-72 animate-pulse rounded-lg bg-v-surface-elevated" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -47,10 +47,10 @@ export default function CompetitionDashboardPage() {
   }
 
   return (
-    <div className="v-dashboard space-y-6">
+    <div className="space-y-6">
       <PageHeader
-        title="Competition dashboard"
-        description={nativeSetupEnabled ? 'Choose an event to configure its independent competitions, judges, and scoring.' : 'Event context and participation, without losing the operational detail.'}
+        title="Competition Scoring dashboard"
+        description={nativeSetupEnabled ? 'Choose an event to configure its independent competitions, judges, and scoring.' : 'Manage contestants, criteria, and judge scoring.'}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {nativeSetupEnabled && (
@@ -72,8 +72,8 @@ export default function CompetitionDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Events" value={data?.stats?.totalEvents ?? 0} icon={CalendarDays} />
         <StatCard label="Active sessions" value={data?.stats?.activeSessions ?? 0} icon={Zap} />
-        <StatCard label="Contestants" value={data?.stats?.totalContestants ?? 0} icon={Users} />
-        <StatCard label="Judges" value={data?.stats?.totalJudges ?? 0} hint="Across all events" icon={Star} />
+        <StatCard label="Total contestants" value={data?.stats?.totalContestants ?? 0} icon={Users} />
+        <StatCard label="Total judges" value={data?.stats?.totalJudges ?? 0} hint="Across all events" icon={Star} />
         <StatCard label="Scores submitted" value={data?.stats?.scoresSubmitted ?? 0} icon={CheckSquare} />
       </div>
 
@@ -85,6 +85,7 @@ export default function CompetitionDashboardPage() {
       />
 
       <EventStatsTable
+        tableClassName="v-competition-dashboard-table"
         title="Judge completion by event"
         events={data?.eventBreakdown ?? []}
         linkFor={(e) => `/organizer/competition/events/${e.id}/${nativeSetupEnabled ? 'workspace' : 'contestants'}`}

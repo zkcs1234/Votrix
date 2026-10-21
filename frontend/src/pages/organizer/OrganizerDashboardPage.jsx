@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Zap, CheckCircle2, Users, Vote, Trophy, BarChart2, BarChart3, CheckSquare, Clock, Play } from 'lucide-react'
+import { CalendarDays, Zap, CheckCircle2, Users, Vote, Trophy, BarChart2, BarChart3, CheckSquare, Clock, Play, ArrowRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import StatCard from '@/components/ui/StatCard'
 import Card from '@/components/ui/Card'
-import PageHeader from '@/components/ui/PageHeader'
-import ModuleCard from '@/components/ui/ModuleCard'
 import {
   SkeletonStatCard,
   SkeletonModuleLink,
@@ -19,6 +17,9 @@ import { useSocketEvent } from '@/hooks/useSocketEvent'
 import OrganizationLogoUpload from '@/components/upload/OrganizationLogoUpload'
 import OrganizerOverviewEvents from '@/components/organizer/OrganizerOverviewEvents'
 import CreateEventMenu from '@/components/organizer/CreateEventMenu'
+import ElectionSVG from '@/assets/module/undraw_voting_3ygx.svg'
+import CompetitionSVG from '@/assets/module/pageant-amico.svg'
+import PollingSVG from '@/assets/module/undraw_data_25jw.svg'
 
 export default function OrganizerDashboardPage() {
   const { user } = useAuth()
@@ -156,18 +157,15 @@ export default function OrganizerDashboardPage() {
 
   return (
     <div className="v-dashboard space-y-6">
-      <PageHeader
-        title="Organizer dashboard"
-        description={
-          <>
-            Your organization&apos;s events, participation and live sessions at a glance.{' '}
-            <span className="whitespace-nowrap">
-              Signed in as <span className="font-medium text-v-text-muted">{user?.organizerName || user?.email}</span>.
-            </span>
-          </>
-        }
-        actions={<CreateEventMenu create showPlus label="Create event" />}
-      />
+      <div className="v-card-md flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="v-page-title">Organizer dashboard</h2>
+          <p className="v-caption mt-2">
+            Signed in as <span className="text-v-text-muted">{user?.organizerName || user?.email}</span>
+          </p>
+        </div>
+        <CreateEventMenu create showPlus label="Create event" />
+      </div>
 
       {/* Live competition session banner */}
       {activeSessions.length > 0 && (
@@ -236,13 +234,7 @@ export default function OrganizerDashboardPage() {
         </div>
       )}
 
-      <OrganizationLogoUpload
-        organizationName={dashboard?.organization?.organizationName}
-        logoUrl={dashboard?.organization?.logo}
-        onUpload={(file) => organizerService.uploadOrganizationLogo(file)}
-      />
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total events" value={stats?.totalEvents ?? 0} icon={CalendarDays} />
         <StatCard label="Active events" value={stats?.activeEvents ?? 0} icon={Zap} />
         <StatCard label="Finished events" value={stats?.finishedEvents ?? 0} icon={CheckCircle2} />
@@ -260,28 +252,57 @@ export default function OrganizerDashboardPage() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <ModuleCard
-          module="election"
-          icon={Vote}
-          title="Election"
-          description="Ballots, positions and voter turnout."
-          to="/organizer/election"
-        />
-        <ModuleCard
-          module="competition"
-          icon={Trophy}
-          title="Competition"
-          description="Scoring, live control and tabulation."
-          to="/organizer/competition"
-        />
-        <ModuleCard
-          module="polling"
-          icon={BarChart2}
-          title="Polling"
-          description="Questions, responses and insights."
-          to="/organizer/polling"
-        />
+      <OrganizationLogoUpload
+        organizationName={dashboard?.organization?.organizationName}
+        logoUrl={dashboard?.organization?.logo}
+        onUpload={(file) => organizerService.uploadOrganizationLogo(file)}
+      />
+
+      <div className="grid gap-5 md:grid-cols-3">
+        <div className="v-module-card">
+          <div className="v-module-card__illustration bg-vote-gradient">
+            <img src={ElectionSVG} alt="Election" className="h-full w-full object-cover" />
+          </div>
+          <div className="v-module-card__body">
+            <Vote className="v-module-card__icon" strokeWidth={1.5} />
+            <h3 className="v-module-card__title">Election module</h3>
+            <p className="v-module-card__desc">Manage events, positions, candidates, and voters.</p>
+            <Link to="/organizer/election" className="v-btn-primary mt-4 w-full v-press">
+              <span>Manage Election</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+
+        <div className="v-module-card">
+          <div className="v-module-card__illustration bg-comp-gradient">
+            <img src={CompetitionSVG} alt="Competition" className="h-full w-full object-cover" />
+          </div>
+          <div className="v-module-card__body">
+            <Trophy className="v-module-card__icon" strokeWidth={1.5} />
+            <h3 className="v-module-card__title">Competition Scoring module</h3>
+            <p className="v-module-card__desc">Contestants, criteria, judge scoring, and rankings.</p>
+            <Link to="/organizer/competition" className="v-btn-primary mt-4 w-full v-press">
+              <span>Manage Competition</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+
+        <div className="v-module-card">
+          <div className="v-module-card__illustration bg-poll-gradient">
+            <img src={PollingSVG} alt="Polling" className="h-full w-full object-cover" />
+          </div>
+          <div className="v-module-card__body">
+            <BarChart2 className="v-module-card__icon" strokeWidth={1.5} />
+            <h3 className="v-module-card__title">Polling module</h3>
+            <p className="v-module-card__desc">Build surveys, configure polls, and view analytics.</p>
+            <Link to="/organizer/polling" className="v-btn-primary mt-4 w-full v-press">
+              <span>Create Poll</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
       </div>
 
       <OrganizerOverviewEvents dashboard={dashboard} />
@@ -346,15 +367,15 @@ export default function OrganizerDashboardPage() {
 
       <Link
         to="/organizer/reports"
-        className="v-card-sm flex items-start gap-3 p-4 transition hover:border-v-primary/50"
+        className="v-card-md block transition hover:border-v-border-strong"
       >
-        <BarChart3 className="mt-0.5 h-4 w-4 text-v-primary" strokeWidth={1.75} aria-hidden />
-        <span>
-          <span className="block font-semibold text-v-text">Analytics &amp; reports</span>
-          <span className="v-caption block">
-            Turnout reports, vote summaries, competition rankings, and polling charts.
-          </span>
-        </span>
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} />
+          <h3 className="v-section-title">Analytics &amp; reports</h3>
+        </div>
+        <p className="v-caption mt-2">
+          Turnout reports, vote summaries, competition rankings, and polling charts.
+        </p>
       </Link>
     </div>
   )

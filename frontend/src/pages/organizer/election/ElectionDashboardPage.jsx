@@ -32,10 +32,10 @@ export default function ElectionDashboardPage() {
   if (isLoading) return <PageLoader label="Loading dashboard…" />
 
   return (
-    <div className="v-dashboard space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Election dashboard"
-        description="Event context and participation, without losing the operational detail."
+        description="Manage events, ballots, and voter turnout."
         actions={
           <Link to="/organizer/election/events/new">
             <Button>
@@ -49,7 +49,7 @@ export default function ElectionDashboardPage() {
       {/* Event counts aggregate cleanly; participation rates do not, so they
           live in the per-event table below rather than as blended totals. */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Events" value={data?.stats?.totalEvents ?? 0} icon={CalendarDays} />
+        <StatCard label="Total events" value={data?.stats?.totalEvents ?? 0} icon={CalendarDays} />
         <StatCard
           label="Voting active"
           value={data?.stats?.activeVoting ?? 0}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { KeyRound, ShieldCheck, RefreshCcw } from 'lucide-react'
 
 import FormAlert from '@/components/ui/FormAlert'
 import { resetPasswordSchema } from '@/schemas/auth.schemas'
@@ -51,10 +52,11 @@ export default function ResetPasswordPage() {
 
   return (
     <div>
-      <h2 className="v-page-title">Set a new password</h2>
-      <p className="mt-2 text-sm leading-relaxed text-v-text-subtle">
-        Choose a password with at least 8 characters.
-      </p>
+      <div className="flex items-center gap-2">
+        <KeyRound className="h-5 w-5 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
+        <h2 className="text-xl font-semibold text-v-text">Set a new password</h2>
+      </div>
+      <p className="mt-2 text-sm text-v-text-subtle">Choose a strong password for your account.</p>
 
       {!token && (
         <FormAlert variant="warning" title="Invalid or missing reset token" className="mt-6">
@@ -95,15 +97,19 @@ export default function ResetPasswordPage() {
 
         {error && <FormAlert variant="error">{error}</FormAlert>}
 
-        <SubmitButton loading={loading} disabled={!token}>Reset password</SubmitButton>
+        <SubmitButton loading={loading} disabled={!token}>
+          <ShieldCheck className="h-4 w-4" strokeWidth={2} />
+          Reset password
+        </SubmitButton>
       </form>
 
-      <p className="mt-5 flex items-center justify-center gap-4 text-center text-sm">
-        <Link to="/login" className="font-semibold text-v-primary hover:underline">
-          Back to sign in
+      <p className="mt-4 flex items-center justify-center gap-4 text-center text-sm text-v-text-subtle">
+        <Link to="/login" className="text-v-text-muted hover:text-v-text">
+          Back to login
         </Link>
-        <Link to="/forgot-password" className="font-semibold text-v-primary hover:underline">
-          Request new reset link
+        <Link to="/forgot-password" className="inline-flex items-center gap-1 text-v-text-muted hover:text-v-text">
+          <RefreshCcw className="h-3.5 w-3.5" strokeWidth={2} />
+          Request new link
         </Link>
       </p>
     </div>

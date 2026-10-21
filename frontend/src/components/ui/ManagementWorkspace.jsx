@@ -21,16 +21,16 @@ export default function ManagementWorkspace({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          {title && <h2 className="font-display text-xl font-bold tracking-tight text-v-text sm:text-2xl">{title}</h2>}
-          {subtitle && <p className="mt-1 max-w-2xl text-sm leading-6 text-v-text-muted">{subtitle}</p>}
+          {title && <h2 className="text-xl font-semibold text-v-text">{title}</h2>}
+          {subtitle && <p className="mt-1 text-sm text-v-text-subtle">{subtitle}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {headerActions}
           <button
             type="button"
-            className="v-btn-secondary lg:hidden"
+            className="lg:hidden rounded-lg border border-v-border px-3 py-1.5 text-sm text-v-text-muted hover:bg-v-surface-elevated"
             onClick={() => setFormVisible(!formVisible)}
           >
             {formVisible ? 'Hide Form' : 'Show Form'}

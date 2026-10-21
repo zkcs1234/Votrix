@@ -32,7 +32,7 @@ export default function PollingDashboardPage() {
   // Show skeleton after 300ms
   if (isLoading || showLoader) {
     return (
-      <div className="v-dashboard space-y-6">
+      <div className="space-y-6">
         <div className="h-8 w-64 animate-pulse rounded-lg bg-v-surface-elevated" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -44,10 +44,10 @@ export default function PollingDashboardPage() {
   }
 
   return (
-    <div className="v-dashboard space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Polling dashboard"
-        description="Event context and participation, without losing the operational detail."
+        description="Manage surveys, configure polls, and track responses."
         actions={
           <Link to="/organizer/polling/events/new">
             <Button>

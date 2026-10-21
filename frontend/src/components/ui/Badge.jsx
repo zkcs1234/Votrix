@@ -13,7 +13,7 @@ const tones = {
 export default function Badge({ children, tone = 'default', dot = false, className = '' }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${tones[tone] ?? tones.default} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium ${tones[tone] ?? tones.default} ${className}`}
     >
       {dot && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />}
       {children}

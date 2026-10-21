@@ -8,20 +8,19 @@ import ImageUploadField from '@/components/upload/ImageUploadField'
 import CalendarCard from '@/components/ui/CalendarCard'
 import Card from '@/components/ui/Card'
 import { getNextStage, stagePath } from '@/utils/eventStages'
-import SaveStatus from '@/components/ui/SaveStatus'
+import StageFooter from '@/components/ui/StageFooter'
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
 import useSilentDraftAutosave from '@/hooks/useSilentDraftAutosave'
 import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
-import EventSetupAside from '@/components/organizer/EventSetupAside'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import { isSetupLocked } from '@/utils/constants'
 import Button from '@/components/ui/Button'
 
 import { COMPETITION_TYPES } from '../../../../../shared/competition-creation-flow.js'
-import WizardSteps from '@/components/ui/WizardSteps'
+import EventStepper from '@/components/ui/EventStepper'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
@@ -65,7 +64,7 @@ export default function CompetitionEventFormPage() {
   // existing event whose setup is locked (scheduled/active/…) is read-only.
   const readOnly = !isNew && (loading || loadFailed || isSetupLocked(eventStatus) || Boolean(officialRulesId))
 
-const { markComplete, reset: resetProgress } = useEventProgress(
+const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'competition',
     eventId,
   )
@@ -363,9 +362,17 @@ useEffect(() => {
   if (loadFailed) return <div role="alert" className="v-card p-5 space-y-3"><p className="v-error-text">{error}</p><Button variant="secondary" onClick={() => setLoadAttempt(value => value + 1)}>Retry loading event</Button></div>
 
   return (
-    <div data-module="competition-scoring" className="mx-auto max-w-6xl space-y-6">
+    <div data-module="competition-scoring" className="space-y-6">
       <>
-          <WizardSteps module="competition" currentKey={step} />
+          <EventStepper
+            module="competition"
+            currentKey={step}
+            eventId={eventId || 'new'}
+            completedKeys={completedKeys}
+            eventStatus={eventStatus}
+            readOnly={readOnly}
+            interactive={false}
+          />
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="competition" frozen={Boolean(officialRulesId)} />}
 
@@ -373,12 +380,12 @@ useEffect(() => {
             <h2 className="v-page-title">
               {isNew ? 'Create Competition Scoring Event' : readOnly ? 'View Competition Scoring Event' : 'Edit Competition Scoring Event'}
             </h2>
-            <p className="mt-1 text-sm text-v-text-subtle">
-              Define the event context and schedule before configuring the experience. Each competition keeps its own scoring, entries, judges, and results.
+            <p className="v-helper-text">
+              Complete the setup steps, then review and create your event. Each competition keeps its own scoring, entries, judges, and results.
             </p>
           </header>
 
-          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="grid grid-cols-1 gap-6">
           <div className="min-w-0">
             {error && <p role="alert" className="v-error-text">{error}</p>}
             <Card padding="md">
@@ -544,33 +551,31 @@ useEffect(() => {
         </fieldset>
       </Card>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-v-border pt-4">
-          <div className="flex items-center gap-3">
-            {step !== 'details' && (
-              <Button type="button" variant="secondary" disabled={saving} onClick={() => { setError(null); setStep(step === 'type' ? 'branding' : 'details') }}>
-                Back: {step === 'type' ? 'Branding' : 'Event Details'}
-              </Button>
-            )}
-            {!readOnly && <SaveStatus status={saveStatus} lastSavedAt={lastSavedAt} />}
-          </div>
-          {readOnly ? (
-            <Button type="button" onClick={() => {
+        <StageFooter
+          module="competition"
+          currentKey={step}
+          eventId={eventId || 'new'}
+          saving={saving}
+          saveStatus={readOnly ? 'idle' : saveStatus}
+          lastSavedAt={readOnly ? null : lastSavedAt}
+          showSidebarHint={false}
+          backLabel={step === 'type' ? 'Back: Branding' : 'Back: Event Details'}
+          onBack={() => { setError(null); setStep(step === 'type' ? 'branding' : 'details') }}
+          nextLabel={step === 'details' ? 'Next: Branding' : step === 'branding' ? 'Next: Competition Type' : 'Next: Competitions / Categories'}
+          onNext={() => {
+            if (readOnly) {
               if (step === 'details') setStep('branding')
-
               else {
                 const next = getNextStage('competition', step)
                 if (next) navigate(stagePath('competition', next.key, eventId))
               }
-            }}>Next</Button>
-          ) : (
-            <Button type="button" disabled={saving} onClick={step === 'details' ? handleNext : step === 'branding' ? handleNextBranding : handleNextType}>
-              {saving ? 'Saving...' : step === 'details' ? 'Next: Branding' : step === 'branding' ? 'Next: Competition Type' : 'Next: Competitions / Categories'}
-            </Button>
-          )}
-        </div>
+            } else if (step === 'details') handleNext()
+            else if (step === 'branding') handleNextBranding()
+            else handleNextType()
+          }}
+        />
           </div>
 
-          <EventSetupAside module="competition" />
           </div>
         </>
 

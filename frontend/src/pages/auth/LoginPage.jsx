@@ -19,8 +19,8 @@ export default function LoginPage() {
 
   return (
     <LoginForm
-      title="Welcome back"
-      description="Sign in to your VOTRIX workspace."
+      title="Sign in to VOTRIX"
+      description="Enter your email and password to access your account."
       error={error}
       loading={loading}
       onSubmit={onSubmit(handleSubmit)}

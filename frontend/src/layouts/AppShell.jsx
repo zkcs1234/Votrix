@@ -523,8 +523,8 @@ export default function AppShell({
     >
       {showSidebar && (
         <aside
-          className={`sticky top-0 hidden h-screen min-h-screen shrink-0 self-start overflow-y-auto border-r border-white/5 bg-v-sidebar transition-[width,padding] duration-200 ease-in-out md:block ${
-            isCollapsed ? 'w-18 px-3 py-6' : 'w-64 p-5'
+          className={`hidden shrink-0 bg-v-sidebar lg:block sticky top-0 self-start h-screen min-h-screen overflow-y-auto transition-[width,padding] duration-200 ease-in-out ${
+            isCollapsed ? 'w-18 px-3 py-6' : 'w-64 p-6'
           }`}
         >
           {sidebar(true)}
@@ -533,25 +533,25 @@ export default function AppShell({
 
       {/* Off-canvas sidebar for Tablet/Mobile */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
           <button
             type="button"
             className="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-sm cursor-default"
             aria-label="Close menu"
             onClick={closeMobile}
           />
-          <aside className="relative flex h-full w-[min(100%,288px)] flex-col overflow-y-auto border-r border-white/5 bg-v-sidebar p-5 shadow-xl animate-in slide-in-from-left duration-200 ease-out">
+          <aside className="relative flex h-full w-[min(100%,280px)] flex-col bg-v-sidebar p-6 shadow-xl animate-in slide-in-from-left duration-200 ease-out">
             {sidebar(false)}
           </aside>
         </div>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex min-h-18 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-v-border bg-v-surface/95 px-4 py-3 backdrop-blur-md sm:px-6">
+        <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-v-border bg-v-surface px-4 py-3 shadow-v-shadow sm:px-6 sm:py-4">
           {showSidebar && (
             <button
               type="button"
-              className="flex-shrink-0 rounded-lg border border-v-border p-2 text-v-text-muted transition hover:border-v-primary/40 hover:bg-v-primary-soft/50 hover:text-v-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary pointer-coarse:min-h-11 pointer-coarse:min-w-11 md:hidden"
+              className="shrink-0 rounded-lg border border-v-border p-2 text-v-text-muted hover:bg-v-surface-elevated lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Open menu"
               aria-expanded={mobileOpen}
@@ -571,9 +571,12 @@ export default function AppShell({
               </Link>
             )}
             {showSidebar ? (
-              <h1 className="truncate font-display text-base font-bold text-v-text sm:text-lg">
-                {headerLabel ?? title}
-              </h1>
+              <>
+                <h1 className="truncate text-base font-semibold text-v-text sm:text-lg">
+                  {headerLabel ?? title}
+                </h1>
+                {moduleLabel && <p className="truncate text-xs text-v-text-subtle">{moduleLabel}</p>}
+              </>
             ) : (
               // Figma participant header: wordmark + context, no sidebar or search.
               <div className="flex min-w-0 items-center gap-2">
@@ -693,7 +696,7 @@ export default function AppShell({
           </div>
         </header>
 
-        <main className="v-page-enter flex-1 p-4 md:px-7 md:py-6 xl:px-8">{children ?? <Outlet />}</main>
+        <main className="v-page-enter flex-1 p-4 md:p-8">{children ?? <Outlet />}</main>
         <div id="stage-footer-portal" className="shrink-0 empty:hidden sticky bottom-0 z-40" />
       </div>
     </div>

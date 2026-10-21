@@ -28,7 +28,7 @@ export default function AnalyticsLayout({
     : undefined
 
   return (
-    <div data-module={moduleLabel} className="mx-auto max-w-7xl space-y-8">
+    <div data-module={moduleLabel} className="space-y-8">
       <PageHeader title={title} description={description} actions={actions} />
       {children}
     </div>

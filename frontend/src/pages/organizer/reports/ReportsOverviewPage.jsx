@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { reportsService } from '@/services/reports.service'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
-import PageHeader from '@/components/ui/PageHeader'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 
 // The report is now a stage inside each module, so link into the module route
@@ -19,34 +18,34 @@ function EventList({ title, events, accent, statLabel }) {
 
   if (!events?.length) {
     return (
-      <section className="v-card p-5 sm:p-6">
+      <section className="rounded-2xl border border-v-border bg-v-surface p-6">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="font-semibold text-v-text">{title}</h3>
-          <span className="rounded-full bg-v-surface-elevated px-2.5 py-1 text-xs font-medium text-v-text-subtle">0 events</span>
+          <h3 className="font-medium text-v-text">{title}</h3>
+          <span className="text-xs text-v-text-subtle">0 events</span>
         </div>
-        <p className="mt-3 text-sm text-v-text-subtle">No events yet.</p>
+        <p className="mt-2 text-sm text-v-text-subtle">No events yet.</p>
       </section>
     )
   }
 
   return (
-    <section className="v-card p-5 sm:p-6">
+    <section className="v-card p-6">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-semibold text-v-text">{title}</h3>
-        <span className={`rounded-full bg-v-primary-soft px-2.5 py-1 text-xs font-semibold ${accent}`}>
+        <h3 className="font-medium text-v-text">{title}</h3>
+        <span className={`text-xs ${accent}`}>
           {eventCount} {eventCount === 1 ? 'event' : 'events'}
         </span>
       </div>
-      <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+      <ul className="mt-4 space-y-2">
         {events.map((event) => (
           <li key={event.id}>
             <Link
               to={toModuleReportPath(event.reportPath)}
-              className="group flex min-h-16 items-center justify-between gap-3 rounded-xl border border-v-border bg-v-surface px-4 py-3 transition-colors hover:border-v-border-strong hover:bg-v-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-v-border px-4 py-3 hover:border-v-border-strong"
             >
-              <span className="min-w-0 truncate font-medium text-v-text">{event.title}</span>
+              <span className="text-v-text-muted">{event.title}</span>
               {event.stats && (
-                <span className={`shrink-0 text-right text-xs font-medium ${accent}`}>
+                <span className={`text-xs ${accent}`}>
                   {statLabel(event.stats)}
                 </span>
               )}
@@ -89,7 +88,10 @@ export default function ReportsOverviewPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-4xl space-y-4">
-        <PageHeader title="Reports overview" description="Turnout, vote summaries, rankings, and poll charts for all your events." />
+        <div>
+          <h2 className="text-xl font-semibold text-v-text">Reports overview</h2>
+          <p className="mt-1 text-sm text-v-text-subtle">Turnout, vote summaries, rankings, and poll charts for all your events.</p>
+        </div>
         <div role="alert" className="v-card space-y-3 p-5">
           <p className="v-error-text">{getErrorMessage(error, 'Reports could not be loaded. Please retry.')}</p>
           <Button variant="secondary" onClick={loadReport}>Retry reports</Button>
@@ -99,13 +101,15 @@ export default function ReportsOverviewPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeader
-        title="Reports overview"
-        description="Turnout, vote summaries, rankings, and poll charts for all your events."
-      />
+    <div className="mx-auto max-w-4xl space-y-8">
+      <div>
+        <h2 className="text-xl font-semibold text-v-text">Reports overview</h2>
+        <p className="mt-1 text-sm text-v-text-subtle">
+          Turnout, vote summaries, rankings, and poll charts for all your events.
+        </p>
+      </div>
 
-      <div className="space-y-5">
+      <div className="space-y-8">
         <div data-module="election">
           <EventList
             title="Election turnout & vote summaries"

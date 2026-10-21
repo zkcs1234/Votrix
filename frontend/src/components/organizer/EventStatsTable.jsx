@@ -54,9 +54,9 @@ export default function EventStatsTable({
     <Card padding={false} className={renderAction ? 'min-w-0' : ''}>
       {events.length > 0 && (
         <div className={`${toolbarLayout === 'single-row' ? 'v-event-stats-header' : 'flex flex-wrap items-center gap-x-6 gap-y-3'} border-b border-v-border px-6 py-4`}>
-          <h3 className="font-display text-base font-bold text-v-text">{title}</h3>
+          <h3 className="font-semibold text-v-text">{title}</h3>
           <FilterBar
-            className="min-w-0 flex-1"
+            className="min-w-0 flex-1 flex-row items-center gap-3"
             singleRow={toolbarLayout === 'single-row'}
             search={search}
             onSearchChange={setSearch}
@@ -77,7 +77,7 @@ export default function EventStatsTable({
 
       {events.length === 0 && (
         <div className="border-b border-v-border px-6 py-4">
-          <h3 className="font-display text-base font-bold text-v-text">{title}</h3>
+          <h3 className="font-semibold text-v-text">{title}</h3>
         </div>
       )}
 
@@ -106,7 +106,7 @@ export default function EventStatsTable({
                   <tr key={e.id} className={linkFor ? 'hover:bg-v-surface-elevated' : ''}>
                     <td className="font-medium text-v-text">
                       {linkFor ? (
-                        <Link to={linkFor(e)} className={`hover:text-v-primary ${renderAction ? 'block max-w-xs whitespace-normal break-words' : ''}`}>
+                        <Link to={linkFor(e)} className={`hover:text-v-primary ${renderAction ? 'block max-w-xs whitespace-normal wrap-break-word' : ''}`}>
                           {e.title}
                         </Link>
                       ) : (

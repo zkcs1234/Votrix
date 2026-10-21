@@ -189,4 +189,13 @@ export const adminService = {
   runArchivalNow() {
     return api.post(`${base}/policies/archival/run-now`)
   },
+
+  // Student management helpers (auto dual-type assignment)
+  addVoterMembership(userId) {
+    return api.post(`${base}/voters/${userId}/membership`)
+  },
+
+  addRespondentMembership(userId) {
+    return api.post(`${base}/respondents/${userId}/membership`)
+  },
 }

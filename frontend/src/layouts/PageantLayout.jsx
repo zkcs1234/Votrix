@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
+import { stagePath } from '@/utils/eventStages'
 
 // Regrouped into Setup → Run → Results so the sidebar follows the actual
 // workflow order. "Structure & Scoring" now holds rounds, criteria (with minor
@@ -16,8 +17,8 @@ const navItems = [
   { label: 'Competition Scoring Events', path: '/organizer/competition/events', icon: CalendarDays },
 
   { section: 'Setup' },
-  { label: 'Event Details', path: 'edit', icon: Settings2, scoped: true, basePath: BASE },
-  { label: 'Branding', path: 'branding', icon: Settings2, scoped: true, basePath: BASE },
+  { label: 'Event Details', path: 'edit', icon: Settings2, scoped: true, basePath: BASE, hrefTemplate: (eventId) => stagePath('competition', 'details', eventId), isActive: (location, eventId) => location.pathname === stagePath('competition', 'details', eventId) },
+  { label: 'Branding', path: 'branding', icon: Settings2, scoped: true, basePath: BASE, hrefTemplate: (eventId) => stagePath('competition', 'branding', eventId) },
   { label: 'Competition Type', path: 'type', icon: Settings2, scoped: true, basePath: BASE },
   { label: 'Competitions / Categories', path: 'categories', icon: Settings2, scoped: true, basePath: BASE },
   { label: 'Rounds & Scoring', path: 'workspace', icon: Settings2, scoped: true, basePath: BASE },

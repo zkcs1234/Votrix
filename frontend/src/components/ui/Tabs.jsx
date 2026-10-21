@@ -3,20 +3,26 @@
 // links by giving a tab an `href` (then `onChange` is optional).
 import { Link } from 'react-router-dom'
 
-export default function Tabs({ tabs, value, onChange, label = 'Sections', className = '' }) {
+export default function Tabs({ tabs, value, onChange, label = 'Sections', className = '', variant = 'underline' }) {
+  const segmented = variant === 'segmented'
   return (
     <div
       role="tablist"
       aria-label={label}
-      className={`flex flex-wrap items-center gap-1 border-b border-v-border ${className}`}
+      className={`${segmented ? 'inline-flex flex-wrap gap-1 rounded-lg border border-v-border p-1' : 'flex flex-wrap items-center gap-1 border-b border-v-border'} ${className}`}
     >
       {tabs.map((tab) => {
         const selected = tab.value === value
-        const base =
-          'relative -mb-px inline-flex min-h-10 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary'
-        const state = selected
-          ? 'border-v-primary text-v-primary'
-          : 'border-transparent text-v-text-subtle hover:text-v-text'
+        const base = segmented
+          ? 'rounded-md px-3 py-2 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary'
+          : 'relative -mb-px inline-flex min-h-10 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary'
+        const state = segmented
+          ? selected
+            ? 'bg-v-primary text-white'
+            : 'text-v-text-muted hover:bg-v-surface-elevated hover:text-v-text'
+          : selected
+            ? 'border-v-primary text-v-text'
+            : 'border-transparent text-v-text-muted hover:text-v-text'
         const content = (
           <>
             {tab.label}

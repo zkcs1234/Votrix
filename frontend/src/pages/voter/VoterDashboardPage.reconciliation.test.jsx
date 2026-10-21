@@ -4,8 +4,10 @@ import { MemoryRouter } from 'react-router-dom'
 import VoterDashboardPage from './VoterDashboardPage'
 const mocks = vi.hoisted(() => ({ overview: vi.fn(), listeners: new Map() }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'judge', firstName: 'Judge' } }) }))
-vi.mock('@/services/voter.service', () => ({ voterService: { getOverview: mocks.overview }, PARTICIPANT_TYPE_META: {} }))
-vi.mock('@/components/voter/VoterEventCard', () => ({ default: ({ event }) => <p>{event.title}</p> }))
+vi.mock('@/services/voter.service', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, voterService: { ...actual.voterService, getOverview: mocks.overview } }
+})
 vi.mock('@/services/socket.service', () => ({ isConnected: () => true, subscribe: (type, callback) => {
   const handlers = mocks.listeners.get(type) ?? new Set(); handlers.add(callback); mocks.listeners.set(type, handlers); return () => handlers.delete(callback)
 } }))
@@ -24,16 +26,17 @@ beforeEach(() => { vi.clearAllMocks(); mocks.listeners.clear(); mocks.overview.m
 afterEach(cleanup)
 test('versioned start session invalidation updates an already open assigned dashboard without refresh', async () => {
   render(<MemoryRouter><VoterDashboardPage /></MemoryRouter>); await screen.findByRole('heading', { name: 'Assigned events' })
-  expect(screen.getByText('Northbridge University')).toBeInTheDocument()
-  expect(screen.getByText('26 Oct, 08:00')).toBeInTheDocument()
-  mocks.overview.mockResolvedValue({ data: { stats: { total: 1, active: 1, assigned: 0, completed: 0 }, events: [event], assigned: [], active: [event], completed: [] } })
+  expect(screen.getByRole('heading', { name: 'Competition' })).toBeInTheDocument()
+  expect(screen.getByRole('status')).toHaveTextContent('Waiting to open')
+  const activeEvent = { ...event, bucket: 'active' }
+  mocks.overview.mockResolvedValue({ data: { stats: { total: 1, active: 1, assigned: 0, completed: 0 }, events: [activeEvent], assigned: [], active: [activeEvent], completed: [] } })
   await act(async () => { for (const callback of mocks.listeners.get('session:contestant-changed') ?? []) callback({ eventId: 'event', session: { eventId: 'event' }, refresh: true }) })
   expect(screen.getByRole('heading', { name: 'Active events' })).toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: 'Assigned events' })).not.toBeInTheDocument()
   expect(screen.getByRole('link', { name: /Open scoresheet/ })).toHaveAttribute('href', event.actionPath)
 })
 
-test('renders correctly when organization is an object as returned by backend', async () => {
+test('renders the assigned event banner without adding a separate organizer panel', async () => {
   const objectOrgEvent = {
     ...event,
     id: 'event-with-object-org',
@@ -42,6 +45,7 @@ test('renders correctly when organization is an object as returned by backend', 
       name: 'Central University',
       logo: 'https://example.com/logo.png',
     },
+    banner: 'https://example.com/banner.jpg',
     actionPath: null,
   }
   mocks.overview.mockResolvedValue({
@@ -55,7 +59,9 @@ test('renders correctly when organization is an object as returned by backend', 
   })
   render(<MemoryRouter><VoterDashboardPage /></MemoryRouter>)
   await screen.findByRole('heading', { name: 'Active events' })
-  expect(screen.getByText('Central University')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Competition' })).toBeInTheDocument()
+  expect(document.querySelector('img[src="https://example.com/banner.jpg"]')).toBeInTheDocument()
+  expect(document.querySelector('img[src="https://example.com/logo.png"]')).not.toBeInTheDocument()
 })
 
 test('renders completed event table safely with object organization', async () => {

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Clock3 } from 'lucide-react'
+import { useParams } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -8,7 +7,7 @@ import FormAlert from '@/components/ui/FormAlert'
 import ElectionPositionSection from '@/components/voter/election/ElectionPositionSection'
 import Button from '@/components/ui/Button'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
-import { useAuth } from '@/hooks/useAuth'
+import VoterDashboardLink from '@/components/voter/VoterDashboardLink'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
 import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
 import { getErrorMessage } from '@/utils/getErrorMessage'
@@ -71,18 +70,12 @@ function BallotSubmittedScreen({ ballot, eventId }) {
 
   return (
     <div data-module="election" className="mx-auto max-w-2xl space-y-6">
-      <div className="v-card-lg border-v-success/30 bg-v-success-bg text-center">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-v-surface text-v-success">
-          <CheckCircle2 className="h-6 w-6" strokeWidth={1.8} aria-hidden />
-        </span>
+      <div className="v-card-lg text-center border-v-success">
         <p className="v-page-title text-v-success">Ballot submitted</p>
-        <p className="mt-2 text-sm leading-relaxed text-v-text-muted">
+        <p className="v-caption mt-2">
           Your {ballot?.event?.title} ballots have been recorded and locked.
         </p>
-        <Link to="/participant" className="v-btn-tertiary mt-5 inline-flex items-center justify-center gap-2">
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          Back to dashboard
-        </Link>
+        <VoterDashboardLink className="mt-5" />
       </div>
 
       {ballot?.canViewResults && (
@@ -112,8 +105,6 @@ function BallotSubmittedScreen({ ballot, eventId }) {
 
 export default function VoterEventPage() {
   const { eventId } = useParams()
-  const { user } = useAuth()
-  const voterName = [user?.firstName, user?.lastName].filter(Boolean).join(' ')
   const [ballot, setBallot] = useState(null)
   const draftKey = getDraftStorageKey(
     'electionDraft',
@@ -303,25 +294,16 @@ export default function VoterEventPage() {
   if (ballot && !ballot.sections?.length) {
     return <div data-module="election" className="v-card-md text-center">
       <p className="v-body-text">No positions are available for you in this election.</p>
-      <Link to="/participant" className="v-btn-tertiary mt-4 inline-flex items-center justify-center gap-2">
-        <ArrowLeft className="h-4 w-4" aria-hidden />
-        Back to dashboard
-      </Link>
+      <VoterDashboardLink className="mt-4" />
     </div>
   }
 
   if (!ballot?.votingOpen) {
     return (
-      <div data-module="election" className="v-card-md mx-auto max-w-lg text-center">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-v-primary-soft text-v-primary">
-          <Clock3 className="h-6 w-6" strokeWidth={1.8} aria-hidden />
-        </span>
-        <p className="mt-4 text-lg font-semibold text-v-text">Voting is not open for this event yet.</p>
-        <p className="mt-2 text-sm leading-relaxed text-v-text-muted">Check back when the organizer opens voting.</p>
-        <Link to="/participant" className="v-btn-tertiary mt-5 inline-flex items-center justify-center gap-2">
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          Back to dashboard
-        </Link>
+      <div data-module="election" className="mx-auto max-w-lg v-card-md text-center">
+        <p className="v-body-text">Voting is not open for this event yet.</p>
+        <p className="v-caption mt-2">Check back when the organizer opens voting.</p>
+        <VoterDashboardLink className="mt-5" />
       </div>
     )
   }
@@ -336,12 +318,12 @@ export default function VoterEventPage() {
       progress bar and submit footer cannot both stay on screen on mobile.
     */
     <FullscreenVotingShell>
-    <div data-module="election" className="fixed inset-0 z-50 flex h-dvh flex-col bg-v-bg">
+    <div data-module="election" className="fixed inset-0 z-50 flex h-dvh flex-col bg-v-surface">
       {/* ===== FIXED TOP: Floating progress card (does not scroll) ===== */}
       {!isReviewing && (
         <div className="shrink-0">
           <div className="mx-auto max-w-2xl px-4 pt-3 pb-1 md:px-8">
-            <div className="v-card-sm border-t-4 border-t-v-primary p-3 shadow-v-shadow-md">
+            <div className="v-card-sm p-3 shadow-v-shadow-md">
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="v-caption">
                   Ballot {currentSectionNumber} of {totalSections}
@@ -370,12 +352,7 @@ export default function VoterEventPage() {
       {/* ===== SCROLLABLE MIDDLE: header + ballot content scroll here ===== */}
       <div className="flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8">
-          <VoterEventHeader event={ballot.event} eyebrow="Election ballot">
-            {voterName && <p className="text-sm font-medium text-white/75">Voting as {voterName}</p>}
-            {ballot.currentSection && (
-              <p className="mt-1 text-base font-semibold text-white">{ballot.currentSection.name}</p>
-            )}
-          </VoterEventHeader>
+          <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
 
           {sectionNotice && !isReviewing && (
             <p role="status" className="rounded-lg border border-v-success/30 bg-v-success/10 px-4 py-3 text-sm text-v-success">

@@ -3,7 +3,7 @@ import CompetitionPublishedResults from '@/components/voter/competition/Competit
 import useJudgeScoreDrafts from '@/hooks/useJudgeScoreDrafts'
 import { workflowService } from '@/services/competition-workflow.service'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { CheckCircle, AlertTriangle, RotateCcw, AlertCircle } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
 import useCompetitionSync from '@/hooks/useCompetitionSync'
@@ -13,6 +13,7 @@ import Button from '@/components/ui/Button'
 import FormAlert from '@/components/ui/FormAlert'
 import CompetitionScoringForm from '@/components/voter/competition/CompetitionScoringForm'
 import JudgeScoringHeader from '@/components/voter/competition/JudgeScoringHeader'
+import VoterDashboardLink from '@/components/voter/VoterDashboardLink'
 import { useAuth } from '@/hooks/useAuth'
 import { CompetitionWorkspaceBoundary } from '@/components/voter/competition/NativeCompetitionWorkspace'
 
@@ -47,7 +48,6 @@ function LegacyJudgeScoringPage() {
     acceptedRevision.current = { key: revisionKey, revision: Number(session?.revision ?? 0) }
     return result
   }, [eventId, user?.id, beginViewRequest])
-  const judgeName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email
   const [sheet, setSheet] = useState(null)
   const currentSheetRef = useRef(sheet)
   currentSheetRef.current = sheet
@@ -345,7 +345,7 @@ function LegacyJudgeScoringPage() {
   if (!sessionState || (sessionState.status !== 'active' && !sheet?.context)) {
     return (
       <div className="mx-auto max-w-lg space-y-6">
-        <JudgeScoringHeader sheet={sheet} sessionState={sessionState} judgeName={judgeName} />
+        <JudgeScoringHeader sheet={sheet} />
         <CompetitionPublishedResults eventId={eventId} judgeId={user?.id}/>
         <p role="status" className="v-caption">{socketConnected ? 'Live updates connected' : 'Live updates interrupted; checking saved scoring state every 15 seconds.'}</p>
 
@@ -368,9 +368,7 @@ function LegacyJudgeScoringPage() {
           {sessionState?.status === 'completed' && (
             <p className="text-sm text-emerald-400">Session has ended</p>
           )}
-          <Link to="/participant" className="inline-block text-v-primary hover:underline text-sm">
-            Back to dashboard
-          </Link>
+          <VoterDashboardLink />
         </div>
       </div>
     )
@@ -405,7 +403,7 @@ function LegacyJudgeScoringPage() {
         </div>
       )}
 
-      <JudgeScoringHeader sheet={selectedDivisionId ? { ...sheet, contestants: sheet.contestants.filter(contestant => contestant.divisionId === selectedDivisionId) } : sheet} sessionState={sessionState} judgeName={judgeName} />
+      <JudgeScoringHeader sheet={sheet} />
       <CompetitionPublishedResults eventId={eventId} judgeId={user?.id}/>
 
       <p role="status" className="v-caption">{socketConnected ? recovering ? 'Reconciling saved scoring state…' : 'Live updates connected' : 'Live updates interrupted; checking saved state every 15 seconds while this page is visible.'}</p>
@@ -493,7 +491,7 @@ function LegacyJudgeScoringPage() {
       {/* Success confirmation — matches the top-center toast design system */}
       {showConfirmation && (
         <div
-          className="v-toast-enter pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4 sm:top-6"
+          className="v-toast-enter pointer-events-none fixed inset-x-0 top-4 z-100 flex justify-center px-4 sm:top-6"
           role="status"
         >
           <div className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-lg border border-v-success/25 bg-v-success-bg px-4 py-3 text-sm text-v-success shadow-v-shadow-md">

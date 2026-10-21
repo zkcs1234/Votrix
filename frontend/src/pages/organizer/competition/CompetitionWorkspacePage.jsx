@@ -38,7 +38,7 @@ const WORKSPACE_TABS = ['rounds', 'criteria', 'divisions', 'scoring', 'structure
 // categories, rounds, criteria, contestants, judges, and scoring config.
 export default function CompetitionWorkspacePage() {
   return (
-    <div data-module="competition-scoring" className="mx-auto max-w-7xl">
+    <div data-module="competition-scoring">
       <NativeSetupBoundary Legacy={LegacyCompetitionWorkspacePage} />
     </div>
   )

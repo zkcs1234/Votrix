@@ -10,8 +10,7 @@ import FormAlert from '@/components/ui/FormAlert'
 import StatCard from '@/components/ui/StatCard'
 import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
-import ModuleCard from '@/components/ui/ModuleCard'
-import { BarChartView } from '@/components/charts'
+import { AreaChartView } from '@/components/charts'
 import {
   SkeletonStatCard,
   SkeletonModuleLink,
@@ -230,12 +229,12 @@ export default function AdminDashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard
-          label="Organizers"
+          label="Total organizers"
           value={stats?.totalOrganizers ?? 0}
           hint={stats?.activeOrganizations != null ? `${stats.activeOrganizations} active organizations` : undefined}
           icon={Users}
         />
-        <StatCard label="Events" value={stats?.totalEvents ?? 0} hint="Across all modules" icon={CalendarDays} />
+        <StatCard label="Total events" value={stats?.totalEvents ?? 0} hint="Across all modules" icon={CalendarDays} />
         <StatCard
           label="Participant accounts"
           value={stats?.totalParticipants ?? stats?.totalVoters ?? 0}
@@ -249,33 +248,20 @@ export default function AdminDashboardPage() {
       {/* Administrators oversee events platform-wide but cannot open organizer
           workspaces, so each module card leads to the global event directory. */}
       <div className="grid gap-4 md:grid-cols-3">
-        <ModuleCard
-          module="election"
-          icon={Vote}
-          title="Election"
-          description="Ballots, positions and voter turnout."
-          meta={eventCount(electionEvents)}
-          to="/admin/events"
-          actionLabel="View events"
-        />
-        <ModuleCard
-          module="competition"
-          icon={Trophy}
-          title="Competition"
-          description="Scoring, live control and tabulation."
-          meta={eventCount(competitionEvents)}
-          to="/admin/events"
-          actionLabel="View events"
-        />
-        <ModuleCard
-          module="polling"
-          icon={BarChart2}
-          title="Polling"
-          description="Questions, responses and insights."
-          meta={eventCount(pollingEvents)}
-          to="/admin/events"
-          actionLabel="View events"
-        />
+        {[
+          { icon: Vote, title: 'Election', description: 'Ballots, positions and voter turnout.', count: electionEvents },
+          { icon: Trophy, title: 'Competition', description: 'Scoring, live control and tabulation.', count: competitionEvents },
+          { icon: BarChart2, title: 'Polling', description: 'Questions, responses and insights.', count: pollingEvents },
+        ].map(({ icon: Icon, title, description, count }) => (
+          <Link key={title} to="/admin/events" className="v-card-md flex flex-col gap-2 transition hover:border-v-border-strong">
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4 text-v-text-subtle" strokeWidth={1.5} aria-hidden />
+              <h3 className="v-section-title">{title}</h3>
+            </div>
+            <p className="v-caption">{description}</p>
+            <p className="v-caption">{eventCount(count)}</p>
+          </Link>
+        ))}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -350,12 +336,11 @@ export default function AdminDashboardPage() {
             <p className="v-caption mt-3">No event data yet</p>
           ) : (
             <div className="mt-3">
-              <BarChartView
+              <AreaChartView
                 data={monthlyEvents.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
-                layout="horizontal"
+                areas={[{ dataKey: 'value', name: 'Events', color: '#818cf8' }]}
                 height={220}
-                barSize={28}
-                colors={['#4f46e5']}
+                showLegend={false}
               />
             </div>
           )}
@@ -366,12 +351,11 @@ export default function AdminDashboardPage() {
             <p className="v-caption mt-3">No participant account data yet</p>
           ) : (
             <div className="mt-3">
-              <BarChartView
+              <AreaChartView
                 data={participantGrowth.slice(0, 6).map((i) => ({ name: i.label, value: i.value }))}
-                layout="horizontal"
+                areas={[{ dataKey: 'value', name: 'Participants', color: '#34d399' }]}
                 height={220}
-                barSize={28}
-                colors={['#7c3aed']}
+                showLegend={false}
               />
             </div>
           )}

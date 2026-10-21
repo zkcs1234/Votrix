@@ -6,10 +6,9 @@ import { electionService } from '@/services/election.service'
 import { electionEventSchemaStep1, isoToLocalInput, localInputToIso } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
 import CalendarCard from '@/components/ui/CalendarCard'
-import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { getNextStage, stagePath } from '@/utils/eventStages'
-import SaveStatus from '@/components/ui/SaveStatus'
+import StageFooter from '@/components/ui/StageFooter'
 import useEventProgress from '@/hooks/useEventProgress'
 import useFormSession from '@/hooks/useFormSession'
 import useDraft from '@/hooks/useDraft'
@@ -18,8 +17,7 @@ import { draftService } from '@/services/draft.service'
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import { isSetupLocked } from '@/utils/constants'
-import WizardSteps from '@/components/ui/WizardSteps'
-import EventSetupAside from '@/components/organizer/EventSetupAside'
+import EventStepper from '@/components/ui/EventStepper'
 
 import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
@@ -69,7 +67,7 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
   // existing event whose setup is locked (scheduled/active/…) is read-only.
   const readOnly = !isNew && isSetupLocked(eventStatus)
 
-  const { markComplete, reset: resetProgress } = useEventProgress(
+  const { completedKeys, markComplete, reset: resetProgress } = useEventProgress(
     'election',
     eventId,
   )
@@ -218,7 +216,7 @@ setBanner(ev.banner)
   }, [eventId, isNew, reset, setValue, markComplete])
 
   const handleNext = async (e) => {
-    e.preventDefault()
+    e?.preventDefault?.()
     const isValid = await trigger(['title', 'startDate', 'endDate'])
     if (!isValid) return
 
@@ -249,7 +247,7 @@ setBanner(ev.banner)
   }
 
   const handleNextBranding = async (e) => {
-    e.preventDefault()
+    e?.preventDefault?.()
     setSaving(true)
     setError(null)
 
@@ -348,20 +346,28 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
   if (loading) return <p className="v-caption">Loading...</p>
 
   return (
-    <div data-module="election" className="mx-auto max-w-6xl space-y-6">
+    <div data-module="election" className="space-y-6">
       <>
-          <WizardSteps module="election" currentKey={step} />
+          <EventStepper
+            module="election"
+            currentKey={step}
+            eventId={eventId || 'new'}
+            completedKeys={completedKeys}
+            eventStatus={eventStatus}
+            readOnly={readOnly}
+            interactive={false}
+          />
 
           {readOnly && <ReadOnlyEventBanner status={eventStatus} noun="election" />}
 
           <header>
-            <h2 className="v-page-title">{isNew ? 'Create election event' : readOnly ? 'View election event' : 'Edit election event'}</h2>
-            <p className="mt-1 text-sm text-v-text-subtle">
-              Define the event context and schedule before configuring the experience.
+            <h2 className="v-page-title mb-2">{isNew ? 'Create election event' : readOnly ? 'View election event' : 'Edit election event'}</h2>
+            <p className="v-helper-text">
+              Fill out the event basics and branding. Use the sidebar to jump between sections.
             </p>
           </header>
 
-          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="grid grid-cols-1 gap-6">
           <div className="min-w-0">
             <Card padding="md">
             <div className="mb-5">
@@ -460,15 +466,15 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             </div>
 
             <fieldset className="v-form-field">
-              <legend className={LABEL_CLASS}>Results visibility</legend>
-              <div className="mt-2 grid gap-3 sm:grid-cols-3">
+              <legend className={LABEL_CLASS}>Election Settings — Results</legend>
+              <div className="mt-2 space-y-2">
                 {RESULTS_VISIBILITY_OPTIONS.map((opt) => (
                   <label
                     key={opt.value}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition ${
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 transition ${
                       resultsVisibility === opt.value
-                        ? 'border-v-primary bg-v-primary-soft ring-1 ring-v-primary'
-                        : 'border-v-border-strong bg-v-surface hover:border-v-primary/50'
+                        ? 'border-v-primary bg-v-surface-elevated'
+                        : 'border-v-border hover:border-v-border-strong'
                     }`}
                   >
                     <input
@@ -506,33 +512,30 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
         </fieldset>
       </Card>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-v-border pt-4">
-          <div className="flex items-center gap-3">
-            {step !== 'details' && (
-              <Button type="button" variant="secondary" disabled={saving} onClick={() => { setError(null); setStep(step === 'settings' ? 'branding' : 'details') }}>
-                Back: {step === 'settings' ? 'Branding' : 'Details'}
-              </Button>
-            )}
-            {!readOnly && <SaveStatus status={saveStatus} lastSavedAt={lastSavedAt} />}
-          </div>
-          {readOnly ? (
-            <Button type="button" onClick={() => {
+        <StageFooter
+          module="election"
+          currentKey={step}
+          eventId={eventId || 'new'}
+          saving={saving}
+          saveStatus={readOnly ? 'idle' : saveStatus}
+          lastSavedAt={readOnly ? null : lastSavedAt}
+          showSidebarHint={false}
+          backLabel="Back: Details"
+          onBack={() => { setError(null); setStep('details') }}
+          nextLabel={step === 'details' ? 'Next: Branding' : isNew ? 'Create & continue' : 'Next: Positions'}
+          onNext={() => {
+            if (readOnly) {
               if (step === 'details') setStep('branding')
-              
               else {
                 const next = getNextStage('election', step)
                 if (next) navigate(stagePath('election', next.key, eventId))
               }
-            }}>Next</Button>
-          ) : (
-            <Button type="button" disabled={saving} onClick={step === 'details' ? handleNext : handleNextBranding}>
-              {saving ? 'Saving...' : step === 'details' ? 'Next: Branding' : isNew ? 'Create & continue' : 'Next: Positions'}
-            </Button>
-          )}
-        </div>
+            } else if (step === 'details') handleNext()
+            else handleNextBranding()
+          }}
+        />
           </div>
 
-          <EventSetupAside module="election" />
           </div>
         </>
 

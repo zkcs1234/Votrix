@@ -4,7 +4,7 @@
 export default function AuthFormField({ label, id, error, hint, required = false, children }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-v-text">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-v-text-muted">
         {label}
         {required && (
           <span className="ml-0.5 text-v-danger" aria-hidden="true">

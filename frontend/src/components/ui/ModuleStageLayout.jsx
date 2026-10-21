@@ -30,9 +30,9 @@ const FORM_WIZARD_STAGES = {
 // and the normal "Next" navigation footer once published — so the layout must
 // not add a second footer here. The stepper still renders for these stages.
 const PAGE_OWNS_FOOTER = {
-  // 'review' renders the Finish & Publish / Unpublish footer; the roster pages
-  // (Voters/Judges/Respondents) now use the layout's default navigation footer.
-  election: ['review'],
+  // 'review' renders Finish & Publish / Unpublish. Election Positions and
+  // Candidates own group-aware footers; voter roster navigation stays shared.
+  election: ['review', 'positions', 'candidates'],
   // 'workspace' (Structure & Scoring) renders its own tab-aware footer
   // (WorkspaceStageFooter); Criteria and Scoring rules use the sticky portal.
   // Rounds and Divisions keep navigation in page flow. No duplicate footer.

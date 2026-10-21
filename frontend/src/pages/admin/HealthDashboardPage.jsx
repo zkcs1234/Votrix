@@ -20,6 +20,12 @@ function StatusIcon({ status }) {
   return <XCircle className="h-5 w-5 text-v-danger" strokeWidth={2} />
 }
 
+function statusBg(status) {
+  if (status === 'healthy') return 'border-v-success/30 bg-v-success-bg'
+  if (status === 'degraded') return 'border-v-warning/30 bg-v-warning-bg'
+  return 'border-v-danger/30 bg-v-danger-bg'
+}
+
 function StatusBadge({ status }) {
   const tone = status === 'healthy' ? 'success' : status === 'degraded' ? 'warning' : status === 'down' ? 'danger' : 'default'
   return <Badge tone={tone} dot className="capitalize">{status || 'Unknown'}</Badge>
@@ -70,23 +76,14 @@ export default function HealthDashboardPage() {
       )}
 
       {health && (
-        <Card className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <StatusIcon status={health.overall} />
-            <div>
-              <p className="font-semibold text-v-text">Platform status</p>
-              <p className="v-caption">Current availability of connected services</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <StatusBadge status={health.overall} />
-            {health.checkedAt && (
-              <span className="v-caption">
-                Checked {format(parseISO(health.checkedAt), 'HH:mm:ss')}
-              </span>
-            )}
-          </div>
-        </Card>
+        <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${statusBg(health.overall)}`}>
+          Overall status: <span className="capitalize">{health.overall}</span>
+          {health.checkedAt && (
+            <span className="ml-2 font-normal text-v-text-muted">
+              — checked {format(parseISO(health.checkedAt), 'HH:mm:ss')}
+            </span>
+          )}
+        </div>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -97,18 +94,16 @@ export default function HealthDashboardPage() {
           : health?.services?.map((svc) => {
               const Icon = SERVICE_ICONS[svc.service] ?? AlertCircle
               return (
-                <Card key={svc.service} className="border border-v-border bg-v-surface">
+                <Card key={svc.service} className={`border ${statusBg(svc.status)}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-v-surface-elevated">
-                        <Icon className="h-5 w-5 text-v-text-muted" strokeWidth={1.5} />
-                      </span>
+                      <Icon className="h-5 w-5 text-v-text-muted" strokeWidth={1.5} />
                       <div>
                         <p className="font-medium capitalize text-v-text">{svc.service}</p>
                         {svc.message && <p className="v-caption mt-0.5">{svc.message}</p>}
                       </div>
                     </div>
-                    <StatusBadge status={svc.status} />
+                    <StatusIcon status={svc.status} />
                   </div>
                 </Card>
               )
@@ -123,7 +118,7 @@ export default function HealthDashboardPage() {
           </div>
           <Card padding="sm">
             <div className="v-table-wrap">
-              <table className="v-table min-w-[480px]">
+              <table className="v-table min-w-120">
                 <thead>
                   <tr><th>Check</th><th>Status</th><th>Details</th></tr>
                 </thead>

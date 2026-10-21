@@ -2,6 +2,8 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import PageantLayout from './PageantLayout'
+import ElectionLayout from './ElectionLayout'
+import PollingLayout from './PollingLayout'
 import TabulationWorkspaceNavigation from '@/components/organizer/competition/TabulationWorkspaceNavigation'
 
 const user = { id: 'owner', role: 'organizer', username: 'Organizer' }
@@ -26,6 +28,13 @@ function mount(path) {
   render(<MemoryRouter initialEntries={[path]}><Routes>
     <Route path="/organizer/competition/events/:eventId" element={<PageantLayout />}>
       <Route path="*" element={<Page />} />
+    </Route>
+  </Routes></MemoryRouter>)
+}
+function mountSetupLayout(Layout, base, path) {
+  render(<MemoryRouter initialEntries={[path]}><Routes>
+    <Route path={`${base}/:eventId`} element={<Layout />}>
+      <Route path="*" element={<p>Setup form</p>} />
     </Route>
   </Routes></MemoryRouter>)
 }
@@ -79,4 +88,15 @@ test('the bare Tabulation URL still selects Overview',async()=>{
  await act(async()=>mount(`${base}/tabulation${context}`))
  expect(screen.getByRole('button',{name:'Tabulation'})).toHaveAttribute('aria-expanded','true')
  expect(screen.getByRole('link',{name:'Overview'})).toHaveAttribute('aria-current','page')
+})
+
+test.each([
+  [PageantLayout, '/organizer/competition/events'],
+  [ElectionLayout, '/organizer/election/events'],
+  [PollingLayout, '/organizer/polling/events'],
+])('exposes valid Event Details and Branding routes for a new event', async (Layout, base) => {
+  await act(async () => mountSetupLayout(Layout, base, `${base}/new`))
+  expect(screen.getByRole('link', { name: 'Event Details' })).toHaveAttribute('href', `${base}/new`)
+  expect(screen.getByRole('link', { name: 'Branding' })).toHaveAttribute('href', `${base}/new/branding`)
+  expect(screen.getByRole('link', { name: 'Event Details' })).toHaveAttribute('aria-current', 'page')
 })

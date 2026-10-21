@@ -23,7 +23,7 @@ export default function DashboardLayout({
   const navItems = [
     { section: isAdmin ? 'Overview' : 'Workspace' },
     {
-      label: isAdmin ? 'Admin dashboard' : 'Overview',
+      label: isAdmin ? 'Admin Dashboard' : 'Overview',
       path: home,
       icon: LayoutDashboard,
       isActive: (loc) => loc.pathname === home,

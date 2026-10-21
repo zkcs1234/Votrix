@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import AppShell from '@/layouts/AppShell'
 import ModuleStageLayout from '@/components/ui/ModuleStageLayout'
+import { stagePath } from '@/utils/eventStages'
 
 // Grouped into Setup → Results so the sidebar follows the workflow order,
 // matching the Competition module's grouped layout. Routes are unchanged.
@@ -14,6 +15,8 @@ const navItems = [
   { label: 'Events', path: '/organizer/polling/events', icon: CalendarDays },
 
   { section: 'Setup' },
+  { label: 'Event Details', path: 'edit', icon: Settings2, scoped: true, basePath: BASE, hrefTemplate: (eventId) => stagePath('polling', 'details', eventId), isActive: (location, eventId) => location.pathname === stagePath('polling', 'details', eventId) },
+  { label: 'Branding', path: 'branding', icon: Settings2, scoped: true, basePath: BASE, hrefTemplate: (eventId) => stagePath('polling', 'branding', eventId) },
   { label: 'Builder', path: 'builder', icon: PenSquare, scoped: true, basePath: BASE },
   { label: 'Settings', path: 'settings', icon: Settings2, scoped: true, basePath: BASE },
   { label: 'Respondents', path: 'respondents', icon: Users, scoped: true, basePath: BASE },
