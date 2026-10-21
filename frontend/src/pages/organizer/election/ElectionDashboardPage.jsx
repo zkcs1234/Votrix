@@ -68,12 +68,14 @@ export default function ElectionDashboardPage() {
       />
 
       <EventStatsTable
+        tableClassName="v-election-dashboard-table"
         title="Election Events"
         events={data?.eventBreakdown ?? []}
         linkFor={electionPath}
         registeredLabel="Registered"
         participatedLabel="Voted"
         rateLabel="Turnout"
+        toolbarLayout="single-row"
         emptyContent={
           <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
             <div>

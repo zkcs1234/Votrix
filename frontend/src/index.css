@@ -1009,6 +1009,112 @@
     width: 16.66%;
   }
 
+  /* Election Dashboard Table - Same design as competition */
+  .v-election-dashboard-table {
+    border: 2px solid var(--v-border-strong);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .v-election-dashboard-table .v-table {
+    table-layout: fixed;
+  }
+
+  .v-election-dashboard-table .v-table th,
+  .v-election-dashboard-table .v-table td {
+    border-right: 1px solid var(--v-border-strong);
+    border-bottom: 1px solid var(--v-border-strong);
+    vertical-align: middle;
+  }
+
+  .v-election-dashboard-table .v-table th {
+    background-color: var(--v-primary);
+    color: #fff !important;
+    border-bottom: 2px solid var(--v-primary-hover);
+    font-weight: 700;
+  }
+
+  .v-election-dashboard-table .v-table th:last-child,
+  .v-election-dashboard-table .v-table td:last-child {
+    border-right: 0;
+  }
+
+  .v-election-dashboard-table .v-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .v-election-dashboard-table .v-table th:first-child,
+  .v-election-dashboard-table .v-table td:first-child {
+    width: 34%;
+  }
+
+  .v-election-dashboard-table .v-table th:nth-child(2),
+  .v-election-dashboard-table .v-table td:nth-child(2) {
+    width: 16%;
+  }
+
+  .v-election-dashboard-table .v-table th:nth-child(3),
+  .v-election-dashboard-table .v-table td:nth-child(3),
+  .v-election-dashboard-table .v-table th:nth-child(4),
+  .v-election-dashboard-table .v-table td:nth-child(4),
+  .v-election-dashboard-table .v-table th:nth-child(5),
+  .v-election-dashboard-table .v-table td:nth-child(5) {
+    width: 16.66%;
+  }
+
+  /* Polling Dashboard Table - Same design as competition */
+  .v-polling-dashboard-table {
+    border: 2px solid var(--v-border-strong);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .v-polling-dashboard-table .v-table {
+    table-layout: fixed;
+  }
+
+  .v-polling-dashboard-table .v-table th,
+  .v-polling-dashboard-table .v-table td {
+    border-right: 1px solid var(--v-border-strong);
+    border-bottom: 1px solid var(--v-border-strong);
+    vertical-align: middle;
+  }
+
+  .v-polling-dashboard-table .v-table th {
+    background-color: var(--v-primary);
+    color: #fff !important;
+    border-bottom: 2px solid var(--v-primary-hover);
+    font-weight: 700;
+  }
+
+  .v-polling-dashboard-table .v-table th:last-child,
+  .v-polling-dashboard-table .v-table td:last-child {
+    border-right: 0;
+  }
+
+  .v-polling-dashboard-table .v-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .v-polling-dashboard-table .v-table th:first-child,
+  .v-polling-dashboard-table .v-table td:first-child {
+    width: 34%;
+  }
+
+  .v-polling-dashboard-table .v-table th:nth-child(2),
+  .v-polling-dashboard-table .v-table td:nth-child(2) {
+    width: 16%;
+  }
+
+  .v-polling-dashboard-table .v-table th:nth-child(3),
+  .v-polling-dashboard-table .v-table td:nth-child(3),
+  .v-polling-dashboard-table .v-table th:nth-child(4),
+  .v-polling-dashboard-table .v-table td:nth-child(4),
+  .v-polling-dashboard-table .v-table th:nth-child(5),
+  .v-polling-dashboard-table .v-table td:nth-child(5) {
+    width: 16.66%;
+  }
+
   .v-event-stats-header {
     display: flex;
     flex-wrap: wrap;
@@ -1700,6 +1806,8 @@
   /* Ensure table headers with primary background have white text */
   .v-table th.bg-v-primary,
   .v-competition-dashboard-table th,
+  .v-election-dashboard-table th,
+  .v-polling-dashboard-table th,
   thead.bg-v-primary th,
   thead.bg-indigo-600 th,
   thead.bg-indigo-500 th,

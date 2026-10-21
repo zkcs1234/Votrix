@@ -73,12 +73,14 @@ export default function PollingDashboardPage() {
       />
 
       <EventStatsTable
+        tableClassName="v-polling-dashboard-table"
         title="Participation by poll"
         events={data?.eventBreakdown ?? []}
         linkFor={(e) => `/organizer/polling/events/${e.id}/builder`}
         registeredLabel="Respondents"
         participatedLabel="Responded"
         rateLabel="Participation"
+        toolbarLayout="single-row"
         emptyMessage="No events available. Create your first event to begin."
       />
     </div>
