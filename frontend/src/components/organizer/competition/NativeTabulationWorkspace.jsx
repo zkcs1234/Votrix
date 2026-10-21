@@ -25,7 +25,13 @@ import { nativeCompetitionService } from '@/services/competition-native.service'
 import { nativeResultsService } from '@/services/competition-native-results.service'
 import { nativeTabulationService as service } from '@/services/competition-native-tabulation.service'
 import { downloadBlob } from '@/utils/csvDownload'
-import { downloadCsv, downloadExcel, downloadPdf } from '@/utils/exportReport'
+import {
+  buildJudgeScoreSheetData,
+  downloadCsv,
+  downloadExcel,
+  downloadJudgeScoreSheetsExcel,
+  downloadPdf,
+} from '@/utils/exportReport'
 import { nextRound as getNextRound } from '../../../../../shared/competition-participation.js'
 
 const key = (context) => `${context.competitionId}:${context.roundId ?? 'single'}`
@@ -634,7 +640,7 @@ export default function NativeTabulationWorkspace({
     }
   }
 
-  const runExport = async () => {
+  const runExport = async (judgeSelection = exportJudge) => {
     if (
       !exportContext ||
       exportBusy ||
@@ -664,7 +670,27 @@ export default function NativeTabulationWorkspace({
         throw new Error('The selected round no longer has complete current sources.')
       }
 
-      if (exportType === 'deductions') {
+      if (exportType === 'judge' && exportFormat === 'xls') {
+        const selectedJudge = judgeSelection === 'all'
+          ? null
+          : sources.progress?.find(judge => judge.judgeId === judgeSelection && judge.submitted)
+        if (judgeSelection !== 'all' && !selectedJudge?.submissionId) {
+          throw new Error('The selected judge no longer has a current submitted sheet.')
+        }
+        await nativeResultsService.export(eventId, exportContext.competitionId, {
+          kind: judgeSelection === 'all' ? 'worksheets' : 'judge',
+          roundId: exportContext.roundId ?? undefined,
+          sourceDigest: sources.sourceDigest,
+          judgeId: selectedJudge?.judgeId,
+          submissionId: selectedJudge?.submissionId,
+        })
+        if (identityRef.current !== exportIdentity || sequence.current !== exportSequence) return
+        const sheets = buildJudgeScoreSheetData(sources, exportContext, judgeSelection)
+        downloadJudgeScoreSheetsExcel(
+          `competition-${exportContext.competitionId}-${exportContext.roundId ?? 'single'}-judge-score-sheets.xls`,
+          sheets,
+        )
+      } else if (exportType === 'deductions') {
         const rules = getApplicableDeductionRules(
           sources.rules?.configuration_snapshot,
           exportContext.roundId,
@@ -874,10 +900,10 @@ export default function NativeTabulationWorkspace({
         let kind = exportType
         let judgeId
         if (exportType === 'judge') {
-          if (exportJudge === 'all') {
+          if (judgeSelection === 'all') {
             kind = 'worksheets'
           } else {
-            judgeId = exportJudge
+            judgeId = judgeSelection
           }
         }
         if (exportType === 'final') {
@@ -994,9 +1020,15 @@ export default function NativeTabulationWorkspace({
   const selectStage = (stage) => {
     setActiveStage(stage)
     const section = stageSection[stage]
-    if (!reviewer && section && (workspace || section !== initialSection)) {
+    if (!reviewer && section && workspace !== 'adjustments' && (workspace || section !== initialSection)) {
       const contextSearch = `?${new URLSearchParams({competitionId:choice.competitionId,...(choice.roundId?{roundId:choice.roundId}:{})})}`
-      navigate(workspace ? tabulationDestination(eventId, section, contextSearch) : `/organizer/competition/events/${eventId}/tabulation/${section}${contextSearch}`)
+      if (workspace === 'results' || workspace === 'advancement' || workspace === 'audit') {
+        navigate(tabulationDestination(eventId, section, contextSearch))
+      } else if (workspace === 'tabulation') {
+        navigate(`/organizer/competition/events/${eventId}/tabulation${contextSearch}#tabulation-${section}`)
+      } else {
+        navigate(`/organizer/competition/events/${eventId}/tabulation/${section}${contextSearch}`)
+      }
     }
   }
   useEffect(() => {
@@ -1154,8 +1186,11 @@ export default function NativeTabulationWorkspace({
     } catch(requestError){if(identityRef.current===expected)setError(message(requestError))}
     finally{if(identityRef.current===expected)setBusy(false)}
   }
-  const pageStages = workspace === 'scoring' ? ['submissions', 'entries', 'deductions']
-    : workspace === 'results' ? ['calculate', 'ranking', 'results'] : [activeStage]
+  const pageStages = workspace === 'adjustments' ? ['deductions']
+    : workspace === 'results' ? ['calculate', 'ranking', 'results']
+      : workspace === 'advancement' || workspace === 'audit' ? [activeStage]
+        : workspace === 'tabulation' ? ['overview', 'entries', 'submissions', 'deductions']
+          : [activeStage]
   const renderStage = (activeStage) => {
     const activeStep = allStages.find(step => step.id === activeStage) ?? steps[0]
     const activeStageIsAvailable = !!activeStep.available
@@ -1169,7 +1204,7 @@ export default function NativeTabulationWorkspace({
             <p>{unavailableMessage}</p>
           </section> : <>
           {activeStage === 'overview' && <TabulationOverviewCards view={view} choice={choice} criteria={criteria} method={method} onStage={selectStage} onExport={openExport} reviewer={reviewer} busy={busy} hasDeductions={hasOrganizerStage || judgeDeductionsEnabled}/>}
-          {['overview', 'entries'].includes(activeStage) && <TabulationScoreMatrix key={`matrix:${identity}`} view={view} roundId={choice.roundId} criteria={criteria} method={method} search={search} onSearch={setSearch} selectedEntryId={focusedEntryId || view.entries?.[0]?.id} onSelectEntry={setFocusedEntryId} onOriginals={viewOriginalSheets} onBreakdown={setBreakdownEntryId} onExportEntry={downloadEntryTabulation} onExport={() => openExport('tabulation')} reviewer={reviewer} busy={busy}/>}
+          {(activeStage === 'entries' || (activeStage === 'overview' && workspace !== 'tabulation')) && <TabulationScoreMatrix key={`matrix:${identity}`} view={view} roundId={choice.roundId} criteria={criteria} method={method} search={search} onSearch={setSearch} selectedEntryId={focusedEntryId || view.entries?.[0]?.id} onSelectEntry={setFocusedEntryId} onOriginals={viewOriginalSheets} onBreakdown={setBreakdownEntryId} onExportEntry={downloadEntryTabulation} onExport={() => openExport('tabulation')} reviewer={reviewer} busy={busy}/>}
           {activeStage === 'submissions' && <TabulationJudgeSubmissions view={view} choice={choice} selection={sheetSelection} onSelect={setSheetSelection} onDownload={downloadJudgeSheet} reviewer={reviewer} busy={busy}/>}
           {activeStage === 'deductions' && judgeDeductionsEnabled && <TabulationJudgeDeductions records={judgeDeductionRows} complete={view.complete}/>}
           {activeStage === 'audit' && <><TabulationAuditTrail view={view}/>{view.complete && <details className="v-tab-panel"><summary>Source version details</summary><dl className="v-tab-facts"><div><dt>Frozen rule version</dt><dd>{view.rules?.version ?? view.rules?.id}</dd></div><div><dt>Current calculation</dt><dd>{calculation ? `Version ${calculation.version}` : 'Unavailable'}</dd></div><div><dt>Source digest</dt><dd className="break-all">{view.sourceDigest}</dd></div><div><dt>Current submissions</dt><dd>{submissions.length}</dd></div></dl></details>}</>}
@@ -1492,13 +1527,50 @@ export default function NativeTabulationWorkspace({
                 {calculationStatus}
               </p>
             </div>
-            <div className="v-tab-calculation-method">
-              <h3>{tabulationMethodName(method, configuration?.scoringConfig)}</h3>
-              <p>{describeCalculationMethod(method, configuration?.scoringConfig ?? {})}</p>
-              <p>{describeRoundProgression(round, configuration, method)}</p>
-              {method !== 'manual' && <ul className="mt-2 flex flex-wrap gap-2" aria-label="Configured criterion weights">
-                {criteria.map(criterion => <li key={criterion.id} className="v-tab-badge">{criterion.name}{configuration?.scoringConfig.criterionBasis === 'points' ? ' · Points' : ` · ${criterion.percentage}%`}</li>)}
-              </ul>}
+            <div className={`v-tab-calculation-method${method === 'weighted_average' && configuration?.scoringConfig.criterionBasis !== 'points' ? ' v-tab-calculation-weighted' : ''}`}>
+              {method === 'weighted_average' && configuration?.scoringConfig.criterionBasis !== 'points' ? (() => {
+                const weightedCriteria = criteria.map(criterion => ({
+                  ...criterion,
+                  weight: Number(criterion.percentage) || 0,
+                }))
+                const totalWeight = weightedCriteria.reduce((total, criterion) => total + criterion.weight, 0)
+                return <div className="v-tab-weight-summary">
+                  <div className="v-tab-weight-heading">
+                    <div>
+                      <h3>Weighted average score</h3>
+                      <p>Averages the complete judge totals.</p>
+                    </div>
+                    <span className="v-tab-weight-round">{round?.name ?? choice.roundName}</span>
+                  </div>
+                  <div className="v-tab-weight-bar" role="img" aria-label={`Criterion weights total ${totalWeight}%`}>
+                    {weightedCriteria.map((criterion, index) => <span
+                      key={criterion.id}
+                      className="v-tab-weight-segment"
+                      data-color={index % 5}
+                      style={{ width: `${Math.max(0, criterion.weight)}%` }}
+                      aria-hidden="true"
+                    />)}
+                  </div>
+                  <ul className="v-tab-weight-list" aria-label="Configured criterion weights">
+                    {weightedCriteria.map((criterion, index) => <li key={criterion.id} data-color={index % 5}>
+                      <span className="v-tab-weight-name"><span aria-hidden="true" />{criterion.name}</span>
+                      <strong>{criterion.weight}%</strong>
+                    </li>)}
+                    <li className="v-tab-weight-total" data-complete={Math.abs(totalWeight - 100) < 0.001}>
+                      <span><span aria-hidden="true">✓</span>Total</span>
+                      <strong>{totalWeight}%</strong>
+                    </li>
+                  </ul>
+                  <p className="v-tab-weight-progression">{describeRoundProgression(round, configuration, method)}</p>
+                </div>
+              })() : <>
+                <h3>{tabulationMethodName(method, configuration?.scoringConfig)}</h3>
+                <p>{describeCalculationMethod(method, configuration?.scoringConfig ?? {})}</p>
+                <p>{describeRoundProgression(round, configuration, method)}</p>
+                {method !== 'manual' && <ul className="mt-2 flex flex-wrap gap-2" aria-label="Configured criterion weights">
+                  {criteria.map(criterion => <li key={criterion.id} className="v-tab-badge">{criterion.name}{configuration?.scoringConfig.criterionBasis === 'points' ? ' · Points' : ` · ${criterion.percentage}%`}</li>)}
+                </ul>}
+              </>}
             </div>
             <ul className="grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
               {[
@@ -1718,23 +1790,36 @@ export default function NativeTabulationWorkspace({
                     <legend className="px-1 text-sm font-semibold">
                       Confirm qualifier roster ({qualification.policy})
                     </legend>
-                    {qualification.standings.map((standing) => (
-                      <label key={standing.contestantId} className="block text-sm">
-                        <input
-                          type="checkbox"
-                          checked={qualifierIds.includes(standing.contestantId)}
-                          disabled={qualification.policy !== 'manual'}
-                          onChange={(event) =>
-                            setQualifierIds(
-                              event.target.checked
-                                ? [...qualifierIds, standing.contestantId]
-                                : qualifierIds.filter((id) => id !== standing.contestantId),
-                            )
-                          }
-                        />{' '}
-                        {name(standing.contestantId)}{standing.divisionName ? ` \u00b7 ${standing.divisionName}` : ''} {'\u00b7'} rank {standing.rank}
-                      </label>
-                    ))}
+                    <p className="v-caption">
+                      {advancementLabel(round)}{(view.divisionRanking?.mode === 'division' || view.advancement?.perDivision) ? ' per division' : ''} · {nextRound?.name ?? 'Next round'}
+                    </p>
+                    <div className="v-table-wrap">
+                      <table className="v-table">
+                        <caption className="sr-only">Advancement candidates and qualifier status</caption>
+                        <thead><tr><th scope="col">Rank</th><th scope="col">Contestant</th><th scope="col">Division</th><th scope="col">Advancement</th></tr></thead>
+                        <tbody>{qualification.standings.map((standing) => {
+                          const advances = qualifierIds.includes(standing.contestantId)
+                          return <tr key={standing.contestantId}>
+                            <td>{standing.rank ?? '—'}</td>
+                            <th scope="row">{name(standing.contestantId)}</th>
+                            <td>{standing.divisionName ?? '—'}</td>
+                            <td>{qualification.policy === 'manual' ? <label className="inline-flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                aria-label={`Advance ${name(standing.contestantId)}`}
+                                checked={advances}
+                                onChange={(event) => setQualifierIds(
+                                  event.target.checked
+                                    ? [...qualifierIds, standing.contestantId]
+                                    : qualifierIds.filter((id) => id !== standing.contestantId),
+                                )}
+                              />
+                              {advances ? 'Selected' : 'Not selected'}
+                            </label> : advances ? 'Advances' : 'Does not advance'}</td>
+                          </tr>
+                        })}</tbody>
+                      </table>
+                    </div>
                     <p className="v-caption">
                       The roster comes from finalized standings and the configured advancement
                       policy. Confirmation freezes the eligible next-round entries.
@@ -1829,7 +1914,7 @@ export default function NativeTabulationWorkspace({
             )}
             <h1 className="v-page-title">{choice.competitionName}</h1>
             <p className="v-caption">
-              {choice.roundName} · {workspace === 'audit' ? 'Audit Trail' : workspace === 'advancement' ? 'Round Advancement' : workspace === 'scoring' ? 'Scoring' : workspace === 'results' ? 'Results' : 'Official Tabulation'}
+              {choice.roundName} · {workspace === 'audit' ? 'Audit Trail' : workspace === 'advancement' ? 'Round Advancement' : workspace === 'adjustments' ? 'Adjustments' : workspace === 'results' ? 'Results' : 'Official Tabulation'}
             </p>
           </div></div>
           {!reviewer && (
@@ -2025,7 +2110,7 @@ export default function NativeTabulationWorkspace({
         <div className="v-tabulation-layout">
         <main className="min-w-0 space-y-4">
         <>
-          {reviewer && <nav className="v-tabulation-stages" aria-label="Tabulation stages">
+          {reviewer && workspace !== 'tabulation' && workspace !== 'adjustments' && <nav className="v-tabulation-stages" aria-label="Tabulation stages">
             <h2 id="tabulation-workflow-heading" className="sr-only">
               Tabulation workflow
             </h2>
@@ -2082,8 +2167,17 @@ export default function NativeTabulationWorkspace({
             {`${activeStage === 'results' && hasNext ? 'Next Round' : 'Next'}: ${nextStage.label} →`}
           </Button> : <span className="text-sm text-v-text-muted">{activeStep?.complete ? 'Stage complete' : 'Complete the required actions above'}</span>}
         </nav>
-        {workspace === 'scoring' && <nav className="v-tab-stage-footer" aria-label="Page navigation"><span>Review submissions, scores and deductions above.</span><Button disabled={busy} onClick={() => selectStage('calculate')}>Continue to Results</Button></nav>}
-        {workspace === 'results' && <nav className="v-tab-stage-footer" aria-label="Page navigation"><span>{calculation?.finalized ? 'Results finalized.' : 'Finalize current results before round advancement.'}</span><Button disabled={busy || !calculation?.finalized} onClick={() => selectStage('next')}>Continue to Round Advancement</Button></nav>}
+        {workspace === 'tabulation' && <nav className="v-tab-stage-footer justify-end" aria-label="Page navigation">
+          <Button onClick={() => navigate(tabulationDestination(eventId, 'validation', `?${new URLSearchParams({ competitionId: choice.competitionId, ...(choice.roundId ? { roundId: choice.roundId } : {}) })}`))}>
+            Proceed to Results →
+          </Button>
+        </nav>}
+        {workspace === 'results' && <nav className="v-tab-stage-footer justify-end" aria-label="Page navigation">
+          <Button variant="secondary" onClick={() => navigate(tabulationDestination(eventId, 'adjustments', `?${new URLSearchParams({ competitionId: choice.competitionId, ...(choice.roundId ? { roundId: choice.roundId } : {}) })}`))}>
+            Proceed to Adjustments →
+          </Button>
+          <Button disabled={busy || !calculation?.finalized} onClick={() => selectStage('next')}>Continue to Round Advancement</Button>
+        </nav>}
         </>
         </main>
         </div>
@@ -2094,7 +2188,7 @@ export default function NativeTabulationWorkspace({
       {exportType && (
         <Modal open onClose={() => { if (!exportBusy) setExportType('') }} closeDisabled={exportBusy} closeOnBackdrop={!exportBusy} title={`Export ${exportLabels[exportType]}`} id="tabulation-export" size="sm">
           <div className="space-y-4">
-            <p className="v-caption">Exports use current sources for this competition and the selected round. Judge sheets and published official results use CSV; combined scores and deduction reports also support Excel and PDF.</p>
+            <p className="v-caption">Exports use current sources for this competition and the selected round. Judge score sheets are available as CSV or formatted Excel; combined scores and deduction reports also support Excel and PDF.</p>
             <label className="block text-sm">
               Competition round
               <select
@@ -2135,8 +2229,8 @@ export default function NativeTabulationWorkspace({
             )}
             <label className="block text-sm">
               File format
-              <select className="v-input mt-1" aria-label="Export format" value={exportFormat} disabled={exportBusy || !['tabulation','deductions'].includes(exportType)} onChange={event => setExportFormat(event.target.value)}>
-                <option value="csv">CSV</option>{['tabulation','deductions'].includes(exportType)&&<><option value="xls">Excel (.xls)</option><option value="pdf">PDF (print)</option></>}
+              <select className="v-input mt-1" aria-label="Export format" value={exportFormat} disabled={exportBusy || !['judge','tabulation','deductions'].includes(exportType)} onChange={event => setExportFormat(event.target.value)}>
+                <option value="csv">CSV</option>{['judge','tabulation','deductions'].includes(exportType)&&<option value="xls">Excel (.xls)</option>}{['tabulation','deductions'].includes(exportType)&&<option value="pdf">PDF (print)</option>}
               </select>
             </label>
             {exportSnapshotStatus === 'ready' && exportSnapshot?.complete && (
@@ -2221,6 +2315,16 @@ export default function NativeTabulationWorkspace({
               >
                 Cancel
               </Button>
+              {exportType === 'judge' && (
+                <Button
+                  variant="secondary"
+                  loading={exportBusy}
+                  disabled={exportBusy || exportSnapshotStatus !== 'ready' || !exportSnapshot?.complete}
+                  onClick={() => runExport('all')}
+                >
+                  Download all judges
+                </Button>
+              )}
               <Button
                 loading={exportBusy}
                 disabled={
@@ -2235,7 +2339,7 @@ export default function NativeTabulationWorkspace({
                   (exportType === 'final' && officialExportStatus !== 'ready')
                   || (exportType === 'deductions' && !exportDeductionsEnabled)
                 }
-                onClick={runExport}
+                onClick={() => runExport()}
               >
                 Export {exportFormat==='xls'?'Excel':exportFormat.toUpperCase()}
               </Button>

@@ -4,7 +4,6 @@ import { ArrowLeft, ChevronRight } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 import { getErrorMessage } from '@/utils/getErrorMessage'
-import { stagePath } from '@/utils/eventStages'
 import { contributionTotal, roundFormValues, validateRoundForm } from '@/utils/competitionRoundForm'
 import CompetitionRoundForm from './CompetitionRoundForm'
 import { DEDUCTION_LABELS, effectiveDeductionMode } from '../../../../../shared/competition-deductions.js'
@@ -139,8 +138,8 @@ export default function CompetitionRoundSettings({ eventId, round, rounds, found
     <SettingsEntry title="Scoring Criteria" description={`${round.criteriaIds?.length ?? 0} linked criteria. Open the existing editor.`} onClick={onConfigureCriteria} />
     {advance && <SettingsEntry title="Advancement & Elimination" description="Choose how entries qualify for the next round." disabled={locked || busy} onClick={() => onSectionChange('advancement')} />}
     <SettingsEntry title="Deductions & Penalties" description={`${DEDUCTION_LABELS[effectiveDeductionMode({rounds,criteria:foundation.criteria,scoringConfig:foundation.scoringConfig},round.id)]} · ${penalties.length} permitted rules. Configure in Rounds & Scoring.`} onClick={onConfigureDeductions} />
-    <SettingsEntry title="Stage Lineup & Live Scoring" description={foundation.event?.official_rules_id ? 'Prepare lineups and manage judging access in Live Control.' : 'Available after setup is published.'}
-      disabled={!foundation.event?.official_rules_id} to={foundation.event?.official_rules_id ? stagePath('competition', 'live', eventId) : undefined} />
+    <SettingsEntry title="Stage Lineup & Live Scoring" description={foundation.event?.official_rules_id || foundation.event?.officialRulesId ? 'Prepare lineups and manage judging access in Live Control.' : 'Open Live Control to view event operations.'}
+      to={`/organizer/competition/events/${eventId}/live`} />
     {round.purpose !== 'special' && <SettingsEntry title="Next Round / Back to Zero" description="Choose the next round and how earlier scores are used." disabled={locked || busy} onClick={() => onSectionChange('progression')} />}
   </div>
 }

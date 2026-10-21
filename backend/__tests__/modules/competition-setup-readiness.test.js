@@ -4,6 +4,13 @@ import {validScore} from '../../../shared/competition-score-input.js'
 const cfg=()=>({structure:'single',rounds:[],criteria:[{id:'c',roundId:null,name:'Technique',percentage:100,minScore:1,maxScore:10,minorCriteria:[]}],scoringConfig:{calculationMethod:'weighted_average',tiePolicy:'shared'}})
 test('single flat scope is ready without fake rounds',()=>expect(setupReadiness(cfg()).allReady).toBe(true))
 test('incomplete weights do not mark criteria complete',()=>{const c=cfg();c.criteria[0].percentage=70;expect(setupReadiness(c).ready.criteria).toBe(false)})
+test('multiple-round setup cannot proceed until it has at least two rounds',()=>{
+ const c=cfg();c.structure='multiple';c.rounds=[{id:'final',name:'Final',displayOrder:0}];c.criteria=[{...c.criteria[0],roundId:'final'}]
+ expect(setupReadiness(c).ready.structure).toBe(false)
+ expect(setupReadiness(c).issues.structure).toContain('Add at least two rounds to continue with a multiple-round setup.')
+ c.rounds.push({id:'pre',name:'Preliminary',displayOrder:1});c.criteria.push({...c.criteria[0],id:'pre-criterion',roundId:'pre'})
+ expect(setupReadiness(c).issues.structure).not.toContain('Add at least two rounds to continue with a multiple-round setup.')
+})
 test('independent qualification rounds need no contribution weights; weighted rounds do',()=>{
  const c=cfg();c.structure='multiple';c.rounds=[{id:'pre',name:'Preliminary',displayOrder:0,nextRoundId:'final',advancementType:'top_n',advancementValue:2},{id:'final',name:'Final',displayOrder:1}];c.criteria=['pre','final'].map(id=>({...c.criteria[0],id:id+'c',roundId:id}))
  expect(setupReadiness(c).allReady).toBe(true);c.rounds.forEach(r=>{r.progression='weighted';r.weight=20});expect(setupReadiness(c).ready.structure).toBe(false);c.rounds[1].weight=80;expect(setupReadiness(c).allReady).toBe(true)

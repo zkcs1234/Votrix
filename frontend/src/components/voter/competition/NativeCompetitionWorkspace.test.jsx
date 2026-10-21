@@ -27,6 +27,36 @@ beforeEach(()=>{
 })
 afterEach(()=>{vi.useRealTimers();vi.unstubAllEnvs()})
 const ready=async(owner=false)=>{if(owner)views.b.session=null;const r=render(<MemoryRouter><Workspace eventId="event" eventName="Campus arts showcase" choices={choices} owner={owner}/></MemoryRouter>);if(owner){await screen.findByRole('heading',{name:'Live Control Panel'});await screen.findByText('Dancer a')}else await screen.findByText('Dancer a');return r}
+
+test.each(['access','pause','correction','row correction'])('a delayed draft response preserves newer %s state',async(change)=>{
+ await ready()
+ let release
+ f.score.mockImplementationOnce(async(_event,_child,_action,body)=>{
+  views.a.drafts=[{entry_id:body.entryId,criterion_id:body.criterionId,scores:body.scores,revision:1,locked:false}]
+  views.a.session.source_revision=2
+  return new Promise(resolve=>{release=resolve})
+ })
+ fireEvent.change(screen.getByRole('spinbutton'),{target:{value:'8'}})
+ fireEvent.click(screen.getByRole('button',{name:'Retry saves'}))
+ await waitFor(()=>expect(f.score).toHaveBeenCalledTimes(1))
+ if(change!=='row correction'){views.a.session.revision=2;views.a.context.sessionRevision=2}
+ if(change==='access'){
+  views.a.contestants[0].open=false;views.a.session.entry_access['entry-a']=false
+ }else if(change==='pause'){
+  views.a.session.status='paused'
+  views.a.criteria[0].open=false;views.a.contestants[0].open=false
+ }
+ else{
+  views.a.drafts[0]={...views.a.drafts[0],scores:{'minor-a':9},revision:2}
+  views.a.session.source_revision=3
+ }
+ await act(async()=>emit({eventId:'event',competitionId:'a',roundId:null}))
+ if(!change.includes('correction'))expect(screen.getByRole('spinbutton')).toBeDisabled()
+ await act(async()=>release({data:{rowRevision:1,locked:false}}))
+ if(!change.includes('correction'))expect(screen.getByRole('spinbutton')).toBeDisabled()
+ else await waitFor(()=>expect(screen.getByRole('spinbutton')).toHaveValue(9))
+ expect(screen.queryByRole('button',{name:'Retry saves'})).not.toBeInTheDocument()
+})
 test('opening published Live Control marks the event active without starting scoring',async()=>{
  vi.stubEnv('VITE_COMPETITION_NATIVE_SCORING_ENABLED','true')
  f.choices.mockResolvedValue({data:{contexts:choices,nativeEvent:true,eventName:'Campus arts showcase',event:{id:'event',status:'scheduled'}}})
@@ -86,10 +116,28 @@ test('locking and submission send participation identity, raw score and child/se
  expect(f.score.mock.calls.some(call=>call[2]==='submit')).toBe(false)
  fireEvent.click(screen.getByRole('button',{name:'Submit Scores'}))
  fireEvent.click(await screen.findByRole('button',{name:'Yes, Submit Scores'}))
- await screen.findByText(/Round submitted/)
+ await screen.findByText('Dancer b')
  expect(f.score.mock.calls.at(-1)[2]).toBe('submit')
  expect(screen.queryByRole('dialog',{name:'Submit scores for this round?'})).not.toBeInTheDocument()
- expect(screen.getByRole('spinbutton')).toBeDisabled()
+ expect(screen.getByRole('spinbutton')).toBeEnabled()
+ expect(screen.getByRole('button',{name:/Contemporary:/})).toHaveAttribute('aria-current','page')
+})
+
+test.each([0,1,2])('judge input enforces %i saved decimal places before sending the accepted score',async precision=>{
+ views.a.criteria[0].minors[0].decimalPlaces=precision
+ await ready()
+ const input=screen.getByRole('spinbutton'),lock=()=>screen.getByRole('button',{name:'Dancer a: Technique, Execution Lock'})
+ expect(input).toHaveAttribute('step',String(10**-precision))
+ fireEvent.change(input,{target:{value:'8.55'}})
+ expect(lock().disabled).toBe(precision!==2)
+ fireEvent.change(input,{target:{value:'8.5'}})
+ expect(lock().disabled).toBe(precision===0)
+ const accepted=precision===2?8.55:precision===1?8.5:8
+ fireEvent.change(input,{target:{value:String(accepted)}})
+ expect(lock()).toBeEnabled()
+ expect(f.score).not.toHaveBeenCalled()
+ fireEvent.click(lock())
+ await waitFor(()=>expect(f.score).toHaveBeenCalledWith('event','a','lock',expect.objectContaining({scores:{'minor-a':accepted}})))
 })
 test('Lock shows progress only on its button and locks score inputs after success',async()=>{
  let finishLock
@@ -332,6 +380,22 @@ test('explicit round selection isolates pending drafts and blocks Final until co
  fireEvent.click(screen.getByRole('button',{name:/Round 2: CLOSED — Final/}));await screen.findByText('Dancer b');expect(screen.getByRole('spinbutton')).toBeDisabled();expect(screen.getByRole('spinbutton').value).toBe('');expect(screen.getByText(/confirmed qualification/)).toBeInTheDocument()
  fireEvent.click(screen.getByRole('button',{name:/Round 1: OPEN — Preliminary/}));await screen.findByText('Dancer a');expect(screen.getByRole('spinbutton').value).toBe('8');expect(f.score).not.toHaveBeenCalled()
 })
+test('successful round submission automatically selects the next round without bypassing qualification',async()=>{
+ const rounds=[{...choices[0],roundId:'preliminary',roundName:'Preliminary',state:'open'},{...choices[0],roundId:'final',roundName:'Final',state:'waiting'}]
+ views.a.context.roundId='preliminary'
+ views.a.contestants[0].lockedCriteria=['criterion-a']
+ views.b.scoringAvailable=false
+ const final={...snapshot('b'),context:{...snapshot('b').context,competitionId:'a',roundId:'final',sessionId:null},session:null,laterRoundBlocked:true,criteria:snapshot('b').criteria.map(k=>({...k,open:false})),contestants:snapshot('b').contestants.map(e=>({...e,open:false}))}
+ f.view.mockImplementation(async(_e,_c,roundId)=>({data:structuredClone(roundId==='final'?final:views.a)}))
+ render(<MemoryRouter><Workspace eventId="event" choices={rounds}/></MemoryRouter>)
+ await screen.findByText('Dancer a')
+ fireEvent.click(screen.getByRole('button',{name:'Submit Scores'}))
+ fireEvent.click(await screen.findByRole('button',{name:'Yes, Submit Scores'}))
+ expect(await screen.findByText(/confirmed qualification/)).toBeInTheDocument()
+ expect(screen.getByRole('button',{name:/Round 2: CLOSED — Final/})).toHaveAttribute('aria-pressed','true')
+ expect(screen.getByRole('spinbutton')).toBeDisabled()
+ expect(f.score.mock.calls.at(-1)[2]).toBe('submit')
+})
 test('reconnect refetches authoritative access; older session/source snapshots cannot reopen scoring',async()=>{
  await ready();views.a.session.revision=5;views.a.session.source_revision=5;views.a.context.sessionRevision=5;views.a.session.status='paused';views.a.criteria[0].open=false;views.a.contestants[0].open=false
  await act(async()=>{for(const cb of f.listeners.get('ws:connected')??[])cb({})});expect(screen.getByRole('spinbutton')).toBeDisabled()
@@ -361,6 +425,32 @@ const enableJudgeDeductions=()=>{
  const rule={id:'late',description:'Late start',amount:2,units:'points',appliedBy:'judge',roundId:null,criteriaId:null,perViolation:false,maxOccurrences:1,anchorCriterionId:'criterion-a'}
  views.a.deductionSettings={mode:'judge',rules:[rule],configuration:{structure:'single',rounds:[],criteria:[{id:'criterion-a',name:'Technique',roundId:null,percentage:100,minorCriteria:[{id:'minor-a',name:'Execution',minScore:0,maxScore:10}]}],scoringConfig:{calculationMethod:'weighted_average',deductionMode:'judge',deductionRules:[{...rule,anchorCriterionId:undefined}]}}}
 }
+test('judge deductions stay locked until an audited correction is reopened and scoring resumes',async()=>{
+ enableJudgeDeductions()
+ views.a.contestants[0].lockedCriteria=['criterion-a']
+ views.a.progress[0].lockedCount=1
+ views.a.drafts=[{entry_id:'entry-a',criterion_id:'criterion-a',scores:{'minor-a':8},deductions:[],revision:1,locked:true}]
+ await ready()
+ expect(screen.getByRole('button',{name:'Deduct'})).toBeDisabled()
+ expect(screen.getByText(/Deductions are locked with this criterion/)).toBeInTheDocument()
+ fireEvent.click(screen.getByRole('button',{name:'Deduct'}))
+ expect(f.score).not.toHaveBeenCalled()
+ views.a.contestants[0].lockedCriteria=[];views.a.progress[0].lockedCount=0
+ views.a.drafts[0].locked=false;views.a.drafts[0].revision=2
+ views.a.session.status='paused';views.a.session.revision=2;views.a.session.source_revision=2;views.a.context.sessionRevision=2
+ views.a.criteria[0].open=false;views.a.contestants[0].open=false
+ await act(async()=>emit({eventId:'event',competitionId:'a',roundId:null}))
+ expect(screen.getByRole('button',{name:'Deduct'})).toBeDisabled()
+ expect(screen.getByText('Scoring is paused. Wait for the organizer to resume it.')).toBeInTheDocument()
+ views.a.session.status='active';views.a.session.revision=3;views.a.session.source_revision=3;views.a.context.sessionRevision=3
+ views.a.criteria[0].open=true;views.a.contestants[0].open=true
+ await act(async()=>emit({eventId:'event',competitionId:'a',roundId:null}))
+ expect(screen.getByRole('button',{name:'Deduct'})).toBeEnabled()
+ fireEvent.click(screen.getByRole('button',{name:'Deduct'}))
+ await waitFor(()=>expect(f.score).toHaveBeenCalledWith('event','a','draft',expect.objectContaining({sessionRevision:3,rowRevision:2,scores:{'minor-a':8},deductions:[expect.objectContaining({ruleId:'late'})]})))
+ expect(screen.getByRole('spinbutton')).toHaveValue(8)
+ expect(screen.getByText('Applied 1 of 1. Configured deduction limit reached.')).toBeInTheDocument()
+})
 test('judge deductions lock and submit with the original criterion score and cannot be changed afterwards',async()=>{
  enableJudgeDeductions();await ready()
  fireEvent.change(screen.getByRole('spinbutton'),{target:{value:'8'}})
@@ -368,10 +458,12 @@ test('judge deductions lock and submit with the original criterion score and can
  await waitFor(()=>expect(f.score).toHaveBeenCalledWith('event','a','draft',expect.objectContaining({entryId:'entry-a',criterionId:'criterion-a',deductions:[expect.objectContaining({ruleId:'late'})]})))
  expect(screen.queryByLabelText(/violation reference|deduction reason/i)).not.toBeInTheDocument()
  expect(screen.getByRole('button',{name:'Deduct'})).toBeDisabled()
+ expect(screen.getByText('Applied 1 of 1. Configured deduction limit reached.')).toBeInTheDocument()
  expect(screen.getByRole('button',{name:'Dancer a: Technique, Execution Lock'})).toBeEnabled()
  expect(screen.queryByText(/Judge total preview/)).not.toBeInTheDocument()
  fireEvent.click(screen.getByRole('button',{name:'Dancer a: Technique, Execution Lock'}))
  await waitFor(()=>expect(screen.getByRole('button',{name:'Submit Scores'})).toBeEnabled())
+ expect(screen.getByText(/Applied 1 of 1\. Deductions are locked with this criterion/)).toBeInTheDocument()
  const payload=f.score.mock.calls.find(call=>call[2]==='lock')[3]
  expect(payload.scores).toEqual({'minor-a':8})
  expect(payload.deductions).toEqual([expect.objectContaining({id:expect.any(String),ruleId:'late'})])
@@ -380,7 +472,7 @@ test('judge deductions lock and submit with the original criterion score and can
  expect(payload.deductions[0]).not.toHaveProperty('amount')
  fireEvent.click(screen.getByRole('button',{name:'Submit Scores'}))
  fireEvent.click(await screen.findByRole('button',{name:'Yes, Submit Scores'}))
- await screen.findByText(/Round submitted/)
+ await screen.findByText('Dancer b')
  expect(f.score.mock.calls.at(-1)[2]).toBe('submit')
 })
 test('competition switching isolates incomplete local judge deductions without posting them to a sibling',async()=>{

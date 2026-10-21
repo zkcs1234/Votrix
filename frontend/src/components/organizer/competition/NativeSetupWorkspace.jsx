@@ -1,19 +1,20 @@
 import {useCallback,useEffect,useRef,useState} from 'react'
-import {Link,useParams,useLocation,useSearchParams} from 'react-router-dom'
+import {useParams,useLocation,useSearchParams} from 'react-router-dom'
 import {Check, ChevronRight, Link2, Pencil, Search, Trash2, Trophy, UserPlus, Users, ShieldCheck} from 'lucide-react'
 import {nativeCompetitionService as service} from '@/services/competition-native.service'
 import {pageantService} from '@/services/pageant.service'
 import {fetchCompetitionSetupData, invalidateCompetitionSetupData, setCompetitionSetupData} from '@/services/competition-setup-cache'
 import CompetitionCreationReview from './CompetitionCreationReview'
 import StageFooter from '@/components/ui/StageFooter'
-import RoundsScoringEditor from './RoundsScoringEditor'
+import RoundsScoringEditor,{RoundConfigurationList} from './RoundsScoringEditor'
+import {roundScoringReadiness} from '@/utils/competitionRoundReadiness'
 import {setupReadiness} from '../../../../../shared/competition-setup-readiness.js'
 import Button from '@/components/ui/Button'
 import {competitionScoringReady} from '../../../../../shared/competition-creation-flow.js'
 import {INPUT_CLASS} from '@/utils/uiClasses'
 
 const message=e=>e.response?.data?.message??e.message??'Unable to load competition setup'
-const blank=()=>({structure:'single',rounds:[],criteria:[],scoringConfig:{calculationMethod:'weighted_average',criterionBasis:'percentage',minorWeightBasis:'overall',tiePolicy:'shared',decimalPlaces:2,defaultMinScore:1,defaultMaxScore:10,deductionMode:'none',deductionRules:[]}})
+const blank=()=>({structure:'single',rounds:[],criteria:[],scoringConfig:{calculationMethod:'weighted_average',criterionBasis:'percentage',minorWeightBasis:'overall',tiePolicy:'shared',decimalPlaces:2,inputDecimalPlaces:0,defaultMinScore:1,defaultMaxScore:10,deductionMode:'none',deductionRules:[]}})
 const convertLegacyMinorWeights=configuration=>{
  if(configuration?.scoringConfig?.minorWeightBasis==='overall')return {configuration,converted:false}
  const converted=structuredClone(configuration)
@@ -130,6 +131,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
  const visible=key=>(!stage||stage===key)&&(key!=='workspace'||stage!=='workspace'||configuring)
  const [children,setChildren]=useState(initialChildren),[selected,setSelected]=useState(initialChildren.find(c=>c.id===params.get('competitionId')&&c.origin==='native')?.id??initialChildren.find(c=>c.origin==='native'&&c.name.trim().toLowerCase()==='pageant'&&(c.competition_type??c.competitionType)==='pageant')?.id??initialChildren.find(c=>c.origin==='native')?.id??'')
  const [activeRoundId,setActiveRoundId]=useState(null)
+ const routeRound=useRef(params.get('roundId'));routeRound.current=params.get('roundId')
  const [summaries,setSummaries]=useState({}),[roundCounts,setRoundCounts]=useState({}),[stepReadiness,setStepReadiness]=useState({}),[activeSetupStep,setActiveSetupStep]=useState(['structure','criteria','score-sheet','deductions'].includes(params.get('scoringStep'))?params.get('scoringStep'):'structure'),[showValidation,setShowValidation]=useState(false)
  const [snapshot,setSnapshot]=useState(null),[configuration,setConfiguration]=useState(blank),[entries,setEntries]=useState([]),[masters,setMasters]=useState([]),[judges,setJudges]=useState([]),[pool,setPool]=useState([]),[event,setEvent]=useState(null),[pageantDivisions,setPageantDivisions]=useState([]),[divisionName,setDivisionName]=useState(''),[judgeAssignments,setJudgeAssignments]=useState([]),[roundsByCompetition,setRoundsByCompetition]=useState({})
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[dirty,setDirty]=useState(false),[ack,setAck]=useState(false)
@@ -143,6 +145,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
  const generation=useRef(0),mutating=useRef(false),createRequest=useRef(null)
  const hasLoadedData=useRef(false);hasLoadedData.current=!!snapshot||!!event
  const view=snapshot?.competition?.id===selected&&snapshot.competition.event_id===eventId?snapshot:null
+ const workspaceView=['structure','rounds','criteria'].includes(params.get('scoringView'))?params.get('scoringView'):params.has('scoringStep')?(params.get('scoringStep')==='structure'?'structure':'criteria'):view?.configuration?'rounds':'structure'
  const pageantEvent=event?.competitionType==='pageant'
  const editable=!!view&&!view.competition.official_child_rules_id&&event?.status==='draft'&&!event?.competitionCreatedAt&&!loading
  const reload=useCallback(async()=>{
@@ -168,7 +171,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
    if(selected&&(foundation?.data?.competition?.id!==selected||foundation.data.competition.event_id!==eventId))throw new Error('Competition setup identity mismatch')
    const loadedConfiguration=structuredClone(foundation?.data.configuration??blank())
    const migratedConfiguration=convertLegacyMinorWeights(loadedConfiguration)
-   setSnapshot(foundation?.data??null);setEntries(participation?.data.entries??[]);setConfiguration(migratedConfiguration.configuration);setActiveRoundId(foundation?.data.configuration?.rounds?.[0]?.id??null);setDirty(migratedConfiguration.converted);setAck(false);setNotice(migratedConfiguration.converted?'Legacy minor weights were converted to direct round percentages without changing their relative contribution. Save the configuration to apply the new format.':'');setError('')
+   setSnapshot(foundation?.data??null);setEntries(participation?.data.entries??[]);setConfiguration(migratedConfiguration.configuration);setActiveRoundId(foundation?.data.configuration?.rounds?.find(round=>round.id===routeRound.current)?.id??foundation?.data.configuration?.rounds?.[0]?.id??null);setDirty(migratedConfiguration.converted);setAck(false);setNotice(migratedConfiguration.converted?'Legacy minor weights were converted to direct round percentages without changing their relative contribution. Save the configuration to apply the new format.':'');setError('')
    const branchCompetitions=(list.data.competitions??[]).filter(c=>c.origin==='native'&&(
     ev.data.event.competitionType!=='pageant'
     ||(c.competition_type??c.competitionType)!=='pageant'
@@ -185,7 +188,8 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
    if(current.current!==expected||generation.current!==request)return
    setRoundCounts(Object.fromEntries(branchStates.map(([id,state])=>[id,state.roundCount])));setRoundsByCompetition(Object.fromEntries(branchStates.map(([id,state])=>[id,state.rounds??[]])));setSummaries(Object.fromEntries(branchStates.map(([id,state])=>[id,state.status])));setStepReadiness(Object.fromEntries(branchStates.map(([id,state])=>[id,state.ready])));if(stage==='judges')setJudgeAssignments(branchStates.flatMap(([,state])=>state.assignments??[]))
    window.dispatchEvent(new CustomEvent('votrix-native-contexts-changed',{detail:{eventId,native:list.data.competitions?.some(c=>c.origin==='native')===true}}))
-  }catch(e){if(import.meta.env.DEV)console.debug('[competition-setup] reload failed',message(e));if(current.current===expected&&generation.current===request){setSnapshot(null);setError(message(e))}}
+   return true
+  }catch(e){if(import.meta.env.DEV)console.debug('[competition-setup] reload failed',message(e));if(current.current===expected&&generation.current===request){setSnapshot(null);setError(message(e))}return false}
   finally{if(current.current===expected&&generation.current===request)setLoading(false)}
  },[eventId,selected,identity,stage])
  const invalidateRequests=useCallback(()=>{generation.current++},[])
@@ -193,7 +197,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
  const run=async(action,success)=>{
   if(mutating.current)return
   mutating.current=true;setBusy(true);setNotice('');const expected=identity
-  try{await action();if(current.current===expected){await invalidateCompetitionSetupData(eventId);await reload();if(current.current===expected)setNotice(success)};return true}
+  try{await action();if(current.current!==expected)return false;await invalidateCompetitionSetupData(eventId);const refreshed=await reload();if(!refreshed||current.current!==expected)return false;setNotice(success);return true}
   catch(e){if(current.current===expected)setError(message(e));return false}
   finally{mutating.current=false;setBusy(false)}
  }
@@ -208,13 +212,34 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
  const validation=setupReadiness(configuration)
  const navigateStep=id=>{if(id===activeSetupStep)return;if(formPending&&!window.confirm('Discard the unfinished Add/Edit form? Use Add or Update to include it in the configuration first.'))return;setActiveSetupStep(id);setShowValidation(false);setPendingForms({});setParams(previous=>{const next=new URLSearchParams(previous);next.set('scoringStep',id);if(selected)next.set('competitionId',selected);return next},{replace:true})}
  const nextSubstep=()=>{setShowValidation(true);if(validation.ready[activeSetupStep])navigateStep(setupSteps[setupSteps.findIndex(s=>s.id===activeSetupStep)+1].id)}
- const returnToList=()=>{setConfiguring(false);setParams(previous=>{const next=new URLSearchParams(previous);next.delete('competitionId');next.delete('scoringStep');return next},{replace:true})}
+ const returnToList=()=>{setConfiguring(false);setParams(previous=>{const next=new URLSearchParams(previous);next.delete('competitionId');next.delete('scoringStep');next.delete('scoringView');next.delete('roundId');return next},{replace:true})}
  const proceedEntries=async()=>{if(!view?.configuration||!view.criteriaReadiness?.allReady||!entries.length){setError('Complete the saved scoring configuration and register at least one entry before proceeding.');return}if(mutating.current)return;mutating.current=true;setBusy(true);setError('');try{await reload();returnToList()}catch(e){setError(message(e))}finally{mutating.current=false;setBusy(false)}}
  const saveConfiguration=async()=>{setShowValidation(true);if(formPending||!validation.allReady)return;const saved=await run(()=>service.configure(eventId,selected,{configuration,expectedSetupRevision:view.competition.setup_revision}),'Configuration saved');if(saved&&stage==='workspace')returnToList()}
- const pageantRounds=pageantEvent&&view?.competition.name.trim().toLowerCase()==='pageant'&&configuration.structure==='multiple'?configuration.rounds??[]:[]
- const selectedRoundIndex=Math.max(0,pageantRounds.findIndex(round=>round.id===activeRoundId))
- const nextPageantRound=pageantRounds[selectedRoundIndex+1]
- const advancePageantRound=()=>{if(nextPageantRound&&!formPending){setShowValidation(false);setActiveRoundId(nextPageantRound.id)}}
+ const currentRound=configuration.structure==='multiple'?configuration.rounds.find(round=>round.id===activeRoundId)??configuration.rounds[0]:{id:null,name:configuration.scoringConfig.singleRoundName||'Single Round'}
+ const roundValidation=roundScoringReadiness(configuration,currentRound?.id)
+ const allRoundsConfigured=!!view&&competitionScoringReady(view)
+ const workspaceIssues=workspaceView==='structure'?validation.issues.structure:workspaceView==='criteria'?roundValidation.issues:[]
+ const setWorkspaceView=(mode,roundId=null)=>{
+  setShowValidation(false);setPendingForms({});setError('')
+  if(mode==='criteria')setActiveRoundId(roundId)
+  setParams(previous=>{const next=new URLSearchParams(previous);next.set('competitionId',selected);next.set('scoringView',mode);next.delete('scoringStep');if(mode==='criteria'&&roundId)next.set('roundId',roundId);else next.delete('roundId');return next},{replace:true})
+ }
+ const backToRounds=async()=>{
+  if(mutating.current)return
+  if((dirty||formPending)&&!window.confirm('Discard unsaved changes and return to Rounds & Scoring?'))return
+  if(dirty||formPending){
+   mutating.current=true;setBusy(true)
+   try{if(!await reload())return}finally{mutating.current=false;setBusy(false)}
+  }
+  setWorkspaceView('rounds')
+ }
+ const saveWorkspace=async()=>{
+  setShowValidation(true)
+  if(!editable||formPending||busy||(workspaceView==='structure'?!validation.ready.structure:!roundValidation.ready))return
+  const savedConfiguration=workspaceView==='structure'?{...configuration,rounds:configuration.rounds.map(round=>({...round,name:round.name.trim()})),scoringConfig:{...configuration.scoringConfig,...(configuration.structure==='single'?{singleRoundName:(configuration.scoringConfig.singleRoundName??'Single Round').trim()}:{})}}:configuration
+  const saved=await run(()=>service.configure(eventId,selected,{configuration:savedConfiguration,expectedSetupRevision:view.competition.setup_revision}),workspaceView==='structure'?'Round structure saved':'Round scoring configuration saved')
+  if(saved)setWorkspaceView('rounds')
+ }
  const addPageantDivision=async eventSubmit=>{
   eventSubmit.preventDefault()
   const nextName=divisionName.trim()
@@ -226,7 +251,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
   void run(()=>pageantService.deleteDivision(eventId,division.id),'Pageant division removed')
  }
 
- const choose=id=>{setConfiguring(true);if(id===selected){setParams(previous=>{const next=new URLSearchParams(previous);next.set('competitionId',id);return next},{replace:true});return;}if((dirty||formPending)&&!window.confirm('Discard unsaved configuration changes and unfinished forms?'))return;generation.current++;setSnapshot(null);setSelected(id);setError('');setPendingForms({});setParams(previous=>{const next=new URLSearchParams(previous);next.set('competitionId',id);return next},{replace:true})}
+ const choose=id=>{if(configuring&&(dirty||formPending)&&!window.confirm('Discard unsaved configuration changes and unfinished forms?'))return;setConfiguring(true);if(id!==selected){generation.current++;setSnapshot(null);setSelected(id);setError('');setPendingForms({})}setParams(previous=>{const next=new URLSearchParams(previous);next.set('competitionId',id);next.delete('scoringView');next.delete('roundId');next.delete('scoringStep');return next},{replace:true})}
  const create=()=>run(async()=>{
   const body=createRequest.current?.name===childName.trim()?createRequest.current:{id:crypto.randomUUID(),name:childName.trim(),competitionType:null}
   createRequest.current=body;const {data}=await service.create(eventId,body);createRequest.current=null;setChildName('');setChildren(cs=>[...cs.filter(c=>c.id!==data.competition.id),data.competition]);setSelected(data.competition.id)
@@ -252,7 +277,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
  const competitionCoverage=nativeCompetitions.map(competition=>{
   const assignments=judgeAssignments.filter(assignment=>assignment.competition_id===competition.id)
   const rounds=roundsByCompetition[competition.id]??[]
-  const scopes=rounds.length>1?rounds:[{id:null}]
+  const scopes=rounds.length?rounds:[{id:null}]
   const covered=scopes.every(round=>assignments.some(assignment=>assignment.round_id==null||assignment.round_id===round.id))
   return {competition,assignments,rounds,covered,judgeCount:new Set(assignments.map(assignment=>assignment.participant_id)).size}
  })
@@ -274,6 +299,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
   setAssignmentDrawerOpen(true)
  }
  const revokeAssignment=assignment=>{
+  if(!editable)return
   if(!window.confirm('Revoke this assignment? The judge will no longer access this competition target, and existing scores will be retained.'))return
   void run(()=>service.assign(eventId,assignment.competition_id,{participantId:assignment.participant_id,roundId:assignment.round_id},true),'Assignment revoked')
  }
@@ -288,13 +314,12 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
    setParams(previous=>{const next=new URLSearchParams(previous);next.delete('competitionId');next.delete('scoringStep');return next},{replace:true})
   }
  },[pageantEvent,pageantChildId,children,selected,dirty,formPending,setParams])
- const configurationIssues=Object.values(validation.issues).flat()
- const returnToCompetitions=()=>{if(!(dirty||formPending)||window.confirm('Discard unsaved configuration changes and return to competitions?')){setPendingForms({});setShowValidation(false);void reload();returnToList()}}
- const configurationStatus=dirty?'Unsaved changes':validation.allReady?'Configured':'Setup incomplete'
+ const returnToCompetitions=()=>{if(mutating.current)return;if(!(dirty||formPending)||window.confirm('Discard unsaved configuration changes and return to competitions?')){setPendingForms({});setShowValidation(false);void reload();returnToList()}}
+ const configurationStatus=dirty?'Unsaved changes':allRoundsConfigured?'Configured':'Setup incomplete'
  return <section className={`v-competition-workflow space-y-5 ${stage==='workspace'?'rs-config-page':''}`} aria-label="Independent competition setup">
   <div className="rounded-2xl border border-v-border bg-v-surface-elevated/50 p-5 sm:p-6">
    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-v-primary">{stage === 'workspace' ? 'Step 5 of 7' : stage === 'contestants' ? 'Step 6 of 7' : stage === 'judges' ? 'Step 7 of 7' : 'Competition setup'}</p>
-   {stage==='workspace'&&view?<><nav className="rs-breadcrumbs" aria-label="Breadcrumb"><button type="button" onClick={returnToCompetitions}>Competitions</button><ChevronRight size={15} aria-hidden="true"/><span>{view.competition.name}</span><ChevronRight size={15} aria-hidden="true"/><span aria-current="page">Configuration</span></nav><div className="rs-page-heading"><div><h2>{view.competition.name}</h2><p>Configure scoring rounds and criteria for this competition. Review your setup before saving.</p></div><div className="rs-page-heading-actions"><span className="rs-config-status" data-status={dirty?'draft':validation.allReady?'complete':'incomplete'}>{configurationStatus}</span><Button variant="ghost" className="rs-back-button" onClick={returnToCompetitions}>← Back to Competitions</Button></div></div></>:<h2 className="mt-1 text-2xl font-semibold tracking-tight text-v-text">{stage === 'contestants' ? 'Contestants & Entries' : stage === 'judges' ? 'Judges' : 'Competition setup'}</h2>}
+   {stage==='workspace'&&view&&configuring?<><nav className="rs-breadcrumbs" aria-label="Breadcrumb"><button type="button" onClick={returnToCompetitions}>Competitions</button><ChevronRight size={15} aria-hidden="true"/><span>{view.competition.name}</span><ChevronRight size={15} aria-hidden="true"/>{workspaceView==='criteria'?<><button type="button" onClick={backToRounds}>Rounds &amp; Scoring</button><ChevronRight size={15} aria-hidden="true"/><span aria-current="page">{currentRound?.name} · Scoring Criteria</span></>:<span aria-current="page">Rounds &amp; Scoring</span>}</nav><div className="rs-page-heading"><div><h2>{view.competition.name}</h2><p>{workspaceView==='criteria'?`${currentRound?.name} — Define the criteria judges will score in this round.`:workspaceView==='structure'?'Rounds & Scoring — Define the scoring phases for this competition.':'Rounds & Scoring — Configure and save each round before continuing.'}</p></div><span className="rs-config-status" data-status={dirty?'draft':allRoundsConfigured?'complete':'incomplete'}>{configurationStatus}</span></div></>:<h2 className="mt-1 text-2xl font-semibold tracking-tight text-v-text">{stage === 'contestants' ? 'Contestants & Entries' : stage === 'judges' ? 'Judges' : stage==='workspace'?'Rounds & Scoring':'Competition setup'}</h2>}
    {stage === 'judges' ? <p className="mt-2 max-w-3xl text-sm leading-relaxed text-v-text-subtle">Enroll judges and assign them to the competitions they will score.</p> : stage==='contestants'&& <p className="mt-2 max-w-3xl text-sm leading-relaxed text-v-text-subtle">Register contestants and entries for each selected competition.</p>}
    {!stage&&visible('workspace')&&<div className="mt-6 pb-1">
     <div className="grid grid-cols-2 gap-4 sm:flex sm:items-start">
@@ -335,19 +360,19 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
      <div className="relative min-w-0 flex-1">
       <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-v-text-subtle"/>
-      <input className={`${INPUT_CLASS} min-h-[44px] w-full rounded-xl pl-9 text-[15px]`} aria-label="Search judges to enroll" placeholder="Search judges by name or email..." value={poolSearch} onChange={e=>{setPoolSearch(e.target.value);setPoolPickerOpen(true)}} onFocus={()=>setPoolPickerOpen(true)} onClick={()=>setPoolPickerOpen(true)} onKeyDown={e=>{if(e.key==='Escape')setPoolPickerOpen(false)}} disabled={busy||loading||(event?.status!=='draft'||!!event?.competitionCreatedAt)} aria-expanded={poolPickerOpen} aria-controls="judge-enrollment-options"/>
+      <input className={`${INPUT_CLASS} min-h-[44px] w-full rounded-xl pl-9 text-[15px]`} aria-label="Search judges to enroll" placeholder="Search judges by name or email..." value={poolSearch} onChange={e=>{setPoolSearch(e.target.value);setPoolPickerOpen(true)}} onFocus={()=>setPoolPickerOpen(true)} onClick={()=>setPoolPickerOpen(true)} onKeyDown={e=>{if(e.key==='Escape')setPoolPickerOpen(false)}} disabled={!editable||busy||loading} aria-expanded={poolPickerOpen} aria-controls="judge-enrollment-options"/>
       {poolPickerOpen&&<div id="judge-enrollment-options" className="absolute left-0 right-0 top-full z-30 mt-2 max-h-80 overflow-y-auto rounded-xl border border-v-border bg-v-surface p-2 shadow-lg">
        <div className="flex items-center justify-between gap-3 px-2 py-1 text-xs text-v-text-subtle"><span>{selectedPoolJudges.length} selected</span><span>{selectablePool.length} available in results</span></div>
-       {selectedPoolJudges.length>0&&<div className="flex flex-wrap gap-1.5 px-2 py-2">{selectedPoolJudges.map(id=>{const judge=pool.find(j=>j.id===id);return judge?<span key={id} className="inline-flex items-center gap-1 rounded-full border border-v-primary/20 bg-v-primary-soft px-2 py-1 text-xs text-v-primary">{name(judge)}<button type="button" aria-label={`Remove ${name(judge)} from selection`} className="font-semibold" onClick={()=>togglePoolJudge(id)}>×</button></span>:null})}</div>}
-       {selectablePool.length>0&&<label className="flex cursor-pointer items-center gap-2 rounded-lg bg-v-primary-soft/60 px-2 py-2 text-xs font-medium text-v-text"><input type="checkbox" checked={allFilteredSelected} onChange={toggleAllPoolJudges}/><span>Select all ({selectablePool.length} available results)</span></label>}
+       {selectedPoolJudges.length>0&&<div className="flex flex-wrap gap-1.5 px-2 py-2">{selectedPoolJudges.map(id=>{const judge=pool.find(j=>j.id===id);return judge?<span key={id} className="inline-flex items-center gap-1 rounded-full border border-v-primary/20 bg-v-primary-soft px-2 py-1 text-xs text-v-primary">{name(judge)}<button type="button" aria-label={`Remove ${name(judge)} from selection`} className="font-semibold" disabled={!editable} onClick={()=>togglePoolJudge(id)}>×</button></span>:null})}</div>}
+       {selectablePool.length>0&&<label className="flex cursor-pointer items-center gap-2 rounded-lg bg-v-primary-soft/60 px-2 py-2 text-xs font-medium text-v-text"><input type="checkbox" checked={allFilteredSelected} disabled={!editable} onChange={toggleAllPoolJudges}/><span>Select all ({selectablePool.length} available results)</span></label>}
        <div className="mt-1 divide-y divide-v-border">
-        {filteredPool.map(j=><label key={j.id} className={`flex items-center gap-2 rounded-lg px-2 py-2 text-sm ${j.enrolled?'cursor-not-allowed opacity-65':'cursor-pointer hover:bg-v-surface-elevated'}`}><input type="checkbox" aria-label={`Select ${name(j)}`} checked={!j.enrolled&&selectedPoolJudges.includes(j.id)} disabled={j.enrolled} onChange={()=>togglePoolJudge(j.id)}/><span className="min-w-0 flex-1"><span className="block truncate font-medium text-v-text">{name(j)}</span><span className="block truncate text-xs text-v-text-subtle">{j.email??'—'}</span></span><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-medium ${j.enrolled?'bg-v-surface-elevated text-v-text-subtle':'bg-emerald-50 text-emerald-700'}`}>{j.enrolled?'Already enrolled':'Available'}</span></label>)}
+        {filteredPool.map(j=><label key={j.id} className={`flex items-center gap-2 rounded-lg px-2 py-2 text-sm ${j.enrolled?'cursor-not-allowed opacity-65':'cursor-pointer hover:bg-v-surface-elevated'}`}><input type="checkbox" aria-label={`Select ${name(j)}`} checked={!j.enrolled&&selectedPoolJudges.includes(j.id)} disabled={!editable||j.enrolled} onChange={()=>togglePoolJudge(j.id)}/><span className="min-w-0 flex-1"><span className="block truncate font-medium text-v-text">{name(j)}</span><span className="block truncate text-xs text-v-text-subtle">{j.email??'—'}</span></span><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-medium ${j.enrolled?'bg-v-surface-elevated text-v-text-subtle':'bg-emerald-50 text-emerald-700'}`}>{j.enrolled?'Already enrolled':'Available'}</span></label>)}
         {!filteredPool.length&&<p className="px-3 py-5 text-center text-sm text-v-text-subtle">No judges match your search.</p>}
        </div>
-       <div className="flex justify-between border-t border-v-border px-2 pt-2 text-xs"><button type="button" className="text-v-primary hover:underline" onClick={()=>setSelectedPoolJudges([])}>Clear all</button><button type="button" className="text-v-text-subtle hover:text-v-text" onClick={()=>setPoolPickerOpen(false)}>Close</button></div>
+       <div className="flex justify-between border-t border-v-border px-2 pt-2 text-xs"><button type="button" className="text-v-primary hover:underline" disabled={!editable} onClick={()=>setSelectedPoolJudges([])}>Clear all</button><button type="button" className="text-v-text-subtle hover:text-v-text" onClick={()=>setPoolPickerOpen(false)}>Close</button></div>
       </div>}
      </div>
-     <Button className="min-h-[44px] px-4 text-[15px] font-medium" disabled={!selectedPoolJudges.length || busy || loading || !!event?.competitionCreatedAt || event?.status!=='draft'} onClick={()=>run(async()=>{const ids=[...new Set(selectedPoolJudges)].filter(id=>pool.some(j=>j.id===id&&!j.enrolled));if(!ids.length)throw new Error('Select at least one available judge.');await service.enroll(eventId,ids);setSelectedPoolJudges([]);setPoolSearch('');setPoolPickerOpen(false)},'Selected judges enrolled without sending invitations')}>+ Enroll {selectedPoolJudges.length?`${selectedPoolJudges.length} `:''}{selectedPoolJudges.length===1?'Judge':'Judges'}</Button>
+     <Button className="min-h-[44px] px-4 text-[15px] font-medium" disabled={!editable||!selectedPoolJudges.length||busy||loading} onClick={()=>run(async()=>{const ids=[...new Set(selectedPoolJudges)].filter(id=>pool.some(j=>j.id===id&&!j.enrolled));if(!ids.length)throw new Error('Select at least one available judge.');await service.enroll(eventId,ids);setSelectedPoolJudges([]);setPoolSearch('');setPoolPickerOpen(false)},'Selected judges enrolled without sending invitations')}>+ Enroll {selectedPoolJudges.length?`${selectedPoolJudges.length} `:''}{selectedPoolJudges.length===1?'Judge':'Judges'}</Button>
     </div>
    </div>
   </section>}
@@ -355,23 +380,23 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
    {stage==='judges'&&!entries.length&&<p role="status">Register entries in Step 6 before assigning judges to this competition.</p>}
    {visible('contestants')&&configuring&&<ContestantsStep event={event} eventId={eventId} children={nativeChildren} selected={selected} view={view} entries={entries} masters={masters} used={used} masterNumber={masterNumber} setMasterNumber={setMasterNumber} editable={editable} busy={busy} dirty={dirty} run={run} service={service} pageantService={pageantService} divisions={pageantDivisions} editingEntry={editingEntry} setEditingEntry={setEditingEntry} onBack={returnToList} onProceed={proceedEntries}/>}
    {visible('workspace')&&<>{stage!=='workspace'&&<h3 className="font-semibold">2. Structure, criteria and scoring rules</h3>}
-   {stage==='workspace'&&pageantEvent&&<section className="v-card space-y-3 p-4" aria-labelledby="pageant-divisions-heading"><div><h3 id="pageant-divisions-heading" className="text-sm font-semibold text-v-text">Pageant divisions</h3><p className="v-helper-text">These divisions organize contestants. The Pageant shares one scoring configuration across them.</p></div><ul className="flex flex-wrap gap-2">{pageantDivisions.map(division=><li key={division.id} className="inline-flex items-center gap-2 rounded-full border border-v-border bg-v-surface-elevated px-3 py-1.5 text-sm text-v-text">{division.name}<button type="button" aria-label={`Remove ${division.name} division`} disabled={!editable||busy} className="font-semibold text-v-text-subtle hover:text-v-danger disabled:opacity-50" onClick={()=>removePageantDivision(division)}>×</button></li>)}{!pageantDivisions.length&&<li className="text-sm text-v-text-subtle">No divisions configured yet.</li>}</ul><form onSubmit={addPageantDivision} className="flex flex-wrap gap-2"><label className="sr-only" htmlFor="pageant-division-name">New division name</label><input id="pageant-division-name" className={`${INPUT_CLASS} min-w-0 flex-1`} maxLength={200} placeholder="Add a custom division" value={divisionName} onChange={e=>setDivisionName(e.target.value)} disabled={!editable||busy}/><Button type="submit" disabled={!editable||busy||!divisionName.trim()}>Add division</Button></form></section>}
+   {stage==='workspace'&&pageantEvent&&workspaceView!=='criteria'&&<section className="v-card space-y-3 p-4" aria-labelledby="pageant-divisions-heading"><div><h3 id="pageant-divisions-heading" className="text-sm font-semibold text-v-text">Pageant divisions</h3><p className="v-helper-text">These divisions organize contestants. The Pageant shares one scoring configuration across them.</p></div><ul className="flex flex-wrap gap-2">{pageantDivisions.map(division=><li key={division.id} className="inline-flex items-center gap-2 rounded-full border border-v-border bg-v-surface-elevated px-3 py-1.5 text-sm text-v-text">{division.name}<button type="button" aria-label={`Remove ${division.name} division`} disabled={!editable||busy} className="font-semibold text-v-text-subtle hover:text-v-danger disabled:opacity-50" onClick={()=>removePageantDivision(division)}>×</button></li>)}{!pageantDivisions.length&&<li className="text-sm text-v-text-subtle">No divisions configured yet.</li>}</ul><form onSubmit={addPageantDivision} className="flex flex-wrap gap-2"><label className="sr-only" htmlFor="pageant-division-name">New division name</label><input id="pageant-division-name" className={`${INPUT_CLASS} min-w-0 flex-1`} maxLength={200} placeholder="Add a custom division" value={divisionName} onChange={e=>setDivisionName(e.target.value)} disabled={!editable||busy}/><Button type="submit" disabled={!editable||busy||!divisionName.trim()}>Add division</Button></form></section>}
    {view.competition.official_child_rules_id&&<p>{view.rulesCurrent?'Rules frozen. Continue to Live Control.':'Frozen rules are stale after a dependency change. Scoring is blocked pending an authorized amendment.'}</p>}
    {stage!=='workspace'&&<p className="text-sm font-semibold">Current competition: {view.competition.name}</p>}
-   <fieldset disabled={busy||!editable} className={`space-y-5 ${stage==='workspace'?'rs-config-fieldset':''}`}><RoundsScoringEditor key={selected} value={configuration} onChange={edit} entries={entries} step={stage==='workspace'?'configuration':activeSetupStep} onPendingChange={trackPending} hasPendingForm={formPending} draft={dirty} competitionName={view.competition.name} activeRoundId={activeRoundId} onRoundChange={setActiveRoundId}/>
-    {stage==='workspace'?<>
-      {showValidation&&!validation.allReady&&<div role="alert" className="rs-validation"><p className="font-semibold">Complete the following before saving:</p><ul>{Object.values(validation.issues).flat().map(issue=><li key={issue}>{issue}</li>)}</ul></div>}
-      {formPending&&<p role="status" className="text-sm text-v-text-muted">Save or cancel the unfinished form before saving this competition.</p>}
-      <div className="rs-save-footer rs-config-sticky-footer"><div className="rs-save-footer-copy"><p className="font-medium text-v-text">{nextPageantRound?`Round ${selectedRoundIndex+1} of ${pageantRounds.length}`:dirty?'Unsaved configuration changes':'Configuration status'}</p><p className="v-helper-text">{nextPageantRound?`Round ${selectedRoundIndex+1} of ${pageantRounds.length} · Changes are saved after the final round.`:!validation.allReady?configurationIssues[0]??'Complete the required configuration before saving.':dirty?'Save to apply these changes.':'Your configuration is ready to save.'}</p>{formPending&&<p className="rs-footer-warning">Finish or cancel the open form before continuing.</p>}</div><div className="rs-save-footer-actions"><Button variant="secondary" onClick={returnToCompetitions}>Back to Competitions</Button>{nextPageantRound?<Button aria-label={`Proceed to ${nextPageantRound.name} →`} disabled={busy||formPending||!validation.allReady} onClick={advancePageantRound}>Next: {nextPageantRound.name} <ChevronRight size={16}/></Button>:<Button disabled={busy||formPending||!validation.allReady} onClick={saveConfiguration}>{busy?'Saving…':'Save & Return to Competitions'}</Button>}</div></div>
-    </>:<>    {(showValidation||dirty)&&validation.issues[activeSetupStep].length>0&&<ul className="rounded-xl border border-v-border p-4 text-sm text-v-danger" aria-label="Substep validation">{validation.issues[activeSetupStep].map(issue=><li key={issue}>{issue}</li>)}</ul>}
+   {stage==='workspace'?<>
+    {workspaceView==='rounds'?<RoundConfigurationList value={configuration} savedConfiguration={view.configuration} onConfigure={roundId=>setWorkspaceView('criteria',roundId)} onEditStructure={()=>setWorkspaceView('structure')} readOnly={!editable} busy={busy}/>:<fieldset disabled={busy||!editable} className="rs-config-fieldset"><RoundsScoringEditor key={`${selected}:${workspaceView}:${currentRound?.id}`} value={configuration} onChange={edit} entries={entries} step={workspaceView==='structure'?'structure':'round-configuration'} onPendingChange={trackPending} hasPendingForm={formPending} draft={dirty} competitionName={view.competition.name} activeRoundId={currentRound?.id}/></fieldset>}
+    {showValidation&&workspaceIssues.length>0&&<div role="alert" className="rs-validation"><p className="font-semibold">{workspaceView==='structure'?'Complete the round structure before saving:':'Complete this round before saving:'}</p><ul>{workspaceIssues.map(issue=><li key={issue}>{issue}</li>)}</ul></div>}
+    {formPending&&<p role="status" className="text-sm text-v-text-muted">Save or cancel the unfinished form before saving this round.</p>}
+    <div className="rs-save-footer"><div className="rs-save-footer-copy"><p className="v-helper-text">{workspaceView==='structure'?'Finish naming your rounds, then choose Done.':workspaceView==='criteria'?'Save this round and return to the same competition’s Rounds & Scoring.':allRoundsConfigured?'All rounds are configured. You can return to your competitions.':'Configure and save each round to complete this competition.'}</p></div><div className="rs-save-footer-actions">
+      {workspaceView==='structure'?<><Button variant="secondary" disabled={busy} onClick={view.configuration?backToRounds:returnToCompetitions}>Cancel</Button><Button disabled={busy||formPending||!editable} onClick={saveWorkspace}>{busy?'Saving…':'Done'}</Button></>:workspaceView==='criteria'?<><Button variant="secondary" disabled={busy} onClick={backToRounds}>Back to Rounds &amp; Scoring</Button><Button disabled={busy||formPending||!editable} onClick={saveWorkspace}>{busy?'Saving…':'Save & Back'}</Button></>:<Button disabled={busy||dirty||!allRoundsConfigured} onClick={returnToCompetitions}>Back to Competitions</Button>}
+    </div></div>
+   </>:<fieldset disabled={busy||!editable} className="space-y-5"><RoundsScoringEditor key={selected} value={configuration} onChange={edit} entries={entries} step={activeSetupStep} onPendingChange={trackPending} hasPendingForm={formPending} draft={dirty} competitionName={view.competition.name} activeRoundId={activeRoundId} onRoundChange={setActiveRoundId}/>
+    {(showValidation||dirty)&&validation.issues[activeSetupStep].length>0&&<ul className="rounded-xl border border-v-border p-4 text-sm text-v-danger" aria-label="Substep validation">{validation.issues[activeSetupStep].map(issue=><li key={issue}>{issue}</li>)}</ul>}
     {showValidation&&activeSetupStep==='deductions'&&!validation.allReady&&<p role="alert">Review incomplete substeps before completing this competition.</p>}
     {formPending&&<p role="status" className="text-sm text-v-text-muted">Use Add or Update to include the unfinished form before saving.</p>}
-    <div className="flex flex-wrap justify-between gap-3 border-t border-v-border pt-4">
-     <Button variant="secondary" disabled={activeSetupStep==='structure'} onClick={()=>navigateStep(setupSteps[setupSteps.findIndex(s=>s.id===activeSetupStep)-1].id)}>Back: {setupSteps[Math.max(0,setupSteps.findIndex(s=>s.id===activeSetupStep)-1)].label}</Button>
-     <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={!dirty||formPending} onClick={()=>run(()=>service.configure(eventId,selected,{configuration,expectedSetupRevision:view.competition.setup_revision}),'Configuration saved')}>Save competition configuration</Button>{activeSetupStep==='deductions'?<Button disabled={!dirty||formPending} onClick={saveConfiguration}>Save &amp; Complete</Button>:<Button onClick={nextSubstep}>Next: {setupSteps[setupSteps.findIndex(s=>s.id===activeSetupStep)+1].label}</Button>}</div>
-    </div>
-</>}
-   </fieldset></>}
+    <div className="flex flex-wrap justify-between gap-3 border-t border-v-border pt-4"><Button variant="secondary" disabled={activeSetupStep==='structure'} onClick={()=>navigateStep(setupSteps[setupSteps.findIndex(s=>s.id===activeSetupStep)-1].id)}>Back: {setupSteps[Math.max(0,setupSteps.findIndex(s=>s.id===activeSetupStep)-1)].label}</Button><div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={!dirty||formPending} onClick={()=>run(()=>service.configure(eventId,selected,{configuration,expectedSetupRevision:view.competition.setup_revision}),'Configuration saved')}>Save competition configuration</Button>{activeSetupStep==='deductions'?<Button disabled={!dirty||formPending} onClick={saveConfiguration}>Save &amp; Complete</Button>:<Button onClick={nextSubstep}>Next: {setupSteps[setupSteps.findIndex(s=>s.id===activeSetupStep)+1].label}</Button>}</div></div>
+   </fieldset>}
+   </>}
    {visible('judges')&&<div className="space-y-5" aria-label="Judge assignments">
      <section className="v-card space-y-4 p-4 sm:p-5" aria-labelledby="judge-assignments-title">
        <div className="flex items-start gap-3">
@@ -394,7 +419,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
              {eligibleJudges.filter(j=>!judgeSearch.trim()||name(j).toLowerCase().includes(judgeSearch.trim().toLowerCase())||String(j.email??'').toLowerCase().includes(judgeSearch.trim().toLowerCase())).map(j=>{
                const assignedCount=judgeAssignments.filter(a=>a.participant_id===j.id).length
                const assigned=assignedCount>0
-               return <tr key={j.id} className="border-b border-v-border last:border-0"><td className="px-3 py-3"><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-v-primary-soft font-medium text-v-primary">{(name(j).split(' ').map(part=>part[0]).join('').slice(0,2)||'J').toUpperCase()}</span><span className="font-medium text-v-text">{name(j)}</span></div></td><td className="px-3 py-3 text-v-text-subtle">{j.email??'—'}</td><td className="px-3 py-3"><span className="inline-flex items-center rounded-full border border-v-border bg-v-surface-elevated px-2.5 py-1 text-xs font-medium text-v-text-subtle">{assignedCount} {assignedCount===1?'competition':'competitions'}</span></td><td className="px-3 py-3"><span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${assigned?'border-emerald-200 bg-emerald-50 text-emerald-700':'border-amber-200 bg-amber-50 text-amber-700'}`}><span className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${assigned?'bg-emerald-500 text-white':'bg-amber-500 text-white'}`}>{assigned?<Check className="h-3 w-3"/>:<span className="text-[10px] leading-none">!</span>}</span>{assigned?'Assigned':'Needs assignment'}</span></td><td className="px-3 py-3 text-right"><Button size="sm" variant={assigned?'secondary':'primary'} onClick={()=>{const selectedCompetitionIds = judgeAssignments.filter(a=>a.participant_id===j.id).map(a=>a.competition_id); setAssignmentDraftJudge(j.id); setAssignmentDraftCompetitions(selectedCompetitionIds); setAssignmentDrawerOpen(true)}}>{assigned?'Manage':'Assign'}</Button></td></tr>
+               return <tr key={j.id} className="border-b border-v-border last:border-0"><td className="px-3 py-3"><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-v-primary-soft font-medium text-v-primary">{(name(j).split(' ').map(part=>part[0]).join('').slice(0,2)||'J').toUpperCase()}</span><span className="font-medium text-v-text">{name(j)}</span></div></td><td className="px-3 py-3 text-v-text-subtle">{j.email??'—'}</td><td className="px-3 py-3"><span className="inline-flex items-center rounded-full border border-v-border bg-v-surface-elevated px-2.5 py-1 text-xs font-medium text-v-text-subtle">{assignedCount} {assignedCount===1?'competition':'competitions'}</span></td><td className="px-3 py-3"><span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${assigned?'border-emerald-200 bg-emerald-50 text-emerald-700':'border-amber-200 bg-amber-50 text-amber-700'}`}><span className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${assigned?'bg-emerald-500 text-white':'bg-amber-500 text-white'}`}>{assigned?<Check className="h-3 w-3"/>:<span className="text-[10px] leading-none">!</span>}</span>{assigned?'Assigned':'Needs assignment'}</span></td><td className="px-3 py-3 text-right"><Button size="sm" variant={assigned?'secondary':'primary'} disabled={!editable||busy||dirty} onClick={()=>{const selectedCompetitionIds = judgeAssignments.filter(a=>a.participant_id===j.id).map(a=>a.competition_id); setAssignmentDraftJudge(j.id); setAssignmentDraftCompetitions(selectedCompetitionIds); setAssignmentDrawerOpen(true)}}>{assigned?'Manage':'Assign'}</Button></td></tr>
              })}
            </tbody>
          </table>
@@ -417,10 +442,10 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
           const covered=coverage.covered
           const rounds=coverage.rounds.length
           return <tr key={coverage.competition.id} className="border-b border-v-border last:border-0">
-           <td className="px-3 py-3"><span className="block font-medium text-v-text">{coverage.competition.name}</span><span className="text-xs text-v-text-subtle">{rounds>1?`${rounds} scoring rounds`:'Single Scoring Phase'}</span></td>
+           <td className="px-3 py-3"><span className="block font-medium text-v-text">{coverage.competition.name}</span><span className="text-xs text-v-text-subtle">{rounds?`${rounds} scoring round${rounds===1?'':'s'}`:'Single Scoring Phase'}</span></td>
            <td className="px-3 py-3 text-v-text">{coverage.judgeCount}</td>
            <td className="px-3 py-3"><span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${covered?'border-emerald-200 bg-emerald-50 text-emerald-700':'border-amber-200 bg-amber-50 text-amber-700'}`}>{covered?<Check className="h-3 w-3"/>:<span aria-hidden="true">!</span>}{covered?'Covered':'Needs judge'}</span></td>
-           <td className="px-3 py-3 text-right"><Button size="sm" variant={covered?'secondary':'primary'} disabled={!eligibleJudges.length||busy||dirty} onClick={()=>openCompetitionAssignment(coverage)}>{covered?'Manage':'Assign Judge'}</Button></td>
+           <td className="px-3 py-3 text-right"><Button size="sm" variant={covered?'secondary':'primary'} disabled={covered?busy||dirty:!eligibleJudges.length||busy||dirty||!editable} onClick={()=>openCompetitionAssignment(coverage)}>{covered?(editable?'Manage':'View'):'Assign Judge'}</Button></td>
           </tr>
          })}
          {!competitionCoverage.length&&<tr><td colSpan="4" className="px-3 py-5 text-center text-sm text-v-text-subtle">No competitions are available for judge assignment.</td></tr>}
@@ -442,12 +467,12 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
         <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
          {assignedJudges.map(assignment=>{
           const judge=eligibleJudges.find(item=>item.id===assignment.participant_id)??judges.find(item=>item.id===assignment.participant_id)
-          const roundName=rounds.find(item=>item.id===assignment.round_id)?.name??(assignment.round_id?'Unknown round':rounds.length>1?'All rounds':'Single Scoring Phase')
+          const roundName=rounds.find(item=>item.id===assignment.round_id)?.name??(assignment.round_id?'Unknown round':rounds.length?'All rounds':'Single Scoring Phase')
           return <div key={`${assignment.participant_id}:${assignment.round_id??'single'}`} className="flex flex-col gap-3 rounded-xl border border-v-border p-3 sm:flex-row sm:items-center">
            <div className="min-w-0 flex-1"><p className="truncate font-medium text-v-text">{name(judge??{id:assignment.participant_id})}</p><p className="text-xs text-v-text-subtle">{roundName}</p></div>
            <div className="flex shrink-0 gap-2">
-            <Button size="sm" variant="secondary" disabled={!eligibleJudges.some(item=>item.id===assignment.participant_id)||busy||dirty} onClick={()=>{setAssignmentBeingEdited(assignment);setAssignmentDraftJudge(assignment.participant_id);setAssignmentDraftCompetitions([assignment.competition_id]);setAssignmentDraftRound(assignment.round_id??'');setCoverageManageCompetitionId('');setAssignmentDrawerOpen(true)}}><Pencil className="h-3.5 w-3.5"/>Edit</Button>
-            <Button size="sm" variant="secondary" disabled={busy} onClick={()=>revokeAssignment(assignment)}><Trash2 className="h-3.5 w-3.5"/>Remove</Button>
+            <Button size="sm" variant="secondary" disabled={!editable||!eligibleJudges.some(item=>item.id===assignment.participant_id)||busy||dirty} onClick={()=>{setAssignmentBeingEdited(assignment);setAssignmentDraftJudge(assignment.participant_id);setAssignmentDraftCompetitions([assignment.competition_id]);setAssignmentDraftRound(assignment.round_id??'');setCoverageManageCompetitionId('');setAssignmentDrawerOpen(true)}}><Pencil className="h-3.5 w-3.5"/>Edit</Button>
+            <Button size="sm" variant="secondary" disabled={!editable||busy} onClick={()=>revokeAssignment(assignment)}><Trash2 className="h-3.5 w-3.5"/>Remove</Button>
            </div>
           </div>
          })}
@@ -455,7 +480,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
         </div>
         <div className="mt-4 flex justify-between border-t border-v-border pt-4">
          <Button variant="secondary" onClick={()=>setCoverageManageCompetitionId('')}>Close</Button>
-         <Button disabled={!eligibleJudges.length||busy||dirty} onClick={()=>{setAssignmentBeingEdited(null);setAssignmentDraftJudge('');setAssignmentDraftCompetitions([coverageManageCompetitionId]);setAssignmentDraftRound('');setCoverageManageCompetitionId('');setAssignmentDrawerOpen(true)}}>+ Add Judge</Button>
+         <Button disabled={!editable||!eligibleJudges.length||busy||dirty} onClick={()=>{setAssignmentBeingEdited(null);setAssignmentDraftJudge('');setAssignmentDraftCompetitions([coverageManageCompetitionId]);setAssignmentDraftRound('');setCoverageManageCompetitionId('');setAssignmentDrawerOpen(true)}}>+ Add Judge</Button>
         </div>
        </div>
       </div>
@@ -480,13 +505,13 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
           const competition=nativeCompetitions.find(candidate=>candidate.id===assignment.competition_id)
           const active=eligibleJudges.some(candidate=>candidate.id===assignment.participant_id)
           const competitionRounds=roundsByCompetition[assignment.competition_id]??[]
-          const roundName=competitionRounds.find(round=>round.id===assignment.round_id)?.name??(assignment.round_id?'Unknown round':competitionRounds.length>1?'All rounds':'Single Scoring Phase')
+          const roundName=competitionRounds.find(round=>round.id===assignment.round_id)?.name??(assignment.round_id?'Unknown round':competitionRounds.length?'All rounds':'Single Scoring Phase')
           return <tr key={`${assignment.competition_id}:${assignment.participant_id}:${assignment.round_id??'single'}`} className="border-b border-v-border last:border-0">
            <td className="px-3 py-3 font-medium text-v-text">{name(judge??{id:assignment.participant_id})}</td>
            <td className="px-3 py-3 text-v-text">{competition?.name??assignment.competition_name??'Unknown competition'}</td>
            <td className="px-3 py-3 text-v-text-subtle">{roundName}</td>
            <td className="px-3 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${active?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>{active?'Active':'Inactive'}</span></td>
-           <td className="px-3 py-3 text-right"><div className="inline-flex gap-2"><Button size="sm" variant="secondary" disabled={!active||busy||dirty} onClick={()=>{setAssignmentBeingEdited(assignment);setAssignmentDraftJudge(assignment.participant_id);setAssignmentDraftCompetitions([assignment.competition_id]);setAssignmentDraftRound(assignment.round_id??'');setAssignmentDrawerOpen(true)}}><Pencil className="h-3.5 w-3.5"/>Edit</Button><Button size="sm" variant="secondary" disabled={busy} onClick={()=>revokeAssignment(assignment)}><Trash2 className="h-3.5 w-3.5"/>Revoke</Button></div></td>
+           <td className="px-3 py-3 text-right"><div className="inline-flex gap-2"><Button size="sm" variant="secondary" disabled={!editable||!active||busy||dirty} onClick={()=>{setAssignmentBeingEdited(assignment);setAssignmentDraftJudge(assignment.participant_id);setAssignmentDraftCompetitions([assignment.competition_id]);setAssignmentDraftRound(assignment.round_id??'');setAssignmentDrawerOpen(true)}}><Pencil className="h-3.5 w-3.5"/>Edit</Button><Button size="sm" variant="secondary" disabled={!editable||busy} onClick={()=>revokeAssignment(assignment)}><Trash2 className="h-3.5 w-3.5"/>Revoke</Button></div></td>
           </tr>
          })}
          {!currentAssignmentRows.length&&<tr><td colSpan="5" className="px-3 py-5 text-center text-sm text-v-text-subtle">{judgeAssignments.length?'No assignments match these filters.':'No judge assignments yet.'}</td></tr>}
@@ -496,7 +521,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
       <p className="text-xs text-v-text-subtle">Showing {currentAssignmentRows.length} of {judgeAssignments.length} assignments.</p>
      </section>
 
-     {assignmentDrawerOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4">
+     {assignmentDrawerOpen&&editable&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4">
       <div className="w-full max-w-lg rounded-2xl border border-v-border bg-v-surface p-5 shadow-v-shadow-xl">
        <div className="flex items-start justify-between gap-3">
         <div><h3 className="text-xl font-semibold text-v-text">Assign Judge</h3><p className="text-sm text-v-text-subtle">Assign an enrolled judge to one or more competitions.</p></div>
@@ -520,7 +545,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
               : <p className="rounded-lg border border-dashed border-v-border bg-v-surface-elevated p-3 text-sm text-v-text-subtle">No competitions available.</p>}
             </div>}
         </div>
-        {assignmentBeingEdited&&(()=>{const competitionId=assignmentDraftCompetitions[0],rounds=roundsByCompetition[competitionId]??[];return rounds.length>1?<label className="block"><span className="mb-1 block text-xs font-medium uppercase tracking-wide text-v-text-subtle">Round</span><select className={INPUT_CLASS} aria-label="Edit assignment round" value={assignmentDraftRound} onChange={e=>setAssignmentDraftRound(e.target.value)}><option value="">Select round</option>{rounds.map(round=><option key={round.id} value={round.id}>{round.name}</option>)}</select></label>:null})()}
+        {assignmentBeingEdited&&(()=>{const competitionId=assignmentDraftCompetitions[0],rounds=roundsByCompetition[competitionId]??[];return rounds.length>0?<label className="block"><span className="mb-1 block text-xs font-medium uppercase tracking-wide text-v-text-subtle">Round</span><select className={INPUT_CLASS} aria-label="Edit assignment round" value={assignmentDraftRound} onChange={e=>setAssignmentDraftRound(e.target.value)}><option value="">Select round</option>{rounds.map(round=><option key={round.id} value={round.id}>{round.name}</option>)}</select></label>:null})()}
         <div className="flex justify-end gap-2 border-t border-v-border pt-4">
          <Button variant="secondary" onClick={()=>{setAssignmentDrawerOpen(false);setAssignmentDraftJudge('');setAssignmentDraftCompetitions([]);setAssignmentDraftRound('');setAssignmentBeingEdited(null)}}>Cancel</Button>
          <Button disabled={!assignmentDraftJudge||!assignmentDraftCompetitions.length||busy||dirty} onClick={async()=>{
@@ -528,7 +553,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
           const targetJudge=assignmentDraftJudge,selected=[...new Set(assignmentDraftCompetitions)]
           if(assignmentBeingEdited){
            const targetCompetition=selected[0],targetRound=assignmentDraftRound||null
-           if((roundsByCompetition[targetCompetition]??[]).length>1&&!targetRound)return setError('Select a scoring round before updating this assignment.')
+           if((roundsByCompetition[targetCompetition]??[]).length>0&&!targetRound)return setError('Select a scoring round before updating this assignment.')
            const duplicate=judgeAssignments.some(assignment=>assignment.id!==assignmentBeingEdited.id&&assignment.participant_id===targetJudge&&assignment.competition_id===targetCompetition&&(assignment.round_id??null)===targetRound)
            if(duplicate)return setError('This judge already has an assignment for that scoring target.')
            if(assignmentBeingEdited.competition_id===targetCompetition&&(assignmentBeingEdited.round_id??null)===targetRound){setAssignmentDrawerOpen(false);setAssignmentBeingEdited(null);return}
@@ -542,7 +567,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
           const ok=await run(async()=>{
            for(const competitionId of selected){
             const rounds=roundsByCompetition[competitionId]??[]
-            const targetRounds=rounds.length>1?rounds.map(round=>round.id):[null]
+            const targetRounds=rounds.length?rounds.map(round=>round.id):[null]
             for(const roundId of targetRounds){
              const existing=judgeAssignments.some(assignment=>assignment.participant_id===targetJudge&&assignment.competition_id===competitionId&&(assignment.round_id??null)===roundId)
              if(!existing)await service.assign(eventId,competitionId,{participantId:targetJudge,roundId})
@@ -559,7 +584,7 @@ export default function NativeSetupWorkspace({eventId,initialChildren=[],stage=n
    {!stage&&<><h3 className="font-semibold">4. Review and freeze</h3><p>Check the selected entrants, round rosters, criteria totals and explicit panel. Freezing prevents ordinary setup edits; it does not start scoring or publish results.</p>
    <fieldset disabled={busy||!editable||dirty}><label><input aria-label="Acknowledge competition rules" type="checkbox" checked={ack} onChange={e=>setAck(e.target.checked)}/> I reviewed this competition’s saved rules and assignments.</label><Button disabled={!ack||!view.configuration||!entries.length||!assignments.length||!view.criteriaReadiness?.allReady} onClick={()=>run(()=>service.freeze(eventId,selected,{acknowledged:true,expectedSetupRevision:view.competition.setup_revision,expectedInputRevision:view.competition.input_revision}),'Competition rules frozen')}>Freeze competition rules</Button></fieldset>
    {view.criteriaReadiness&&!view.criteriaReadiness.allReady&&<p role="status">Each phase needs complete criteria totaling 100% before freezing.</p>}
-   </>}{stage!=='workspace'&&<nav className="flex flex-wrap gap-4" aria-label="Competition workflow"><Link to={`/organizer/competition/events/${eventId}/live`}>Live Control</Link><Link to={`/organizer/competition/events/${eventId}/tabulation`}>Tabulation and qualification</Link><Link to={`/organizer/competition/events/${eventId}/rankings`}>Official results, publication and CSV</Link></nav>}
+   </>}
   </>}
   {stage&&!event?.competitionCreatedAt&&setupChildren.some(c=>!stepReadiness[c.id])&&<p role="status">Complete this step for every selected competition before continuing.</p>}
   {stage&&<StageFooter module="competition" currentKey={stage} eventId={eventId} saving={busy} nextDisabled={loading||dirty||formPending||!!error||!setupChildren.length||!event?.competitionCreatedAt&&setupChildren.some(c=>!stepReadiness[c.id])}/> }

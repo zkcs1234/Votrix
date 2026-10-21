@@ -31,6 +31,12 @@ test('one continuous grid uses actual division row colors/indicators without gro
  expect(rows[0]).toHaveAttribute('data-contestant-id','b');expect(rows[0]).toHaveAttribute('data-division-tone','female')
  expect(rows[1]).toHaveAttribute('data-division-tone','male')
  expect(within(rows[0]).getByText('F')).toBeInTheDocument();expect(within(rows[1]).getByText('M')).toBeInTheDocument()
+ expect(rows[0].style.getPropertyValue('--judge-number-bg')).toBe('#fce7f3')
+ expect(rows[0].style.getPropertyValue('--judge-number-color')).toBe('#9d174d')
+ expect(rows[1].style.getPropertyValue('--judge-number-bg')).toBe('#4f46e5')
+ expect(rows[1].style.getPropertyValue('--judge-number-color')).toBe('#fff')
+ expect(rows[0].style.getPropertyValue('--judge-accent')).toBe('#db2777')
+ expect(rows[1].style.getPropertyValue('--judge-accent')).toBe('#2563eb')
  expect(screen.queryByText('MEN')).not.toBeInTheDocument();expect(screen.queryByText('WOMEN')).not.toBeInTheDocument()
  expect(within(table).queryByRole('columnheader',{name:/total/i})).not.toBeInTheDocument()
  expect(table.querySelector('tbody td')).toHaveClass('v-judge-contestant')
@@ -127,6 +133,53 @@ test('configured deduction names and amounts replace the generic minor header',(
  expect(changed).toHaveBeenCalledWith('b','c',[expect.objectContaining({ruleId:'late'})])
  view.rerender(<CompetitionScoringForm sheet={configured} scores={{}} deductionDrafts={{...initialDrafts,'b:c':changed.mock.calls.at(-1)[2]}} onDeductionChange={changed} onScoreChange={()=>{}} simplified/>)
  expect(within(rows[1]).getByRole('button',{name:'Deduct'})).toBeDisabled()
+ expect(within(rows[1]).getByRole('status')).toHaveTextContent('Applied 1 of 1. Configured deduction limit reached.')
+})
+
+test.each([
+ ['another criterion locked',value=>{value.contestants[0].lockedCriteria=['other']},'Apply round deductions before locking any criterion.'],
+ ['anchor criterion locked',value=>{value.contestants[0].lockedCriteria=['c']},'Deductions are locked with this criterion.'],
+ ['contestant closed',value=>{value.contestants[0].open=false},'Scoring is not open for this contestant.'],
+ ['criterion closed',value=>{value.criteria[0].open=false},'This criterion is not open for scoring.'],
+ ['scoring paused',value=>{value.session={status:'paused'};value.criteria[0].open=false;value.contestants[0].open=false},'Scoring is paused.'],
+ ['round submitted',value=>{value.submission={id:'submitted'}},'Scores submitted.'],
+])('a disabled judge deduction explains why when %s',(_state,prepare,explanation)=>{
+ const configured=structuredClone(sheet),changed=vi.fn()
+ configured.criteria.push({id:'other',name:'Artistry',percentage:0,open:true,minors:[{id:'other-input',name:'Expression',minScore:0,maxScore:10}]})
+ configured.deductionSettings={mode:'judge',rules:[{id:'late',description:'Late start',amount:2,units:'points',criteriaId:null,appliedBy:'judge',anchorCriterionId:'c'}]}
+ prepare(configured)
+ render(<CompetitionScoringForm sheet={configured} scores={{}} deductionDrafts={{}} onDeductionChange={changed} onScoreChange={()=>{}} simplified/>)
+ const row=screen.getByRole('table').querySelector('tbody tr'),deduct=within(row).getByRole('button',{name:'Deduct'})
+ expect(deduct).toBeDisabled()
+ expect(deduct.title).toContain(explanation)
+ expect(within(row).getByRole('status')).toHaveTextContent(explanation)
+ fireEvent.click(deduct)
+ expect(changed).not.toHaveBeenCalled()
+})
+
+test('a criterion-scoped deduction stays available when a different criterion is locked',()=>{
+ const configured=structuredClone(sheet),changed=vi.fn()
+ configured.contestants[0].lockedCriteria=['other']
+ configured.deductionSettings={mode:'judge',rules:[{id:'late',description:'Technique offense',amount:2,units:'points',criteriaId:'c',appliedBy:'judge',anchorCriterionId:'c'}]}
+ render(<CompetitionScoringForm sheet={configured} scores={{}} deductionDrafts={{}} onDeductionChange={changed} onScoreChange={()=>{}} simplified/>)
+ const row=screen.getByRole('table').querySelector('tbody tr'),deduct=within(row).getByRole('button',{name:'Deduct'})
+ expect(deduct).toBeEnabled()
+ fireEvent.click(deduct)
+ expect(changed).toHaveBeenCalledWith('a','c',[expect.objectContaining({ruleId:'late'})])
+})
+
+test('repeated deductions show the applied count and stop at their configured limit',()=>{
+ const configured={...sheet,deductionSettings:{mode:'judge',rules:[{id:'late',description:'Late start',amount:2,units:'points',criteriaId:null,appliedBy:'judge',anchorCriterionId:'c',perViolation:true,maxOccurrences:2}]}}
+ const changed=vi.fn(),props={sheet:configured,scores:{},onDeductionChange:changed,onScoreChange:()=>{},simplified:true}
+ const view=render(<CompetitionScoringForm {...props} deductionDrafts={{}}/>)
+ for(let count=1;count<=2;count++){
+  const row=screen.getByRole('table').querySelector('tbody tr')
+  fireEvent.click(within(row).getByRole('button',{name:'Deduct'}))
+  view.rerender(<CompetitionScoringForm {...props} deductionDrafts={{'a:c':changed.mock.lastCall[2]}}/>)
+  expect(within(row).getByRole('status')).toHaveTextContent(`Applied ${count} of 2.`)
+  expect(within(row).getByRole('button',{name:'Deduct'}).disabled).toBe(count===2)
+ }
+ expect(changed).toHaveBeenCalledTimes(2)
 })
 
 test('multiple saved deductions stay compact inside their contestant cell without showing audit metadata',()=>{

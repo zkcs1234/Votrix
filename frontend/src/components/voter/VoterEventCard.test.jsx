@@ -25,3 +25,20 @@ test('renders one native event card with direct links for each category and roun
  expect(within(nav).getByRole('link',{name:'Street Dance (Final)'})).toHaveAttribute('href','/participant/competition/events/event-1/score?competitionId=street-dance&roundId=final-2')
  expect(within(nav).queryByText('Waiting to open')).not.toBeInTheDocument()
 })
+
+test('shows scoring open with the green check status treatment',()=>{
+ const event={
+  id:'event-2',
+  title:'Dance Competition',
+  eventType:'competition_scoring',
+  participantType:'COMPETITION_JUDGE',
+  bucket:'active',
+  statusLabel:'Scoring open',
+  nativeContexts:[{competitionId:'hip-hop',competitionName:'Hip-Hop',roundId:'final',roundName:'Final'}],
+ }
+ render(<MemoryRouter><VoterEventCard event={event}/></MemoryRouter>)
+ const status=screen.getByRole('status')
+ expect(status).toHaveTextContent('Scoring open')
+ expect(status).toHaveClass('bg-emerald-100','border-emerald-500','text-emerald-800')
+ expect(status.querySelector('svg')).toHaveAttribute('aria-hidden','true')
+})

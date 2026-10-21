@@ -10,6 +10,13 @@ test('single phase retains NULL criterion scope and requires no fake round',()=>
  const config=single();expect(validateNativeConfiguration(config).rounds).toEqual([])
  config.rounds=[{id:uid(3),name:'Fake',displayOrder:0}];expect(()=>validateNativeConfiguration(config)).toThrow('single phase has no rounds')
 })
+test('multiple-round setup requires at least two rounds',()=>{
+ const config=single();config.structure='multiple';config.rounds=[{id:uid(3),name:'Final',displayOrder:0}];config.criteria[0].roundId=uid(3)
+ expect(()=>validateNativeConfiguration(config)).toThrow('at least two named rounds')
+ config.rounds.push({id:uid(4),name:'Preliminary',displayOrder:1})
+ config.criteria.push({...config.criteria[0],id:uid(5),roundId:uid(4),minorCriteria:[{...config.criteria[0].minorCriteria[0],id:uid(6)}]})
+ expect(validateNativeConfiguration(config).rounds).toHaveLength(2)
+})
 test('draft weights can be partial but readiness is incomplete in that scope',()=>{
  const config=single();config.criteria[0].percentage=50
  expect(validateNativeConfiguration(config)).toEqual(config);expect(nativeCriteriaReadiness(config).allReady).toBe(false)
@@ -46,6 +53,10 @@ test('deduction units and parent scopes cannot be silently changed',()=>{
  expect(()=>validateNativeConfiguration(cfg)).toThrow('method and unit semantics')
  cfg.scoringConfig.deductionRules[0].units='placements';cfg.scoringConfig.deductionRules[0].criteriaId=uid(99)
  expect(()=>validateNativeConfiguration(cfg)).toThrow('another criterion scope')
+})
+test('judge deduction mode and configured judge-owned rules persist through native validation',()=>{
+ const cfg=single();cfg.scoringConfig.deductionMode='judge';cfg.scoringConfig.deductionRules=[{id:'late-start',description:'Late start',amount:2,units:'points',roundId:null,criteriaId:null,appliedBy:'judge',perViolation:false,maxOccurrences:1}]
+ expect(validateNativeConfiguration(cfg)).toEqual(cfg)
 })
 test('unimplemented options are rejected instead of being ignored',()=>{
  const cfg=single();cfg.scoringConfig.perDivision=true

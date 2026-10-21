@@ -5,6 +5,7 @@ import NativeSetupWorkspace,{NativeSetupBoundary} from './NativeSetupWorkspace'
 import {nativeCompetitionService as service} from '@/services/competition-native.service'
 import {pageantService} from '@/services/pageant.service'
 import {queryClient} from '@/app/queryClient'
+import {setupReadiness} from '../../../../../shared/competition-setup-readiness.js'
 vi.mock('@/services/competition-native.service',()=>({nativeCompetitionService:Object.fromEntries(['list','create','entries','addEntry','removeEntry','foundation','configure','assign','freeze','enrollments','pool','enroll','role'].map(k=>[k,vi.fn()]))}))
 vi.mock('@/services/pageant.service',()=>({pageantService:{getEvent:vi.fn(),listContestants:vi.fn(),getNextContestantNumber:vi.fn(),createContestant:vi.fn(),uploadContestantPhoto:vi.fn(),listDivisions:vi.fn(),setDivisionsEnabled:vi.fn(),createDivision:vi.fn(),deleteDivision:vi.fn()}}))
 const children=Array.from({length:5},(_,i)=>({id:`child-${i}`,event_id:'event',name:['Hip-Hop','Contemporary','Ballet','Ballroom','Folk'][i],origin:'native'}))
@@ -25,10 +26,12 @@ describe('Native organizer setup connections',()=>{
   await waitFor(()=>expect(screen.getByRole('button',{name:'Edit Configuration Hip-Hop'})).not.toBeDisabled())
   expect(screen.queryByLabelText('Single round name')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button',{name:'Edit Configuration Hip-Hop'}))
+  fireEvent.click(await screen.findByRole('button',{name:'Edit round structure'}))
   expect(await screen.findByLabelText('Single round name')).toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Single round name'),{target:{value:'Dance Round'}})
-  fireEvent.click(screen.getByRole('button',{name:'Save & Return to Competitions'}))
+  fireEvent.click(screen.getByRole('button',{name:'Done'}))
   await waitFor(()=>expect(service.configure).toHaveBeenCalledWith('event','child-0',expect.objectContaining({configuration:expect.objectContaining({scoringConfig:expect.objectContaining({singleRoundName:'Dance Round'})}),expectedSetupRevision:8})))
+  fireEvent.click(await screen.findByRole('button',{name:'Back to Competitions'}))
   expect(await screen.findByText('Selected Competitions')).toBeInTheDocument()
   expect(screen.queryByLabelText('Single round name')).not.toBeInTheDocument()
  })
@@ -38,9 +41,154 @@ describe('Native organizer setup connections',()=>{
   expect(await screen.findByRole('heading',{name:'Hip-Hop'})).toBeInTheDocument()
   expect(screen.getByRole('navigation',{name:'Breadcrumb'})).toHaveTextContent('Competitions')
   expect(screen.getByText('Setup incomplete')).toBeInTheDocument()
+  expect(screen.queryByRole('progressbar',{name:'Criterion weight allocation'})).not.toBeInTheDocument()
+  expect(screen.getByRole('button',{name:'Back to Competitions'})).toBeDisabled()
+  fireEvent.click(screen.getByRole('button',{name:'Configure Single Round scoring criteria'}))
   expect(screen.getByRole('progressbar',{name:'Criterion weight allocation'})).toHaveAttribute('aria-valuenow','0')
-  expect(screen.getByRole('button',{name:'Save & Return to Competitions'})).toBeDisabled()
+  fireEvent.click(screen.getByRole('button',{name:'Save & Back'}))
+  expect(service.configure).not.toHaveBeenCalled()
   expect(screen.getByText(/Add 100% before continuing/)).toBeInTheDocument()
+ })
+ it('persists competition precision through the API and restores custom round methods and judge input limits',async()=>{
+  let saved={...structuredClone(config),structure:'multiple',rounds:[
+   {id:'pre',name:'Preliminary',displayOrder:0,progression:'back_to_zero',calculationMethod:'sum'},
+   {id:'final',name:'Final',displayOrder:1,progression:'back_to_zero'},
+  ],criteria:[
+   {...structuredClone(config.criteria[0]),id:'first-criterion',roundId:'pre',decimalPlaces:0},
+   {...structuredClone(config.criteria[0]),id:'last-criterion',roundId:'final',name:'Performance',minorCriteria:[{id:'minor',name:'Execution',minScore:1,maxScore:10,decimalPlaces:1}]},
+  ],scoringConfig:{...config.scoringConfig,inputDecimalPlaces:0,decimalPlaces:2}}
+  service.list.mockResolvedValue({data:{competitions:[children[0]]}})
+  service.foundation.mockImplementation(async()=>({data:{...foundation(children[0]),configuration:structuredClone(saved)}}))
+  service.configure.mockImplementation(async(_event,_id,body)=>{saved=JSON.parse(JSON.stringify(body.configuration));return {data:{}}})
+  render(<MemoryRouter initialEntries={['/?competitionId=child-0&scoringView=criteria&roundId=pre']}><NativeSetupWorkspace eventId="event" initialChildren={[children[0]]} stage="workspace"/></MemoryRouter>)
+  await screen.findByRole('button',{name:'Edit criterion Technique'})
+  expect(screen.getByText('Scoring Method',{exact:true}).closest('details').querySelector('.rs-setting-value')).toHaveTextContent('Total Score')
+  fireEvent.click(screen.getByText('Score Input',{exact:true}).closest('summary'))
+  fireEvent.change(screen.getByLabelText('Input decimal places'),{target:{value:'2'}})
+  fireEvent.click(screen.getByRole('button',{name:'Save & Back'}))
+  fireEvent.click(await screen.findByRole('button',{name:'Edit Final scoring criteria'}))
+  expect(service.configure).toHaveBeenCalledWith('event','child-0',expect.objectContaining({expectedSetupRevision:8}))
+  expect(saved.criteria[0]).not.toHaveProperty('decimalPlaces')
+  expect(saved.criteria[1].minorCriteria[0]).not.toHaveProperty('decimalPlaces')
+  expect(saved.scoringConfig).toMatchObject({inputDecimalPlaces:2,decimalPlaces:2})
+  expect(saved.rounds[0].calculationMethod).toBe('sum')
+  fireEvent.click(screen.getByRole('button',{name:'Preview Score Sheet'}))
+  const preview=screen.getByRole('region',{name:'Judge score sheet preview'})
+  expect(within(preview).getByRole('spinbutton')).toHaveAttribute('step','0.01')
+  fireEvent.change(within(preview).getByRole('spinbutton'),{target:{value:'8.55'}})
+  expect(within(preview).getByRole('button',{name:/Execution Lock/})).toBeEnabled()
+  fireEvent.click(screen.getByRole('button',{name:'Close Preview'}))
+  fireEvent.click(screen.getByRole('button',{name:'Back to Rounds & Scoring'}))
+  fireEvent.click(screen.getByRole('button',{name:'Edit Preliminary scoring criteria'}))
+  expect(screen.getByText('Scoring Method',{exact:true}).closest('details').querySelector('.rs-setting-value')).toHaveTextContent('Total Score')
+ })
+ it('validates names, focuses added rounds, and saves structure before opening criteria',async()=>{
+  let saved=null
+  service.list.mockResolvedValue({data:{competitions:[children[0]]}})
+  service.foundation.mockImplementation(async(_event,id)=>({data:{...foundation(children.find(child=>child.id===id)),configuration:structuredClone(saved),criteriaReadiness:{allReady:false}}}))
+  service.configure.mockImplementation(async(_event,_id,body)=>{saved=structuredClone(body.configuration);return {data:{}}})
+  render(<MemoryRouter initialEntries={['/?competitionId=child-0']}><NativeSetupWorkspace eventId="event" initialChildren={[children[0]]} stage="workspace"/></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('radio',{name:'Multiple Rounds'}))
+  fireEvent.change(screen.getByLabelText('Round 1 name'),{target:{value:'Qualifying'}})
+  fireEvent.click(screen.getByRole('button',{name:'+ Add Round'}))
+  expect(screen.getByLabelText('Round 2 name')).toHaveFocus()
+  expect(screen.getByLabelText('Round 1 name')).toHaveValue('Qualifying')
+  expect(screen.queryByRole('region',{name:'Scoring criteria'})).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Done'}))
+  expect(service.configure).not.toHaveBeenCalled()
+  expect(screen.getByRole('alert')).toHaveTextContent('Give each round a unique name.')
+  fireEvent.change(screen.getByLabelText('Round 2 name'),{target:{value:' qualifying '}})
+  fireEvent.click(screen.getByRole('button',{name:'Done'}))
+  expect(service.configure).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByLabelText('Round 2 name'),{target:{value:' Final '}})
+  fireEvent.click(screen.getByRole('button',{name:'Done'}))
+  expect(await screen.findByRole('button',{name:'Configure Qualifying scoring criteria'})).toBeInTheDocument()
+  expect(screen.getByRole('button',{name:'Configure Final scoring criteria'})).toBeInTheDocument()
+  expect(screen.getByText('0 of 2 rounds configured')).toBeInTheDocument()
+  expect(screen.getByRole('button',{name:'Back to Competitions'})).toBeDisabled()
+  expect(saved.rounds.map(round=>round.name)).toEqual(['Qualifying','Final'])
+  expect(saved.scoringConfig.inputDecimalPlaces).toBe(0)
+  expect(saved.criteria).toEqual([])
+  expect(screen.queryByRole('region',{name:'Scoring criteria'})).not.toBeInTheDocument()
+ })
+ it('saves rounds independently, returns to the same overview, and restores saved criteria on edit',async()=>{
+  service.list.mockResolvedValue({data:{competitions:[children[0]]}})
+  let saved={...structuredClone(config),structure:'multiple',rounds:[
+   {id:'qualifying',name:'Qualifying',displayOrder:0,progression:'back_to_zero',nextRoundId:'final',advancementType:'none'},
+   {id:'final',name:'Final',displayOrder:1,progression:'back_to_zero'},
+  ],criteria:[]}
+  service.foundation.mockImplementation(async(_event,id)=>({data:{...foundation(children.find(child=>child.id===id)),configuration:structuredClone(saved),criteriaReadiness:{allReady:setupReadiness(saved).ready.criteria}}}))
+  service.configure.mockImplementation(async(_event,_id,body)=>{saved=structuredClone(body.configuration);return {data:{}}})
+  const workspace=render(<MemoryRouter initialEntries={['/?competitionId=child-0']}><NativeSetupWorkspace eventId="event" initialChildren={[children[0]]} stage="workspace"/></MemoryRouter>)
+  for(const [round,name] of [['Qualifying','Technique'],['Final','Performance']]){
+   fireEvent.click(await screen.findByRole('button',{name:`Configure ${round} scoring criteria`}))
+   expect(screen.getByRole('navigation',{name:'Breadcrumb'})).toHaveTextContent(`${round} · Scoring Criteria`)
+   expect(screen.queryByRole('button',{name:'Edit round structure'})).not.toBeInTheDocument()
+   expect(screen.queryByRole('button',{name:'Edit criterion Technique'})).not.toBeInTheDocument()
+   fireEvent.click(screen.getByRole('button',{name:'Add Criterion',exact:true}))
+   fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:name}})
+   fireEvent.change(screen.getByLabelText('Major criterion weight (%)'),{target:{value:'100'}})
+   fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}))
+   expect(saved.criteria.some(criterion=>criterion.name===name)).toBe(false)
+   fireEvent.click(screen.getByRole('button',{name:'Save & Back'}))
+   expect(await screen.findByRole('button',{name:`Edit ${round} scoring criteria`})).toBeInTheDocument()
+   expect(screen.queryByRole('region',{name:'Scoring criteria'})).not.toBeInTheDocument()
+   if(round==='Qualifying'){
+    expect(screen.getByText('1 of 2 rounds configured')).toBeInTheDocument()
+    expect(screen.getByRole('button',{name:'Back to Competitions'})).toBeDisabled()
+   }
+  }
+  expect(saved.criteria.map(criterion=>[criterion.roundId,criterion.name])).toEqual([['qualifying','Technique'],['final','Performance']])
+  expect(service.configure.mock.calls[1][2].configuration.criteria[0]).toEqual(service.configure.mock.calls[0][2].configuration.criteria[0])
+  expect(screen.getByText('All rounds configured')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Back to Competitions'}))
+  expect(await screen.findByText('1 of 1 configured')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Edit Configuration Hip-Hop'}))
+  fireEvent.click(await screen.findByRole('button',{name:'Edit Qualifying scoring criteria'}))
+  fireEvent.click(screen.getByRole('button',{name:'Edit criterion Technique'}))
+  expect(screen.getByLabelText('Major criterion name')).toHaveValue('Technique')
+  expect(screen.getByLabelText('Major criterion weight (%)')).toHaveValue(100)
+  fireEvent.click(screen.getByRole('button',{name:'Cancel',exact:true}))
+  workspace.unmount()
+  render(<MemoryRouter initialEntries={['/?competitionId=child-0&scoringView=criteria&roundId=final']}><NativeSetupWorkspace eventId="event" initialChildren={[children[0]]} stage="workspace"/></MemoryRouter>)
+  expect(await screen.findByRole('button',{name:'Edit criterion Performance'})).toBeInTheDocument()
+  expect(screen.queryByRole('button',{name:'Edit criterion Technique'})).not.toBeInTheDocument()
+  expect(service.configure).toHaveBeenCalledTimes(2)
+ })
+ it('keeps failed round edits open without marking unsaved criteria configured',async()=>{
+  service.configure.mockRejectedValueOnce(new Error('Save rejected. Please try again.'))
+  render(<MemoryRouter initialEntries={['/?competitionId=child-0&scoringView=criteria']}><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button',{name:'Edit criterion Technique'}))
+  fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:'Updated Technique'}})
+  fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}))
+  fireEvent.click(screen.getByRole('button',{name:'Save & Back'}))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Save rejected')
+  expect(screen.getByRole('button',{name:'Edit criterion Updated Technique'})).toBeInTheDocument()
+  expect(screen.queryByRole('button',{name:'Edit round structure'})).not.toBeInTheDocument()
+  expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
+ })
+ it('retains a failed post-save refresh error and lets the organizer reload saved setup',async()=>{
+  service.configure.mockImplementationOnce(async()=>{service.foundation.mockRejectedValueOnce(new Error('Saved setup refresh failed'));return {data:{}}})
+  render(<MemoryRouter initialEntries={['/?competitionId=child-0&scoringView=criteria']}><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
+  await screen.findByRole('button',{name:'Edit criterion Technique'})
+  fireEvent.click(screen.getByRole('button',{name:'Save & Back'}))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Saved setup refresh failed')
+  expect(screen.queryByText('Round scoring configuration saved')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Reload saved setup'}))
+  expect(await screen.findByRole('button',{name:'Edit criterion Technique'})).toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(service.configure).toHaveBeenCalledTimes(1)
+ })
+ it('lets organizers inspect frozen round criteria while keeping scoring edits disabled',async()=>{
+  service.foundation.mockResolvedValue({data:{...foundation(children[0]),competition:{...foundation(children[0]).competition,official_child_rules_id:'frozen'}}})
+  render(<MemoryRouter initialEntries={['/?competitionId=child-0']}><NativeSetupWorkspace eventId="event" initialChildren={[children[0]]} stage="workspace"/></MemoryRouter>)
+  expect(await screen.findByRole('button',{name:'Edit round structure'})).toBeDisabled()
+  fireEvent.click(screen.getByRole('button',{name:'Edit Single Round scoring criteria'}))
+  expect(screen.getByRole('button',{name:'Edit criterion Technique'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:'Save & Back'})).toBeDisabled()
+  fireEvent.click(screen.getByRole('button',{name:'Back to Rounds & Scoring'}))
+  expect(screen.getByText('All rounds configured')).toBeInTheDocument()
+  expect(service.configure).not.toHaveBeenCalled()
  })
  it('converts legacy relative minor weights to equivalent direct round percentages before saving',async()=>{
   const legacy=structuredClone(config)
@@ -56,7 +204,8 @@ describe('Native organizer setup connections',()=>{
   render(<MemoryRouter><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
   fireEvent.click(await screen.findByRole('button',{name:'Edit Configuration Hip-Hop'}))
   expect(await screen.findByText(/converted to direct round percentages/)).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Save & Return to Competitions'}))
+  fireEvent.click(screen.getByRole('button',{name:'Edit Single Round scoring criteria'}))
+  fireEvent.click(screen.getByRole('button',{name:'Save & Back'}))
   await waitFor(()=>expect(service.configure).toHaveBeenCalled())
   const persisted=service.configure.mock.calls[0][2].configuration
   expect(persisted.scoringConfig.minorWeightBasis).toBe('overall')
@@ -116,14 +265,14 @@ describe('Native organizer setup connections',()=>{
   service.foundation.mockResolvedValue({data:{...foundation(pageant),configuration:multiRoundConfig}})
   render(<MemoryRouter initialEntries={['/?competitionId=pageant-child']}><NativeSetupWorkspace eventId="event" initialChildren={[pageant]} stage="workspace"/></MemoryRouter>)
 
-  expect(await screen.findByLabelText('Select Round')).toHaveValue('preliminary')
-  expect(screen.getByRole('button',{name:'Proceed to Final →'})).toBeInTheDocument()
-  expect(screen.getByText('Round 1 of 2 · Changes are saved after the final round.')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Proceed to Final →'}))
-
-  expect(screen.getByLabelText('Select Round')).toHaveValue('final')
-  expect(screen.getByRole('button',{name:'Save & Return to Competitions'})).toBeInTheDocument()
-  expect(screen.queryByRole('button',{name:'Proceed to Final →'})).not.toBeInTheDocument()
+  fireEvent.click(await screen.findByRole('button',{name:'Edit Preliminary scoring criteria'}))
+  expect(screen.queryByLabelText('Round 1 name')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Save & Back'}))
+  fireEvent.click(await screen.findByRole('button',{name:'Edit Final scoring criteria'}))
+  expect(screen.getByRole('navigation',{name:'Breadcrumb'})).toHaveTextContent('Final · Scoring Criteria')
+  fireEvent.click(screen.getByRole('button',{name:'Save & Back'}))
+  expect(await screen.findByRole('button',{name:'Back to Competitions'})).toBeEnabled()
+  expect(service.configure).toHaveBeenCalledTimes(2)
  })
  it('keeps the existing return action for multi-round non-Pageant competitions',async()=>{
   const multiRoundConfig={...structuredClone(config),structure:'multiple',rounds:[
@@ -133,7 +282,8 @@ describe('Native organizer setup connections',()=>{
   service.foundation.mockResolvedValue({data:{...foundation(children[0]),configuration:multiRoundConfig}})
   render(<MemoryRouter initialEntries={['/?competitionId=child-0']}><NativeSetupWorkspace eventId="event" initialChildren={[children[0]]} stage="workspace"/></MemoryRouter>)
 
-  expect(await screen.findByRole('button',{name:'Save & Return to Competitions'})).toBeInTheDocument()
+  expect(await screen.findByRole('button',{name:'Back to Competitions'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:'Configure Preliminary scoring criteria'})).toBeInTheDocument()
   expect(screen.queryByRole('button',{name:/Proceed to/})).not.toBeInTheDocument()
  })
  it('loads Step 6 without judge-only requests or duplicate selected-competition reads',async()=>{
@@ -170,9 +320,10 @@ describe('Native organizer setup connections',()=>{
   service.configure.mockImplementation((_event,id,body)=>{saved[id]=structuredClone(body.configuration);return Promise.resolve({data:{}})})
   render(<MemoryRouter><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
   await waitFor(()=>expect(screen.getByRole('button',{name:'Edit Configuration Hip-Hop'})).not.toBeDisabled())
-  fireEvent.click(screen.getByRole('button',{name:'Edit Configuration Hip-Hop'}));fireEvent.click(await screen.findByRole('button',{name:'Edit criterion Technique'}))
+  fireEvent.click(screen.getByRole('button',{name:'Edit Configuration Hip-Hop'}));fireEvent.click(await screen.findByRole('button',{name:'Edit Single Round scoring criteria'}));fireEvent.click(screen.getByRole('button',{name:'Edit criterion Technique'}))
   fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:'Hip-Hop Technique'}});fireEvent.click(screen.getByRole('button',{name:'Save Criterion'}))
-  fireEvent.click(screen.getByRole('button',{name:'Save & Return to Competitions'}))
+  fireEvent.click(screen.getByRole('button',{name:'Save & Back'}))
+  fireEvent.click(await screen.findByRole('button',{name:'Back to Competitions'}))
   await screen.findByText('Selected Competitions');fireEvent.click(screen.getByRole('button',{name:'Configure Contemporary'}))
   await screen.findByLabelText('Single round name')
   expect(screen.queryByRole('button',{name:'Edit criterion Hip-Hop Technique'})).not.toBeInTheDocument()
@@ -181,24 +332,24 @@ describe('Native organizer setup connections',()=>{
  })
  it('retains the current configuration when Save and Return is rejected',async()=>{
   service.configure.mockRejectedValueOnce(new Error('Revision changed. Reload before saving.'))
-  render(<MemoryRouter initialEntries={['/?competitionId=child-0']}><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
+  render(<MemoryRouter initialEntries={['/?competitionId=child-0&scoringView=structure']}><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
   const input=await screen.findByLabelText('Single round name');fireEvent.change(input,{target:{value:'My Round'}})
-  fireEvent.click(screen.getByRole('button',{name:'Save & Return to Competitions'}))
+  fireEvent.click(screen.getByRole('button',{name:'Done'}))
   expect(await screen.findByRole('alert')).toHaveTextContent('Revision changed')
   expect(screen.getByLabelText('Single round name')).toHaveValue('My Round');expect(screen.queryByText('Selected Competitions')).not.toBeInTheDocument()
  })
  it('guards unfinished criterion dialogs and blocks incomplete configuration saves',async()=>{
   const confirmation=vi.spyOn(window,'confirm').mockReturnValue(false)
-  render(<MemoryRouter initialEntries={['/?competitionId=child-0']}><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
+  render(<MemoryRouter initialEntries={['/?competitionId=child-0&scoringView=criteria']}><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
   fireEvent.click(await screen.findByRole('button',{name:'Add Criterion',exact:true}))
   fireEvent.change(screen.getByLabelText('Major criterion name'),{target:{value:'Unfinished'}})
-  expect(screen.getByRole('button',{name:'Save & Return to Competitions'})).toBeDisabled()
-  fireEvent.click(screen.getByRole('button',{name:'Back to Competitions'}));expect(confirmation).toHaveBeenCalled()
+  expect(screen.getByRole('button',{name:'Save & Back'})).toBeDisabled()
+  fireEvent.click(screen.getByRole('button',{name:'Back to Rounds & Scoring'}));expect(confirmation).toHaveBeenCalled()
   expect(screen.getByLabelText('Major criterion name')).toHaveValue('Unfinished')
   fireEvent.click(screen.getByRole('button',{name:'Cancel',exact:true}))
   fireEvent.click(screen.getByLabelText('Remove criterion Technique'));expect(confirmation).toHaveBeenCalled()
   confirmation.mockReturnValue(true);fireEvent.click(screen.getByLabelText('Remove criterion Technique'))
-  expect(screen.getByRole('button',{name:'Save & Return to Competitions'})).toBeDisabled()
+  fireEvent.click(screen.getByRole('button',{name:'Save & Back'}))
   expect(screen.getByText(/Add 100% before continuing/)).toBeInTheDocument()
   expect(service.configure).not.toHaveBeenCalled();confirmation.mockRestore()
  })
@@ -217,7 +368,7 @@ describe('Native organizer setup connections',()=>{
  it('blocks the scoring Next action until every selected competition is configured',async()=>{
   service.foundation.mockImplementation((_event,id)=>Promise.resolve({data:{...foundation(children.find(c=>c.id===id)),criteriaReadiness:{allReady:id!=='child-1'}}}))
   render(<MemoryRouter initialEntries={['/?competitionId=child-0']}><NativeSetupWorkspace eventId="event" initialChildren={children} stage="workspace"/></MemoryRouter>)
-  await screen.findByLabelText('Single round name');expect(screen.getByRole('button',{name:/Next: Contestants/})).toBeDisabled();expect(screen.getByText('Complete this step for every selected competition before continuing.')).toBeInTheDocument()
+  await screen.findByRole('button',{name:'Edit round structure'});expect(screen.getByRole('button',{name:/Next: Contestants/})).toBeDisabled();expect(screen.getByText('Complete this step for every selected competition before continuing.')).toBeInTheDocument()
  })
  it('choosing the already selected competition while loading does not invalidate its pending foundation',async()=>{
   let resolve;service.foundation.mockImplementationOnce(()=>new Promise(r=>{resolve=r}));show();await waitFor(()=>expect(service.foundation).toHaveBeenCalled())
@@ -477,6 +628,24 @@ describe('Native organizer setup connections',()=>{
   await waitFor(()=>expect(service.assign).toHaveBeenCalledWith('event','child-0',{participantId:'enrollment',roundId:null}))
   expect(service.enroll).not.toHaveBeenCalled()
  })
+ it('assigns the only explicit round in a multiple-round competition instead of a NULL single-phase grant',async()=>{
+  const roundId='round-only'
+  service.foundation.mockImplementation((_event,id)=>{
+   const saved=foundation(children.find(child=>child.id===id))
+   if(id==='child-0'){
+    saved.configuration={...saved.configuration,structure:'multiple',rounds:[{id:roundId,name:'Final',displayOrder:0}],criteria:[{...saved.configuration.criteria[0],roundId}]}
+    saved.assignments=[]
+   }
+   return Promise.resolve({data:saved})
+  })
+  render(<MemoryRouter><NativeSetupWorkspace eventId="event" initialChildren={children} stage="judges"/></MemoryRouter>)
+  const coverageRow=await screen.findByRole('row',{name:/Hip-Hop.*Needs judge/})
+  expect(within(coverageRow).getByText('1 scoring round')).toBeInTheDocument()
+  fireEvent.click(within(coverageRow).getByRole('button',{name:'Assign Judge'}))
+  fireEvent.change(await screen.findByLabelText('Coverage judge'),{target:{value:'enrollment'}})
+  fireEvent.click(screen.getByRole('button',{name:'Assign Competition'}))
+  await waitFor(()=>expect(service.assign).toHaveBeenCalledWith('event','child-0',{participantId:'enrollment',roundId}))
+ })
  it('offers one Pageant competition for judge assignment, not its legacy division children',async()=>{
   const pageant={id:'pageant-child',event_id:'event',name:'Pageant',competition_type:'pageant',origin:'native'}
   const women={id:'women-child',event_id:'event',name:'Women',competition_type:'pageant',origin:'native'}
@@ -531,6 +700,24 @@ describe('Native organizer setup connections',()=>{
   fireEvent.click(within(summary).getByRole('button',{name:'+ Add Judge'}))
   expect(screen.queryByRole('dialog',{name:'Assigned Judges'})).not.toBeInTheDocument()
   expect(screen.getByLabelText('Coverage judge')).toBeInTheDocument()
+ })
+ it('keeps published judge assignments reviewable but disables assignment mutations',async()=>{
+  pageantService.getEvent.mockResolvedValue({data:{event:{status:'scheduled'}}})
+  service.foundation.mockImplementation(async(_event,id)=>({
+   data:{...foundation(children.find(child=>child.id===id)),assignments:[{id:'grant',participant_id:'enrollment',round_id:null,competition_id:id}]},
+  }))
+  render(<MemoryRouter><NativeSetupWorkspace eventId="event" initialChildren={children} stage="judges"/></MemoryRouter>)
+  const judgeAssignments=await screen.findByRole('region',{name:'Judge Assignments'})
+  expect(within(judgeAssignments).getByRole('button',{name:'Manage'})).toBeDisabled()
+
+  const coverage=screen.getByRole('region',{name:'Competition Coverage'})
+  const hipHop=within(coverage).getByRole('row',{name:/Hip-Hop.*Covered/})
+  fireEvent.click(within(hipHop).getByRole('button',{name:'View'}))
+  const summary=await screen.findByRole('dialog',{name:'Assigned Judges'})
+  expect(within(summary).getByRole('button',{name:/Edit/})).toBeDisabled()
+  expect(within(summary).getByRole('button',{name:/Remove/})).toBeDisabled()
+  expect(within(summary).getByRole('button',{name:'+ Add Judge'})).toBeDisabled()
+  expect(service.assign).not.toHaveBeenCalled()
  })
  it('shows all organizer-assigned judges, supports multi-select, and prevents re-enrolling enrolled judges',async()=>{
   service.pool.mockResolvedValue({data:{judges:[

@@ -7,7 +7,8 @@ export function setupReadiness(value) {
   const rounds = value.rounds ?? [], majors = value.criteria ?? [], config = value.scoringConfig ?? {}
   const named = items => items.every(x => typeof x.name === 'string' && x.name.trim() && x.name.length <= 200)
   const duplicate = items => new Set(items.map(x => x.name?.trim().toLowerCase())).size !== items.length
-  if (!['single','multiple'].includes(value.structure) || value.structure === 'single' && rounds.length || value.structure === 'multiple' && !rounds.length) structure.push('Choose a single round or add at least one round.')
+  if (!['single','multiple'].includes(value.structure) || value.structure === 'single' && rounds.length) structure.push('Choose a valid single-phase or multiple-round structure.')
+  if (value.structure === 'multiple' && rounds.length < 2) structure.push('Add at least two rounds to continue with a multiple-round setup.')
   if (!named(rounds) || duplicate(rounds)) structure.push('Give each round a unique name.')
   if (config.singleRoundName !== undefined && !String(config.singleRoundName).trim()) structure.push('Name the single round.')
   for (const r of rounds) structure.push(...progressionIssues(r, rounds, r.calculationMethod ?? config.calculationMethod))

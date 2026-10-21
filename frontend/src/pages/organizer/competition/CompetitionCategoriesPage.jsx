@@ -39,7 +39,7 @@ export default function CompetitionCategoriesPage({ typeOnly = false }) {
       ? await fetchCompetitionSetupData(eventId,'divisions',()=>pageantService.listDivisions(eventId))
       : { data: { divisions: [] } }
     let savedChildren = list.data.competitions ?? []
-    if (savedType === 'pageant' && divisionList.data.divisions?.length && !savedChildren.some(child =>
+    if (ev.data.event.status === 'draft' && savedType === 'pageant' && divisionList.data.divisions?.length && !savedChildren.some(child =>
       child.origin === 'native' && child.name.trim().toLowerCase() === 'pageant',
     )) {
       await service.create(eventId, {

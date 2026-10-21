@@ -177,6 +177,7 @@ export default function NativeCompetitionWorkspace({eventId,eventName,event=null
    for(const row of Object.keys(queue.current)) {
     if(identityRef.current!==expected)return false
     const job=queue.current[row],current=viewRef.current
+    if(current.session?.status!=='active'||current.submission)return false
     if(job.blocked||job.retryAt>Date.now())continue
     const criterion=current.criteria.find(k=>k.id===job.criterionId),entry=current.contestants.find(e=>e.id===job.entryId)
     if(job.action!=='submit'&&(!criterion?.open||!entry?.open))continue
@@ -188,18 +189,27 @@ export default function NativeCompetitionWorkspace({eventId,eventName,event=null
     if(job.action==='lock')setSubmittingKey(row)
     const {data}=await service.score(eventId,choice.competitionId,job.action,job.body)
     if(identityRef.current!==expected||storageKey.current!==key)return false
-    if(job.action!=='submit') {
-     const drafts=[...current.drafts]
+    // Reconcile into the latest snapshot. A refresh or access notification may
+    // have closed scoring or superseded this row while the request was pending.
+    const latest=viewRef.current
+    if(latest.context.sessionRevision!==job.body.sessionRevision) {
+     refreshAfterWrite=true
+    } else if(job.action!=='submit') {
+     const drafts=[...latest.drafts]
      const idx=drafts.findIndex(d=>d.entry_id===job.entryId&&d.criterion_id===job.criterionId)
-     const saved={session_id:current.context.sessionId,judge_id:judgeId,entry_id:job.entryId,criterion_id:job.criterionId,scores:job.body.scores,deductions:job.body.deductions??[],revision:data.rowRevision,locked:data.locked}
-     if(idx<0)drafts.push(saved);else drafts[idx]=saved
-     const contestants=job.action==='lock'
-      ?current.contestants.map(cont=>cont.id===job.entryId?{...cont,lockedCriteria:[...new Set([...(cont.lockedCriteria??[]),job.criterionId])]}:cont)
-      :current.contestants
-     const updated={...current,drafts,contestants}
-     viewRef.current=updated;setView(updated)
+     if(idx>=0&&drafts[idx].revision>=data.rowRevision) {
+      refreshAfterWrite=true
+     }else{
+      const saved={session_id:latest.context.sessionId,judge_id:judgeId,entry_id:job.entryId,criterion_id:job.criterionId,scores:job.body.scores,deductions:job.body.deductions??[],revision:data.rowRevision,locked:data.locked}
+      if(idx<0)drafts.push(saved);else drafts[idx]=saved
+      const contestants=job.action==='lock'
+       ?latest.contestants.map(cont=>cont.id===job.entryId?{...cont,lockedCriteria:[...new Set([...(cont.lockedCriteria??[]),job.criterionId])]}:cont)
+       :latest.contestants
+      const updated={...latest,drafts,contestants}
+      viewRef.current=updated;setView(updated)
+     }
     } else {
-     const updated={...current,submission:{id:data.submissionId}}
+     const updated={...latest,submission:latest.submission??{id:data.submissionId}}
      viewRef.current=updated;setView(updated)
     }
     // Preserve keystrokes entered while a previous draft request was in flight.
@@ -271,7 +281,12 @@ export default function NativeCompetitionWorkspace({eventId,eventName,event=null
   queue.current.submit={action:'submit',body:envelope()};persist();return flush()
  }
  const confirmSubmit=async()=>{
-  await submit()
+  const submitted=await submit()
+  if(submitted&&identityRef.current===identity){
+   const currentIndex=choicesRef.current.findIndex(context=>chooseKey(context)===selected)
+   const nextContext=choicesRef.current.slice(currentIndex+1).find(context=>context.state!=='submitted')
+   if(nextContext)setSelected(chooseKey(nextContext))
+  }
   setSubmitConfirmOpen(false)
  }
  const control=async(action,extra={})=>{
