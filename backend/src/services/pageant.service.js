@@ -189,12 +189,16 @@ export async function getOrganizerDashboard(organizerId) {
     // Build a map of judges who have submitted rounds (native system)
     const nativeSubmittedJudges = new Map() // event_id -> Set(judge_id)
     if (!roundSubmissionsRes.error && roundSubmissionsRes.data) {
+      console.log('[Dashboard] Round submissions found:', roundSubmissionsRes.data.length)
       for (const submission of roundSubmissionsRes.data) {
         if (!nativeSubmittedJudges.has(submission.event_id)) {
           nativeSubmittedJudges.set(submission.event_id, new Set())
         }
         nativeSubmittedJudges.get(submission.event_id).add(submission.judge_id)
       }
+      console.log('[Dashboard] Native submitted judges by event:', Array.from(nativeSubmittedJudges.entries()).map(([k,v]) => [k, Array.from(v)]))
+    } else if (roundSubmissionsRes.error) {
+      console.log('[Dashboard] Round submissions query error:', roundSubmissionsRes.error.message)
     }
 
     for (const row of judgeRowsRes.data ?? []) {
@@ -208,6 +212,7 @@ export async function getOrganizerDashboard(organizerId) {
       if (row.has_scored || hasSubmittedRound) {
         bucket.completed += 1
         completedJudges += 1
+        console.log(`[Dashboard] Judge ${row.user_id} completed for event ${row.event_id} (has_scored=${row.has_scored}, hasSubmittedRound=${hasSubmittedRound})`)
       }
     }
 
