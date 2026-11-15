@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { RefreshCw, Download, X, AlertTriangle, FileSearch, ChevronUp, ChevronDown, Copy, Check } from 'lucide-react'
+import { RefreshCw, Download, X, AlertTriangle, FileSearch, ChevronUp, ChevronDown, Copy, Check, Mail, Search } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import { useToast } from '@/hooks/useToast'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -12,6 +12,7 @@ import Button from '@/components/ui/Button'
 import StatCard from '@/components/ui/StatCard'
 import SearchInput from '@/components/ui/SearchInput'
 import PageHeader from '@/components/ui/PageHeader'
+import { INPUT_CLASS } from '@/utils/uiClasses'
 
 // ─── Action colour coding ────────────────────────────────────────────────────
 
@@ -47,6 +48,198 @@ function actionTone(action = '') {
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100]
 const EMPTY_VALUE = 'Not available'
+const EMAIL_PAGE_SIZE = 50
+
+// ─── Email Delivery Tab Component ────────────────────────────────────────────
+
+function statusTone(status = '') {
+  if (['sent', 'delivered', 'opened', 'clicked'].includes(status)) return 'success'
+  if (['failed', 'bounced', 'complained'].includes(status)) return 'danger'
+  if (['queued', 'delivery_delayed', 'skipped_duplicate', 'skipped_quota'].includes(status)) return 'warning'
+  return 'default'
+}
+
+function formatEmailDate(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+
+function EmailDeliveryTab({ onRefresh }) {
+  const [logs, setLogs] = useState([])
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: EMAIL_PAGE_SIZE, totalPages: 0 })
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [workflow, setWorkflow] = useState('')
+  const [providerStatus, setProviderStatus] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
+  const { error: toastError } = useToast()
+  const showLoader = useDelayedLoading(loading, 300)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    adminService.getEmailDeliveryLogs({
+      page,
+      limit: EMAIL_PAGE_SIZE,
+      search: search.trim() || undefined,
+      workflow: workflow || undefined,
+      providerStatus: providerStatus || undefined,
+      startDate: startDate ? new Date(`${startDate}T00:00:00`).toISOString() : undefined,
+      endDate: endDate ? new Date(`${endDate}T23:59:59.999`).toISOString() : undefined,
+    }).then(({ data }) => {
+      if (cancelled) return
+      setLogs(data.logs ?? [])
+      setPagination(data.pagination ?? { total: 0, page, limit: EMAIL_PAGE_SIZE, totalPages: 0 })
+    }).catch((err) => {
+      if (!cancelled) {
+        const msg = err.response?.data?.message || 'Failed to load email delivery logs.'
+        setError(msg)
+      }
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [page, search, workflow, providerStatus, startDate, endDate, refreshKey])
+
+  // Pass refresh function to parent
+  useEffect(() => {
+    if (onRefresh) {
+      onRefresh(() => setRefreshKey((key) => key + 1))
+    }
+  }, [onRefresh])
+
+  const updateFilter = (setter) => (event) => {
+    setter(event.target.value)
+    setPage(1)
+  }
+
+  const emailStats = useMemo(() => {
+    const total = pagination.total
+    const sent = logs.filter((l) => ['sent', 'delivered', 'opened', 'clicked'].includes(l.provider_status)).length
+    const failed = logs.filter((l) => ['failed', 'bounced', 'complained'].includes(l.provider_status)).length
+    const pending = logs.filter((l) => ['queued', 'delivery_delayed'].includes(l.provider_status)).length
+    return { total, sent, failed, pending }
+  }, [logs, pagination.total])
+
+  if (loading && !showLoader) return null
+
+  return (
+    <div className="space-y-6">
+      {/* Email Stats */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total emails" value={emailStats.total.toLocaleString()} />
+        <StatCard label="Delivered" value={emailStats.sent.toLocaleString()} />
+        <StatCard label="Failed" value={emailStats.failed.toLocaleString()} />
+        <StatCard label="Pending" value={emailStats.pending.toLocaleString()} />
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-5">
+          <label className="relative sm:col-span-2 xl:col-span-1">
+            <span className="sr-only">Search recipient email</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v-text-subtle" />
+            <input
+              className={`${INPUT_CLASS} pl-9`}
+              value={search}
+              onChange={updateFilter(setSearch)}
+              placeholder="Recipient email"
+            />
+          </label>
+          <label>
+            <span className="sr-only">Workflow</span>
+            <input className={INPUT_CLASS} value={workflow} onChange={updateFilter(setWorkflow)} placeholder="Workflow" />
+          </label>
+          <label>
+            <span className="sr-only">Delivery status</span>
+            <select className={INPUT_CLASS} value={providerStatus} onChange={updateFilter(setProviderStatus)}>
+              <option value="">All statuses</option>
+              {['queued', 'sent', 'delivered', 'delivery_delayed', 'bounced', 'complained', 'opened', 'clicked', 'failed', 'skipped_duplicate', 'skipped_quota'].map((status) => (
+                <option key={status} value={status}>{status.replaceAll('_', ' ')}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="sr-only">Start date</span>
+            <input aria-label="Start date" className={INPUT_CLASS} type="date" value={startDate} onChange={updateFilter(setStartDate)} />
+          </label>
+          <label>
+            <span className="sr-only">End date</span>
+            <input aria-label="End date" className={INPUT_CLASS} type="date" value={endDate} onChange={updateFilter(setEndDate)} />
+          </label>
+        </div>
+      </Card>
+
+      {/* Error State */}
+      {error && (
+        <Card>
+          <div className="flex flex-col items-center gap-4 p-8 text-center">
+            <AlertTriangle className="h-10 w-10 text-v-danger" strokeWidth={1.5} />
+            <div>
+              <p className="font-medium text-v-danger">{error}</p>
+              <p className="mt-1 text-sm text-v-text-muted">Check the console for more details.</p>
+            </div>
+            <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)}>Try again</Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Table */}
+      {!error && (
+        <Card padding="sm">
+          {loading || showLoader ? (
+            <div className="p-8 text-center v-caption">Loading email delivery history…</div>
+          ) : logs.length === 0 ? (
+            <div className="p-8 text-center">
+              <Mail className="mx-auto mb-2 h-6 w-6 text-v-text-subtle" />
+              <p className="text-sm font-medium text-v-text">No email delivery records found</p>
+              <p className="v-caption mt-1">Records appear after the email audit migration is applied and sends are processed.</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto rounded-lg">
+                <table className="v-table min-w-[900px]">
+                  <thead>
+                    <tr>
+                      <th>Time</th><th>Recipient</th><th>Workflow</th><th>Subject</th><th>Status</th><th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-v-border">
+                    {logs.map((log) => (
+                      <tr key={log.id} className="hover:bg-v-surface-elevated/50">
+                        <td className="whitespace-nowrap">{formatEmailDate(log.created_at)}</td>
+                        <td>{log.recipient}</td>
+                        <td>{log.workflow}</td>
+                        <td>{log.subject || log.template_name || '—'}</td>
+                        <td><Badge tone={statusTone(log.provider_status)}>{log.provider_status}</Badge></td>
+                        <td className="max-w-xs whitespace-normal">
+                          {log.provider_error || (log.retryable ? 'Retryable error' : log.provider_message_id ? `Provider ID: ${log.provider_message_id}` : '—')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-v-border px-4 py-3">
+                <p className="v-caption">{pagination.total} record(s) · Page {pagination.page} of {Math.max(1, pagination.totalPages)}</p>
+                <div className="flex gap-2">
+                  <Button variant="secondary" size="sm" disabled={page <= 1 || loading} onClick={() => setPage((current) => current - 1)}>Previous</Button>
+                  <Button variant="secondary" size="sm" disabled={page >= pagination.totalPages || loading} onClick={() => setPage((current) => current + 1)}>Next</Button>
+                </div>
+              </div>
+            </>
+          )}
+        </Card>
+      )}
+    </div>
+  )
+}
 
 // ─── Utility: safe ISO date format ───────────────────────────────────────────
 
@@ -270,9 +463,29 @@ function Row({ label, value, mono = false }) {
 
 export default function AuditLogsPage() {
   const { success: toastSuccess, error: toastError } = useToast()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const initialEntity = searchParams.get('entity') || ''
   const initialEntityId = searchParams.get('entityId') || ''
+
+  // ── Tab state ──
+  const [activeTab, setActiveTab] = useState(() => {
+    return searchParams.get('view') === 'email' ? 'email' : 'system'
+  })
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab)
+    const params = new URLSearchParams(searchParams)
+    if (tab === 'email') {
+      params.set('view', 'email')
+    } else {
+      params.delete('view')
+    }
+    setSearchParams(params)
+  }
+
+  // ── Email refresh handler ──
+  const [emailRefreshFn, setEmailRefreshFn] = useState(null)
 
   // ── Data state ──
   const [logs, setLogs]           = useState([])
@@ -456,31 +669,70 @@ export default function AuditLogsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Audit Logs"
-        description="Security and compliance trail for all administrative actions."
+        description={
+          activeTab === 'system'
+            ? "Security and compliance trail for all administrative actions."
+            : "Provider send and delivery status history for all outbound emails."
+        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => fetchLogs({ silent: true })}
+            onClick={() => activeTab === 'system' ? fetchLogs({ silent: true }) : emailRefreshFn?.()}
             disabled={loading}
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={2} />
             Refresh
           </Button>
-          <Button size="sm" variant="secondary" onClick={exportCSV} disabled={logs.length === 0}>
-            <Download className="h-4 w-4" strokeWidth={1.5} />
-            Export page
-          </Button>
-          <Button size="sm" variant="secondary" onClick={exportServerCSV} loading={serverExporting}>
-            <Download className="h-4 w-4" strokeWidth={1.5} />
-            Export full
-          </Button>
+          {activeTab === 'system' ? (
+            <>
+              <Button size="sm" variant="secondary" onClick={exportCSV} disabled={logs.length === 0}>
+                <Download className="h-4 w-4" strokeWidth={1.5} />
+                Export page
+              </Button>
+              <Button size="sm" variant="secondary" onClick={exportServerCSV} loading={serverExporting}>
+                <Download className="h-4 w-4" strokeWidth={1.5} />
+                Export full
+              </Button>
+            </>
+          ) : null}
           </div>
         }
       />
 
+      {/* Tab Switcher */}
+      <div className="flex gap-1 rounded-lg bg-v-surface-elevated p-1">
+        <button
+          type="button"
+          className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${
+            activeTab === 'system'
+              ? 'bg-v-surface text-v-text shadow-sm'
+              : 'text-v-text-muted hover:text-v-text'
+          }`}
+          onClick={() => handleTabChange('system')}
+        >
+          System Logs
+        </button>
+        <button
+          type="button"
+          className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${
+            activeTab === 'email'
+              ? 'bg-v-surface text-v-text shadow-sm'
+              : 'text-v-text-muted hover:text-v-text'
+          }`}
+          onClick={() => handleTabChange('email')}
+        >
+          Email Delivery
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'email' ? (
+        <EmailDeliveryTab onRefresh={(fn) => setEmailRefreshFn(() => fn)} />
+      ) : (
+        <>
       {/* Summary stat cards */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total logs" value={summary.total.toLocaleString()} />
@@ -791,6 +1043,8 @@ export default function AuditLogsPage() {
       {/* Detail modal */}
       {selectedLog && (
         <AuditDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />
+      )}
+      </>
       )}
     </div>
   )

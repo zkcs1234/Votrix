@@ -720,7 +720,7 @@ export async function getJudgePool(eventId, organizerId, { search } = {}) {
   const { data, error } = await getClient()
     .from(DB_TABLES.USER_PARTICIPANT_TYPES)
     .select('users!user_participant_types_user_id_fkey!inner(id, email, first_name, last_name, profile_data, account_status)')
-    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .eq('participant_type', PARTICIPANT_TYPES.JUDGE)
     .eq('is_active', true)
     .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
   if (error) throw new ApiError(500, error.message)

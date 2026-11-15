@@ -22,9 +22,10 @@ import VoterStatusBadge from '@/components/voter/VoterStatusBadge'
 import VoterEventCard from '@/components/voter/VoterEventCard'
 
 const ROLE_PHRASES = {
-  ELECTION_VOTER: 'Elections',
+  STUDENT: 'Elections and polls',
+  ELECTION_VOTER: 'Elections', // Legacy
   COMPETITION_JUDGE: 'competition judging',
-  POLLING_RESPONDENT: 'polls',
+  POLLING_RESPONDENT: 'polls', // Legacy
 }
 
 function formatOrganization(org) {

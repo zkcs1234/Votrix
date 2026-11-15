@@ -188,12 +188,12 @@ async function listSchoolParticipantType(participantType, { search, program, yea
 }
 
 export async function listVoters(options = {}) {
-  const result = await listSchoolParticipantType(PARTICIPANT_TYPES.ELECTION_VOTER, options)
+  const result = await listSchoolParticipantType(PARTICIPANT_TYPES.STUDENT, options)
   return { ...result, voters: result.participants }
 }
 
 export async function listRespondents(options = {}) {
-  const result = await listSchoolParticipantType(PARTICIPANT_TYPES.POLLING_RESPONDENT, options)
+  const result = await listSchoolParticipantType(PARTICIPANT_TYPES.STUDENT, options)
   return { ...result, respondents: result.participants }
 }
 
@@ -321,11 +321,11 @@ async function createSchoolParticipant(input, participantType) {
 }
 
 export async function createVoter(input) {
-  return createSchoolParticipant(input, PARTICIPANT_TYPES.ELECTION_VOTER)
+  return createSchoolParticipant(input, PARTICIPANT_TYPES.STUDENT)
 }
 
 export async function createRespondent(input) {
-  return createSchoolParticipant(input, PARTICIPANT_TYPES.POLLING_RESPONDENT)
+  return createSchoolParticipant(input, PARTICIPANT_TYPES.STUDENT)
 }
 
 // ---------------------------------------------------------------------------
@@ -378,11 +378,11 @@ async function updateSchoolParticipant(userId, input, participantType) {
 }
 
 export async function updateVoter(userId, input) {
-  return updateSchoolParticipant(userId, input, PARTICIPANT_TYPES.ELECTION_VOTER)
+  return updateSchoolParticipant(userId, input, PARTICIPANT_TYPES.STUDENT)
 }
 
 export async function updateRespondent(userId, input) {
-  return updateSchoolParticipant(userId, input, PARTICIPANT_TYPES.POLLING_RESPONDENT)
+  return updateSchoolParticipant(userId, input, PARTICIPANT_TYPES.STUDENT)
 }
 
 async function updateSchoolParticipantStatus(userId, accountStatus, participantType) {
@@ -401,21 +401,21 @@ async function updateSchoolParticipantStatus(userId, accountStatus, participantT
 }
 
 export async function updateVoterStatus(userId, accountStatus) {
-  return updateSchoolParticipantStatus(userId, accountStatus, PARTICIPANT_TYPES.ELECTION_VOTER)
+  return updateSchoolParticipantStatus(userId, accountStatus, PARTICIPANT_TYPES.STUDENT)
 }
 
 export async function updateRespondentStatus(userId, accountStatus) {
-  return updateSchoolParticipantStatus(userId, accountStatus, PARTICIPANT_TYPES.POLLING_RESPONDENT)
+  return updateSchoolParticipantStatus(userId, accountStatus, PARTICIPANT_TYPES.STUDENT)
 }
 
 export async function removeVoterMembership(userId) {
-  await assertSchoolParticipant(userId, PARTICIPANT_TYPES.ELECTION_VOTER)
-  await setParticipantTypeMembership(userId, PARTICIPANT_TYPES.ELECTION_VOTER, false)
+  await assertSchoolParticipant(userId, PARTICIPANT_TYPES.STUDENT)
+  await setParticipantTypeMembership(userId, PARTICIPANT_TYPES.STUDENT, false)
 }
 
 export async function removeRespondentMembership(userId) {
-  await assertSchoolParticipant(userId, PARTICIPANT_TYPES.POLLING_RESPONDENT)
-  await setParticipantTypeMembership(userId, PARTICIPANT_TYPES.POLLING_RESPONDENT, false)
+  await assertSchoolParticipant(userId, PARTICIPANT_TYPES.STUDENT)
+  await setParticipantTypeMembership(userId, PARTICIPANT_TYPES.STUDENT, false)
 }
 
 // ---------------------------------------------------------------------------
@@ -604,11 +604,11 @@ async function registerSchoolParticipantImport(parsedData, participantType) {
 }
 
 export async function registerVoterImport(parsedData) {
-  return registerSchoolParticipantImport(parsedData, PARTICIPANT_TYPES.ELECTION_VOTER)
+  return registerSchoolParticipantImport(parsedData, PARTICIPANT_TYPES.STUDENT)
 }
 
 export async function registerRespondentImport(parsedData) {
-  return registerSchoolParticipantImport(parsedData, PARTICIPANT_TYPES.POLLING_RESPONDENT)
+  return registerSchoolParticipantImport(parsedData, PARTICIPANT_TYPES.STUDENT)
 }
 
 // ===========================================================================
@@ -720,7 +720,7 @@ async function insertJudge(row, temporaryPassword) {
     .select('*')
     .single()
   if (error) throw new ApiError(500, error.message)
-  await addParticipantTypeMembership(data.id, PARTICIPANT_TYPES.COMPETITION_JUDGE)
+  await addParticipantTypeMembership(data.id, PARTICIPANT_TYPES.JUDGE)
   return data
 }
 
@@ -751,7 +751,7 @@ async function assertJudge(userId) {
     .from(DB_TABLES.USER_PARTICIPANT_TYPES)
     .select('user_id')
     .eq('user_id', userId)
-    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .eq('participant_type', PARTICIPANT_TYPES.JUDGE)
     .eq('is_active', true)
     .maybeSingle()
   if (membershipError) throw new ApiError(500, membershipError.message)
@@ -767,7 +767,7 @@ export async function listJudges({ search, status, page = 1, limit = 50 } = {}) 
   let query = getClient()
     .from(DB_TABLES.USERS)
     .select('*, user_participant_types!user_participant_types_user_id_fkey!inner(participant_type, is_active)', { count: 'exact' })
-    .eq('user_participant_types.participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    .eq('user_participant_types.participant_type', PARTICIPANT_TYPES.JUDGE)
     .eq('user_participant_types.is_active', true)
     .in('role', [USER_ROLES.PARTICIPANT, USER_ROLES.VOTER])
 
@@ -818,7 +818,7 @@ export async function createJudge(input) {
       throw new ApiError(409, 'Existing account has conflicting shared name details; edit the account before adding this participant type', { fields: nameConflicts })
     }
     const user = await updateJudgeRow(existing.id, row)
-    await addParticipantTypeMembership(existing.id, PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    await addParticipantTypeMembership(existing.id, PARTICIPANT_TYPES.JUDGE)
     return { user: sanitizeUser(user), email: null, created: false }
   }
 
@@ -864,7 +864,7 @@ export async function updateJudgeStatus(userId, accountStatus) {
 
 export async function removeJudgeMembership(userId) {
   await assertJudge(userId)
-  await setParticipantTypeMembership(userId, PARTICIPANT_TYPES.COMPETITION_JUDGE, false)
+  await setParticipantTypeMembership(userId, PARTICIPANT_TYPES.JUDGE, false)
 }
 
 export async function previewJudgeImport(fileBuffer) {
@@ -953,7 +953,7 @@ export async function registerJudgeImport(parsedData) {
             const existing = await findStudentByEmail(row.email)
             if (!existing) throw new ApiError(409, 'account no longer exists')
             await updateJudgeRow(existing.id, row)
-            await addParticipantTypeMembership(existing.id, PARTICIPANT_TYPES.COMPETITION_JUDGE)
+            await addParticipantTypeMembership(existing.id, PARTICIPANT_TYPES.JUDGE)
             results.push({
               email: row.email,
               success: true,
