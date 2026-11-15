@@ -99,11 +99,16 @@ export async function listUserParticipantRoles(userId) {
 
 /**
  * Determine the correct participant_type based on an event's event_type.
+ * For elections and polling, uses the unified STUDENT type.
  */
 export function resolveParticipantType(eventType) {
-  if (eventType === EVENT_TYPES.ELECTION) return PARTICIPANT_TYPES.ELECTION_VOTER
+  // Use unified STUDENT type for elections and polling
+  if (eventType === EVENT_TYPES.ELECTION) return PARTICIPANT_TYPES.STUDENT
+  if (eventType === EVENT_TYPES.POLLING) return PARTICIPANT_TYPES.STUDENT
+  
+  // Judges remain separate
   if (COMPETITION_SCORING_EVENT_TYPES.has(eventType)) return PARTICIPANT_TYPES.COMPETITION_JUDGE
-  if (eventType === EVENT_TYPES.POLLING) return PARTICIPANT_TYPES.POLLING_RESPONDENT
+  
   throw new ApiError(400, `Unknown event type: ${eventType}`)
 }
 
@@ -231,15 +236,16 @@ export async function markResponded(eventId, userId) {
 /**
  * Enrich an event object with its participant type label based on event_type.
  * Used by voter.service.js for dashboard display.
+ * For elections and polling, uses the unified STUDENT type.
  */
 export function enrichEventWithParticipantType(event, eventsEventType) {
   const eventType = eventsEventType || event.eventType || event.event_type
 
   const typeMap = {
-    election: PARTICIPANT_TYPES.ELECTION_VOTER,
+    election: PARTICIPANT_TYPES.STUDENT, // Use unified STUDENT type
     pageant: PARTICIPANT_TYPES.COMPETITION_JUDGE,
     competition_scoring: PARTICIPANT_TYPES.COMPETITION_JUDGE,
-    polling: PARTICIPANT_TYPES.POLLING_RESPONDENT,
+    polling: PARTICIPANT_TYPES.STUDENT, // Use unified STUDENT type
   }
 
   return {

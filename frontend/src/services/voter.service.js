@@ -26,7 +26,8 @@ export const EVENT_TYPE_META = {
 
 // Participant type metadata for display in UI
 export const PARTICIPANT_TYPE_META = {
-  ELECTION_VOTER: { label: 'Voter', color: 'indigo', icon: 'Vote' },
+  STUDENT: { label: 'Student', color: 'blue', icon: 'GraduationCap' },
+  ELECTION_VOTER: { label: 'Voter', color: 'indigo', icon: 'Vote' }, // Legacy
   COMPETITION_JUDGE: { label: 'Judge', color: 'pink', icon: 'Trophy' },
-  POLLING_RESPONDENT: { label: 'Respondent', color: 'cyan', icon: 'BarChart2' },
+  POLLING_RESPONDENT: { label: 'Respondent', color: 'cyan', icon: 'BarChart2' }, // Legacy
 }

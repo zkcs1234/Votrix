@@ -52,7 +52,7 @@ export default function DashboardLayout({
               loc.pathname.startsWith('/admin/users') || loc.pathname.startsWith('/admin/organizers'),
           },
           {
-            label: 'Global Events',
+            label: 'Events',
             path: '/admin/events',
             icon: CalendarDays,
             isActive: (loc) => loc.pathname.startsWith('/admin/events'),
@@ -90,12 +90,6 @@ export default function DashboardLayout({
             path: '/admin/audit-logs',
             icon: ClipboardList,
             isActive: (loc) => loc.pathname.startsWith('/admin/audit-logs'),
-          },
-          {
-            label: 'Email Delivery',
-            path: '/admin/email-delivery',
-            icon: Mail,
-            isActive: (loc) => loc.pathname.startsWith('/admin/email-delivery'),
           },
         ]
       : []),

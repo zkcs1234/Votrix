@@ -119,17 +119,37 @@ export const ASSIGNMENT_SCOPES = {
   DIVISION: 'division',
 }
 
-// Event participant types (used for event-scoped roles)
+// Participant types used in TWO different contexts:
+//
+// 1. user_participant_types table (ELIGIBILITY - what user CAN do):
+//    - STUDENT: Can vote in elections AND respond to polls
+//    - JUDGE: Can judge competitions
+//    - ORGANIZER: Can organize events
+//
+// 2. event_participants table (ENROLLMENT - what user IS DOING in specific event):
+//    - ELECTION_VOTER: Voting in this election
+//    - POLLING_RESPONDENT: Responding to this poll
+//    - COMPETITION_JUDGE: Judging this competition
 export const PARTICIPANT_TYPES = {
-  ELECTION_VOTER: 'ELECTION_VOTER',
-  COMPETITION_JUDGE: 'COMPETITION_JUDGE',
-  POLLING_RESPONDENT: 'POLLING_RESPONDENT',
+  // Eligibility types (user_participant_types)
+  STUDENT: 'STUDENT', // Can vote in elections AND respond to polls
+  JUDGE: 'JUDGE', // Can judge competitions
+  ORGANIZER: 'ORGANIZER', // Can organize events
+  
+  // Legacy/Event-specific types (kept for backward compatibility)
+  ELECTION_VOTER: 'ELECTION_VOTER', // Specific event role
+  COMPETITION_JUDGE: 'COMPETITION_JUDGE', // Specific event role
+  POLLING_RESPONDENT: 'POLLING_RESPONDENT', // Specific event role
 }
 
 // Labels for participant types (for frontend display)
 export const PARTICIPANT_TYPE_LABELS = {
+  [PARTICIPANT_TYPES.STUDENT]: { label: 'Student', color: 'blue', icon: 'GraduationCap' },
+  [PARTICIPANT_TYPES.JUDGE]: { label: 'Judge', color: 'pink', icon: 'Gavel' },
+  [PARTICIPANT_TYPES.ORGANIZER]: { label: 'Organizer', color: 'purple', icon: 'Users' },
+  // Legacy labels
   [PARTICIPANT_TYPES.ELECTION_VOTER]: { label: 'Voter', color: 'indigo', icon: 'Vote' },
-  [PARTICIPANT_TYPES.COMPETITION_JUDGE]: { label: 'Judge', color: 'pink', icon: 'Trophy' },
+  [PARTICIPANT_TYPES.COMPETITION_JUDGE]: { label: 'Competition Judge', color: 'pink', icon: 'Trophy' },
   [PARTICIPANT_TYPES.POLLING_RESPONDENT]: { label: 'Respondent', color: 'cyan', icon: 'BarChart2' },
 }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CalendarDays, Zap, Clock, CheckCircle2, Archive, Vote, Trophy, BarChart2, Download, X, FileSearch, MoreHorizontal } from 'lucide-react'
+import { CalendarDays, Zap, Clock, CheckCircle2, Archive, Vote, Trophy, BarChart2, Download, X, Eye, ClipboardList, Users } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Card from '@/components/ui/Card'
 import { format } from 'date-fns'
@@ -42,8 +42,7 @@ export default function GlobalEventsPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [exporting, setExporting] = useState(false)
-  const [eventExporting, setEventExporting] = useState(null)
-  const [eventRestoring, setEventRestoring] = useState(null)
+  const [selectedEvent, setSelectedEvent] = useState(null)
   const showLoader = useDelayedLoading(loading, 300)
   const { success: toastSuccess, error: toastError } = useToast()
   const navigate = useNavigate()
@@ -70,40 +69,12 @@ export default function GlobalEventsPage() {
     }
   }
 
-  const handleEventExport = async (event) => {
-    setEventExporting(event.id)
-    try {
-      const { data } = await adminService.exportEvents({ eventId: event.id })
-      const url = URL.createObjectURL(data)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${event.title?.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'event'}-report.csv`
-      a.click()
-      URL.revokeObjectURL(url)
-      toastSuccess('Event report exported')
-    } catch {
-      toastError('Event report export failed')
-    } finally {
-      setEventExporting(null)
-    }
+  const handleViewEvent = (event) => {
+    setSelectedEvent(event)
   }
 
-  const handleEventRestore = async (event) => {
-    if (!window.confirm(`Restore "${event.title}" as a completed, read-only event?`)) return
-    setEventRestoring(event.id)
-    try {
-      await adminService.restoreEvent(event.id)
-      setEvents((current) =>
-        current.map((item) =>
-          item.id === event.id ? { ...item, status: 'completed' } : item,
-        ),
-      )
-      toastSuccess('Event restored as completed')
-    } catch (err) {
-      toastError(getErrorMessage(err, 'Event restoration failed'))
-    } finally {
-      setEventRestoring(null)
-    }
+  const handleCloseView = () => {
+    setSelectedEvent(null)
   }
 
   const fetchEvents = useCallback(async () => {
@@ -188,7 +159,7 @@ export default function GlobalEventsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Global events"
+        title="Events"
         description="Monitor all elections, competitions, and polls across the platform."
         actions={
           <Button size="sm" variant="secondary" onClick={handleExport} loading={exporting}>
@@ -309,27 +280,17 @@ export default function GlobalEventsPage() {
                             : 'Not set'}
                         </td>
                         <td className="align-middle">
-                          <div className="grid min-w-[320px] grid-cols-3 items-center gap-2">
-                            <Link to={`/admin/audit-logs?entity=events&entityId=${event.id}`} className="v-press inline-flex h-8 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-xs font-medium text-v-text-muted transition hover:bg-v-surface-elevated hover:text-v-text" aria-label={`View activity for ${event.title}`}>
-                              <FileSearch className="h-4 w-4" strokeWidth={1.5} />
-                              Activity
-                            </Link>
-                            <Button type="button" variant="ghost" size="sm" className="h-8 w-full justify-center gap-1.5 whitespace-nowrap px-2 text-xs" onClick={() => handleEventExport(event)} loading={eventExporting === event.id} aria-label={`Export report for ${event.title}`}>
-                              <Download className="h-4 w-4" strokeWidth={1.5} />
-                              Export
-                            </Button>
-                            {event.organizations?.organizer?.id && (
-                              <Button type="button" variant="ghost" size="sm" className="h-8 w-full justify-center gap-1.5 whitespace-nowrap px-2 text-xs" onClick={() => navigate(`/admin/organizers/${event.organizations.organizer.id}`)} aria-label={`Open organizer for ${event.title}`}>
-                                <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
-                                Organizer
-                              </Button>
-                            )}
-                            {event.status === 'archived' && (
-                              <Button type="button" variant="ghost" size="sm" className="h-8 w-full justify-center gap-1.5 whitespace-nowrap px-2 text-xs" onClick={() => handleEventRestore(event)} loading={eventRestoring === event.id} aria-label={`Restore ${event.title}`}>
-                                Restore
-                              </Button>
-                            )}
-                          </div>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 gap-1.5 px-3 text-xs"
+                            onClick={() => handleViewEvent(event)}
+                            aria-label={`View details for ${event.title}`}
+                          >
+                            <Eye className="h-4 w-4" strokeWidth={1.5} />
+                            View
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -340,6 +301,179 @@ export default function GlobalEventsPage() {
           </div>
         )}
       </Card>
+
+      {/* Event Details Modal */}
+      {selectedEvent && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={handleCloseView}
+        >
+          <div 
+            className="v-card-md w-full max-w-3xl max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="mb-6 flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-v-text">{selectedEvent.title}</h2>
+                <p className="mt-1 text-sm text-v-text-subtle">Event Details & Monitoring</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseView}
+                className="v-press rounded-lg p-2 hover:bg-v-surface-elevated"
+                aria-label="Close details"
+              >
+                <X className="h-5 w-5" strokeWidth={1.5} />
+              </button>
+            </div>
+
+            {/* Event Overview Section */}
+            <div className="mb-6 space-y-4">
+              <h3 className="text-sm font-semibold text-v-text">Event Overview</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-medium text-v-text-subtle">Event Type</p>
+                  <Badge className="mt-1 border-v-primary/20 bg-v-primary-soft text-v-primary">
+                    <span className="inline-flex items-center gap-1.5">
+                      {selectedEvent.event_type === 'election' && <Vote className="h-3 w-3" strokeWidth={2} />}
+                      {(selectedEvent.event_type === 'competition_scoring' || selectedEvent.event_type === 'pageant') && <Trophy className="h-3 w-3" strokeWidth={2} />}
+                      {selectedEvent.event_type === 'polling' && <BarChart2 className="h-3 w-3" strokeWidth={2} />}
+                      {eventTypeLabel(selectedEvent.event_type)}
+                    </span>
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-v-text-subtle">Status</p>
+                  <Badge className="mt-1" tone={selectedEvent.status === 'active' ? 'success' : selectedEvent.status === 'cancelled' ? 'danger' : 'default'}>
+                    {selectedEvent.status}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-v-text-subtle">Start Date</p>
+                  <p className="mt-1 text-sm text-v-text">
+                    {selectedEvent.start_date ? format(new Date(selectedEvent.start_date), 'MMM d, yyyy h:mm a') : 'Not set'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-v-text-subtle">End Date</p>
+                  <p className="mt-1 text-sm text-v-text">
+                    {selectedEvent.end_date ? format(new Date(selectedEvent.end_date), 'MMM d, yyyy h:mm a') : 'Not set'}
+                  </p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-medium text-v-text-subtle">Event ID</p>
+                  <p className="mt-1 font-mono text-xs text-v-text-muted">{selectedEvent.id}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Organization Info Section */}
+            <div className="mb-6 space-y-4">
+              <h3 className="text-sm font-semibold text-v-text">Organization</h3>
+              <div className="rounded-lg border border-v-border bg-v-surface-elevated p-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-medium text-v-text-subtle">Organization Name</p>
+                    <p className="mt-1 text-sm text-v-text">
+                      {selectedEvent.organizations?.organization_name || 'N/A'}
+                    </p>
+                  </div>
+                  {selectedEvent.organizations?.organizer?.id && (
+                    <div>
+                      <p className="text-xs font-medium text-v-text-subtle">Organizer</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleCloseView()
+                          navigate(`/admin/organizers/${selectedEvent.organizations.organizer.id}`)
+                        }}
+                        className="mt-1 text-sm text-v-primary hover:underline"
+                      >
+                        View Organizer Profile →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Participation Stats Section */}
+            <div className="mb-6 space-y-4">
+              <h3 className="text-sm font-semibold text-v-text">Participation Metrics</h3>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-v-border bg-v-surface-elevated p-4">
+                  <p className="text-xs font-medium text-v-text-subtle">Total Participants</p>
+                  <p className="mt-2 text-2xl font-semibold text-v-text">
+                    {selectedEvent.participant_count || 0}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-v-border bg-v-surface-elevated p-4">
+                  <p className="text-xs font-medium text-v-text-subtle">Voters/Judges</p>
+                  <p className="mt-2 text-2xl font-semibold text-v-text">
+                    {selectedEvent.voter_count || 0}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-v-border bg-v-surface-elevated p-4">
+                  <p className="text-xs font-medium text-v-text-subtle">Submissions</p>
+                  <p className="mt-2 text-2xl font-semibold text-v-text">
+                    {selectedEvent.submission_count || 0}
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-v-text-subtle">
+                Note: Metrics may vary based on event type and configuration
+              </p>
+            </div>
+
+            {/* Admin Actions Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-v-text">Admin Actions</h3>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  to={`/admin/audit-logs?entity=events&entityId=${selectedEvent.id}`}
+                  className="v-press inline-flex items-center gap-2 rounded-lg border border-v-border bg-v-surface px-4 py-2 text-sm font-medium text-v-text transition hover:bg-v-surface-elevated"
+                  onClick={handleCloseView}
+                >
+                  <ClipboardList className="h-4 w-4" strokeWidth={1.5} />
+                  View Audit Logs
+                </Link>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    handleCloseView()
+                    const { data } = await adminService.exportEvents({ eventId: selectedEvent.id })
+                    const url = URL.createObjectURL(data)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `${selectedEvent.title?.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'event'}-report.csv`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                    toastSuccess('Event report exported')
+                  }}
+                  className="v-press inline-flex items-center gap-2 rounded-lg border border-v-border bg-v-surface px-4 py-2 text-sm font-medium text-v-text transition hover:bg-v-surface-elevated"
+                >
+                  <Download className="h-4 w-4" strokeWidth={1.5} />
+                  Export Event Report
+                </button>
+                {selectedEvent.organizations?.organizer?.id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCloseView()
+                      navigate(`/admin/organizers/${selectedEvent.organizations.organizer.id}`)
+                    }}
+                    className="v-press inline-flex items-center gap-2 rounded-lg border border-v-border bg-v-surface px-4 py-2 text-sm font-medium text-v-text transition hover:bg-v-surface-elevated"
+                  >
+                    <Users className="h-4 w-4" strokeWidth={1.5} />
+                    View Organizer
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
