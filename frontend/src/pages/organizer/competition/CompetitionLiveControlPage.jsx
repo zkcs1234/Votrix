@@ -8,6 +8,7 @@ import {
 import { competitionSessionService } from '@/services/competition-session.service.js'
 import { pageantService } from '@/services/pageant.service.js'
 import { useToast } from '@/hooks/useToast'
+import { useReasonDialog } from '@/components/ui/ReasonDialog'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
@@ -29,6 +30,7 @@ export default function CompetitionLiveControlPage() { return <CompetitionWorksp
 function LegacyCompetitionLiveControlPage() {
   const { eventId } = useParams()
   const { success, error: toastError } = useToast()
+  const { ask: askReason, dialog: reasonDialog } = useReasonDialog()
   const beginRequest = useLatestRequest(eventId)
   const [loadError, setLoadError] = useState(null)
   const [session, setSession] = useState(null)
@@ -184,7 +186,13 @@ function LegacyCompetitionLiveControlPage() {
   // broad to fine: all judges → one judge → one judge's single criterion.
   const unlockContestant = async (contestantId, judgeId = null, criteriaId = null) => {
     if (actionLoading) return
-    const reason = window.prompt('Reason for reopening this score. The affected round submission will be invalidated and must be submitted again.')?.trim()
+    const reason = await askReason({
+      title: 'Reopen this score',
+      label: 'Reason',
+      description: 'The affected round submission will be invalidated and must be submitted again. The reason is kept in the audit log.',
+      placeholder: 'e.g. Judge entered the wrong value for this criterion',
+      confirmLabel: 'Continue',
+    })
     if (!reason || !window.confirm('Confirm this audited correction and require fresh round submission?')) return
     setActionLoading(`unlock:${contestantId}:${judgeId ?? 'all'}:${criteriaId ?? 'all'}`)
     try {
@@ -403,6 +411,7 @@ function LegacyCompetitionLiveControlPage() {
   // Active or Paused session
   return (
     <div className="space-y-6">
+      {reasonDialog}
       <PageHeader eventId={eventId} title={event?.title ?? 'Competition Live Control'} />
         {syncFeedback}
 

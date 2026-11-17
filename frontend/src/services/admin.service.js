@@ -21,13 +21,37 @@ export const adminService = {
   updateOrganizerStatus(organizerId, accountStatus) {
     return api.patch(`${base}/organizers/${organizerId}/status`, { accountStatus })
   },
-  previewOrganizersCsv(file) {
-    const form = new FormData()
-    form.append('file', file)
-    return api.post(`${base}/organizers/import-preview`, form)
+  // Student officers of an organizer (admin read + deactivate override).
+  getOrganizerOfficers(organizerId) {
+    return api.get(`${base}/organizers/${organizerId}/officers`)
   },
-  registerOrganizersCsv(data) {
-    return api.post(`${base}/organizers/import-register`, { data })
+  deactivateOrganizerOfficer(organizerId, officerId) {
+    return api.post(`${base}/organizers/${organizerId}/officers/${officerId}/deactivate`)
+  },
+  // Organizer invitation → application → approval flow.
+  listOrganizerInvitations(params = {}) {
+    return api.get(`${base}/organizer-invitations`, { params })
+  },
+  createOrganizerInvitation(data) {
+    return api.post(`${base}/organizer-invitations`, data)
+  },
+  revokeOrganizerInvitation(invitationId) {
+    return api.post(`${base}/organizer-invitations/${invitationId}/revoke`)
+  },
+  resendOrganizerInvitation(invitationId) {
+    return api.post(`${base}/organizer-invitations/${invitationId}/resend`)
+  },
+  listOrganizerApplications(params = {}) {
+    return api.get(`${base}/organizer-applications`, { params })
+  },
+  getOrganizerApplication(applicationId) {
+    return api.get(`${base}/organizer-applications/${applicationId}`)
+  },
+  approveOrganizerApplication(applicationId, data = {}) {
+    return api.post(`${base}/organizer-applications/${applicationId}/approve`, data)
+  },
+  declineOrganizerApplication(applicationId, reason) {
+    return api.post(`${base}/organizer-applications/${applicationId}/decline`, { reason })
   },
   getGlobalEvents() {
     return api.get(`${base}/events`)
@@ -40,6 +64,9 @@ export const adminService = {
   },
   updateSystemSetting(data) {
     return api.put(`${base}/settings`, data)
+  },
+  getPrograms() {
+    return api.get(`${base}/programs`)
   },
   getParticipantTaxonomy() {
     return api.get(`${base}/settings/taxonomy`)
@@ -82,6 +109,9 @@ export const adminService = {
   updateVoterStatus(userId, accountStatus) {
     return api.patch(`${base}/voters/${userId}/status`, { accountStatus })
   },
+  resendVoterCredentials(userId) {
+    return api.post(`${base}/voters/${userId}/resend-credentials`)
+  },
   removeVoterMembership(userId) {
     return api.delete(`${base}/voters/${userId}/membership`)
   },
@@ -104,6 +134,9 @@ export const adminService = {
   },
   updateJudgeStatus(userId, accountStatus) {
     return api.patch(`${base}/judges/${userId}/status`, { accountStatus })
+  },
+  resendJudgeCredentials(userId) {
+    return api.post(`${base}/judges/${userId}/resend-credentials`)
   },
   removeJudgeMembership(userId) {
     return api.delete(`${base}/judges/${userId}/membership`)
@@ -139,9 +172,6 @@ export const adminService = {
   },
   exportOrganizers() {
     return api.get(`${base}/export/organizers`, { responseType: 'blob' })
-  },
-  getOrganizerCsvTemplate() {
-    return api.get(`${base}/organizers/template`, { responseType: 'blob' })
   },
   getVoterCsvTemplate() {
     return api.get(`${base}/voters/template`, { responseType: 'blob' })
@@ -190,12 +220,4 @@ export const adminService = {
     return api.post(`${base}/policies/archival/run-now`)
   },
 
-  // Student management helpers (auto dual-type assignment)
-  addVoterMembership(userId) {
-    return api.post(`${base}/voters/${userId}/membership`)
-  },
-
-  addRespondentMembership(userId) {
-    return api.post(`${base}/respondents/${userId}/membership`)
-  },
 }

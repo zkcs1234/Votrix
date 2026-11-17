@@ -5,10 +5,10 @@ import { DB_TABLES, ORGANIZER_SCOPE_TYPES } from '../utils/constants.js'
 // Phase A of ORGANIZER_REGISTRATION_AND_SCOPING_PLAN.md.
 // Resolves an organizer's voter scope and provides the predicates/filters that
 // later phases use to bound the cohort picker, invite guard, enrolled lists,
-// analytics and dashboards (decision O9). Judges are NOT scoped here — they use
-// the admin-assigned mapping in the judge's profile_data (decision O7).
+// analytics and dashboards (decision O9). Judges are NOT scoped here — they are
+// a global pool and each organizer picks the judges for their own events.
 
-const ALL_ACCESS = { scopeType: ORGANIZER_SCOPE_TYPES.ALL, programs: [], sections: [] }
+const ALL_ACCESS = { scopeType: ORGANIZER_SCOPE_TYPES.ALL, programs: [] }
 
 function toList(value) {
   return Array.isArray(value) ? value.map((v) => String(v)).filter(Boolean) : []
@@ -23,7 +23,6 @@ export function normalizeScope(scope) {
   return {
     scopeType: ORGANIZER_SCOPE_TYPES.SCOPED,
     programs: toList(scope.programs),
-    sections: toList(scope.sections),
   }
 }
 
@@ -42,32 +41,30 @@ export async function getOrganizerScope(organizerId) {
   return normalizeScope(data?.scope)
 }
 
-// Does a given student (program / year_section) fall inside the scope?
-export function isStudentInScope(scope, { program, yearSection } = {}) {
+// Does a given student (by program) fall inside the scope? An empty program
+// list means the scope is not constrained by program.
+export function isStudentInScope(scope, { program } = {}) {
   const s = normalizeScope(scope)
   if (s.scopeType === ORGANIZER_SCOPE_TYPES.ALL) return true
   if (s.programs.length && !s.programs.includes(program)) return false
-  if (s.sections.length && !s.sections.includes(yearSection)) return false
   return true
 }
 
-// Are the given cohort values (of one dimension) all inside scope? Used by the
-// invite guard so an organizer cannot invite a program/section they don't own.
-export function areCohortValuesInScope(scope, cohortType, values) {
+// Are the given program values all inside scope? Used by the invite guard so an
+// organizer cannot invite a program they don't own.
+export function areCohortValuesInScope(scope, values) {
   const s = normalizeScope(scope)
   if (s.scopeType === ORGANIZER_SCOPE_TYPES.ALL) return true
-  const allowed = cohortType === 'program' ? s.programs : s.sections
-  // An empty allowed-list for that dimension means "not constrained on it".
-  if (!allowed.length) return true
-  return toList(values).every((v) => allowed.includes(v))
+  // An empty program list means "not constrained".
+  if (!s.programs.length) return true
+  return toList(values).every((v) => s.programs.includes(v))
 }
 
-// Filter the taxonomy-derived cohort lists down to what the organizer may see.
-export function filterCohortsForScope(scope, { programs = [], sections = [] } = {}) {
+// Filter the cohort list down to the programs the organizer may see.
+export function filterCohortsForScope(scope, { programs = [] } = {}) {
   const s = normalizeScope(scope)
-  if (s.scopeType === ORGANIZER_SCOPE_TYPES.ALL) return { programs, sections }
+  if (s.scopeType === ORGANIZER_SCOPE_TYPES.ALL) return { programs }
   return {
     programs: s.programs.length ? programs.filter((p) => s.programs.includes(p.value ?? p)) : programs,
-    sections: s.sections.length ? sections.filter((sec) => s.sections.includes(sec.value ?? sec)) : sections,
   }
 }

@@ -173,8 +173,13 @@ export const electionService = {
   },
 
   // Pull a published (scheduled) event back to draft so setup can be corrected.
-  unpublishEvent(eventId) {
-    return api.post(`${base}/events/${eventId}/unpublish`)
+  // `reason` is required by the server when pausing a live election.
+  unpublishEvent(eventId, reason) {
+    return api.post(`${base}/events/${eventId}/unpublish`, reason ? { reason } : undefined)
+  },
+
+  getEditPolicy(eventId) {
+    return api.get(`${base}/events/${eventId}/edit-policy`)
   },
 
   // Voter

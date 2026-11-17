@@ -8,6 +8,7 @@ import { pageantService } from '@/services/pageant.service'
 import Button from '@/components/ui/Button'
 import StageFooter from '@/components/ui/StageFooter'
 import ReadinessItem from '@/components/organizer/ReadinessItem'
+import PublishedEventEditPanel from '@/components/organizer/PublishedEventEditPanel'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { EVENT_STATUS } from '@/utils/constants'
@@ -18,7 +19,7 @@ import useCompetitionSync from '@/hooks/useCompetitionSync'
 // started later from Live Control. Versioned publication freezes the setup.
 export default function CompetitionReviewPage() {
   return (
-    <div data-module="competition-scoring" className="mx-auto max-w-5xl">
+    <div data-module="competition-scoring" className="mx-auto max-w-7xl">
       <NativeSetupBoundary Legacy={LegacyCompetitionReviewPage} />
     </div>
   )
@@ -162,6 +163,14 @@ function LegacyCompetitionReviewPage() {
           </div>
         </div>
       )}
+
+      <PublishedEventEditPanel
+        eventId={eventId}
+        event={event}
+        service={pageantService}
+        noun="competition"
+        onChanged={load}
+      />
 
       {isDraft && <label className="flex gap-2 v-card p-4"><input type="checkbox" checked={acknowledged} onChange={e=>setAcknowledged(e.target.checked)}/>I acknowledge the configured rules as the official competition rules. Publishing freezes this version.</label>}
       <StageFooter

@@ -26,7 +26,7 @@ export default function PollingRespondentsPage() {
   }, [eventId])
 
   return (
-    <div data-module="polling" className="mx-auto max-w-5xl space-y-6">
+    <div data-module="polling" className="mx-auto max-w-7xl space-y-6">
       <PageHeader
         title="Polling Respondents"
         description="Invite eligible respondents by program or year and section, and manage poll enrollment."

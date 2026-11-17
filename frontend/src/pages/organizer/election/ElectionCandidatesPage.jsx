@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useNavigate } from 'react-router-dom'
 import { electionService } from '@/services/election.service'
 import { SkeletonGrid } from '@/components/ui/Skeleton'
-import ImageUploadField from '@/components/upload/ImageUploadField'
+import CandidateForm from '@/components/organizer/election/CandidateForm'
 import FilterBar from '@/components/ui/FilterBar'
 import StageFooter from '@/components/ui/StageFooter'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -16,8 +16,6 @@ import useTableFilter from '@/hooks/useTableFilter'
 import { stagePath } from '@/utils/eventStages'
 import { firstIncompleteSectionId, groupHasCandidatesForEveryPosition } from '@/utils/electionGroupProgress'
 
-import { INPUT_CLASS } from '@/utils/uiClasses'
-const inputClass = INPUT_CLASS
 
 function CandidateCard({ candidate, positionName, onDelete, canDelete = true }) {
   const [deleting, setDeleting] = useState(false)
@@ -91,8 +89,6 @@ function CandidateFormSkeleton() {
   )
 }
 
-const EMPTY_FORM = { name: '', biography: '', platform: '', party: '' }
-
 function ElectionCandidatesPageContent() {
   const { eventId } = useParams()
   const navigate = useNavigate()
@@ -101,11 +97,8 @@ function ElectionCandidatesPageContent() {
   const [sectionId, setSectionId] = useState('')
   const [positions, setPositions] = useState([])
   const [candidates, setCandidates] = useState([])
-  const [positionId, setPositionId] = useState('')
   const [loading, setLoading] = useState(true)
   const requestRef = useRef(0)
-  const [form, setForm] = useState(EMPTY_FORM)
-  const [photoFile, setPhotoFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const { success: showSuccess, error: showError } = useToast()
   const { status, setupLocked } = useEventStatus(electionService, eventId)
@@ -179,10 +172,9 @@ function ElectionCandidatesPageContent() {
   }, [load])
 
   // Optimistic UI - add candidate immediately
-  const handleCreate = async (e) => {
-    e.preventDefault()
-    if (!positionId) return
-
+  // CandidateForm validates as the organizer types; this only performs the
+  // request. Resolves true on success so the form clears itself.
+  const handleCreate = async ({ positionId, ...form }, photoFile) => {
     setSaving(true)
 
     const tempId = `temp-${Date.now()}`
@@ -206,13 +198,12 @@ function ElectionCandidatesPageContent() {
       }
 
       load()
-
-      setForm(EMPTY_FORM)
-      setPhotoFile(null)
       showSuccess(`${form.name} added`)
+      return true
     } catch (err) {
       setCandidates((prev) => prev.filter((c) => c.id !== tempId))
       showError(err.response?.data?.message || 'Failed to create candidate')
+      return false
     } finally {
       setSaving(false)
     }
@@ -239,12 +230,10 @@ function ElectionCandidatesPageContent() {
   const handleGroupBack = () => {
     if (!previousSection) return
     setSectionId(previousSection.id)
-    setPositionId('')
   }
   const handleGroupNext = () => {
     if (nextSection) {
       setSectionId(nextSection.id)
-      setPositionId('')
       return
     }
     navigate(stagePath('election', 'voters', eventId))
@@ -267,7 +256,7 @@ function ElectionCandidatesPageContent() {
   return (
     <div data-module="election" className="mx-auto max-w-7xl pb-24">
     <div className="mb-4">
-      <ElectionGroupStepper sections={sections} currentId={sectionId} completedIds={completedSectionIds} onSelect={(id) => { setSectionId(id); setPositionId('') }} />
+      <ElectionGroupStepper sections={sections} currentId={sectionId} completedIds={completedSectionIds} onSelect={setSectionId} />
     </div>
     <ManagementWorkspace
       title="Candidate Management"
@@ -277,72 +266,12 @@ function ElectionCandidatesPageContent() {
         {setupLocked ? (
           <ReadOnlyEventBanner status={status} noun="election" />
         ) : (
-        <form onSubmit={handleCreate} className="space-y-4 v-card p-6 mb-4">
-        <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Position</label>
-          <select
-            className={inputClass}
-            value={positionId}
-            onChange={(e) => setPositionId(e.target.value)}
-            required
-          >
-            <option value="">Select position</option>
-            {positions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Name</label>
-          <input
-            className={inputClass}
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Party</label>
-          <input
-            className={inputClass}
-            placeholder="e.g. Independent"
-            value={form.party}
-            onChange={(e) => setForm({ ...form, party: e.target.value })}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Biography</label>
-          <textarea
-            className={inputClass}
-            rows={3}
-            value={form.biography}
-            onChange={(e) => setForm({ ...form, biography: e.target.value })}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Platform</label>
-          <textarea
-            className={inputClass}
-            rows={3}
-            value={form.platform}
-            onChange={(e) => setForm({ ...form, platform: e.target.value })}
-          />
-        </div>
-        <ImageUploadField
-          label="Candidate photo"
-          variant="photo"
-          onFileSelect={setPhotoFile}
+        <CandidateForm
+          positions={positions}
+          sectionId={sectionId}
+          saving={saving}
+          onCreate={handleCreate}
         />
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-xl bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-50"
-        >
-          {saving ? 'Adding...' : 'Add candidate'}
-        </button>
-      </form>
         )}
         </div>
       }

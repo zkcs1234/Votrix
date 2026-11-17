@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, CalendarDays, Settings, ClipboardList,
-  Vote, Trophy, BarChart2, BarChart3, MapPin
+  Vote, Trophy, BarChart2, BarChart3, MapPin, GraduationCap
 } from 'lucide-react'
 import { USER_ROLES } from '@/utils/constants'
 
@@ -16,13 +16,22 @@ export const searchIndex = [
     icon: LayoutDashboard,
   },
   {
-    id: 'admin-users',
-    title: 'User Management',
-    path: '/admin/users',
-    keywords: ['users', 'organizers', 'voters', 'accounts', 'create', 'register', 'management'],
+    id: 'admin-organizers',
+    title: 'Organizers',
+    path: '/admin/organizers',
+    keywords: ['organizers', 'organizer', 'accounts', 'invite', 'invitations', 'applications', 'create', 'register', 'management', 'users'],
     category: 'Administration',
     roles: [USER_ROLES.ADMIN],
     icon: Users,
+  },
+  {
+    id: 'admin-participants',
+    title: 'Participants',
+    path: '/admin/participants',
+    keywords: ['participants', 'students', 'voters', 'respondents', 'judges', 'accounts', 'create', 'register', 'import', 'management', 'users'],
+    category: 'Administration',
+    roles: [USER_ROLES.ADMIN],
+    icon: GraduationCap,
   },
   {
     id: 'admin-events',
@@ -61,6 +70,17 @@ export const searchIndex = [
     category: 'Pages',
     roles: [USER_ROLES.ORGANIZER],
     icon: LayoutDashboard,
+  },
+  {
+    id: 'org-account-manager',
+    title: 'Account Manager',
+    path: '/organizer/officers',
+    keywords: ['officers', 'student officers', 'members', 'access', 'assign', 'account manager', 'position'],
+    category: 'Pages',
+    roles: [USER_ROLES.ORGANIZER],
+    // Only the real organizer manages officers; hidden from officers acting as them.
+    ownerOnly: true,
+    icon: Users,
   },
   {
     id: 'org-election',

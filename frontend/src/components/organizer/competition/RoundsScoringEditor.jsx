@@ -112,16 +112,19 @@ function Criteria({value,patch,score,onPendingChange,hasPendingForm,draft,select
   const scope=scopes.find(s=>s.id===(selectedRound===undefined?roundId:selectedRound))??scopes[0]
   const own=value.criteria.filter(c=>c.roundId===scope?.id),total=own.reduce((sum,c)=>sum+(Number(c.percentage)||0),0),maximumPoints=own.reduce((sum,c)=>sum+(Number(c.maxScore)||0),0)
   const weightComplete=Math.abs(total-100)<=0.001,weightProgress=Math.min(100,Math.max(0,total))
-  const [criterion,setCriterion]=useState(null),[editing,setEditing]=useState(false),[error,setError]=useState(''),[validationAttempted,setValidationAttempted]=useState(false),[copying,setCopying]=useState(false),[minorPending,setMinorPending]=useState({})
+  const [criterion,setCriterion]=useState(null),[editing,setEditing]=useState(false),[error,setError]=useState(''),[validationAttempted,setValidationAttempted]=useState(false),[touched,setTouched]=useState({}),[copying,setCopying]=useState(false),[minorPending,setMinorPending]=useState({})
   const trackMinor=useCallback((key,pending)=>setMinorPending(current=>current[key]===pending?current:{...current,[key]:pending}),[])
   const open=!!criterion
   useEffect(()=>{onPendingChange('major',open);return()=>onPendingChange('major',false)},[onPendingChange,open])
-  const reset=()=>{setCriterion(null);setEditing(false);setError('');setValidationAttempted(false);setMinorPending({})}
-  const begin=c=>{setEditing(!!c);setCriterion(c?structuredClone(c):{id:uuid(),roundId:scope.id,name:'',percentage:points?undefined:'',minScore:1,maxScore:10,minorCriteria:[]});setError('');setValidationAttempted(false);setMinorPending({})}
-  const change=fields=>{setCriterion(current=>({...current,...fields}));setError('')}
+  const reset=()=>{setCriterion(null);setEditing(false);setError('');setValidationAttempted(false);setTouched({});setMinorPending({})}
+  const begin=c=>{setEditing(!!c);setCriterion(c?structuredClone(c):{id:uuid(),roundId:scope.id,name:'',percentage:points?undefined:'',minScore:1,maxScore:10,minorCriteria:[]});setError('');setValidationAttempted(false);setTouched({});setMinorPending({})}
+  // A field's problem shows as soon as that field has been edited (not only after Save).
+  const change=fields=>{setCriterion(current=>({...current,...fields}));setTouched(current=>({...current,...Object.fromEntries(Object.keys(fields).map(key=>[key,true]))}));setError('')}
+  const shown=(...keys)=>validationAttempted||keys.some(key=>touched[key])
   const duplicateName=!!criterion&&own.some(item=>item.id!==criterion.id&&item.name.trim().toLowerCase()===criterion.name.trim().toLowerCase())
-  const criterionNameInvalid=validationAttempted&&!!criterion&&(!criterion.name.trim()||duplicateName)
-  const criterionWeightInvalid=validationAttempted&&!!criterion&&!points&&(
+  const criterionNameInvalid=shown('name')&&!!criterion&&(!criterion.name.trim()||duplicateName)
+  const criterionNameMessage=!criterionNameInvalid?'':!criterion.name.trim()?'Criterion name is required.':'This name is already used in this round.'
+  const criterionWeightInvalid=shown('percentage')&&!!criterion&&!points&&(
     !Number.isFinite(Number(criterion.percentage))||Number(criterion.percentage)<=0||Number(criterion.percentage)>100||
     total-(own.find(item=>item.id===criterion.id)?.percentage??0)+Number(criterion.percentage)>100.001||
     (criterion.minorCriteria.length>0&&criterion.minorCriteria.some(item=>item.percentage!==undefined)&&(
@@ -130,8 +133,8 @@ function Criteria({value,patch,score,onPendingChange,hasPendingForm,draft,select
         (value.scoringConfig.minorWeightBasis==='overall'?Number(criterion.percentage):100))>0.001
     ))
   )
-  const criterionPointsInvalid=validationAttempted&&!!criterion&&points&&(!Number.isFinite(Number(criterion.maxScore))||Number(criterion.maxScore)<=0)
-  const criterionRangeInvalid=validationAttempted&&!!criterion&&(!Number.isFinite(criterion.minScore)||!Number.isFinite(criterion.maxScore)||criterion.maxScore<=0||criterion.maxScore<=criterion.minScore)
+  const criterionPointsInvalid=shown('maxScore')&&!!criterion&&points&&(!Number.isFinite(Number(criterion.maxScore))||Number(criterion.maxScore)<=0)
+  const criterionRangeInvalid=shown('minScore','maxScore')&&!!criterion&&(!Number.isFinite(criterion.minScore)||!Number.isFinite(criterion.maxScore)||criterion.maxScore<=0||criterion.maxScore<=criterion.minScore)
   const save=()=>{
     setValidationAttempted(true)
     const c=criterion,weight=Number(c.percentage)
@@ -186,8 +189,8 @@ function Criteria({value,patch,score,onPendingChange,hasPendingForm,draft,select
       {points&&<div className="rs-criteria-table-footer rs-points-table-footer"><strong>Total maximum points</strong><span>{Number(maximumPoints.toFixed(3))} pts</span><div className="rs-table-actions"><Button variant="primary" aria-label="Add Criterion" className="rs-add-criterion" onClick={()=>begin()}><Plus size={16}/>Add criterion</Button>{scopes.length>1&&<Button variant="secondary" onClick={()=>setCopying(true)}>Copy criteria from...</Button>}</div></div>}
     </div>}
     <Modal open={open} onClose={reset} id="criterion-dialog" title={editing?'Edit Criterion':'Add Criterion'} footer={<div className="rs-dialog-actions"><Button variant="secondary" onClick={reset}>Cancel</Button><Button disabled={Object.values(minorPending).some(Boolean)} onClick={save}>Save Criterion</Button></div>}>
-      {criterion&&<div className="rs-criteria-form rs-criterion-dialog"><div className="rs-criterion-basics"><Field label="Major criterion name" displayLabel={<span className="sr-only">Criterion Name</span>} placeholder="Criterion name, e.g. Execution & Technique" value={criterion.name} onChange={name=>change({name})} invalid={criterionNameInvalid} maxLength={200}/><div className="rs-criterion-weight">{points?<Field label="Maximum Points" displayLabel="Maximum Points" placeholder="10" type="number" min={0} step="any" value={criterion.maxScore} onChange={maxScore=>change({maxScore})} invalid={criterionPointsInvalid}/>:<><Field label="Major criterion weight (%)" displayLabel={<span className="sr-only">Weight (%)</span>} placeholder="30" type="number" min={0} max={100} step="any" value={criterion.percentage} onChange={percentage=>change({percentage})} invalid={criterionWeightInvalid}/><span aria-hidden="true">%</span></>}</div></div>
-      <MinorCriteria key={criterion.id} criterion={criterion} points={points} minorWeightBasis={value.scoringConfig.minorWeightBasis} showValidation={validationAttempted} scoreRangeInvalid={criterionRangeInvalid} onChange={change} onPendingChange={trackMinor}/>
+      {criterion&&<div className="rs-criteria-form rs-criterion-dialog"><div className="rs-criterion-basics"><Field label="Major criterion name" displayLabel={<span className="sr-only">Criterion Name</span>} placeholder="Criterion name, e.g. Execution & Technique" value={criterion.name} onChange={name=>change({name})} invalid={criterionNameInvalid} aria-describedby={criterionNameMessage?'criterion-name-message':undefined} maxLength={200}/>{criterionNameMessage&&<p id="criterion-name-message" className="v-error-text basis-full">{criterionNameMessage}</p>}<div className="rs-criterion-weight">{points?<Field label="Maximum Points" displayLabel="Maximum Points" placeholder="10" type="number" min={0} step="any" value={criterion.maxScore} onChange={maxScore=>change({maxScore})} invalid={criterionPointsInvalid}/>:<><Field label="Major criterion weight (%)" displayLabel={<span className="sr-only">Weight (%)</span>} placeholder="30" type="number" min={0} max={100} step="any" value={criterion.percentage} onChange={percentage=>change({percentage})} invalid={criterionWeightInvalid}/><span aria-hidden="true">%</span></>}</div></div>
+      <MinorCriteria key={criterion.id} criterion={criterion} points={points} minorWeightBasis={value.scoringConfig.minorWeightBasis} showValidation={shown('minorCriteria')} scoreRangeInvalid={criterionRangeInvalid} onChange={change} onPendingChange={trackMinor}/>
       {error&&<p role="alert" className="v-error-text">{error}</p>}</div>}
     </Modal>
     <Modal open={copying} onClose={()=>setCopying(false)} title="Copy Criteria From" footer={<Button variant="secondary" onClick={()=>setCopying(false)}>Cancel</Button>}><p className="v-helper-text mb-4">Copy criteria into {scope.name}. Each round keeps an independent copy.</p><Select label={`Copy criteria into ${scope.name}`} value="" onChange={id=>{if(!id)return;if(own.length&&!window.confirm('Replace this round’s draft criteria with independent copies? Saved data changes only when you save.'))return;patch({criteria:[...value.criteria.filter(c=>c.roundId!==scope.id),...value.criteria.filter(c=>c.roundId===id).map(c=>({...structuredClone(c),id:uuid(),roundId:scope.id,minorCriteria:(c.minorCriteria??[]).map(m=>({...m,id:uuid()}))}))]});setCopying(false)}}><option value="">Choose a round</option>{scopes.filter(s=>s.id!==scope.id).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</Select></Modal>

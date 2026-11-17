@@ -4,11 +4,13 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ArrowLeft, Activity, ChevronLeft, ChevronRight, Copy, Check, X } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
+import OrganizerOfficersCard from '@/components/admin/OrganizerOfficersCard'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
 import PageHeader from '@/components/ui/PageHeader'
+import ActingUserNote from '@/components/admin/ActingUserNote'
 
 const ACTION_TONES = {
   CREATE: 'success', INSERT: 'success',
@@ -191,6 +193,8 @@ export default function OrganizerDetailPage() {
         }
       />
 
+      <OrganizerOfficersCard organizerId={id} />
+
       <Card>
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
@@ -256,8 +260,9 @@ export default function OrganizerDetailPage() {
                       <td className="whitespace-nowrap font-mono text-xs text-v-text-muted">{formatDate(log.createdAt)}</td>
                       <td><Badge tone={actionTone(log.action)}>{log.action}</Badge></td>
                       <td className="capitalize text-v-text-muted">{log.entity ?? EMPTY_VALUE}</td>
-                      <td className="max-w-70 truncate text-xs text-v-text-muted">
-                        {formatActivitySummary(log)}
+                      <td className="max-w-70 text-xs text-v-text-muted">
+                        <p className="truncate">{formatActivitySummary(log)}</p>
+                        <ActingUserNote log={log} />
                       </td>
                       <td className="text-right">
                         <button onClick={() => setSelectedLog(log)} className="rounded-md px-2 py-1 text-xs font-medium text-v-primary hover:bg-v-surface-elevated" aria-label="View activity details">

@@ -45,7 +45,8 @@ export function downloadJson(filename, data) {
 
 export function downloadCsv(filename, rows) {
   if (!rows || !rows.length) return
-  const blob = new Blob([serializeCsv(rows)], { type: 'text/csv;charset=utf-8' })
+  // A leading byte-order mark makes Excel read accented names correctly.
+  const blob = new Blob(['﻿', serializeCsv(rows)], { type: 'text/csv;charset=utf-8' })
   downloadBlob(blob, filename)
 }
 

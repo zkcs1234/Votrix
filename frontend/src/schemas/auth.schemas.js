@@ -1,8 +1,21 @@
 import { z } from 'zod'
+import { EMAIL_RE, FORM_LIMITS } from '../../../shared/form-rules.js'
+
+// Same email rule the server applies (shared/form-rules.js), so the form and
+// the API never disagree about what a valid address is.
+const email = z
+  .string()
+  .trim()
+  .min(1, 'Email is required')
+  .regex(EMAIL_RE, 'Enter a valid email')
+
+const newPassword = z
+  .string()
+  .min(FORM_LIMITS.passwordMin, `Password must be at least ${FORM_LIMITS.passwordMin} characters`)
 
 // Unified login schema for admin, organizer, and voter
 export const loginSchema = z.object({
-  email: z.string().email('Enter a valid email'),
+  email,
   password: z.string().min(1, 'Password is required'),
   remember: z.boolean().optional(),
 })
@@ -10,7 +23,7 @@ export const loginSchema = z.object({
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, 'Current password is required'),
-    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+    newPassword,
     confirmPassword: z.string().min(1, 'Confirm your password'),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
@@ -19,16 +32,16 @@ export const changePasswordSchema = z
   })
 
 export const createOrganizerSchema = z.object({
-  email: z.string().email('Enter a valid email'),
+  email,
 })
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email('Enter a valid email'),
+  email,
 })
 
 export const resetPasswordSchema = z
   .object({
-    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+    newPassword,
     confirmPassword: z.string().min(1, 'Confirm your password'),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {

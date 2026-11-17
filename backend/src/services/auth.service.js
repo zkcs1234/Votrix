@@ -1,7 +1,9 @@
 import { ApiError } from '../utils/ApiError.js'
 import { comparePassword } from '../utils/password.js'
-import { USER_ROLES, DB_TABLES } from '../utils/constants.js'
+import { USER_ROLES, DB_TABLES, isParticipantRole } from '../utils/constants.js'
 import { db } from '../foundation/db.js'
+import { resolveOfficerContext, toOfficershipDto } from './organization-officer.service.js'
+import { assertPlatformAvailableFor } from './platform-settings.service.js'
 import {
   findUserByEmail,
   findUserById,
@@ -60,6 +62,9 @@ export async function login({ email, password }) {
   }
 
   assertAccountActive(user)
+  // Maintenance mode: only administrators may sign in (checked after the
+  // credentials, so a wrong password still reads as a wrong password).
+  await assertPlatformAvailableFor(user.role)
 
   const sessionId = await createSession(user)
   return issueTokenPair(user, { sessionId })
@@ -79,6 +84,7 @@ export async function refreshSession(userId, tokenVersion, { sessionId = null } 
   }
 
   assertAccountActive(user)
+  await assertPlatformAvailableFor(user.role)
 
   let sid = sessionId
   if (sid) {
@@ -111,12 +117,65 @@ export async function revokeSession(userId) {
   return incrementTokenVersion(userId)
 }
 
+/**
+ * Adds `officership` to a participant's user payload: the organization they
+ * currently act for as a student officer, or null. This only drives what the UI
+ * offers (a link into the organizer workspace); the backend re-checks the
+ * officership on every organizer request, so a failure here just hides the link.
+ */
+export async function attachOfficership(userDto) {
+  if (!userDto || !isParticipantRole(userDto.role)) return userDto
+  try {
+    const context = await resolveOfficerContext(userDto.id)
+    const usable = context && context.owner?.account_status === 'active'
+    return { ...userDto, officership: usable ? toOfficershipDto(context) : null }
+  } catch (err) {
+    console.warn('[auth] could not resolve officership:', err.message)
+    return { ...userDto, officership: null }
+  }
+}
+
+/**
+ * The participant's active account types (STUDENT or JUDGE; an account is one or
+ * the other). Used only to label the UI (role chip, empty states); no
+ * authorization decision reads it, access stays per-event enrollment. A failed
+ * lookup returns [] so sign-in never breaks.
+ */
+export async function listParticipantTypes(userId) {
+  try {
+    const { data, error } = await db()
+      .from(DB_TABLES.USER_PARTICIPANT_TYPES)
+      .select('participant_type')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+    if (error) throw new Error(error.message)
+    return [...new Set((data ?? []).map((row) => row.participant_type))].sort()
+  } catch (err) {
+    console.warn('[auth] could not resolve participant types:', err.message)
+    return []
+  }
+}
+
+/**
+ * Everything the participant UI needs on top of the base user payload: the
+ * officership (see attachOfficership) and the account's participant types.
+ * Other roles are returned unchanged.
+ */
+export async function attachParticipantContext(userDto) {
+  if (!userDto || !isParticipantRole(userDto.role)) return userDto
+  const [withOfficership, participantTypes] = await Promise.all([
+    attachOfficership(userDto),
+    listParticipantTypes(userDto.id),
+  ])
+  return { ...withOfficership, participantTypes }
+}
+
 export async function getCurrentUser(userId) {
   const user = await findUserById(userId)
   if (!user) {
     throw new ApiError(404, 'User not found')
   }
-  return sanitizeUser(user)
+  return attachParticipantContext(sanitizeUser(user))
 }
 
 export async function changePassword(userId, { currentPassword, newPassword }) {

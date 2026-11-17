@@ -7,6 +7,7 @@ import { configureCloudinary } from './config/cloudinary.js'
 import { getSupabase } from './config/database.js'
 import { globalLimiter } from './middleware/rateLimiter.js'
 import { csrfProtection } from './middleware/csrf.js'
+import { maintenanceGuard } from './middleware/maintenance.js'
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js'
 import { assertProductionSecurity } from './config/security.js'
 import { isTrustedOrigin } from './config/trusted-origins.js'
@@ -77,6 +78,8 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }))
   app.use(express.urlencoded({ extended: true }))
   app.use('/api', csrfProtection)
+  // Maintenance mode: only administrators get past this (see middleware/maintenance.js).
+  app.use('/api', maintenanceGuard)
 
   configureCloudinary()
   getSupabase()

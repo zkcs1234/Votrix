@@ -12,6 +12,7 @@ import Button from '@/components/ui/Button'
 import StatCard from '@/components/ui/StatCard'
 import SearchInput from '@/components/ui/SearchInput'
 import PageHeader from '@/components/ui/PageHeader'
+import ActingUserNote from '@/components/admin/ActingUserNote'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 
 // ─── Action colour coding ────────────────────────────────────────────────────
@@ -908,6 +909,7 @@ export default function AuditLogsPage() {
                             <p className="v-caption capitalize">
                               {log.actor?.role ?? 'system'}
                             </p>
+                            <ActingUserNote log={log} />
                           </div>
                         </td>
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { useCsrfBootstrap } from '@/hooks/useCsrfBootstrap'
+import { usePlatformSync } from '@/hooks/usePlatformSync'
 import { useAuthStore } from '@/store/auth.store'
 import ToastContainer from '@/components/ui/ToastContainer'
 import { connect, disconnect } from '@/services/socket.service'
@@ -8,6 +9,7 @@ import { connect, disconnect } from '@/services/socket.service'
 export default function Bootstrap({ children }) {
   useCsrfBootstrap()
   useAuthBootstrap()
+  usePlatformSync()
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const identity = useAuthStore((s) => s.user?.id)

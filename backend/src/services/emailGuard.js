@@ -1,6 +1,7 @@
 import { env } from '../config/env.js'
 import { db } from '../foundation/db.js'
 import { recordEmailAudit, getEmailUsageCounts } from './emailAudit.service.js'
+import { getPlatformSettings } from './platform-settings.service.js'
 
 const dailyUsage = new Map()
 const monthlyUsage = new Map()
@@ -32,6 +33,17 @@ function pruneExpiredEntries() {
       dedupeCache.delete(key)
     }
   }
+}
+
+/**
+ * Quota settings with the admin's "daily email limit" (System settings) applied.
+ * It wins over the RESEND_DAILY_LIMIT env value, which is only the fallback while
+ * no admin value is saved. Read fresh so a new limit applies to the very next send.
+ */
+export async function resolveEmailQuotaSettings() {
+  const settings = getEmailQuotaSettings()
+  const { emailDailyLimit } = await getPlatformSettings({ force: true })
+  return emailDailyLimit ? { ...settings, dailyLimit: emailDailyLimit } : settings
 }
 
 export function getEmailQuotaSettings() {
@@ -118,7 +130,7 @@ export async function checkAndRecordEmailSend({
   template,
   dedupeKey,
 }) {
-  const settings = getEmailQuotaSettings()
+  const settings = await resolveEmailQuotaSettings()
   pruneExpiredEntries()
 
   const normalizedKey = dedupeKey || buildEmailDedupeKey({ to, subject, workflow, eventId, userId, template })

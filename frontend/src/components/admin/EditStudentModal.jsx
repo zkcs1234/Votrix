@@ -1,182 +1,144 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import FormAlert from '@/components/ui/FormAlert'
+import FormField from '@/components/ui/FormField'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
-import { getErrorMessage } from '@/utils/getErrorMessage'
+import { useLiveForm } from '@/hooks/useLiveForm'
+import { buildEditStudentSchema, STUDENT_SERVER_FIELDS } from '@/schemas/people.schemas'
 
 export default function EditStudentModal({ student, onClose, onSaved }) {
-  const [form, setForm] = useState({
-    firstName: student.firstName || '',
-    lastName: student.lastName || '',
-    schoolId: student.schoolId || '',
-    program: student.program || '',
-    yearSection: student.yearSection || '',
-  })
-  const [taxonomy, setTaxonomy] = useState({ programs: [], sections: [] })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
+  const [programs, setPrograms] = useState([])
   const { success, error: toastError } = useToast()
 
   useEffect(() => {
-    adminService.getParticipantTaxonomy()
-      .then(({ data }) => {
-        setTaxonomy({
-          programs: data.taxonomy?.programs || [],
-          sections: data.taxonomy?.sections || [],
-        })
-      })
+    adminService.getPrograms()
+      .then(({ data }) => setPrograms(data.programs || []))
       .catch(() => {})
   }, [])
 
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+  const schema = useMemo(() => buildEditStudentSchema(programs), [programs])
+  const {
+    register,
+    handleSubmit,
+    trigger,
+    getValues,
+    formState: { errors, isSubmitting },
+    formError,
+    clearFormError,
+    handleServerError,
+    blockedReason,
+    canSubmit,
+  } = useLiveForm({
+    schema,
+    defaultValues: {
+      firstName: student.firstName || '',
+      lastName: student.lastName || '',
+      schoolId: student.schoolId || '',
+      program: student.program || '',
+    },
+    serverFieldMap: STUDENT_SERVER_FIELDS,
+  })
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
+  // A student's saved program may have been retired from the list since. The
+  // server rejects it, so flag it as soon as the list loads instead of on save.
+  useEffect(() => {
+    if (programs.length && getValues('program')) trigger('program')
+  }, [programs, getValues, trigger])
 
+  const onSubmit = async (values) => {
+    clearFormError()
     try {
       // Update both voter and respondent records if they exist
       const promises = []
-      
+
       if (student.hasVoterType) {
-        promises.push(adminService.updateVoter(student.id, form))
+        promises.push(adminService.updateVoter(student.id, values))
       }
       if (student.hasRespondentType) {
-        promises.push(adminService.updateRespondent(student.id, form))
+        promises.push(adminService.updateRespondent(student.id, values))
       }
 
       await Promise.all(promises)
-      
+
       success('Student information updated')
       onSaved()
-      
     } catch (err) {
-      const details = err.response?.data?.details?.errors
-      const message = details?.length ? details.join('; ') : getErrorMessage(err, 'Failed to update student')
-      setError(message)
-      toastError(message)
-    } finally {
-      setSaving(false)
+      const message = handleServerError(err, 'Failed to update student')
+      if (message) toastError(message)
     }
   }
 
+  const noPrograms = programs.length === 0
+
   return (
     <Modal open onClose={onClose} title="Edit Student Information" size="md">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <fieldset className="space-y-3">
           <legend className="v-section-title">Account Details</legend>
-          
-          <div>
-            <label className="v-label">Email</label>
-            <input
-              type="email"
-              value={student.email}
-              className={INPUT_CLASS}
-              disabled
-            />
-            <p className="v-caption mt-1">Email cannot be changed here.</p>
-          </div>
+
+          <FormField label="Email" hint="Email cannot be changed here.">
+            {(field) => (
+              <input type="email" {...field} className={INPUT_CLASS} value={student.email} disabled readOnly />
+            )}
+          </FormField>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="edit-student-first" className="v-label">First Name *</label>
-              <input
-                id="edit-student-first"
-                type="text"
-                value={form.firstName}
-                onChange={set('firstName')}
-                className={INPUT_CLASS}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="edit-student-last" className="v-label">Last Name *</label>
-              <input
-                id="edit-student-last"
-                type="text"
-                value={form.lastName}
-                onChange={set('lastName')}
-                className={INPUT_CLASS}
-                required
-              />
-            </div>
+            <FormField label="First Name" required error={errors.firstName?.message}>
+              {(field) => <input type="text" autoComplete="off" {...field} {...register('firstName')} />}
+            </FormField>
+            <FormField label="Last Name" required error={errors.lastName?.message}>
+              {(field) => <input type="text" autoComplete="off" {...field} {...register('lastName')} />}
+            </FormField>
           </div>
         </fieldset>
 
         <fieldset className="space-y-3 border-t border-v-border pt-4">
           <legend className="v-section-title">Student Information</legend>
-          
-          <div>
-            <label htmlFor="edit-student-id" className="v-label">School ID *</label>
-            <input
-              id="edit-student-id"
-              type="text"
-              value={form.schoolId}
-              onChange={set('schoolId')}
-              className={INPUT_CLASS}
-              required
-              placeholder="2024-12345"
-            />
-          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="edit-student-program" className="v-label">Program *</label>
-              <select
-                id="edit-student-program"
-                value={form.program}
-                onChange={set('program')}
-                className={INPUT_CLASS}
-                required
-              >
+          <FormField label="School ID" required error={errors.schoolId?.message}>
+            {(field) => (
+              <input type="text" placeholder="2024-12345" autoComplete="off" {...field} {...register('schoolId')} />
+            )}
+          </FormField>
+
+          <FormField label="Program" required error={errors.program?.message}>
+            {(field) => (
+              <select {...field} {...register('program')}>
                 <option value="">Select program</option>
-                {taxonomy.programs.map(p => (
+                {/* Keep a student's current program visible even if it was later retired from the list. */}
+                {student.program && !programs.includes(student.program) && (
+                  <option value={student.program}>{student.program}</option>
+                )}
+                {programs.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label htmlFor="edit-student-section" className="v-label">Year & Section *</label>
-              <select
-                id="edit-student-section"
-                value={form.yearSection}
-                onChange={set('yearSection')}
-                className={INPUT_CLASS}
-                required
-              >
-                <option value="">Select year & section</option>
-                {taxonomy.sections.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+            )}
+          </FormField>
         </fieldset>
 
-        {(taxonomy.programs.length === 0 || taxonomy.sections.length === 0) && (
+        {noPrograms && (
           <FormAlert variant="warning">
-            Define Programs and Year & Sections in System Settings.{' '}
-            <Link to="/admin/settings" onClick={onClose} className="font-medium text-v-primary hover:underline">
-              Open System Settings
-            </Link>
+            No programs are available yet.
           </FormAlert>
         )}
 
-        {error && <FormAlert variant="error">{error}</FormAlert>}
+        {formError && <FormAlert variant="error">{formError}</FormAlert>}
 
-        <div className="flex justify-end gap-2 border-t border-v-border pt-4">
+        <div className="flex items-center justify-end gap-3 border-t border-v-border pt-4">
+          {blockedReason && !noPrograms && (
+            <p className="v-caption mr-auto" role="status">{blockedReason}</p>
+          )}
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button 
-            type="submit" 
-            loading={saving}
-            disabled={!taxonomy.programs.length || !taxonomy.sections.length}
+          <Button
+            type="submit"
+            loading={isSubmitting}
+            disabled={noPrograms || !canSubmit}
           >
             Save Changes
           </Button>

@@ -8,6 +8,7 @@ import { badRequest, notFound } from '../foundation/errors.js'
 import { recordAudit, listAuditTrail } from '../foundation/audit.js'
 import { mapAuditLog } from '../foundation/mapper.js'
 import { DB_TABLES, USER_ROLES, ACCOUNT_STATUS } from '../utils/constants.js'
+import { invalidatePlatformSettings, isPlatformSettingKey } from './platform-settings.service.js'
 
 export async function getOrganizersList() {
   const usersQuery = db()
@@ -44,6 +45,7 @@ export async function getOrganizersList() {
       position: orgUser.position || '',
       organization_type_display: orgUser.organization_type_display || '',
       organization_logo: orgUser.organization_logo ?? null,
+      scope: orgUser.scope ?? null,
       profile_complete: profileComplete,
       created_at: orgUser.created_at,
       updated_at: orgUser.updated_at,
@@ -102,16 +104,19 @@ export async function getGlobalEvents() {
     .select(`
       id,
       title,
+      description,
       event_type,
       status,
       start_date,
       end_date,
       created_at,
+      updated_at,
       organization_id,
       organizations (
         organization_name,
         organizer:users (
           id,
+          email,
           organization_name,
           organizer_name
         )
@@ -160,7 +165,10 @@ export async function saveSystemSetting(key, value, description = null) {
     )
     .select()
     .single()
-  return wrap(result, { context: 'admin.saveSystemSetting' })
+  const saved = wrap(result, { context: 'admin.saveSystemSetting' })
+  // A changed platform name / maintenance flag / organizer limit must apply at once.
+  if (isPlatformSettingKey(key)) invalidatePlatformSettings()
+  return saved
 }
 
 /**

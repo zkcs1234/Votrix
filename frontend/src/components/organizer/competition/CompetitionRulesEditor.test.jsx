@@ -277,3 +277,16 @@ it('local recovery detects a changed server baseline and cannot silently save st
   fireEvent.click(screen.getByRole('button', { name: 'Save Draft', exact: true }))
   expect(pageantService.setScoringConfig).not.toHaveBeenCalled()
 })
+it('flags an invalid precision as soon as it is edited, before Save & Review, and clears it when fixed', () => {
+  render(<Fixture />); settings()
+  const field = screen.getByLabelText('Decimal places for calculated scores')
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument() // untouched settings do not nag
+
+  fireEvent.change(field, { target: { value: '' } })
+  expect(screen.getByRole('alert')).toHaveTextContent('Choose 0–6 decimal places.')
+  expect(field).toHaveAttribute('aria-invalid', 'true')
+
+  fireEvent.change(field, { target: { value: '3' } })
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(field).not.toHaveAttribute('aria-invalid', 'true')
+})

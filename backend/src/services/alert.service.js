@@ -4,6 +4,7 @@ import { db } from '../foundation/db.js'
 import { DB_TABLES } from '../utils/constants.js'
 import { ApiError } from '../utils/ApiError.js'
 import { createAdminAlert } from './notification.service.js'
+import { FORM_LIMITS } from '../../../shared/form-rules.js'
 
 const ALERT_CONFIG_KEY = 'admin_alert_config'
 const ALERT_WINDOW_MINUTES = 15
@@ -15,8 +16,8 @@ export const DEFAULT_ALERT_CONFIG = {
 }
 
 function validateThreshold(value, label) {
-  if (!Number.isInteger(value) || value < 1 || value > 100000) {
-    throw new ApiError(400, `${label} must be an integer between 1 and 100000`)
+  if (!Number.isInteger(value) || value < 1 || value > FORM_LIMITS.alertThresholdMax) {
+    throw new ApiError(400, `${label} must be an integer between 1 and ${FORM_LIMITS.alertThresholdMax}`)
   }
   return value
 }

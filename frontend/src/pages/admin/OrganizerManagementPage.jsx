@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Users, UserCheck, ShieldOff, UserPlus, Upload, Download } from 'lucide-react'
+import { Users, UserCheck, Archive, Download } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import CreateOrganizerModal from '@/components/admin/CreateOrganizerModal'
 import AccountStatusConfirmModal from '@/components/admin/AccountStatusConfirmModal'
+import AccountActionsMenu from '@/components/admin/AccountActionsMenu'
+import ViewOrganizerDetailsModal from '@/components/admin/ViewOrganizerDetailsModal'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
-import Modal from '@/components/ui/Modal'
 import FormAlert from '@/components/ui/FormAlert'
 import Badge from '@/components/ui/Badge'
 import SearchInput from '@/components/ui/SearchInput'
@@ -15,9 +16,7 @@ import StatCard from '@/components/ui/StatCard'
 import PageHeader from '@/components/ui/PageHeader'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
-import { getErrorMessage } from '@/utils/getErrorMessage'
-import { downloadBlob, downloadCsv } from '@/utils/csvDownload'
-import CsvImportResults from '@/components/admin/CsvImportResults'
+import { downloadBlob } from '@/utils/csvDownload'
 
 const STATUS_CONFIG = {
   active: { tone: 'success', label: 'Active' },
@@ -119,54 +118,15 @@ export default function OrganizerManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingOrg, setEditingOrg] = useState(null)
   const [statusTarget, setStatusTarget] = useState(null)
+  const [viewOrg, setViewOrg] = useState(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
   const [savingKey, setSavingKey] = useState(null)
   const showLoader = useDelayedLoading(loading, 300)
   const { success: toastSuccess, error: toastError } = useToast()
   const [exporting, setExporting] = useState(false)
-  const [csvPreview, setCsvPreview] = useState(null)
-  const [registeringCsv, setRegisteringCsv] = useState(false)
-  const fileRef = useRef(null)
 
   const closeModal = () => { setIsModalOpen(false); setEditingOrg(null) }
-
-  const downloadTemplate = async () => {
-    try {
-      const { data } = await adminService.getOrganizerCsvTemplate()
-      downloadBlob('organizer-template.csv', data)
-    } catch (err) {
-      toastError(getErrorMessage(err, 'Could not download the organizer template'))
-    }
-  }
-
-  const handleCsvFile = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    try {
-      const { data } = await adminService.previewOrganizersCsv(file)
-      setCsvPreview(data)
-    } catch (err) {
-      const details = err.response?.data?.details?.errors
-      toastError(details?.length ? details.join('; ') : getErrorMessage(err, 'Preview failed'))
-    }
-    e.target.value = ''
-  }
-
-  const handleRegisterCsv = async () => {
-    if (!csvPreview?.data?.length) return
-    setRegisteringCsv(true)
-    try {
-      const { data } = await adminService.registerOrganizersCsv(csvPreview.data)
-      toastSuccess(`Registered ${data.succeeded} of ${data.total}${data.failed ? ` (${data.failed} failed)` : ''}`)
-      setCsvPreview((current) => current ? { ...current, importResult: data } : current)
-      await fetchOrganizers()
-    } catch (err) {
-      toastError(getErrorMessage(err, 'Registration failed'))
-    } finally {
-      setRegisteringCsv(false)
-    }
-  }
 
   const handleExport = async () => {
     setExporting(true)
@@ -201,8 +161,8 @@ export default function OrganizerManagementPage() {
   const summary = useMemo(() => {
     const total = organizers.length
     const active = organizers.filter((org) => org.account_status === 'active').length
-    const suspended = organizers.filter((org) => org.account_status === 'suspended').length
-    return { total, active, suspended }
+    const archived = organizers.filter((org) => org.account_status === 'archived').length
+    return { total, active, archived }
   }, [organizers])
 
   const filteredOrganizers = useMemo(() => {
@@ -273,25 +233,12 @@ export default function OrganizerManagementPage() {
     <div className="space-y-6">
       <PageHeader
         title="Organizer management"
-        description="Review organizer accounts, track onboarding, and suspend or restore access when needed."
+        description="Review organizer accounts, and archive or restore access when needed."
         actions={
           <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={downloadTemplate}>
-            <Download className="h-4 w-4" strokeWidth={1.5} />
-            Template
-          </Button>
           <Button variant="secondary" onClick={handleExport} loading={exporting}>
             <Download className="h-4 w-4" strokeWidth={1.5} />
             Export CSV
-          </Button>
-          <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-            <Upload className="h-4 w-4" strokeWidth={1.5} />
-            Review CSV import
-          </Button>
-          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleCsvFile} />
-          <Button onClick={() => { setEditingOrg(null); setIsModalOpen(true) }}>
-            <UserPlus className="h-4 w-4" strokeWidth={2} />
-            Add organizer
           </Button>
           </div>
         }
@@ -300,7 +247,7 @@ export default function OrganizerManagementPage() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard label="Total organizers" value={summary.total} icon={Users} />
         <StatCard label="Active" value={summary.active} icon={UserCheck} />
-        <StatCard label="Suspended" value={summary.suspended} icon={ShieldOff} />
+        <StatCard label="Archived" value={summary.archived} icon={Archive} />
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -312,7 +259,7 @@ export default function OrganizerManagementPage() {
         />
 
         <div className="flex flex-wrap gap-2">
-          {['all', 'active', 'suspended', 'archived'].map((status) => (
+          {['all', 'active', 'archived'].map((status) => (
             <Button
               key={status}
               type="button"
@@ -352,13 +299,8 @@ export default function OrganizerManagementPage() {
               <tbody className="divide-y divide-v-border">
                 {filteredOrganizers.map((org) => {
                   const status = org.account_status || 'active'
-                  const isBusy = savingKey?.startsWith(org.id)
-                  const nextPrimaryAction =
-                    status === 'active'
-                      ? { label: 'Suspend', next: 'suspended', variant: 'danger' }
-                      : status === 'suspended'
-                        ? { label: 'Reinstate', next: 'active', variant: 'secondary' }
-                        : { label: 'Restore', next: 'active', variant: 'secondary' }
+                  // savingKey is "<id>:<status being saved>"; pass the status for this row only.
+                  const busyStatus = savingKey?.startsWith(org.id) ? savingKey.split(':')[1] : null
 
                   return (
                     <tr key={org.id} className="hover:bg-v-surface-elevated/50 cursor-pointer" onClick={() => navigate(`/admin/organizers/${org.id}`)}>
@@ -386,50 +328,21 @@ export default function OrganizerManagementPage() {
                       <td className="v-caption">
                         {format(new Date(org.created_at), 'MMM d, yyyy')}
                       </td>
-                      <td className="text-right">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => { e.stopPropagation(); setEditingOrg(org); setIsModalOpen(true) }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={nextPrimaryAction.variant}
-                            loading={isBusy && savingKey.endsWith(nextPrimaryAction.next)}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setStatusTarget({
-                                id: org.id,
-                                accountStatus: nextPrimaryAction.next,
-                                label: nextPrimaryAction.label,
-                                name: org.organizer_name || org.organization_name,
-                                email: org.email,
-                              })
-                            }}
-                          >
-                            {nextPrimaryAction.label}
-                          </Button>
-
-                          {status !== 'archived' && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              loading={isBusy && savingKey.endsWith('archived')}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setStatusTarget({ id: org.id, accountStatus: 'archived', label: 'Archive', name: org.organizer_name || org.organization_name, email: org.email })
-                              }}
-                            >
-                              Archive
-                            </Button>
-                          )}
-                        </div>
+                      <td>
+                        <AccountActionsMenu
+                          status={status}
+                          busyStatus={busyStatus}
+                          onEdit={() => { setEditingOrg(org); setIsModalOpen(true) }}
+                          onView={() => setViewOrg(org)}
+                          onStatusChange={(change) =>
+                            setStatusTarget({
+                              ...change,
+                              id: org.id,
+                              name: org.organizer_name || org.organization_name,
+                              email: org.email,
+                            })
+                          }
+                        />
                       </td>
                     </tr>
                   )
@@ -447,6 +360,8 @@ export default function OrganizerManagementPage() {
         onSuccess={fetchOrganizers}
       />
 
+      {viewOrg && <ViewOrganizerDetailsModal organizer={viewOrg} onClose={() => setViewOrg(null)} />}
+
       <AccountStatusConfirmModal
         target={statusTarget}
         accountType="Organizer"
@@ -454,63 +369,6 @@ export default function OrganizerManagementPage() {
         onConfirm={() => handleStatusChange(statusTarget.id, statusTarget.accountStatus)}
         loading={Boolean(savingKey)}
       />
-
-      {csvPreview && (
-        <Modal open onClose={() => setCsvPreview(null)} title={csvPreview.importResult ? 'Organizer import results' : 'Review & Register organizers'} size="lg">
-          {csvPreview.importResult ? (
-            <CsvImportResults
-              result={csvPreview.importResult}
-              filename="organizer-import-results.csv"
-              onDone={() => setCsvPreview(null)}
-            />
-          ) : (
-            <>
-          {csvPreview.errors?.length > 0 && (
-            <div className="mb-4 rounded-lg border border-v-danger/30 bg-v-danger/10 p-3">
-              <p className="v-error-text mb-2 font-semibold">{csvPreview.errors.length} row error(s) — these will be skipped</p>
-              <ul className="v-error-text list-inside list-disc text-sm">
-                {csvPreview.errors.slice(0, 6).map((err, i) => <li key={i}>{err}</li>)}
-                {csvPreview.errors.length > 6 && <li>…and {csvPreview.errors.length - 6} more</li>}
-              </ul>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="mt-3"
-                onClick={() => downloadCsv('organizer-import-errors.csv', ['Issue'], csvPreview.errors.map((issue) => [issue]))}
-              >
-                <Download className="h-4 w-4" strokeWidth={1.5} /> Download errors
-              </Button>
-            </div>
-          )}
-          <p className="v-label mb-3">{csvPreview.valid} of {csvPreview.total} rows ready. Invalid rows will not be registered.</p>
-          <div className="v-table-wrap mb-4 max-h-80 overflow-auto">
-            <table className="v-table">
-              <thead>
-                <tr><th>Email</th><th>Name</th><th>Organization</th><th>Scope</th></tr>
-              </thead>
-              <tbody>
-                {(csvPreview.data ?? []).map((row, i) => (
-                  <tr key={i}>
-                    <td>{row.email}</td>
-                    <td>{row.organizerName}</td>
-                    <td>{row.organizationName}</td>
-                    <td>{row.scope?.scopeType === 'scoped' ? (row.scope.programs || []).join(', ') || 'scoped' : 'All access'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex justify-end gap-2 border-t border-v-border pt-4">
-            <Button type="button" variant="secondary" onClick={() => setCsvPreview(null)}>Cancel</Button>
-            <Button type="button" onClick={handleRegisterCsv} loading={registeringCsv} disabled={!csvPreview.data?.length}>
-              Register {csvPreview.data?.length ?? 0}
-            </Button>
-          </div>
-            </>
-          )}
-        </Modal>
-      )}
     </div>
   )
 }

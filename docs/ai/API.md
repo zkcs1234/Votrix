@@ -40,6 +40,8 @@
 | `scoreLimiters.ip/user` | Score submission | Very strict |
 | `pollLimiters.ip/user` | Poll submission | Very strict |
 | `adminActionLimiter` | Admin write actions | Moderate |
+| `organizerApplyLimiter` | `POST /public/organizer-apply/:token` (unauthenticated, accepts files) | Strict, per IP (`RATE_LIMIT_ORGANIZER_APPLY_MAX`, default 10/hour) |
+| `officerActionLimiter` | Assign / edit / (de)activate student officers | Moderate, per owner (`RATE_LIMIT_OFFICER_ACTION_MAX`, default 60/hour) |
 
 ---
 
@@ -110,7 +112,7 @@
 
 ### `GET /api/auth/me`
 **Auth:** Required (any role)  
-**Response:** `{ success, user }`
+**Response:** `{ success, user }`. For participants, `user` also carries `officership` (see Student Officers) and `participantTypes` (`['STUDENT']` or `['JUDGE']`, active memberships only). `participantTypes` only labels the UI; no authorization decision reads it. Login, refresh and change-password responses carry the same fields.
 
 ---
 
@@ -185,6 +187,61 @@ Resend invitation email to voter.
 
 ### `POST /api/organizer/events/:eventId/notify`
 Send event notification email to all voters.
+
+---
+
+## Platform settings — `/api/public/platform` and `/api/admin/settings`
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/api/public/platform` | Public (`publicApiLimiter`, `Cache-Control: no-store`). `{ success, platformName, maintenanceMode }` only; never the organizer limit. Reachable during maintenance. |
+| GET | `/api/admin/settings` | Admin. `{ success, settings: [rows], effective: { maintenanceMode, maxOrganizers, emailDailyLimit, invitationExpiryDays } }`. `effective` is what is in force now, including the environment fallback for a value nobody has saved (e.g. the email limit). |
+| PUT | `/api/admin/settings` | Admin. Body `{ key, value, description? }`. `maintenance_mode`: boolean. `max_organizers`: integer 1–100000. `email_daily_limit`: integer 1–10000. `invitation_expiry_days`: integer 1–30. `platform_name` is fixed and always refused with `400`. Takes effect immediately. |
+
+New error codes: **`503 MAINTENANCE_MODE`** (any non-admin request, and non-admin sign-in, while maintenance mode is on) and **`409 ORGANIZER_LIMIT_REACHED`** (`details: { limit, current }`) when creating or inviting an organizer at the limit.
+
+---
+
+## Organizer Invitations & Applications — `/api/admin/…` and `/api/public/…`
+
+Admin (all require an admin session; writes use `adminActionLimiter`, sends also `emailLimiter`):
+
+| Method | Path | Body / query | Response |
+|--------|------|--------------|----------|
+| GET | `/api/admin/organizer-invitations` | `?status=pending\|expired\|used\|revoked&limit&offset` | `{ invitations, total }` (never includes the token or its hash) |
+| POST | `/api/admin/organizer-invitations` | `{ email, expiresInDays?, note? }` | `201 { invitation, email, applyUrl }` — `applyUrl` is returned **once** so it can be shared by hand if the email failed |
+| POST | `/api/admin/organizer-invitations/:invitationId/revoke` | — | `{ invitation }`; `409` if not pending |
+| POST | `/api/admin/organizer-invitations/:invitationId/resend` | — | `201` as create; `409` if already used |
+| GET | `/api/admin/organizer-applications` | `?status=pending\|approved\|declined&limit&offset` | `{ applications, total }` |
+| GET | `/api/admin/organizer-applications/:applicationId` | — | `{ application }` with `certificates: [{ name, mime, size, url }]` (signed, admin only) |
+| POST | `/api/admin/organizer-applications/:applicationId/approve` | optional corrections: `organizerName, position, organizationName, organizationType, scopeType, programs, sections` | `{ application, user, email }`; `409` if already reviewed |
+| POST | `/api/admin/organizer-applications/:applicationId/decline` | `{ reason }` (required, ≤ 1000) | `{ application, email }` |
+
+Public (no session; the token in the URL is the credential; the `POST` needs the CSRF header/cookie):
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/api/public/organizer-apply/:token` | `{ email, note, expiresAt, organizationTypes, taxonomy }`. Any unusable link → `410` with one generic message |
+| POST | `/api/public/organizer-apply/:token` | `multipart/form-data`: `organizerName, position, organizationName, organizationType` (`Co-curricular`\|`Extra-curricular`), `scopeType` (`all`\|`scoped`), `programs`, `sections` (JSON array strings), and 1–5 `certificates` files (PDF/JPEG/PNG, ≤ 8 MB). `201 { applicationId }`; `400 { details: { errors } }`; `410` if the link is gone. The email is bound to the invitation and ignored if supplied |
+
+---
+
+## Student Officers — `/api/organizer/officers/` (owner only) and `/api/admin/organizers/:organizerId/officers`
+
+Student officers use the rest of `/api/organizer/*` as the owner organizer (see `docs/AUTH.md`). These endpoints are owner-only; an officer gets `403 Only the organizer account can do this`.
+
+| Method | Path | Body / query | Response |
+|--------|------|--------------|----------|
+| GET | `/api/organizer/officers` | `?status=active\|inactive\|all` | `{ officers: [{ id, studentId, position, status, assignedAt, deactivatedAt, student }] }` |
+| GET | `/api/organizer/officers/candidates` | `?search&limit` (≤ 50) | `{ candidates: [{ id, email, firstName, lastName, schoolId, program, yearSection }] }` — eligible, in the owner's scope, not already an active officer |
+| POST | `/api/organizer/officers` | `{ studentId, position }` | `201 { officer, email }` — `404` not an eligible student, `403` outside scope, `409` already an officer |
+| PATCH | `/api/organizer/officers/:officerId` | `{ position }` | `{ officer }` |
+| POST | `/api/organizer/officers/:officerId/deactivate` | — | `{ officer }`; access ends on the officer's next request |
+| POST | `/api/organizer/officers/:officerId/activate` | — | `{ officer, email }`; re-checks eligibility, scope and uniqueness |
+| GET | `/api/admin/organizers/:organizerId/officers` | — | `{ officers }` |
+| POST | `/api/admin/organizers/:organizerId/officers/:officerId/deactivate` | — | `{ officer }` (audited as an admin override) |
+
+`GET /api/auth/me`, login, refresh and the password-change responses include `user.officership` for participant accounts: `{ organizerId, organizationName, organizerName, position }` or `null`.
 
 ---
 
@@ -423,8 +480,26 @@ Submit poll answers.
 
 ## Voter Routes — `/api/voter/`
 
+Every `/api/voter/*` route is also served under `/api/participant/*` (same router). All of them require a signed-in participant (`authorize(participant)`); an admin or organizer gets 403. Each endpoint reads **only the caller's own enrollments**: no user id is accepted from the client.
+
 ### `GET /api/voter/overview`
-Unified voter overview: assigned events across all modules.
+Unified voter overview: assigned events across all modules. Election result bodies are **not** embedded any more; pass `?include=results` to get the old behaviour.
+
+### `GET /api/participant/events`
+My events: active and upcoming events only (completed events and events that closed without the participant are left to History). Query: `bucket` (`active` | `assigned`), `type` (`election` | `poll` | `competition`), `search`, `page`, `limit` (1-50, default 20). Response: `{ events, total, page, limit, counts: { active, assigned } }`. Active first, then by start date.
+
+### `GET /api/participant/history`
+The participant's own participation record. Query: `type`, `outcome` (`done` | `missed`), `range` (`last12` default | `year` | `all`), `search`, `page`, `limit`. Response: `{ items, total, page, limit, summary }`.
+- `outcome` per row: `Submitted`, `Partial` (election with some ballot sections submitted before it closed) or `Missed` (enrolled, event closed, nothing submitted). Events still in progress are not returned.
+- `completedAt` comes from the per-module submission tables (`election_ballot_submissions.submitted_at`, `poll_submissions.completed_at`, `competition_round_submissions.submitted_at`). It is `null` for **anonymous polls** (their submission is stored without a voter id) and for native competitions; `sortDate` then falls back to the event end date.
+- `receipt` is `{ kind: 'sections' | 'poll' | 'rounds', ... }`. It never contains ballot selections, poll answers or any judge's scores.
+- `summary` covers the chosen `range` only (not `type`, `outcome` or `search`).
+
+### `GET /api/participant/results`
+Results the participant may see, as a list. Query: `type` (`election` | `competition`), `page`, `limit`. Items:
+- `kind: 'election'` with `state` `final` | `live` | `pending` (pending carries `availableAfter`). Hidden elections are never listed. The body is fetched on demand from `GET /api/participant/election/events/:eventId/results` (existing endpoint; applies the per-position eligibility rules).
+- `kind: 'competition'` (judges): the official published standings snapshot (`standings: [{ rank, entryNumber, name, score, manual }]`, `publishedAt`, `method`). Unpublished and withdrawn publications are not listed. Other judges' scores are never included.
+- Polls are not listed (no results visibility setting exists for polls).
 
 ### `GET /api/voter/login-redirect`
 Determine correct post-login redirect based on voter's assigned events.

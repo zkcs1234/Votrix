@@ -1,38 +1,14 @@
 /**
  * Organizer Profile Controller
  *
- * Handles the organizer onboarding profile endpoints.
- * Organizers must complete their profile before accessing the dashboard.
+ * Read-only organizer profile endpoints. The organization name, type, organizer name
+ * and position come from the application (or from the admin who created the account),
+ * and only an administrator changes them (PUT /api/admin/organizers/:id).
  */
 
 import { asyncHandler } from '../utils/asyncHandler.js'
 import * as organizerProfileService from '../services/organizer-profile.service.js'
 import { ApiError } from '../utils/ApiError.js'
-
-/**
- * Validate the profile update payload.
- * All 4 fields are required and must be non-empty strings.
- */
-function validateProfilePayload(body) {
-  const { organizationName, organizationType, organizerName, position } = body ?? {}
-  const errors = []
-
-  if (!organizationName?.trim()) errors.push('Organization name is required')
-  if (!organizationType?.trim()) errors.push('Organization type is required')
-  if (!organizerName?.trim()) errors.push('Organizer name is required')
-  if (!position?.trim()) errors.push('Position is required')
-
-  if (errors.length > 0) {
-    throw new ApiError(400, errors.join('; '))
-  }
-
-  return {
-    organizationName: organizationName.trim(),
-    organizationType: organizationType.trim(),
-    organizerName: organizerName.trim(),
-    position: position.trim(),
-  }
-}
 
 /**
  * GET /api/organizer/profile
@@ -45,18 +21,13 @@ export const getProfile = asyncHandler(async (req, res) => {
 
 /**
  * PUT /api/organizer/profile
- * Creates or updates the organizer's profile.
- * All 4 fields are required.
+ *
+ * Organizers cannot edit their own profile. The route stays so a stale client gets a
+ * clear answer instead of a 404. The organization logo is separate and the organizer
+ * can still upload it (POST /api/organizer/organization/logo).
  */
-export const updateProfile = asyncHandler(async (req, res) => {
-  const payload = validateProfilePayload(req.body)
-  const profile = await organizerProfileService.updateOrganizerProfile(req.user.id, payload)
-
-  res.json({
-    success: true,
-    message: 'Organization profile saved successfully',
-    profile,
-  })
+export const updateProfile = asyncHandler(async () => {
+  throw new ApiError(403, 'Your profile is managed by an administrator. Contact an administrator to change it.')
 })
 
 /**
@@ -68,4 +39,3 @@ export const getProfileStatus = asyncHandler(async (req, res) => {
   const { complete, profile } = await organizerProfileService.isOrganizerProfileComplete(req.user.id)
   res.json({ success: true, complete, profile })
 })
-

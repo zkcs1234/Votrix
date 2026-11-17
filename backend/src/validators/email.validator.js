@@ -1,6 +1,7 @@
 import { ApiError } from '../utils/ApiError.js'
+import { normalizePasswordInput } from '../utils/password.js'
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+import { EMAIL_RE } from '../../../shared/form-rules.js'
 
 export function validateEmailField(email) {
   if (!email?.trim()) {
@@ -14,7 +15,7 @@ export function validateEmailField(email) {
 
 export function validateInviteVoter(body) {
   const email = validateEmailField(body?.email)
-  const temporaryPassword = body?.temporaryPassword
+  const temporaryPassword = normalizePasswordInput(body?.temporaryPassword)
 
   // temporaryPassword is optional — backend will auto-generate if not provided
   if (temporaryPassword && temporaryPassword.length < 8) {
@@ -40,7 +41,9 @@ export function validateForgotPassword(body) {
 }
 
 export function validateResetPassword(body) {
-  const { token, newPassword, confirmPassword } = body ?? {}
+  const { token } = body ?? {}
+  const newPassword = normalizePasswordInput(body?.newPassword)
+  const confirmPassword = normalizePasswordInput(body?.confirmPassword)
 
   if (!token?.trim()) {
     throw new ApiError(400, 'Reset token is required')

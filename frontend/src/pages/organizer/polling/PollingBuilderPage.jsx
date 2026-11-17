@@ -7,7 +7,14 @@ import ImageUploadField from '@/components/upload/ImageUploadField'
 import ManagementWorkspace from '@/components/ui/ManagementWorkspace'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import useEventStatus from '@/hooks/useEventStatus'
-import { INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
+import FormField from '@/components/ui/FormField'
+import { LABEL_CLASS } from '@/utils/uiClasses'
+import {
+  configFieldFor,
+  hasQuestionErrors,
+  needsFreeOptions,
+  validateQuestionForm,
+} from '@/utils/pollQuestionValidation'
 import {
   DndContext,
   closestCenter,
@@ -41,42 +48,8 @@ function listQuestionTypes() {
   return api.get('/organizer/polling/question-types')
 }
 
-function needsFreeOptions(typeDef) {
-  if (!typeDef) return true
-  const input = typeDef.ui?.input
-  if (input === 'radio' || input === 'checkbox' || input === 'ranking') return true
-  return false
-}
-
 function isAutoOptionsType(typeDef) {
   return Boolean(typeDef?.ui?.autoOptions)
-}
-
-function configFieldFor(typeDef) {
-  // Returns an array of { key, label, kind, value, options } for the
-  // fields we want to render for this type. Kept in the UI for clarity —
-  // the engine on the server does the same with configSchema.
-  if (!typeDef) return []
-  switch (typeDef.answerFormat?.kind) {
-    case 'numeric':
-      return [
-        { key: 'min', label: 'Min', kind: 'number' },
-        { key: 'max', label: 'Max', kind: 'number' },
-        { key: 'step', label: 'Step', kind: 'number' },
-      ]
-    case 'text':
-      return [
-        { key: 'maxLength', label: 'Max length', kind: 'number' },
-        { key: 'multiline', label: 'Multiline', kind: 'boolean' },
-      ]
-    case 'ranking':
-      return [
-        { key: 'allowTies', label: 'Allow ties', kind: 'boolean' },
-        { key: 'minItems', label: 'Min items to rank', kind: 'number' },
-      ]
-    default:
-      return []
-  }
 }
 
 // Drag handle icon
@@ -204,11 +177,26 @@ export default function PollingBuilderPage() {
   const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  // Fields the organizer has left at least once; their messages show from then on, live.
+  const [touched, setTouched] = useState({})
 
   const currentTypeDef = useMemo(
     () => types.find((t) => t.key === form.type) ?? null,
     [types, form.type],
   )
+
+  const errors = useMemo(() => validateQuestionForm(form, currentTypeDef), [form, currentTypeDef])
+  const touch = (key) => () => setTouched((t) => (t[key] ? t : { ...t, [key]: true }))
+  const shown = (key, message) => (touched[key] || touched.all ? message : undefined)
+  const formInvalid = hasQuestionErrors(errors)
+  // Why "Add question" is unavailable (null when it is available).
+  let blockedReason = null
+  if (formInvalid) {
+    blockedReason =
+      errors.question && !touched.question && !Object.keys(touched).length
+        ? 'Enter the question text to continue.'
+        : 'Fix the highlighted fields to continue.'
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -250,10 +238,12 @@ export default function PollingBuilderPage() {
     setForm(emptyForm())
     setEditingId(null)
     setError(null)
+    setTouched({})
     setFormKey((k) => k + 1)
   }
 
 const startEdit = (q) => {
+    setTouched({})
     setEditingId(q.id)
     setFormKey((k) => k + 1)
     setForm({
@@ -310,6 +300,11 @@ const handleTypeChange = (typeKey) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (formInvalid) {
+      // The button is disabled, but Enter can still submit: reveal every message.
+      setTouched({ question: true, options: true, all: true })
+      return
+    }
     setSaving(true)
     setError(null)
 
@@ -416,36 +411,29 @@ const handleTypeChange = (typeKey) => {
           {editingId ? 'Edit question' : 'Add question'}
         </h3>
 
-        <div>
-          <label className={LABEL_CLASS}>Question text</label>
-          <input
-            className={INPUT_CLASS}
-            placeholder="Question text"
-            value={form.question}
-            onChange={(e) => setForm({ ...form, question: e.target.value })}
-            required
-          />
-        </div>
-
-        <div>
-          <label className={LABEL_CLASS}>Question type</label>
-          <select
-            className={INPUT_CLASS}
-            value={form.type}
-            onChange={(e) => handleTypeChange(e.target.value)}
-          >
-            {types.map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-          {currentTypeDef?.description && (
-            <p className="mt-1 text-xs text-v-text-subtle">
-              {currentTypeDef.description}
-            </p>
+        <FormField label="Question text" required error={shown('question', errors.question)}>
+          {(field) => (
+            <input
+              {...field}
+              placeholder="Question text"
+              value={form.question}
+              onChange={(e) => setForm({ ...form, question: e.target.value })}
+              onBlur={touch('question')}
+            />
           )}
-        </div>
+        </FormField>
+
+        <FormField label="Question type" hint={currentTypeDef?.description}>
+          {(field) => (
+            <select {...field} value={form.type} onChange={(e) => handleTypeChange(e.target.value)}>
+              {types.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          )}
+        </FormField>
 
         {/* Question image */}
         <div>
@@ -459,10 +447,10 @@ const handleTypeChange = (typeKey) => {
         </div>
 
         {/* Per-type config — rendered dynamically from configSchema. */}
-        {configFieldFor(currentTypeDef).map((f) => (
-          <div key={f.key} className="grid grid-cols-2 gap-2">
-            <label className={LABEL_CLASS}>{f.label}</label>
-            {f.kind === 'boolean' ? (
+        {configFieldFor(currentTypeDef).map((f) =>
+          f.kind === 'boolean' ? (
+            <div key={f.key} className="grid grid-cols-2 gap-2">
+              <label className={LABEL_CLASS}>{f.label}</label>
               <input
                 type="checkbox"
                 checked={Boolean(form.typeConfig?.[f.key])}
@@ -473,25 +461,30 @@ const handleTypeChange = (typeKey) => {
                   })
                 }
               />
-            ) : (
-              <input
-                type="number"
-                step="any"
-                className={INPUT_CLASS}
-                value={form.typeConfig?.[f.key] ?? ''}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    typeConfig: {
-                      ...form.typeConfig,
-                      [f.key]: e.target.value === '' ? undefined : Number(e.target.value),
-                    },
-                  })
-                }
-              />
-            )}
-          </div>
-        ))}
+            </div>
+          ) : (
+            <FormField key={f.key} label={f.label} error={shown(`config.${f.key}`, errors.config[f.key])}>
+              {(field) => (
+                <input
+                  {...field}
+                  type="number"
+                  step="any"
+                  value={form.typeConfig?.[f.key] ?? ''}
+                  onBlur={touch(`config.${f.key}`)}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      typeConfig: {
+                        ...form.typeConfig,
+                        [f.key]: e.target.value === '' ? undefined : Number(e.target.value),
+                      },
+                    })
+                  }
+                />
+              )}
+            </FormField>
+          ),
+        )}
 
         {isAutoOptionsType(currentTypeDef) && (
           <p className="text-xs text-v-text-subtle">
@@ -504,17 +497,29 @@ const handleTypeChange = (typeKey) => {
             <p className="text-xs text-v-text-subtle">Options</p>
             {form.options.map((opt, i) => (
               <div key={i} className="space-y-1">
-                <div className="flex gap-2">
-                  <input
-                    className={INPUT_CLASS}
-                    placeholder={`Option ${i + 1}`}
-                    value={opt.label}
-                    onChange={(e) => {
-                      const options = [...form.options]
-                      options[i] = { ...options[i], label: e.target.value }
-                      setForm({ ...form, options })
-                    }}
-                  />
+                <div className="flex items-start gap-2">
+                  <FormField
+                    className="min-w-0 flex-1"
+                    label={<span className="sr-only">{`Option ${i + 1}`}</span>}
+                    error={shown(`option.${i}`, errors.optionLabels[i])}
+                  >
+                    {(field) => (
+                      <input
+                        {...field}
+                        placeholder={`Option ${i + 1}`}
+                        value={opt.label}
+                        onBlur={() => {
+                          touch(`option.${i}`)()
+                          touch('options')()
+                        }}
+                        onChange={(e) => {
+                          const options = [...form.options]
+                          options[i] = { ...options[i], label: e.target.value }
+                          setForm({ ...form, options })
+                        }}
+                      />
+                    )}
+                  </FormField>
                   {form.options.length > 2 && (
                     <button
                       type="button"
@@ -541,6 +546,9 @@ const handleTypeChange = (typeKey) => {
                 </div>
               </div>
             ))}
+            {shown('options', errors.options) && (
+              <p role="alert" className="v-error-text">{errors.options}</p>
+            )}
             <button
               type="button"
               className="text-sm text-v-text-muted"
@@ -562,10 +570,10 @@ onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageU
 
         {error && <p className="text-sm text-v-danger">{error}</p>}
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || formInvalid}
             className="v-btn-primary disabled:opacity-60"
           >
             {editingId ? 'Update' : 'Add question'}
@@ -575,6 +583,7 @@ onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageU
               Cancel
             </button>
           )}
+          {blockedReason && <p className="v-caption" role="status">{blockedReason}</p>}
         </div>
       </form>
         )

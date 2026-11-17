@@ -4,6 +4,7 @@ import { Search, X, Users, CalendarDays, Database } from 'lucide-react'
 import { searchIndex } from '@/config/searchIndex'
 import { useAuth } from '@/hooks/useAuth'
 import { USER_ROLES } from '@/utils/constants'
+import { effectiveWorkspaceRole, isOfficer } from '@/utils/workspace'
 import { adminService } from '@/services/admin.service'
 
 const RESULT_TYPES = {
@@ -69,9 +70,12 @@ export default function GlobalSearch() {
   const [liveResults, setLiveResults] = useState({ organizers: [], events: [] })
   const [liveLoading, setLiveLoading] = useState(false)
   const inputRef = useRef(null)
-  const { role } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  // A student officer searches the organizer index while inside /organizer.
+  const role = effectiveWorkspaceRole(user, location.pathname)
+  const officer = isOfficer(user)
   const isAdmin = role === USER_ROLES.ADMIN
 
   // Extract eventId if present in the current URL path
@@ -109,6 +113,7 @@ export default function GlobalSearch() {
     const q = query.toLowerCase()
     return searchIndex
       .filter((item) => item.roles.includes(role))
+      .filter((item) => !(item.ownerOnly && officer))
       .filter((item) => {
         return (
           item.title.toLowerCase().includes(q) ||
@@ -117,7 +122,7 @@ export default function GlobalSearch() {
         )
       })
       .map((item) => ({ ...item, __type: RESULT_TYPES.STATIC }))
-  }, [query, role])
+  }, [query, role, officer])
 
   useEffect(() => {
     if (!isAdmin) {

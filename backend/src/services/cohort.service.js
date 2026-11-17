@@ -12,13 +12,13 @@ import { getEmailQuotaSettings } from './emailGuard.js'
 
 // Phase 5 of VOTER_PROFILE_AND_ADMIN_REGISTRATION_PLAN.md.
 // Organizers no longer create voter/respondent accounts. Instead they invite
-// COHORTS of already-registered students (by Program or Year & Section) into an
+// COHORTS of already-registered students (by Program) into an
 // event. Shared by the election and polling modules; the participant_type is
 // resolved from the event type, so the same logic serves both.
 
-const COHORT_COLUMN = { program: 'program', year_section: 'year_section' }
+const COHORT_COLUMN = { program: 'program' }
 
-// Tally a list of {program, year_section} rows into per-value counts.
+// Tally a list of {program} rows into per-value counts.
 function tally(rows, column) {
   const counts = new Map()
   for (const row of rows) {
@@ -30,8 +30,7 @@ function tally(rows, column) {
 }
 
 /**
- * Cohorts available for an event: every Program and Year & Section from the
- * managed taxonomy, annotated with how many active students are in the pool and
+ * Cohorts available for an event: every Program in the pool, annotated with how many active students are in the pool and
  * how many are already enrolled in this event.
  */
 export async function getEventCohorts(eventId, organizerId) {
@@ -42,7 +41,7 @@ export async function getEventCohorts(eventId, organizerId) {
   // Active accounts in the pool for this event type.
   const { data: pool, error: poolErr } = await getClient()
     .from(DB_TABLES.USER_PARTICIPANT_TYPES)
-    .select('users!user_participant_types_user_id_fkey!inner(program, year_section, account_status)')
+    .select('users!user_participant_types_user_id_fkey!inner(program, account_status)')
     .eq('participant_type', participantType)
     .eq('is_active', true)
     .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
@@ -51,7 +50,7 @@ export async function getEventCohorts(eventId, organizerId) {
   // Already-enrolled accounts for this event and participant type.
   const { data: enrolled, error: enrErr } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('users!inner (program, year_section)')
+    .select('users!inner (program)')
     .eq('event_id', eventId)
     .eq('participant_type', participantType)
   if (enrErr) throw new ApiError(500, enrErr.message)
@@ -62,9 +61,7 @@ export async function getEventCohorts(eventId, organizerId) {
 
   const poolProfiles = (pool ?? []).map((row) => row.users).filter(Boolean)
   const poolPrograms = tally(poolProfiles, 'program')
-  const poolSections = tally(poolProfiles, 'year_section')
   const enrProgramsMap = tally(enrolledStudents, 'program')
-  const enrSectionsMap = tally(enrolledStudents, 'year_section')
 
   // Distinct values come from the actual pool (so admins don't have to keep the
   // taxonomy and the imported data in perfect lock-step for the picker to work).
@@ -73,15 +70,10 @@ export async function getEventCohorts(eventId, organizerId) {
     poolCount: poolPrograms.get(value) ?? 0,
     enrolledCount: enrProgramsMap.get(value) ?? 0,
   }))
-  const sections = [...poolSections.keys()].sort().map((value) => ({
-    value,
-    poolCount: poolSections.get(value) ?? 0,
-    enrolledCount: enrSectionsMap.get(value) ?? 0,
-  }))
 
   // Bound the picker to the organizer's scope (plan O9).
   const scope = await getOrganizerScope(organizerId)
-  return filterCohortsForScope(scope, { programs, sections })
+  return filterCohortsForScope(scope, { programs })
 }
 
 /**
@@ -96,15 +88,15 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
   assertParticipantsEditable(event)
 
   const column = COHORT_COLUMN[cohortType]
-  if (!column) throw new ApiError(400, "cohortType must be 'program' or 'year_section'")
+  if (!column) throw new ApiError(400, "cohortType must be 'program'")
   if (!Array.isArray(values) || values.length === 0) {
     throw new ApiError(400, 'Select at least one cohort value')
   }
 
   // Enforce the organizer's scope server-side (plan O9) — can't be bypassed
-  // by crafting a request for a program/section they don't own.
+  // by crafting a request for a program they don't own.
   const scope = await getOrganizerScope(organizerId)
-  if (!areCohortValuesInScope(scope, cohortType, values)) {
+  if (!areCohortValuesInScope(scope, values)) {
     throw new ApiError(403, 'One or more selected cohorts are outside your assigned scope')
   }
 
@@ -113,7 +105,7 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
   // Matching active accounts that have this event's participant type.
   const { data: students, error } = await getClient()
     .from(DB_TABLES.USER_PARTICIPANT_TYPES)
-    .select('users!user_participant_types_user_id_fkey!inner(id, email, account_status, program, year_section)')
+    .select('users!user_participant_types_user_id_fkey!inner(id, email, account_status, program)')
     .eq('participant_type', participantType)
     .eq('is_active', true)
     .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)

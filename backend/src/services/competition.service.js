@@ -712,6 +712,17 @@ export async function getCompetitionJudgesView(eventId, organizerId) {
 // eligibility; organizers select existing participant accounts.
 // ---------------------------------------------------------------------------
 
+const JUDGE_POOL_PROFILE_FIELDS = ['title', 'affiliation', 'expertise']
+
+function pickJudgeProfileFields(profileData) {
+  const source = profileData && typeof profileData === 'object' ? profileData : {}
+  const out = {}
+  for (const field of JUDGE_POOL_PROFILE_FIELDS) {
+    if (source[field]) out[field] = source[field]
+  }
+  return out
+}
+
 // The global judge pool, annotated with whether each judge is already enrolled
 // in this event. Supports a name/email search.
 export async function getJudgePool(eventId, organizerId, { search } = {}) {
@@ -733,24 +744,24 @@ export async function getJudgePool(eventId, organizerId, { search } = {}) {
   if (enrErr) throw new ApiError(500, enrErr.message)
   const enrolledSet = new Set((enrolled ?? []).map((r) => r.user_id))
 
-  // Judge → organizer assignment (organizer plan O7). A judge with an
-  // organizerIds list is visible only to those organizers; a judge with no
-  // assignment stays visible to everyone (backward-compatible default).
+  // The judge pool is global: every active judge account is visible to every
+  // organizer, and each organizer picks the judges for their own event. There is
+  // no admin-side judge → organizer assignment.
   const searchTerm = String(search ?? '').trim().toLowerCase()
   const visible = (data ?? []).map((row) => row.users).filter((u) => {
     if (!u) return false
     if (searchTerm && ![u.email, u.first_name, u.last_name].some((value) => String(value ?? '').toLowerCase().includes(searchTerm))) return false
-    const ids = u.profile_data?.organizerIds
-    if (!Array.isArray(ids) || ids.length === 0) return true
-    return ids.map(String).includes(String(organizerId))
+    return true
   })
 
+  // Every organizer can see every judge, so expose only the fields the picker
+  // needs rather than the whole profile_data blob.
   return visible.map((u) => ({
     id: u.id,
     email: u.email,
     firstName: u.first_name,
     lastName: u.last_name,
-    profileData: u.profile_data ?? {},
+    profileData: pickJudgeProfileFields(u.profile_data),
     enrolled: enrolledSet.has(u.id),
   }))
 }
@@ -773,8 +784,9 @@ export async function pickJudges(eventId, organizerId, { userIds, notify = false
     .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
     .in('user_id', userIds)
   if (error) throw new ApiError(500, error.message)
-  const authorizedPool = new Set((await getJudgePool(eventId, organizerId)).map(j => j.id))
-  if (userIds.some(id => !authorizedPool.has(id))) throw new ApiError(403, 'Judge is outside your authorized pool')
+  // Every selected id must be an active judge in the global pool.
+  const judgePool = new Set((await getJudgePool(eventId, organizerId)).map(j => j.id))
+  if (userIds.some(id => !judgePool.has(id))) throw new ApiError(403, 'One or more selected accounts are not available judges')
   const judges = (membershipRows ?? []).map((row) => row.users).filter(Boolean)
   if (!judges?.length) return { matched: 0, enrolled: 0, alreadyEnrolled: 0, notified: 0 }
 

@@ -14,7 +14,6 @@ export function sanitizeUser(row) {
     lastName: row.last_name ?? null,
     schoolId: row.school_id ?? null,
     program: row.program ?? null,
-    yearSection: row.year_section ?? null,
     profileData: row.profile_data ?? null,
     // Organizer voter scope (migration 076). Null for non-organizer accounts.
     scope: row.scope ?? null,

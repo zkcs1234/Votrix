@@ -9,6 +9,7 @@ import { HELPER_TEXT, INPUT_CLASS, LABEL_CLASS } from '@/utils/uiClasses'
 // not per-criterion, and each minor criterion carries its own score type. Both
 // live in the shared helper so this editor and the organizer previews agree.
 import { resolveScaleBounds, minorScoreLabel } from '@/utils/scoreScale'
+import { validateCriterionName, validateCustomRange, validateWeight } from '@/utils/criteriaValidation'
 import CriteriaProgress, { CriteriaCompletion } from './CriteriaProgress'
 import { CRITERIA_WEIGHT_TOLERANCE, isCriteriaActive } from '../../../../../shared/competition-criteria-readiness.js'
 
@@ -35,27 +36,33 @@ function MinorCriteriaManager({ eventId, criterion, mutate, showError }) {
   const [form, setForm] = useState({ name: '', scoreType: lastScoreType, customMin: '', customMax: '' })
   const [busy, setBusy] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  // Fields the organizer has left at least once; their messages show from then on, live.
+  const [touched, setTouched] = useState({})
+
+  const nameError = validateCriterionName(form.name, 'Minor criterion name')
+  const rangeError = form.scoreType === 'custom_range' ? validateCustomRange(form.customMin, form.customMax) : null
+  const invalid = Boolean(nameError || rangeError)
+  const touch = (key) => () => setTouched((t) => (t[key] ? t : { ...t, [key]: true }))
+  const shown = (key, message) => (touched[key] || touched.all ? message : null)
 
   const openAdd = () => {
     setEditingId(null)
+    setTouched({})
     setForm({ name: '', scoreType: lastScoreType, customMin: '', customMax: '' })
     setAdding(true)
   }
 
   const add = async (e) => {
     e.preventDefault()
-    if (!form.name.trim()) {
-      showError('Enter a minor criteria name')
+    if (invalid) {
+      // The button is disabled, but Enter can still submit: reveal the messages.
+      setTouched({ all: true })
       return
     }
     const payload = { name: form.name.trim(), scoreType: form.scoreType }
     if (form.scoreType === 'custom_range') {
       payload.customMin = Number(form.customMin)
       payload.customMax = Number(form.customMax)
-      if (!form.customMin.trim() || !form.customMax.trim() || !Number.isFinite(payload.customMin) || !Number.isFinite(payload.customMax) || payload.customMax <= payload.customMin || payload.customMax <= 0) {
-        showError('Enter a valid custom range (max greater than min)')
-        return
-      }
     }
     setBusy(true)
     try {
@@ -89,7 +96,7 @@ function MinorCriteriaManager({ eventId, criterion, mutate, showError }) {
               <span className="min-w-0 break-words text-v-text">{m.name}</span>
               <button type="button" aria-label={`${isCriteriaActive(m) ? 'Disable' : 'Enable'} ${m.name}`} className="v-caption underline" onClick={() => mutate(() => pageantService.updateMinorCriteria(eventId, criterion.id, m.id, { isActive: !isCriteriaActive(m) }), criterion.id)}>{isCriteriaActive(m) ? 'Enabled' : 'Disabled'}</button>
               <button type="button" className="v-caption" onClick={() => mutate(() => pageantService.updateMinorCriteria(eventId, criterion.id, m.id, { displayOrder: Math.max(0, (m.displayOrder ?? 0) - 1) }), criterion.id)}>Earlier</button>
-              <button type="button" aria-label={`Edit ${m.name}`} className="v-caption underline" onClick={() => { setEditingId(m.id); setForm({ name: m.name, scoreType: m.scoreType ?? 'range_1_100', customMin: m.customMin == null ? '' : String(m.customMin), customMax: m.customMax == null ? '' : String(m.customMax) }); setAdding(true) }}>Edit</button>
+              <button type="button" aria-label={`Edit ${m.name}`} className="v-caption underline" onClick={() => { setEditingId(m.id); setTouched({}); setForm({ name: m.name, scoreType: m.scoreType ?? 'range_1_100', customMin: m.customMin == null ? '' : String(m.customMin), customMax: m.customMax == null ? '' : String(m.customMax) }); setAdding(true) }}>Edit</button>
               <span className="flex items-center gap-2">
                 <span className="rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-v-primary">
                   {minorScoreLabel(m, { placeholder: '?' })}
@@ -113,13 +120,16 @@ function MinorCriteriaManager({ eventId, criterion, mutate, showError }) {
       )}
 
       {adding ? (
-        <form onSubmit={add} className="mt-2 flex flex-wrap items-end gap-2">
+        <form onSubmit={add} className="mt-2 flex flex-wrap items-start gap-2" noValidate>
           <input
-            className={`${inputClass} flex-1 min-w-[10rem]`}
+            className={`${inputClass} flex-1 min-w-[10rem]${shown('name', nameError) ? ' v-input-error' : ''}`}
             placeholder="Minor criterion name"
             aria-label="Minor criterion name"
+            aria-invalid={shown('name', nameError) ? true : undefined}
+            aria-describedby={shown('name', nameError) ? 'minor-name-error' : undefined}
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
+            onBlur={touch('name')}
             autoFocus
           />
           <select
@@ -138,25 +148,31 @@ function MinorCriteriaManager({ eventId, criterion, mutate, showError }) {
             <>
               <input
                 type="number"
-                className={`${inputClass} w-20`}
+                className={`${inputClass} w-20${shown('range', rangeError) ? ' v-input-error' : ''}`}
                 placeholder="min"
                 aria-label="Minimum score"
+                aria-invalid={shown('range', rangeError) ? true : undefined}
+                aria-describedby={shown('range', rangeError) ? 'minor-range-error' : undefined}
                 value={form.customMin}
                 onChange={(e) => setForm({ ...form, customMin: e.target.value })}
+                onBlur={touch('range')}
               />
               <input
                 type="number"
-                className={`${inputClass} w-20`}
+                className={`${inputClass} w-20${shown('range', rangeError) ? ' v-input-error' : ''}`}
                 placeholder="max"
                 aria-label="Maximum score"
+                aria-invalid={shown('range', rangeError) ? true : undefined}
+                aria-describedby={shown('range', rangeError) ? 'minor-range-error' : undefined}
                 value={form.customMax}
                 onChange={(e) => setForm({ ...form, customMax: e.target.value })}
+                onBlur={touch('range')}
               />
             </>
           )}
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || invalid}
             className="rounded-lg bg-v-primary px-3 py-2 text-sm font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
           >
             {busy ? 'Saving…' : editingId ? 'Save minor' : 'Add'}
@@ -168,6 +184,13 @@ function MinorCriteriaManager({ eventId, criterion, mutate, showError }) {
           >
             Cancel
           </button>
+          {shown('name', nameError) && <p id="minor-name-error" role="alert" className="v-error-text basis-full">{nameError}</p>}
+          {shown('range', rangeError) && <p id="minor-range-error" role="alert" className="v-error-text basis-full">{rangeError}</p>}
+          {invalid && !touched.all && !touched.name && !touched.range && (
+            <p className="v-caption basis-full" role="status">
+              {nameError ? 'Enter a name to add this minor criterion.' : 'Complete the custom range to continue.'}
+            </p>
+          )}
         </form>
       ) : (
         <button
@@ -180,6 +203,70 @@ function MinorCriteriaManager({ eventId, criterion, mutate, showError }) {
         </button>
       )}
     </div>
+  )
+}
+
+// Inline editor for a major criterion's name and weight (replaces two browser
+// prompts). Errors appear as the organizer types, and Save stays unavailable
+// until both values are valid.
+function MajorEditForm({ criterion, onSave, onCancel }) {
+  const [name, setName] = useState(criterion.name ?? '')
+  const [weight, setWeight] = useState(String(criterion.percentage ?? ''))
+  const [saving, setSaving] = useState(false)
+  const [touched, setTouched] = useState({})
+  const nameError = validateCriterionName(name, 'Name')
+  const weightError = validateWeight(weight)
+  const touch = (key) => () => setTouched((t) => (t[key] ? t : { ...t, [key]: true }))
+  const shownName = touched.name ? nameError : null
+  const shownWeight = touched.weight ? weightError : null
+  const submit = async (e) => {
+    e.preventDefault()
+    if (nameError || weightError) { setTouched({ name: true, weight: true }); return }
+    setSaving(true)
+    await onSave({ name: name.trim(), percentage: Number(weight) })
+    setSaving(false)
+  }
+  const id = `major-edit-${criterion.id}`
+  return (
+    <form onSubmit={submit} noValidate className="mt-2 flex flex-wrap items-start gap-2" aria-label={`Edit ${criterion.name}`}>
+      <div className="min-w-[10rem] flex-1">
+        <input
+          className={`${inputClass}${shownName ? ' v-input-error' : ''}`}
+          aria-label="Major criterion name"
+          aria-invalid={shownName ? true : undefined}
+          aria-describedby={shownName ? `${id}-name-error` : undefined}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={touch('name')}
+          autoFocus
+        />
+        {shownName && <p id={`${id}-name-error`} role="alert" className="v-error-text">{shownName}</p>}
+      </div>
+      <div className="w-28">
+        <input
+          type="number"
+          step="0.01"
+          className={`${inputClass}${shownWeight ? ' v-input-error' : ''}`}
+          aria-label="Major contribution percentage"
+          aria-invalid={shownWeight ? true : undefined}
+          aria-describedby={shownWeight ? `${id}-weight-error` : undefined}
+          value={weight}
+          onChange={(e) => setWeight(e.target.value)}
+          onBlur={touch('weight')}
+        />
+        {shownWeight && <p id={`${id}-weight-error`} role="alert" className="v-error-text">{shownWeight}</p>}
+      </div>
+      <button
+        type="submit"
+        disabled={saving || Boolean(nameError || weightError)}
+        className="rounded-lg bg-v-primary px-3 py-2 text-sm font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50"
+      >
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+      <button type="button" onClick={onCancel} className="rounded-lg border border-v-border px-3 py-2 text-sm text-v-text-muted hover:text-v-text">
+        Cancel
+      </button>
+    </form>
   )
 }
 
@@ -201,6 +288,8 @@ export default function CriteriaManager({ eventId, foundation, initialRoundId = 
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', percentage: '', divisionId: '' })
   const [attachId, setAttachId] = useState('')
+  const [touched, setTouched] = useState({})
+  const [editingMajorId, setEditingMajorId] = useState(null)
   const { error: showError } = useToast()
 
   // Keep the selected round valid as rounds change (added/removed elsewhere).
@@ -234,6 +323,20 @@ export default function CriteriaManager({ eventId, foundation, initialRoundId = 
   const isFull = remaining <= CRITERIA_WEIGHT_TOLERANCE
   const scopeLabel = hasRounds ? 'this round' : 'the criteria budget'
 
+  // Live validation for the "add major criterion" form. The name message shows
+  // after the field is left; the weight message shows as soon as a value is typed
+  // (an over-budget weight is wrong the moment it is entered).
+  const nameError = validateCriterionName(form.name, hasRounds ? 'Criterion name' : 'Criteria name')
+  const weightError = isFull ? null : validateWeight(form.percentage, { remaining, tolerance: CRITERIA_WEIGHT_TOLERANCE, scopeLabel })
+  const addInvalid = Boolean(nameError || weightError)
+  const touch = (key) => () => setTouched((t) => (t[key] ? t : { ...t, [key]: true }))
+  const shownName = touched.name || touched.all ? nameError : null
+  const shownWeight = touched.weight || touched.all || form.percentage.trim() !== '' ? weightError : null
+  const attachPicked = attachId ? list.find((c) => c.id === attachId) : null
+  const attachError = attachPicked && isCriteriaActive(attachPicked) && Number(attachPicked.percentage) > remaining + CRITERIA_WEIGHT_TOLERANCE
+    ? `Only ${remaining.toFixed(2)}% left in ${scopeLabel}. Lower this criterion's weight before attaching it.`
+    : null
+
   const selectRound = roundId => {
     setSelectedRoundId(roundId)
     setAttachId('')
@@ -247,30 +350,27 @@ export default function CriteriaManager({ eventId, foundation, initialRoundId = 
   }
   const handleCreate = async e => {
     e.preventDefault()
+    if (addInvalid) { setTouched({ all: true }); return } // the button is disabled, but Enter can still submit
     const percentage = Number(form.percentage)
-    if (!form.name.trim() || !Number.isFinite(percentage) || percentage <= 0) { showError('Enter a criteria name and a weight greater than 0'); return }
-    if (percentage > remaining + CRITERIA_WEIGHT_TOLERANCE) { showError(`Only ${remaining.toFixed(2)}% left in ${scopeLabel}. Lower the weight to add this criterion.`); return }
     setSaving(true)
     const create = hasRounds && selectedRoundId ? payload => workflowService.createRoundCriterion(eventId, selectedRoundId, payload) : payload => pageantService.createCriteria(eventId, payload)
-    if (await mutate(() => create({ name: form.name.trim(), percentage, minScore: scoreBounds.min, maxScore: scoreBounds.max, divisionId: hasRounds ? null : form.divisionId || null }))) setForm({ name: '', percentage: '', divisionId: '' })
+    if (await mutate(() => create({ name: form.name.trim(), percentage, minScore: scoreBounds.min, maxScore: scoreBounds.max, divisionId: hasRounds ? null : form.divisionId || null }))) {
+      setForm({ name: '', percentage: '', divisionId: '' })
+      setTouched({})
+    }
     setSaving(false)
   }
   const removeFromRound = criteriaId => mutate(() => pageantService.removeRoundCriteria(eventId, selectedRoundId, criteriaId), criteriaId)
   const attachExisting = async () => {
-    if (!attachId) return
-    const picked = list.find(c => c.id === attachId)
-    if (picked && isCriteriaActive(picked) && Number(picked.percentage) > remaining + CRITERIA_WEIGHT_TOLERANCE) { showError(`Only ${remaining.toFixed(2)}% left in ${scopeLabel}. Lower the weight before attaching this criterion.`); return }
+    if (!attachId || attachError) return
     if (await mutate(() => pageantService.addRoundCriteria(eventId, selectedRoundId, attachId))) setAttachId('')
   }
   const deleteCriterion = criteriaId => mutate(() => pageantService.deleteCriteria(eventId, criteriaId), criteriaId)
-  const editMajor = async criterion => {
-    const name = window.prompt('Major criterion name', criterion.name)
-    if (!name) return
-    const weight = window.prompt('Major contribution percentage', String(criterion.percentage))
-    if (weight === null) return
-    const percentage = Number(weight)
-    if (!weight.trim() || !Number.isFinite(percentage) || percentage <= 0 || percentage > 100) { showError('Enter a weight greater than 0 and no more than 100%.'); return }
-    await mutate(() => pageantService.updateCriteria(eventId, criterion.id, { name, percentage }), criterion.id)
+  // Inline edit (MajorEditForm) replaces the old browser prompts.
+  const saveMajor = async (criterion, { name, percentage }) => {
+    const saved = await mutate(() => pageantService.updateCriteria(eventId, criterion.id, { name, percentage }), criterion.id)
+    if (saved) setEditingMajorId(null)
+    return saved
   }
   const editingBlocked = readOnly || saveState.pending || Boolean(saveState.error)
 
@@ -299,6 +399,7 @@ export default function CriteriaManager({ eventId, foundation, initialRoundId = 
 
           <form
             onSubmit={handleCreate}
+            noValidate
             className={`grid gap-5 v-card p-6 mb-4 ${
               !hasRounds && divisionsEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
             }`}
@@ -309,13 +410,18 @@ export default function CriteriaManager({ eventId, foundation, initialRoundId = 
               </label>
               <input
                 id="criteria-name"
-                className={inputClass}
+                className={`${inputClass}${shownName ? ' v-input-error' : ''}`}
                 placeholder="e.g. Technique, Stage Presence"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
+                onBlur={touch('name')}
+                aria-required="true"
+                aria-invalid={shownName ? true : undefined}
+                aria-describedby={shownName ? 'criteria-name-error' : undefined}
               />
-              <p className={HELPER_TEXT}>This is the label judges will see while scoring.</p>
+              {shownName
+                ? <p id="criteria-name-error" role="alert" className="v-error-text">{shownName}</p>
+                : <p className={HELPER_TEXT}>This is the label judges will see while scoring.</p>}
             </div>
 
             <div>
@@ -328,12 +434,17 @@ export default function CriteriaManager({ eventId, foundation, initialRoundId = 
                 min={0}
                 max={remaining || 100}
                 step="0.01"
-                className={inputClass}
+                className={`${inputClass}${shownWeight ? ' v-input-error' : ''}`}
                 placeholder="e.g. 40"
                 value={form.percentage}
                 onChange={(e) => setForm({ ...form, percentage: e.target.value })}
+                onBlur={touch('weight')}
                 disabled={isFull}
+                aria-required="true"
+                aria-invalid={shownWeight ? true : undefined}
+                aria-describedby={shownWeight ? 'criteria-weight-error' : undefined}
               />
+              {shownWeight && <p id="criteria-weight-error" role="alert" className="v-error-text">{shownWeight}</p>}
               <p className={HELPER_TEXT}>
                 {isFull
                   ? `${scopeLabel[0].toUpperCase()}${scopeLabel.slice(1)} is full (100%).`
@@ -362,7 +473,7 @@ export default function CriteriaManager({ eventId, foundation, initialRoundId = 
 
             <button
               type="submit"
-              disabled={saving || isFull}
+              disabled={saving || isFull || addInvalid}
               title={isFull ? `${scopeLabel[0].toUpperCase()}${scopeLabel.slice(1)} already totals 100%` : undefined}
               className={`inline-flex items-center justify-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm font-medium text-v-sidebar-active hover:bg-v-primary-hover disabled:opacity-50 ${
                 !hasRounds && divisionsEnabled ? 'sm:col-span-3' : 'sm:col-span-2'
@@ -371,6 +482,11 @@ export default function CriteriaManager({ eventId, foundation, initialRoundId = 
               <Plus className="h-4 w-4" strokeWidth={1.8} aria-hidden />
               {saving ? 'Adding...' : isFull ? 'Full (100%)' : hasRounds ? 'Add to round' : 'Add criteria'}
             </button>
+            {addInvalid && !isFull && !shownName && !shownWeight && (
+              <p className="v-caption -mt-2 sm:col-span-full" role="status">
+                Enter a name and a weight above 0 to add this criterion.
+              </p>
+            )}
           </form>
 
           {/* Attach an existing criterion to this round (reuse across rounds). */}
@@ -391,13 +507,14 @@ export default function CriteriaManager({ eventId, foundation, initialRoundId = 
               <button
                 type="button"
                 onClick={attachExisting}
-                disabled={!attachId}
+                disabled={!attachId || Boolean(attachError)}
                 className="rounded-lg border border-v-border px-3 py-2 text-sm text-v-text-muted hover:text-v-text disabled:opacity-50"
               >
                 Attach
               </button>
             </div>
           )}
+          {attachError && <p role="alert" className="v-error-text mt-1">{attachError}</p>}
         </>
       }
       recordsPanel={
@@ -418,11 +535,18 @@ export default function CriteriaManager({ eventId, foundation, initialRoundId = 
                       <p className="break-words font-medium text-v-text">{c.name}</p>
                       <div className="flex gap-2">
                         <button type="button" aria-label={`${isCriteriaActive(c) ? 'Disable' : 'Enable'} ${c.name}`} className="v-caption underline" onClick={() => mutate(() => pageantService.updateCriteria(eventId, c.id, { isActive: !isCriteriaActive(c) }), c.id)}>{isCriteriaActive(c) ? 'Disable' : 'Enable'}</button>
-                        <button type="button" aria-label={`Edit major ${c.name}`} className="v-caption underline" onClick={() => editMajor(c)}>Edit major</button>
+                        <button type="button" aria-label={`Edit major ${c.name}`} className="v-caption underline" onClick={() => setEditingMajorId(c.id)}>Edit major</button>
                       </div>
                       <p className="mt-1 text-xs text-v-text-subtle">
                         Weight: {Number(c.percentage).toFixed(2)}%
                       </p>
+                      {editingMajorId === c.id && (
+                        <MajorEditForm
+                          criterion={c}
+                          onSave={(values) => saveMajor(c, values)}
+                          onCancel={() => setEditingMajorId(null)}
+                        />
+                      )}
                     </div>
                     {!hasRounds && divisionsEnabled && divisionName && (
                       <span className="mt-0.5 rounded-full bg-v-primary/10 px-2 py-0.5 text-[10px] font-medium text-v-primary uppercase tracking-wide">

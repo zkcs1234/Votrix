@@ -146,7 +146,6 @@ export async function registerParticipant(eventId, userId, options = {}) {
     throw new ApiError(403, 'Participant account is not active')
   }
 
-  if(resolvedType===PARTICIPANT_TYPES.COMPETITION_JUDGE){const authorized=account.profile_data?.organizerIds;if(Array.isArray(authorized)&&authorized.length&&!authorized.map(String).includes(String(event.organizations?.organizer_id)))throw new ApiError(403,"Judge is outside this organizer's authorized pool")}
   if (!(await hasParticipantTypeMembership(userId, resolvedType))) {
     throw new ApiError(403, 'Account is not eligible for this participant type')
   }

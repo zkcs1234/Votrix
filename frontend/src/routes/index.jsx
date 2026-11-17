@@ -12,22 +12,26 @@ import PollingLayout from '@/layouts/PollingLayout'
 import ReportsLayout from '@/layouts/ReportsLayout'
 import ProtectedRoute from '@/routes/ProtectedRoute'
 import GuestRoute from '@/routes/GuestRoute'
+import LegacyUserManagementRedirect from '@/routes/LegacyUserManagementRedirect'
 import { USER_ROLES } from '@/utils/constants'
 
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
 const ChangePasswordPage = lazy(() => import('@/pages/auth/ChangePasswordPage'))
 const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'))
-const UserManagementPage = lazy(() => import('@/pages/admin/UserManagementPage'))
+const OrganizersPage = lazy(() => import('@/pages/admin/OrganizersPage'))
+const ParticipantsPage = lazy(() => import('@/pages/admin/ParticipantsPage'))
 const GlobalEventsPage = lazy(() => import('@/pages/admin/GlobalEventsPage'))
-const SystemSettingsPage = lazy(() => import('@/pages/admin/SystemSettingsPage'))
+const SystemPage = lazy(() => import('@/pages/admin/SystemPage'))
 const AuditLogsPage = lazy(() => import('@/pages/admin/AuditLogsPage'))
 const OrganizerDetailPage = lazy(() => import('@/pages/admin/OrganizerDetailPage'))
-const HealthDashboardPage = lazy(() => import('@/pages/admin/HealthDashboardPage'))
-const AlertConfigPage = lazy(() => import('@/pages/admin/AlertConfigPage'))
-const ArchivalPolicyPage = lazy(() => import('@/pages/admin/ArchivalPolicyPage'))
+const OrganizerApplyPage = lazy(() => import('@/pages/organizer/OrganizerApplyPage'))
+const OrganizerOfficersPage = lazy(() => import('@/pages/organizer/OrganizerOfficersPage'))
 const OrganizerDashboardPage = lazy(() => import('@/pages/organizer/OrganizerDashboardPage'))
-const VoterDashboardPage = lazy(() => import('@/pages/voter/VoterDashboardPage'))
+const ParticipantOverviewPage = lazy(() => import('@/pages/participant/ParticipantOverviewPage'))
+const ParticipantEventsPage = lazy(() => import('@/pages/participant/ParticipantEventsPage'))
+const ParticipantHistoryPage = lazy(() => import('@/pages/participant/ParticipantHistoryPage'))
+const ParticipantResultsPage = lazy(() => import('@/pages/participant/ParticipantResultsPage'))
 const VoterEventPage = lazy(() => import('@/pages/voter/VoterEventPage'))
 
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'))
@@ -165,6 +169,14 @@ export const routeConfig = [
     ),
     children: [{ index: true, element: <ChangePasswordPage /> }],
   },
+  // Public organizer application, opened from an admin's invitation link. The
+  // token in the URL is the credential, so there is deliberately no GuestRoute
+  // or ProtectedRoute here (anyone holding the link, signed in or not, can use it).
+  {
+    path: '/organizer/apply/:token',
+    element: <AuthLayout size="lg" />,
+    children: [{ index: true, element: <OrganizerApplyPage /> }],
+  },
 
   {
     path: '/admin',
@@ -175,17 +187,19 @@ export const routeConfig = [
     ),
     children: [
       { index: true, element: <AdminDashboardPage /> },
-      { path: 'users', element: <UserManagementPage /> },
-      // Legacy path — redirect to the renamed User Management area (plan D14).
-      { path: 'organizers', element: <Navigate to="/admin/users" replace /> },
+      { path: 'organizers', element: <OrganizersPage /> },
       { path: 'organizers/:id', element: <OrganizerDetailPage /> },
+      { path: 'participants', element: <ParticipantsPage /> },
+      // Legacy single User Management page: map old URLs onto the two new pages.
+      { path: 'users', element: <LegacyUserManagementRedirect /> },
       { path: 'events', element: <GlobalEventsPage /> },
-      { path: 'settings', element: <SystemSettingsPage /> },
+      { path: 'settings', element: <SystemPage /> },
       { path: 'audit-logs', element: <AuditLogsPage /> },
       { path: 'email-delivery', element: <Navigate to="/admin/audit-logs?view=email" replace /> },
-      { path: 'health', element: <HealthDashboardPage /> },
-      { path: 'alerts', element: <AlertConfigPage /> },
-      { path: 'archival', element: <ArchivalPolicyPage /> },
+      // Health, alerts and the archival policy now live as tabs on System settings.
+      { path: 'health', element: <Navigate to="/admin/settings?section=health" replace /> },
+      { path: 'alerts', element: <Navigate to="/admin/settings?section=alerts" replace /> },
+      { path: 'archival', element: <Navigate to="/admin/settings?section=archival" replace /> },
     ],
   },
     {
@@ -195,7 +209,11 @@ export const routeConfig = [
         <DashboardLayout title="Organizer" />
       </ProtectedRoute>
     ),
-    children: [{ index: true, element: <OrganizerDashboardPage /> }],
+    children: [
+      { index: true, element: <OrganizerDashboardPage /> },
+      // Owner-only; the page redirects an officer back to /organizer.
+      { path: 'officers', element: <OrganizerOfficersPage /> },
+    ],
   },
   {
     path: '/organizer/election',
@@ -290,16 +308,23 @@ export const routeConfig = [
     path: '/participant',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.PARTICIPANT]}>
-        <DashboardLayout title="Participant" showSidebar={false} />
+        <DashboardLayout title="Participant" />
       </ProtectedRoute>
     ),
-    children: [{ index: true, element: <VoterDashboardPage /> }],
+    children: [
+      { index: true, element: <ParticipantOverviewPage /> },
+      { path: 'my-events', element: <ParticipantEventsPage /> },
+      { path: 'history', element: <ParticipantHistoryPage /> },
+      { path: 'results', element: <ParticipantResultsPage /> },
+    ],
   },
+  // Task pages keep the sidebar as a collapsed rail so the ballot, poll or
+  // scoresheet gets the full width.
   {
     path: '/participant/events/:eventId',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.PARTICIPANT]}>
-        <DashboardLayout title="Vote" moduleLabel="Election" showSidebar={false} />
+        <DashboardLayout title="Vote" moduleLabel="Election" railOnly />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <VoterEventPage /> }],
@@ -308,7 +333,7 @@ export const routeConfig = [
     path: '/participant/polling/events/:eventId',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.PARTICIPANT]}>
-        <DashboardLayout title="Poll" moduleLabel="Polling" showSidebar={false} />
+        <DashboardLayout title="Poll" moduleLabel="Polling" railOnly />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <VoterPollPage /> }],
@@ -317,7 +342,7 @@ export const routeConfig = [
     path: '/participant/competition/events/:eventId/score',
     element: (
       <ProtectedRoute allowedRoles={[USER_ROLES.PARTICIPANT]}>
-        <DashboardLayout title="Judge scoring" moduleLabel="Competition Scoring" showSidebar={false} />
+        <DashboardLayout title="Judge scoring" moduleLabel="Competition Scoring" railOnly />
       </ProtectedRoute>
     ),
     children: [{ index: true, element: <JudgeScoringPage /> }],

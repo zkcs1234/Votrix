@@ -39,10 +39,8 @@ export function buildPollingStats(analytics) {
   ]
 }
 
-export function buildPollingParticipationGroups(analytics, dimension) {
-  const rows = dimension === 'program'
-    ? analytics?.participationByProgram
-    : analytics?.participationByYearSection
+export function buildPollingParticipationGroups(analytics) {
+  const rows = analytics?.participationByProgram
   return (rows ?? []).map((row) => ({
     id: row.label,
     label: row.label,
@@ -135,23 +133,12 @@ export function buildPollingReportSheets(report) {
       })),
     },
     {
-      name: 'Year section participation',
-      rows: (report?.participationByYearSection ?? []).map((row) => ({
-        yearSection: row.label,
-        registered: row.registered,
-        responded: row.responded,
-        notResponded: row.notResponded,
-        responseRate: `${row.responseRate}%`,
-      })),
-    },
-    {
       name: 'Respondent participation',
       rows: (report?.respondentParticipation ?? []).map((r) => ({
         'Student ID': r.schoolId || 'N/A',
         'Last Name': r.lastName || '',
         'First Name': r.firstName || '',
         'Program': r.program || '',
-        'Year & Section': r.yearSection || '',
         'Status': r.hasResponded ? 'Responded' : 'Not responded',
       })),
     },
@@ -238,7 +225,6 @@ export function buildPollingReportCsvRows(report) {
       schoolId: r.schoolId || 'N/A',
       name: `${r.lastName ? `${r.lastName}, ` : ''}${r.firstName || ''}`.trim(),
       program: r.program || '',
-      yearSection: r.yearSection || '',
       status: r.hasResponded ? 'Responded' : 'Not responded',
     })
   }

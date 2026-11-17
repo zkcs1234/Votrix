@@ -27,19 +27,7 @@ export const organizerProfileService = {
     return api.get(`${base}/profile/status`)
   },
 
-  /**
-   * Create or update the organizer's profile.
-   * All 4 fields are required.
-   *
-   * @param {object} payload
-   * @param {string} payload.organizationName - Organization name
-   * @param {string} payload.organizationType - Organization type (free text)
-   * @param {string} payload.organizerName - Organizer's full name
-   * @param {string} payload.position - Organizer's position/role
-   * @returns {Promise<{data: {success: boolean, profile: object}}>}
-   */
-  updateProfile(payload) {
-    return api.put(`${base}/profile`, payload)
-  },
+  // There is no update call on purpose: an organizer's profile is edited only by an
+  // administrator (PUT /admin/organizers/:id). The organization logo is separate.
 }
 

@@ -25,7 +25,7 @@ function judgeName(j) {
 
 export default function CompetitionJudgesPage() {
   return (
-    <div data-module="competition-scoring" className="mx-auto max-w-5xl">
+    <div data-module="competition-scoring" className="mx-auto max-w-7xl">
       <NativeSetupBoundary Legacy={LegacyCompetitionJudgesPage} />
     </div>
   )
@@ -182,7 +182,7 @@ function LegacyCompetitionJudgesPage() {
             {poolError && <div role="alert"><p className="v-error-text">{poolError}</p><Button variant="secondary" onClick={loadPool}>Retry judge pool</Button></div>}
             {poolLoading ? <p className="v-caption">Loading judge pool…</p> : !poolError && pool.length === 0 ? (
               <p className="v-caption">
-                No judges in the pool. Ask an admin to register judges in User Management.
+                No judges in the pool. Ask an admin to register judges under Participants → Judges.
               </p>
             ) : (
               <div className="grid gap-2 sm:grid-cols-2">

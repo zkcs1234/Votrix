@@ -399,3 +399,21 @@ it('shows a division save failure and preserves the typed form for retry', async
   expect(await screen.findByRole('alert')).toHaveTextContent('Division service offline')
   expect(screen.getByLabelText('Division name')).toHaveValue('Junior')
 })
+it('flags a repeated or blank division name while typing and explains the disabled Add button', async () => {
+  foundation.event.divisions_enabled = true
+  foundation.divisions = [{ id: 'a', name: 'Senior' }]
+  await openWorkspace(); fireEvent.click(screen.getByRole('tab', { name: 'Divisions', exact: true }))
+  const name = screen.getByLabelText('Division name')
+  const add = screen.getByRole('button', { name: 'Add division' })
+  expect(add).toBeDisabled()
+  expect(screen.queryByText('Division name is required.')).not.toBeInTheDocument() // nothing nags before the field is touched
+
+  fireEvent.change(name, { target: { value: 'senior' } })
+  expect(await screen.findByText('A division with this name already exists.')).toBeInTheDocument()
+  expect(name).toHaveAttribute('aria-invalid', 'true')
+  expect(add).toBeDisabled()
+
+  fireEvent.change(name, { target: { value: 'Junior' } })
+  await waitFor(() => expect(screen.queryByText('A division with this name already exists.')).not.toBeInTheDocument())
+  expect(add).toBeEnabled()
+})

@@ -11,7 +11,7 @@ import { downloadExcel, downloadCsv } from '@/utils/exportReport'
  *
  * Renders a clean roster of enrolled voters or respondents showing who has
  * participated (voted/responded) and who has not. Includes multi-level filtering
- * by Program and Year & Section (e.g. BSCS 1A, 1B, 2A; BSED 1A...), search by
+ * by Program, search by
  * Student ID or Name, status filter, and quick Excel/CSV export.
  */
 export default function ParticipantParticipationTable({
@@ -25,7 +25,6 @@ export default function ParticipantParticipationTable({
 }) {
   const [search, setSearch] = useState('')
   const [selectedProgram, setSelectedProgram] = useState('all')
-  const [selectedSection, setSelectedSection] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -41,26 +40,11 @@ export default function ParticipantParticipationTable({
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
   }, [participants])
 
-  // Extract distinct sections, optionally constrained to selected program
-  const sections = useMemo(() => {
-    const set = new Set()
-    for (const p of participants) {
-      if (selectedProgram !== 'all' && p.program !== selectedProgram) continue
-      if (p.yearSection && p.yearSection !== 'Unspecified') {
-        set.add(p.yearSection)
-      }
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-  }, [participants, selectedProgram])
-
   // Filter participants
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return participants.filter((p) => {
       if (selectedProgram !== 'all' && (p.program || 'Unspecified') !== selectedProgram) {
-        return false
-      }
-      if (selectedSection !== 'all' && (p.yearSection || 'Unspecified') !== selectedSection) {
         return false
       }
       const hasParticipated = Boolean(p[statusKey])
@@ -77,17 +61,11 @@ export default function ParticipantParticipationTable({
       }
       return true
     })
-  }, [participants, selectedProgram, selectedSection, selectedStatus, search, statusKey])
+  }, [participants, selectedProgram, selectedStatus, search, statusKey])
 
   // Reset pagination when filter changes
   const handleProgramChange = (prog) => {
     setSelectedProgram(prog)
-    setSelectedSection('all')
-    setPage(1)
-  }
-
-  const handleSectionChange = (sec) => {
-    setSelectedSection(sec)
     setPage(1)
   }
 
@@ -104,7 +82,6 @@ export default function ParticipantParticipationTable({
   const handleClearFilters = () => {
     setSearch('')
     setSelectedProgram('all')
-    setSelectedSection('all')
     setSelectedStatus('all')
     setPage(1)
   }
@@ -123,7 +100,7 @@ export default function ParticipantParticipationTable({
     return filtered.slice(start, start + pageSize)
   }, [filtered, safePage, pageSize])
 
-  const hasActiveFilters = search || selectedProgram !== 'all' || selectedSection !== 'all' || selectedStatus !== 'all'
+  const hasActiveFilters = search || selectedProgram !== 'all' || selectedStatus !== 'all'
 
   // Excel / CSV Export
   const handleExportExcel = () => {
@@ -132,7 +109,6 @@ export default function ParticipantParticipationTable({
       'Last Name': p.lastName || '',
       'First Name': p.firstName || '',
       'Program': p.program || '',
-      'Year & Section': p.yearSection || '',
       'Status': p[statusKey] ? votedLabel : notVotedLabel,
     }))
     downloadExcel(filename, [{ name: 'Participation', rows }])
@@ -144,7 +120,6 @@ export default function ParticipantParticipationTable({
       lastName: p.lastName || '',
       firstName: p.firstName || '',
       program: p.program || '',
-      yearSection: p.yearSection || '',
       status: p[statusKey] ? votedLabel : notVotedLabel,
     }))
     downloadCsv(`${filename}.csv`, rows)
@@ -210,21 +185,6 @@ export default function ParticipantParticipationTable({
           ))}
         </select>
 
-        {/* Year & Section Filter */}
-        <select
-          value={selectedSection}
-          onChange={(e) => handleSectionChange(e.target.value)}
-          aria-label="Filter by section"
-          className="w-full rounded-lg border border-v-border-strong bg-v-surface-elevated px-3 py-2 text-sm text-v-text shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all hover:border-v-text-muted focus:border-v-primary focus:bg-v-surface focus:outline-none focus:ring-2 focus:ring-v-primary/20"
-        >
-          <option value="all">All Sections ({sections.length})</option>
-          {sections.map((sec) => (
-            <option key={sec} value={sec}>
-              {sec}
-            </option>
-          ))}
-        </select>
-
         {/* Status Filter */}
         <select
           value={selectedStatus}
@@ -272,14 +232,13 @@ export default function ParticipantParticipationTable({
               <th className="px-3.5 py-2.5">Student ID</th>
               <th className="px-3.5 py-2.5">Name</th>
               <th className="px-3.5 py-2.5">Program</th>
-              <th className="px-3.5 py-2.5">Year &amp; Section</th>
               <th className="px-3.5 py-2.5 text-right">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-v-border">
             {paginatedRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-sm text-v-text-muted">
+                <td colSpan={4} className="px-4 py-8 text-center text-sm text-v-text-muted">
                   No participants match the selected filter.
                 </td>
               </tr>
@@ -294,7 +253,6 @@ export default function ParticipantParticipationTable({
                     </td>
                     <td className="px-3.5 py-2.5 font-medium text-v-text">{fullName}</td>
                     <td className="px-3.5 py-2.5 text-v-text-muted">{p.program || '—'}</td>
-                    <td className="px-3.5 py-2.5 text-v-text-muted">{p.yearSection || '—'}</td>
                     <td className="px-3.5 py-2.5 text-right">
                       {hasParticipated ? (
                         <Badge tone="success" dot>

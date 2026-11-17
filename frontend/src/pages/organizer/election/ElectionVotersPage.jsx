@@ -31,7 +31,7 @@ export default function ElectionVotersPage() {
   }, [eventId])
 
   return (
-    <div data-module="election" className="mx-auto max-w-5xl space-y-6">
+    <div data-module="election" className="mx-auto max-w-7xl space-y-6">
       <PageHeader
         title="Election Voters"
         description="Invite eligible voters by program or year and section, then manage ballot eligibility."

@@ -31,10 +31,14 @@ import { mapEvent } from '../foundation/mapper.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
 import { notifyAdminsEventPublished } from './notification.service.js'
 import {
-  assertEventUpdateAllowed,
+  EDIT_CLASS,
+  assertPublishedEventUpdate,
   assertSetupEditable,
   assertParticipantsEditable,
+  buildEditPolicy,
   canUnpublishEventStatus,
+  normalizeChangeReason,
+  summarizeChanges,
 } from '../utils/eventLifecycle.js'
 import { deleteDraft } from './draft.service.js'
 import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
@@ -356,9 +360,13 @@ export async function updatePageantEvent(eventId, organizerId, payload) {
 export async function updateCompetitionEvent(eventId, organizerId, payload) {
   const event = await assertCompetitionEvent(eventId, organizerId)
 
-  assertSetupEditable(event)
-  assertEventUpdateAllowed(event, payload)
-  if (event.competition_created_at) throw new ApiError(409, 'Competition creation is complete; its reviewed setup is frozen')
+  // Draft: free edit. Published: safe fields + schedule changes with a reason.
+  const changes = assertPublishedEventUpdate(event, payload)
+  // Once competition creation is complete its reviewed setup is frozen; only
+  // cosmetic (safe) details may still be corrected.
+  if (event.competition_created_at && changes.some((c) => c.cls !== EDIT_CLASS.SAFE)) {
+    throw new ApiError(409, 'Competition creation is complete; its reviewed setup is frozen')
+  }
 
   // Capture old image_asset_id before updating so we can clean it up if replaced
   const oldAssetId = event.image_asset_id ?? null
@@ -397,9 +405,32 @@ export async function updateCompetitionEvent(eventId, organizerId, payload) {
     action: 'competition.event.update',
     userId: organizerId,
     module: 'competition',
-    details: { changedKeys: Object.keys(updates) },
+    details: {
+      changedKeys: Object.keys(updates),
+      changes: summarizeChanges(changes),
+      ...(event.status !== EVENT_STATUS.DRAFT
+        ? { statusAtEdit: event.status, reason: normalizeChangeReason(payload.changeReason) }
+        : {}),
+    },
   })
   return mapEvent(data)
+}
+
+/**
+ * What the organizer may currently do to this competition (drives the UI).
+ * Pause-and-revise is not offered: competition status is driven by the live
+ * scoring session and rule changes go through the approved amendment flow.
+ */
+export async function getCompetitionEditPolicy(eventId, organizerId) {
+  const event = await assertCompetitionEvent(eventId, organizerId)
+  const policy = buildEditPolicy(event, { supportsPause: false })
+  if (event.competition_created_at) {
+    // Reviewed setup is frozen: only cosmetic details stay editable.
+    policy.liveEditableFields = policy.liveEditableFields.filter((f) =>
+      ['title', 'description', 'banner'].includes(f),
+    )
+  }
+  return policy
 }
 
 export async function getPageantEvent(eventId, organizerId) {

@@ -20,14 +20,15 @@ import {
   revokeAllSessionsForUser,
 } from '../services/session.service.js'
 
-function sendAuthResponse(res, { accessToken, refreshToken, user }, { remember = false } = {}) {
+async function sendAuthResponse(res, { accessToken, refreshToken, user }, { remember = false } = {}) {
   setAuthCookies(res, { accessToken, refreshToken }, { remember })
   const csrfToken = issueCsrfToken(res)
 
   res.json({
     success: true,
     csrfToken,
-    user,
+    // Participants also learn whether they act as a student officer.
+    user: await authService.attachParticipantContext(user),
   })
 }
 
@@ -100,7 +101,7 @@ export const refresh = asyncHandler(async (req, res) => {
   const tokens = await authService.refreshSession(decoded.sub, decoded.tokenVersion, {
     sessionId: decoded.sid ?? null,
   })
-  sendAuthResponse(res, tokens)
+  await sendAuthResponse(res, tokens)
 })
 
 export const logout = asyncHandler(async (_req, res) => {
@@ -201,7 +202,7 @@ export const changePassword = asyncHandler(async (req, res) => {
     message: 'Password updated successfully',
     accessToken: tokens.accessToken,
     csrfToken,
-    user: tokens.user,
+    user: await authService.attachParticipantContext(tokens.user),
   })
 })
 
@@ -239,6 +240,6 @@ export const skipPasswordChange = asyncHandler(async (req, res) => {
     message: 'You can continue with your current password',
     accessToken: tokens.accessToken,
     csrfToken,
-    user: tokens.user,
+    user: await authService.attachParticipantContext(tokens.user),
   })
 })

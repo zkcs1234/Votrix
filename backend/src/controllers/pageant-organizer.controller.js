@@ -12,6 +12,7 @@ import {
   validateScoringToggle,
 } from '../validators/competition.validator.js'
 import { listTemplates as listCompetitionTemplates } from '../modules/competition-templates.js'
+import { validateChangeReasonShape } from '../utils/eventLifecycle.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const data = await pageantService.getOrganizerDashboard(req.user.id)
@@ -66,11 +67,17 @@ export const unpublishEvent = asyncHandler(async (req, res) => {
   res.json({ success: true, event })
 })
 
+export const getEditPolicy = asyncHandler(async (req, res) => {
+  const policy = await pageantService.getCompetitionEditPolicy(req.params.eventId, req.user.id)
+  res.json({ success: true, policy })
+})
+
 export const uploadBanner = asyncHandler(async (req, res) => {
   const result = await uploadImageFile(req.file, UPLOAD_KIND.BANNER, `competition-${req.params.eventId}`)
   const event = await pageantService.updateCompetitionEvent(req.params.eventId, req.user.id, {
     banner: result.secure_url,
     image_asset_id: result.image_asset_id ?? null,
+    changeReason: validateChangeReasonShape(req.body?.changeReason),
   })
   res.json({ success: true, url: result.secure_url, event })
 })

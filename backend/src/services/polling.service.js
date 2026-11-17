@@ -31,10 +31,14 @@ import { createNotification, notifyAdminsEventPublished } from './notification.s
 import { USER_ROLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES, isParticipantRole } from '../utils/constants.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
 import {
-  assertEventUpdateAllowed,
+  assertPublishedEventUpdate,
+  assertChangeReason,
   assertSetupEditable,
   assertParticipantsEditable,
+  buildEditPolicy,
   canUnpublishEventStatus,
+  normalizeChangeReason,
+  summarizeChanges,
 } from '../utils/eventLifecycle.js'
 import { deleteDraft } from './draft.service.js'
 import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
@@ -177,7 +181,7 @@ export async function listEventRespondents(eventId, organizerId, page = 1, limit
       created_at,
       user_id,
       metadata,
-      users!inner (id, email, first_name, last_name, school_id, program, year_section)
+      users!inner (id, email, first_name, last_name, school_id, program)
     `, { count: 'exact' })
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
@@ -211,7 +215,6 @@ export async function listEventRespondents(eventId, organizerId, page = 1, limit
     lastName: row.users?.last_name ?? row.last_name,
     schoolId: row.users?.school_id ?? null,
     program: row.users?.program ?? null,
-    yearSection: row.users?.year_section ?? null,
     hasResponded: row.has_responded,
     createdAt: row.created_at,
     metadata: row.metadata ?? {},
@@ -222,7 +225,7 @@ export async function listEventRespondents(eventId, organizerId, page = 1, limit
   const scope = await getOrganizerScope(organizerId)
   const scoped = !isAllAccess(scope)
   if (scoped) {
-    voters = voters.filter((v) => isStudentInScope(scope, { program: v.program, yearSection: v.yearSection }))
+    voters = voters.filter((v) => isStudentInScope(scope, { program: v.program }))
   }
 
   return {
@@ -641,8 +644,8 @@ export async function createPollEvent(organizerId, payload) {
 
 export async function updatePollEvent(eventId, organizerId, payload) {
   const event = await assertPollingEvent(eventId, organizerId)
-  assertSetupEditable(event)
-  assertEventUpdateAllowed(event, payload)
+  // Draft: free edit. Published: safe fields + schedule changes with a reason.
+  const changes = assertPublishedEventUpdate(event, payload)
   assertPollExpirationWithinSchedule(
     payload.pollExpiresAt !== undefined ? payload.pollExpiresAt : event.poll_expires_at,
     payload.startDate ?? event.start_date,
@@ -689,7 +692,13 @@ export async function updatePollEvent(eventId, organizerId, payload) {
     action: 'polling.event.update',
     userId: organizerId,
     module: 'polling',
-    details: { changedKeys: Object.keys(updates) },
+    details: {
+      changedKeys: Object.keys(updates),
+      changes: summarizeChanges(changes),
+      ...(event.status !== EVENT_STATUS.DRAFT
+        ? { statusAtEdit: event.status, reason: normalizeChangeReason(payload.changeReason) }
+        : {}),
+    },
   })
   return mapPollEvent(data)
 }
@@ -772,18 +781,40 @@ async function assertNoPollSubmissions(eventId, action = 'modify questions') {
   }
 }
 
+async function countPollSubmissions(eventId) {
+  const { count, error } = await getClient()
+    .from(DB_TABLES.POLL_SUBMISSIONS)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+  if (error) throw new ApiError(500, error.message)
+  return count ?? 0
+}
+
+/** What the organizer may currently do to this poll (drives the UI). */
+export async function getPollEditPolicy(eventId, organizerId) {
+  const event = await assertPollingEvent(eventId, organizerId)
+  const hasActivity =
+    event.status === EVENT_STATUS.ACTIVE ? (await countPollSubmissions(eventId)) > 0 : false
+  return buildEditPolicy(event, { hasActivity })
+}
+
 /**
- * Pull a published poll back to `draft` so its setup can be corrected. Only
- * allowed while the poll is still `scheduled` (published but not yet open).
+ * Pull a published poll back to `draft` so its setup can be corrected.
+ *
+ * Allowed while the poll is `scheduled`, or while it is `active` ("pause and
+ * revise") provided no response has been received yet and a reason is given.
  */
-export async function unpublishPollEvent(eventId, organizerId) {
+export async function unpublishPollEvent(eventId, organizerId, { reason } = {}) {
   const event = await assertPollingEvent(eventId, organizerId)
 
-  if (!canUnpublishEventStatus(event.status)) {
-    throw new ApiError(400, 'Only a scheduled poll can be unpublished. It has already opened or is closed.')
+  const wasActive = event.status === EVENT_STATUS.ACTIVE
+  if (!canUnpublishEventStatus(event.status) && !wasActive) {
+    throw new ApiError(400, 'Only a scheduled or live poll can be unpublished. This poll is closed.')
   }
 
-  await assertNoPollSubmissions(eventId, 'unpublish this poll')
+  if (wasActive) assertChangeReason(reason, 'pause a live poll')
+
+  await assertNoPollSubmissions(eventId, wasActive ? 'pause this poll' : 'unpublish this poll')
 
   const { error } = await getClient()
     .from(DB_TABLES.EVENTS)
@@ -792,12 +823,30 @@ export async function unpublishPollEvent(eventId, organizerId) {
 
   if (error) throw new ApiError(500, error.message)
 
+  // A response could have arrived between the check above and closing the poll.
+  // Responses are rejected once the poll is a draft, so re-count and restore it
+  // if anything slipped in.
+  if (wasActive && (await countPollSubmissions(eventId)) > 0) {
+    await getClient()
+      .from(DB_TABLES.EVENTS)
+      .update({ status: EVENT_STATUS.ACTIVE, polling_enabled: true })
+      .eq('id', eventId)
+    throw new ApiError(
+      409,
+      'A response was received while pausing, so the poll was left open and can no longer be paused.',
+    )
+  }
+
   recordEventActivity({
     eventId,
     action: 'polling.event.unpublish',
     userId: organizerId,
     module: 'polling',
-    details: { title: event.title },
+    details: {
+      title: event.title,
+      fromStatus: event.status,
+      ...(wasActive ? { reason: normalizeChangeReason(reason) } : {}),
+    },
   })
 
   const reverted = await getEventById(eventId)
@@ -1488,7 +1537,7 @@ export async function getPollAnalytics(eventId, organizerId) {
 
   const { data: participantRows, error: participantErr } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id, has_responded, users!inner (id, email, first_name, last_name, school_id, program, year_section)')
+    .select('id, has_responded, users!inner (id, email, first_name, last_name, school_id, program)')
     .eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
 
@@ -1577,7 +1626,7 @@ export async function getPollAnalytics(eventId, organizerId) {
   let scopedParticipants = participantRows ?? []
   if (scoped) {
     scopedParticipants = scopedParticipants.filter((row) =>
-      isStudentInScope(scope, { program: row.users?.program, yearSection: row.users?.year_section })
+      isStudentInScope(scope, { program: row.users?.program })
     )
   }
 
@@ -1587,15 +1636,12 @@ export async function getPollAnalytics(eventId, organizerId) {
     firstName: row.users?.first_name ?? '',
     lastName: row.users?.last_name ?? '',
     program: row.users?.program ?? 'Unspecified',
-    yearSection: row.users?.year_section ?? 'Unspecified',
     hasResponded: Boolean(row.has_responded),
   }))
 
   respondentParticipation.sort((a, b) => {
     const progCmp = a.program.localeCompare(b.program, undefined, { numeric: true })
     if (progCmp !== 0) return progCmp
-    const secCmp = a.yearSection.localeCompare(b.yearSection, undefined, { numeric: true })
-    if (secCmp !== 0) return secCmp
     const lastCmp = a.lastName.localeCompare(b.lastName, undefined, { numeric: true })
     if (lastCmp !== 0) return lastCmp
     return a.firstName.localeCompare(b.firstName, undefined, { numeric: true })
@@ -1607,7 +1653,6 @@ export async function getPollAnalytics(eventId, organizerId) {
     respondedRespondents: (participantRows ?? []).filter((row) => row.has_responded).length,
     pollAnonymous: anonymous,
     participationByProgram: participationBy('program'),
-    participationByYearSection: participationBy('year_section'),
     respondentParticipation,
     responseActivity: Array.from(activityByDay.entries()).map(([period, responses]) => ({ period, responses })),
     averageCompletionTimeSeconds,

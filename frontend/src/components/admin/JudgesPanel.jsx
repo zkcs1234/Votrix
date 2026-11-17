@@ -1,21 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Trophy, UserPlus, Upload, Download, Pencil, ShieldOff, UserCheck, ChevronDown } from 'lucide-react'
+import { Trophy, UserPlus, Upload, Download, Archive, UserCheck, ChevronDown } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
 import FormAlert from '@/components/ui/FormAlert'
+import FormField from '@/components/ui/FormField'
+import { useLiveForm } from '@/hooks/useLiveForm'
+import { buildJudgeSchema, JUDGE_SERVER_FIELDS } from '@/schemas/people.schemas'
 import SearchInput from '@/components/ui/SearchInput'
 import StatCard from '@/components/ui/StatCard'
 import PageHeader from '@/components/ui/PageHeader'
 import { INPUT_CLASS } from '@/utils/uiClasses'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
-import { downloadBlob, downloadCsv } from '@/utils/csvDownload'
+import { downloadBlob } from '@/utils/csvDownload'
 import AccountStatusConfirmModal from '@/components/admin/AccountStatusConfirmModal'
+import AccountActionsMenu from '@/components/admin/AccountActionsMenu'
+import ViewJudgeDetailsModal from '@/components/admin/ViewJudgeDetailsModal'
 import { getEmailOutcomeMessage } from '@/utils/emailOutcome'
-import CsvImportResults from '@/components/admin/CsvImportResults'
+import CsvImportPreview from '@/components/admin/CsvImportPreview'
 
 const STATUS_TONE = { active: 'success', suspended: 'danger', archived: 'default' }
 
@@ -27,37 +32,38 @@ function fullName(v) {
 function JudgeFormModal({ mode, initial, onClose, onSaved }) {
   const isEdit = mode === 'edit'
   const data = initial?.profileData ?? {}
-  const [form, setForm] = useState({
-    email: initial?.email ?? '',
-    firstName: initial?.firstName ?? '',
-    lastName: initial?.lastName ?? '',
-    title: data.title ?? '',
-    affiliation: data.affiliation ?? '',
-    expertise: data.expertise ?? '',
-  })
   const [showAdditionalDetails, setShowAdditionalDetails] = useState(
     isEdit && Boolean(data.title || data.affiliation),
   )
-  const [organizerIds, setOrganizerIds] = useState(() => (Array.isArray(data.organizerIds) ? data.organizerIds : []))
-  const [organizers, setOrganizers] = useState([])
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
   const { success, warning, error: toastError } = useToast()
 
-  useEffect(() => {
-    adminService.getOrganizers().then(({ data: d }) => setOrganizers(d.organizers ?? [])).catch(() => {})
-  }, [])
+  const schema = useMemo(() => buildJudgeSchema({ isEdit }), [isEdit])
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    formError,
+    setFormError,
+    handleServerError,
+    blockedReason,
+    canSubmit,
+  } = useLiveForm({
+    schema,
+    defaultValues: {
+      email: initial?.email ?? '',
+      firstName: initial?.firstName ?? '',
+      lastName: initial?.lastName ?? '',
+      title: data.title ?? '',
+      affiliation: data.affiliation ?? '',
+      expertise: data.expertise ?? '',
+    },
+    serverFieldMap: JUDGE_SERVER_FIELDS,
+  })
 
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
-  const toggleOrganizer = (id) =>
-    setOrganizerIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
+  const onSubmit = async (values) => {
+    setFormError(null)
     try {
-      const payload = { ...form, organizerIds }
+      const payload = { ...values }
       if (isEdit) {
         await adminService.updateJudge(initial.id, payload)
         success('Competition Judge updated')
@@ -68,36 +74,37 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
       }
       onSaved()
     } catch (err) {
-      const details = err.response?.data?.details?.errors
-      const message = details?.length ? details.join('; ') : getErrorMessage(err, 'Save failed')
-      setError(message)
-      toastError(message)
-    } finally {
-      setSaving(false)
+      const message = handleServerError(err, 'Save failed')
+      if (message) toastError(message)
     }
   }
 
   return (
     <Modal open onClose={onClose} title={isEdit ? 'Edit Judge' : 'Add Judge'} size="md">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="v-label">Email</label>
-          <input type="email" value={form.email} onChange={set('email')} className={INPUT_CLASS} required disabled={isEdit} placeholder="judge@example.com" />
-          {isEdit && <p className="v-caption mt-1">Email can&apos;t be changed here.</p>}
-        </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        {isEdit ? (
+          <FormField label="Email" hint="Email can't be changed here.">
+            {(field) => <input type="email" {...field} value={initial?.email ?? ''} disabled readOnly />}
+          </FormField>
+        ) : (
+          <FormField label="Email" required error={errors.email?.message}>
+            {(field) => <input type="email" placeholder="judge@example.com" autoComplete="off" {...field} {...register('email')} />}
+          </FormField>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="v-label">First name</label>
-            <input type="text" value={form.firstName} onChange={set('firstName')} className={INPUT_CLASS} required />
-          </div>
-          <div>
-            <label className="v-label">Last name</label>
-            <input type="text" value={form.lastName} onChange={set('lastName')} className={INPUT_CLASS} required />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="v-label">Expertise <span className="v-caption">(optional)</span></label>
-            <input type="text" value={form.expertise} onChange={set('expertise')} className={INPUT_CLASS} placeholder="Field of specialization" />
-          </div>
+          <FormField label="First name" required error={errors.firstName?.message}>
+            {(field) => <input type="text" {...field} {...register('firstName')} />}
+          </FormField>
+          <FormField label="Last name" required error={errors.lastName?.message}>
+            {(field) => <input type="text" {...field} {...register('lastName')} />}
+          </FormField>
+          <FormField
+            className="sm:col-span-2"
+            label={<>Expertise <span className="v-caption">(optional)</span></>}
+            error={errors.expertise?.message}
+          >
+            {(field) => <input type="text" placeholder="Field of specialization" {...field} {...register('expertise')} />}
+          </FormField>
         </div>
 
         <div className="border-t border-v-border pt-2">
@@ -113,54 +120,26 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
           </button>
           {showAdditionalDetails && (
             <div id="judge-additional-details" className="grid gap-4 pb-2 sm:grid-cols-2">
-              <div>
-                <label className="v-label">Title <span className="v-caption">(optional)</span></label>
-                <input type="text" value={form.title} onChange={set('title')} className={INPUT_CLASS} placeholder="Prof., Engr., Dr." />
-              </div>
-              <div>
-                <label className="v-label">Affiliation <span className="v-caption">(optional)</span></label>
-                <input type="text" value={form.affiliation} onChange={set('affiliation')} className={INPUT_CLASS} placeholder="Organization / department" />
-              </div>
+              <FormField label={<>Title <span className="v-caption">(optional)</span></>} error={errors.title?.message}>
+                {(field) => <input type="text" placeholder="Prof., Engr., Dr." {...field} {...register('title')} />}
+              </FormField>
+              <FormField label={<>Affiliation <span className="v-caption">(optional)</span></>} error={errors.affiliation?.message}>
+                {(field) => <input type="text" placeholder="Organization / department" {...field} {...register('affiliation')} />}
+              </FormField>
             </div>
           )}
         </div>
 
-        <div className="rounded-2xl border border-v-border p-3">
-          <p className="v-label mb-1">Assign to organizers</p>
-          <p className="v-caption mb-2">
-            Only assigned organizers can pick this Competition Judge. Leave empty to make them available to all organizers.
-          </p>
-          {organizers.length === 0 ? (
-            <p className="v-caption">No organizers registered yet.</p>
-          ) : (
-            <div className="max-h-32 overflow-auto rounded-lg border border-v-border p-2">
-              <div className="flex flex-wrap gap-1.5">
-                {organizers.map((o) => {
-                  const on = organizerIds.includes(o.id)
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onClick={() => toggleOrganizer(o.id)}
-                      title={o.email}
-                      className={`rounded-md border px-2 py-1 text-xs transition ${
-                        on ? 'border-v-primary bg-v-primary/10 text-v-text' : 'border-v-border text-v-text-muted hover:bg-v-surface-elevated'
-                      }`}
-                    >
-                      {o.organizer_name || o.organization_name || o.email}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+        <p className="v-caption">
+          Judges are available to every organizer. Each organizer chooses which judges join their own competition event.
+        </p>
 
-        {error && <FormAlert variant="error">{error}</FormAlert>}
+        {formError && <FormAlert variant="error">{formError}</FormAlert>}
 
-        <div className="flex justify-end gap-2 border-t border-v-border pt-4">
+        <div className="flex items-center justify-end gap-3 border-t border-v-border pt-4">
+          {blockedReason && <p className="v-caption mr-auto" role="status">{blockedReason}</p>}
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={saving}>{isEdit ? 'Save changes' : 'Add Judge'}</Button>
+          <Button type="submit" loading={isSubmitting} disabled={!canSubmit}>{isEdit ? 'Save changes' : 'Add Judge'}</Button>
         </div>
       </form>
     </Modal>
@@ -168,67 +147,26 @@ function JudgeFormModal({ mode, initial, onClose, onSaved }) {
 }
 
 // ---- CSV preview modal -----------------------------------------------------
+const JUDGE_PREVIEW_COLUMNS = [
+  { header: 'Name', cell: (row) => [row.first_name, row.last_name].filter(Boolean).join(' ') },
+  { header: 'Email', cell: (row) => row.email },
+  { header: 'Title', cell: (row) => row.title },
+  { header: 'Affiliation', cell: (row) => row.affiliation },
+  { header: 'Expertise', cell: (row) => row.expertise },
+]
+
 function CsvPreviewModal({ preview, onClose, onRegister, registering }) {
   return (
-    <Modal open onClose={onClose} title={preview.importResult ? 'Import results' : 'Review & Register'} size="lg">
-      {preview.importResult ? (
-        <CsvImportResults result={preview.importResult} filename="judge-import-results.csv" onDone={onClose} />
-      ) : (
-        <>
-      {preview.errors?.length > 0 && (
-        <div className="mb-4 rounded-lg border border-v-danger/30 bg-v-danger/10 p-3">
-          <p className="v-error-text mb-2 font-semibold">{preview.errors.length} row error(s) — these will be skipped</p>
-          <ul className="v-error-text list-inside list-disc text-sm">
-            {preview.errors.slice(0, 6).map((err, i) => <li key={i}>{err}</li>)}
-            {preview.errors.length > 6 && <li>…and {preview.errors.length - 6} more</li>}
-          </ul>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            className="mt-3"
-            onClick={() => downloadCsv('judge-import-errors.csv', ['Issue'], preview.errors.map((issue) => [issue]))}
-          >
-            <Download className="h-4 w-4" strokeWidth={1.5} /> Download errors
-          </Button>
-        </div>
-      )}
-
-      <div className="mb-3 flex flex-wrap gap-4">
-        <span className="v-label">{preview.valid} of {preview.total} ready</span>
-        <span className="v-caption">New accounts: {preview.summary?.newAccounts ?? 0}</span>
-        <span className="v-caption">Profile updates: {preview.summary?.existingAccounts ?? 0}</span>
-      </div>
-
-      <div className="v-table-wrap mb-4 max-h-80 overflow-auto">
-        <table className="v-table">
-          <thead>
-            <tr><th>Name</th><th>Email</th><th>Title</th><th>Affiliation</th><th>Expertise</th><th>Action</th></tr>
-          </thead>
-          <tbody>
-            {(preview.data ?? []).map((row, i) => (
-              <tr key={i}>
-                <td>{[row.first_name, row.last_name].filter(Boolean).join(' ')}</td>
-                <td>{row.email}</td>
-                <td>{row.title || '—'}</td>
-                <td>{row.affiliation || '—'}</td>
-                <td>{row.expertise || '—'}</td>
-                <td><Badge tone={row.type === 'new' ? 'success' : 'default'}>{row.type === 'new' ? 'New' : 'Update'}</Badge></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="flex justify-end gap-2 border-t border-v-border pt-4">
-        <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button type="button" onClick={onRegister} loading={registering} disabled={!preview.data?.length}>
-          Register {preview.data?.length ?? 0}
-        </Button>
-      </div>
-        </>
-      )}
-    </Modal>
+    <CsvImportPreview
+      preview={preview}
+      columns={JUDGE_PREVIEW_COLUMNS}
+      noun="accounts"
+      resultsFilename="judge-import-results.csv"
+      errorsFilename="judge-import-errors.csv"
+      onClose={onClose}
+      onRegister={onRegister}
+      registering={registering}
+    />
   )
 }
 
@@ -242,12 +180,14 @@ export default function JudgesPanel() {
   const [statusFilter, setStatusFilter] = useState('active')
   const [modal, setModal] = useState(null)
   const [statusTarget, setStatusTarget] = useState(null)
+  const [viewTarget, setViewTarget] = useState(null)
   const [preview, setPreview] = useState(null)
   const [registering, setRegistering] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [savingId, setSavingId] = useState(null)
   const fileRef = useRef(null)
-  const { success, error: toastError } = useToast()
+  const [resendingId, setResendingId] = useState(null)
+  const { success, warning, error: toastError } = useToast()
 
   const fetchJudges = async () => {
     setLoading(true)
@@ -275,8 +215,8 @@ export default function JudgesPanel() {
 
   const summary = useMemo(() => {
     const active = judges.filter((v) => v.accountStatus === 'active').length
-    const suspended = judges.filter((v) => v.accountStatus === 'suspended').length
-    return { active, suspended }
+    const archived = judges.filter((v) => v.accountStatus === 'archived').length
+    return { active, archived }
   }, [judges])
 
   const handleFile = async (e) => {
@@ -337,12 +277,25 @@ export default function JudgesPanel() {
     }
   }
 
+  const handleResend = async (judge) => {
+    setResendingId(judge.id)
+    try {
+      const { data } = await adminService.resendJudgeCredentials(judge.id)
+      if (data.email?.sent) success(`New credentials emailed to ${judge.email}`)
+      else warning(getEmailOutcomeMessage(data.email))
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Failed to resend credentials'))
+    } finally {
+      setResendingId(null)
+    }
+  }
+
   const downloadTemplate = async () => {
     try {
       const { data } = await adminService.getJudgeCsvTemplate()
       downloadBlob('judge-template.csv', data)
     } catch (err) {
-      const message = getErrorMessage(err, 'Could not download the Competition Judge template')
+      const message = getErrorMessage(err, 'Could not download the Competition Judge form')
       setError(message)
       toastError(message)
     }
@@ -356,7 +309,7 @@ export default function JudgesPanel() {
         actions={
           <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={downloadTemplate}>
-            <Download className="h-4 w-4" strokeWidth={1.5} /> Template
+            <Download className="h-4 w-4" strokeWidth={1.5} /> Form
           </Button>
           <Button variant="secondary" onClick={handleExport} loading={exporting}>
             <Download className="h-4 w-4" strokeWidth={1.5} /> Export CSV
@@ -375,7 +328,7 @@ export default function JudgesPanel() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard label="Competition Judges (this view)" value={total} icon={Trophy} />
         <StatCard label="Active" value={summary.active} icon={UserCheck} />
-        <StatCard label="Suspended" value={summary.suspended} icon={ShieldOff} />
+        <StatCard label="Archived" value={summary.archived} icon={Archive} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:flex lg:items-center">
@@ -388,7 +341,6 @@ export default function JudgesPanel() {
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={`${INPUT_CLASS} lg:w-40`}>
           <option value="">All statuses</option>
           <option value="active">Active</option>
-          <option value="suspended">Suspended</option>
           <option value="archived">Archived</option>
         </select>
       </div>
@@ -422,28 +374,15 @@ export default function JudgesPanel() {
                     <td>{v.profileData?.expertise || '—'}</td>
                     <td><Badge tone={STATUS_TONE[v.accountStatus] ?? 'default'}>{v.accountStatus}</Badge></td>
                     <td>
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => setModal({ mode: 'edit', judge: v })}>
-                          <Pencil className="h-4 w-4" strokeWidth={1.5} /> Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          loading={savingId === v.id}
-                          onClick={() => setStatusTarget({
-                            user: v,
-                            accountStatus: v.accountStatus === 'active' ? 'suspended' : 'active',
-                            label: v.accountStatus === 'active' ? 'Suspend' : v.accountStatus === 'archived' ? 'Restore' : 'Reinstate',
-                          })}
-                        >
-                          {v.accountStatus === 'active' ? 'Suspend' : v.accountStatus === 'archived' ? 'Restore' : 'Reinstate'}
-                        </Button>
-                        {v.accountStatus !== 'archived' && (
-                          <Button size="sm" variant="secondary" onClick={() => setStatusTarget({ user: v, accountStatus: 'archived', label: 'Archive' })}>
-                            Archive
-                          </Button>
-                        )}
-                      </div>
+                      <AccountActionsMenu
+                        status={v.accountStatus}
+                        onEdit={() => setModal({ mode: 'edit', judge: v })}
+                        onView={() => setViewTarget(v)}
+                        onResend={v.mustChangePassword && v.accountStatus === 'active' ? () => handleResend(v) : undefined}
+                        resending={resendingId === v.id}
+                        busyStatus={savingId === v.id ? statusTarget?.accountStatus : null}
+                        onStatusChange={(change) => setStatusTarget({ ...change, user: v })}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -461,6 +400,8 @@ export default function JudgesPanel() {
           onSaved={() => { setModal(null); fetchJudges() }}
         />
       )}
+
+      {viewTarget && <ViewJudgeDetailsModal judge={viewTarget} onClose={() => setViewTarget(null)} />}
 
       <AccountStatusConfirmModal
         target={statusTarget ? {

@@ -99,8 +99,7 @@ export default function ElectionAnalyticsPage() {
   const positionSummaries = buildElectionPositionSummaries(data)
   const ballotSections = data?.ballotSections ?? []
   const trend = buildElectionParticipationTrend(data)
-  const programParticipation = buildElectionParticipationGroups(data, 'program')
-  const yearSectionParticipation = buildElectionParticipationGroups(data, 'yearSection')
+  const programParticipation = buildElectionParticipationGroups(data)
 
   const timelineItems = (timeline?.hourly?.length ? timeline.hourly : timeline?.daily ?? []).map((t) => ({
     label: t.period,
@@ -164,13 +163,10 @@ export default function ElectionAnalyticsPage() {
       </AnalyticsSection>
 
       <AnalyticsSection
-        title="Participation by program & year"
-        description="Turnout among registered voters broken down by program and by year & section."
+        title="Participation by program"
+        description="Turnout among registered voters broken down by program."
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ParticipationTable rows={programParticipation} />
-          <ParticipationTable rows={yearSectionParticipation} />
-        </div>
+        <ParticipationTable rows={programParticipation} />
       </AnalyticsSection>
 
       {ballotSections.length > 1 && ballotSections.map((section) => (

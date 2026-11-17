@@ -1,4 +1,5 @@
 import { ApiError } from '../utils/ApiError.js'
+import { validateChangeReasonShape } from '../utils/eventLifecycle.js'
 
 export function validatePollEvent(body, isCreate = false) {
   if (isCreate && !body?.title?.trim()) {
@@ -27,6 +28,7 @@ export function validatePollEvent(body, isCreate = false) {
     }
     payload.pollExpiresAt = body.pollExpiresAt || null
   }
+  if (body.changeReason !== undefined) payload.changeReason = validateChangeReasonShape(body.changeReason)
   if (body.pollAnonymous !== undefined) payload.pollAnonymous = Boolean(body.pollAnonymous)
   if (body.pollAllowMultipleSubmissions !== undefined) {
     payload.pollAllowMultipleSubmissions = Boolean(body.pollAllowMultipleSubmissions)

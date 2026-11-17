@@ -42,6 +42,16 @@ export function passwordResetUrl(token) {
   return `${base}/reset-password?token=${encodeURIComponent(token)}`
 }
 
+// Where a student officer goes to use the organizer workspace (they are sent to
+// login first if they are not signed in).
+export function organizerWorkspaceUrl() {
+  return `${base}/organizer`
+}
+
+export function organizerApplyUrl(token) {
+  return `${base}/organizer/apply/${encodeURIComponent(token)}`
+}
+
 export function forgotPasswordUrl() {
   return `${base}/forgot-password`
 }

@@ -1,3 +1,5 @@
+import { FORM_LIMITS } from '../../../shared/form-rules.js'
+
 export const USER_ROLES = {
   ADMIN: 'admin',
   ORGANIZER: 'organizer',
@@ -166,9 +168,37 @@ export const ORGANIZER_SCOPE_TYPES = {
   SCOPED: 'scoped',
 }
 
+// Organizer application flow (plan docs/plans/organizer-invitation-and-student-officers-plan.md).
+// The applicant picks one of these; it is stored in the existing free-text
+// users.organization_type_display column (existing free-text values stay valid).
+export const ORGANIZER_ORGANIZATION_TYPES = ['Co-curricular', 'Extra-curricular']
+
+// Student officers (organization_officers.status): assigned by an organizer to
+// act inside the organizer workspace as that organizer.
+export const OFFICER_STATUS = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+}
+
+export const ORGANIZER_INVITATION_STATUS = {
+  PENDING: 'pending',
+  USED: 'used',
+  REVOKED: 'revoked',
+}
+
+export const ORGANIZER_APPLICATION_STATUS = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  DECLINED: 'declined',
+}
+
 export const DB_TABLES = {
   USERS: 'users',
   USER_PARTICIPANT_TYPES: 'user_participant_types',
+  PROGRAMS: 'programs',
+  ORGANIZER_INVITATIONS: 'organizer_invitations',
+  ORGANIZER_APPLICATIONS: 'organizer_applications',
+  ORGANIZATION_OFFICERS: 'organization_officers',
   ORGANIZATIONS: 'organizations',
   EVENTS: 'events',
   EVENT_PARTICIPANTS: 'event_participants',
@@ -209,4 +239,9 @@ export const DB_TABLES = {
 
 // Modules that support persistent Create-session drafts. Values match the
 // frontend module strings and the /organizer/{module} route prefixes exactly.
+
 export const DRAFT_MODULES = ['election', 'competition', 'polling']
+
+// Longest an organizer invitation link may stay valid (days). Also caps the
+// admin-configured default in System settings.
+export const MAX_INVITATION_EXPIRY_DAYS = FORM_LIMITS.invitationExpiryMaxDays

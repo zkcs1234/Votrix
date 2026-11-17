@@ -87,7 +87,7 @@ export default function ReportsOverviewPage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4">
+      <div className="mx-auto max-w-6xl space-y-4">
         <div>
           <h2 className="text-xl font-semibold text-v-text">Reports overview</h2>
           <p className="mt-1 text-sm text-v-text-subtle">Turnout, vote summaries, rankings, and poll charts for all your events.</p>
@@ -101,7 +101,7 @@ export default function ReportsOverviewPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="mx-auto max-w-6xl space-y-8">
       <div>
         <h2 className="text-xl font-semibold text-v-text">Reports overview</h2>
         <p className="mt-1 text-sm text-v-text-subtle">

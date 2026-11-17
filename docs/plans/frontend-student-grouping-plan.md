@@ -1,3 +1,5 @@
+> **SUPERSEDED** by `student-unified-participant-type-NEW-APPROACH.md`. This plan creates *two* participant types per student (voter + respondent); the system now uses a single `STUDENT` type, so the "Add Student auto-assigns both types" parts below must **not** be built. See that plan's frontend status note.
+
 # Frontend Student Grouping Plan (UI-Only Changes)
 
 ## Executive Summary

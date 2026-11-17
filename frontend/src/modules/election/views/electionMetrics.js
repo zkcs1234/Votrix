@@ -37,10 +37,8 @@ export function buildElectionStats(analytics) {
   ]
 }
 
-export function buildElectionParticipationGroups(analytics, dimension) {
-  const rows = dimension === 'program'
-    ? analytics?.participationByProgram
-    : analytics?.participationByYearSection
+export function buildElectionParticipationGroups(analytics) {
+  const rows = analytics?.participationByProgram
   return (rows ?? []).map((row) => ({
     id: row.label,
     label: row.label,
@@ -223,23 +221,12 @@ export function buildElectionReportSheets(report) {
       })),
     },
     {
-      name: 'Year section participation',
-      rows: (report?.participationByYearSection ?? []).map((row) => ({
-        yearSection: row.label,
-        registered: row.registered,
-        voted: row.voted,
-        notVoted: row.notVoted,
-        turnoutPercentage: `${row.turnoutPercentage}%`,
-      })),
-    },
-    {
       name: 'Voter participation',
       rows: (report?.voterParticipation ?? []).map((v) => ({
         'Student ID': v.schoolId || 'N/A',
         'Last Name': v.lastName || '',
         'First Name': v.firstName || '',
         'Program': v.program || '',
-        'Year & Section': v.yearSection || '',
         'Status': v.hasVoted ? 'Voted' : 'Not voted',
       })),
     },
@@ -289,7 +276,6 @@ export function buildElectionReportCsvRows(report) {
       schoolId: v.schoolId || 'N/A',
       name: `${v.lastName ? `${v.lastName}, ` : ''}${v.firstName || ''}`.trim(),
       program: v.program || '',
-      yearSection: v.yearSection || '',
       status: v.hasVoted ? 'Voted' : 'Not voted',
     })
   }

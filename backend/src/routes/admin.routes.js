@@ -1,9 +1,11 @@
 import { Router } from 'express'
 import { authenticate, authorize, requirePasswordChanged } from '../middleware/auth.js'
 import { USER_ROLES } from '../utils/constants.js'
-import { adminActionLimiter, csvImportLimiter } from '../middleware/rateLimiter.js'
+import { adminActionLimiter, csvImportLimiter, emailLimiter } from '../middleware/rateLimiter.js'
 import { uploadSingle } from '../middleware/upload.js'
 import * as adminController from '../controllers/admin.controller.js'
+import * as onboardingController from '../controllers/admin-organizer-onboarding.controller.js'
+import * as officersController from '../controllers/organizer-officers.controller.js'
 import { validateRouteUUIDParams } from '../utils/sanitize.js'
 
 const router = Router()
@@ -16,14 +18,23 @@ router.get('/dashboard', adminController.getDashboard)
 router.get('/analytics', adminController.getAnalytics)
 
 router.get('/organizers', adminController.getOrganizers)
-router.get('/organizers/template', adminController.getOrganizerCsvTemplate)
 router.post('/organizers', adminActionLimiter, adminController.createOrganizerAccount)
-router.post('/organizers/import-preview', csvImportLimiter, uploadSingle('file'), adminController.previewOrganizersCsv)
-router.post('/organizers/import-register', csvImportLimiter, adminController.registerOrganizersCsv)
 router.get('/organizers/:organizerId/activity', adminController.getOrganizerActivity)
+router.get('/organizers/:organizerId/officers', officersController.adminListOrganizerOfficers)
+router.post('/organizers/:organizerId/officers/:officerId/deactivate', adminActionLimiter, officersController.adminDeactivateOrganizerOfficer)
 router.patch('/organizers/:organizerId', adminActionLimiter, adminController.updateOrganizer)
 router.patch('/organizers/:organizerId/status', adminActionLimiter, adminController.updateOrganizerStatus)
 router.post('/organizers/:organizerId/send-onboarding', adminActionLimiter, adminController.sendOrganizerOnboarding)
+
+// Organizer invitation → application → approval flow.
+router.get('/organizer-invitations', onboardingController.listOrganizerInvitations)
+router.post('/organizer-invitations', adminActionLimiter, emailLimiter, onboardingController.createOrganizerInvitation)
+router.post('/organizer-invitations/:invitationId/revoke', adminActionLimiter, onboardingController.revokeOrganizerInvitation)
+router.post('/organizer-invitations/:invitationId/resend', adminActionLimiter, emailLimiter, onboardingController.resendOrganizerInvitation)
+router.get('/organizer-applications', onboardingController.listOrganizerApplications)
+router.get('/organizer-applications/:applicationId', onboardingController.getOrganizerApplication)
+router.post('/organizer-applications/:applicationId/approve', adminActionLimiter, onboardingController.approveOrganizerApplication)
+router.post('/organizer-applications/:applicationId/decline', adminActionLimiter, onboardingController.declineOrganizerApplication)
 
 router.get('/events', adminController.getGlobalEvents)
 router.patch('/events/:eventId/restore', adminActionLimiter, adminController.restoreEvent)
@@ -36,6 +47,7 @@ router.post('/voters/import-preview', csvImportLimiter, uploadSingle('file'), ad
 router.post('/voters/import-register', csvImportLimiter, adminController.registerVotersCsv)
 router.patch('/voters/:userId', adminActionLimiter, adminController.updateVoter)
 router.patch('/voters/:userId/status', adminActionLimiter, adminController.updateVoterStatus)
+router.post('/voters/:userId/resend-credentials', adminActionLimiter, emailLimiter, adminController.resendVoterCredentials)
 router.delete('/voters/:userId/membership', adminActionLimiter, adminController.removeVoterFromPool)
 
 // Polling respondents have an independent pool but reuse participant accounts.
@@ -56,6 +68,7 @@ router.post('/judges/import-preview', csvImportLimiter, uploadSingle('file'), ad
 router.post('/judges/import-register', csvImportLimiter, adminController.registerJudgesCsv)
 router.patch('/judges/:userId', adminActionLimiter, adminController.updateJudge)
 router.patch('/judges/:userId/status', adminActionLimiter, adminController.updateJudgeStatus)
+router.post('/judges/:userId/resend-credentials', adminActionLimiter, emailLimiter, adminController.resendJudgeCredentialsEmail)
 router.delete('/judges/:userId/membership', adminActionLimiter, adminController.removeJudgeFromPool)
 
 router.get('/settings', adminController.getSystemSettings)
@@ -64,6 +77,9 @@ router.put('/settings', adminController.updateSystemSettings)
 // Managed participant taxonomy — valid Programs and Year & Sections (plan D13).
 router.get('/settings/taxonomy', adminController.getParticipantTaxonomy)
 router.put('/settings/taxonomy', adminActionLimiter, adminController.updateParticipantTaxonomy)
+
+// Valid student programs (programs table).
+router.get('/programs', adminController.getPrograms)
 
 router.get('/audit-logs', adminController.getAuditLogs)
 router.get('/email-delivery-logs', adminController.getEmailDeliveryLogs)

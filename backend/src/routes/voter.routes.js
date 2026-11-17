@@ -21,6 +21,11 @@ router.use('/polling', pollingVoterRoutes)
 router.get('/participant-types', voterController.getMyParticipantTypes)
 router.get('/events/:eventId/my-role', voterController.getMyEventRole)
 
+// Participant portal: My events, History, Results (always the caller's own data)
+router.get('/events', voterController.listMyEvents)
+router.get('/history', voterController.getMyHistory)
+router.get('/results', voterController.getMyResults)
+
 // Dashboard & redirect
 router.get('/overview', voterController.getVoterOverview)
 router.get('/login-redirect', voterController.getVoterLoginRedirect)

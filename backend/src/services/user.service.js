@@ -7,6 +7,7 @@ import { DB_TABLES, USER_ROLES } from '../utils/constants.js'
 import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
 import { sanitizeUser } from '../utils/userMapper.js'
+import { assertOrganizerCapacity } from './platform-settings.service.js'
 
 export async function findUserByUsername(username) {
   const result = await db()
@@ -60,6 +61,10 @@ export async function createOrganizer({
   if (existing) {
     throw conflict('An account with this email already exists')
   }
+
+  // Every way of creating an organizer (CSV import, approving an application, the
+  // API) ends here, so this is the one place the organizer limit is enforced.
+  await assertOrganizerCapacity()
 
   // Auto-generate a temporary password when the caller doesn't supply one, so
   // no human (admin included) ever sees or chooses the organizer's initial

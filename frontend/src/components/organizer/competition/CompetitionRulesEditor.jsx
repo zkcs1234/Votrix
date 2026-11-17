@@ -37,6 +37,9 @@ export default function CompetitionRulesEditor({ foundation, reload, eventId, re
   const [reviewAcknowledged, setReviewAcknowledged] = useState(false)
   const [reviewKey, setReviewKey] = useState(null)
   const [validationAttempted, setValidationAttempted] = useState(false)
+  // Settings the organizer has edited. A problem with one of them shows as soon as
+  // it is edited (and keeps updating), instead of waiting for "Save & Review".
+  const [editedFields, setEditedFields] = useState({})
   const [recovered, setRecovered] = useState(false)
   const editorRef = useRef(null), headingRef = useRef(null), focusField = useRef(null), previousStage = useRef(stage), lastSection = useRef(initialSection)
   const [baseline, setBaseline] = useState(incoming)
@@ -97,7 +100,7 @@ export default function CompetitionRulesEditor({ foundation, reload, eventId, re
     else if (previousStage.current !== stage) { headingRef.current?.focus(); editorRef.current?.scrollIntoView?.({ block: 'start' }) }
     previousStage.current = stage
   }, [stage, validationAttempted, focusSetting])
-  const fieldError = field => validationAttempted ? [...new Set(readiness.issues.filter(issue => issue.field === field).map(issue => issue.message))].join(' ') : ''
+  const fieldError = field => validationAttempted || editedFields[field] ? [...new Set(readiness.issues.filter(issue => issue.field === field).map(issue => issue.message))].join(' ') : ''
   const validationMessage = field => fieldError(field) ? <p id={`rules-error-${field}`} role="alert" className="v-error-text mt-1">{fieldError(field)}</p> : null
   const prepareReview = () => {
     if (locked) { setStage(3); return }
@@ -105,6 +108,8 @@ export default function CompetitionRulesEditor({ foundation, reload, eventId, re
     setReviewAcknowledged(false); setReviewKey(currentReviewKey); setValidationAttempted(false); setError(''); setStage(3)
   }
   const update = (key, value) => {
+    // The judge-panel message belongs to both drop-count boxes.
+    setEditedFields(previous => previous[key] ? previous : { ...previous, [key]: true, ...(key === 'dropHighest' || key === 'dropLowest' ? { judgePanel: true } : {}) })
     setRules(previous => ({ ...previous, [key]: value, confirmed: false, ...(key === 'calculationMethod' && ['rank_based', 'manual'].includes(value) ? { tiePolicy: 'shared', ...(value === 'manual' ? { independentApproval: true } : {}) } : {}) }))
     setSuccess(''); setError(''); setReviewAcknowledged(false); setReviewKey(null)
   }

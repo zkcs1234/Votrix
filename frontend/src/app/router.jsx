@@ -1,5 +1,9 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { routeConfig } from '@/routes'
 import { wrapWithSuspense } from './routerSuspense'
+import MaintenanceGate from './MaintenanceGate'
 
-export const router = createBrowserRouter(wrapWithSuspense(routeConfig))
+// Every route sits under the maintenance gate (a pathless layout route).
+export const router = createBrowserRouter([
+  { element: <MaintenanceGate />, children: wrapWithSuspense(routeConfig) },
+])

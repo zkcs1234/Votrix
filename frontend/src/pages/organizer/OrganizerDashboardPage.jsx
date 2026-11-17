@@ -159,7 +159,7 @@ export default function OrganizerDashboardPage() {
     <div className="v-dashboard space-y-6">
       <div className="v-card-md flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="v-page-title">Organizer dashboard</h2>
+          <h2 className="v-page-title">Organizer Dashboard</h2>
           <p className="v-caption mt-2">
             Signed in as <span className="text-v-text-muted">{user?.organizerName || user?.email}</span>
           </p>

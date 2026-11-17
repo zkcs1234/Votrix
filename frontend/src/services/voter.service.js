@@ -4,6 +4,22 @@ export const voterService = {
   getOverview() {
     return api.get('/participant/overview')
   },
+  /** Active and upcoming events you can act on. params: bucket, type, search, page, limit */
+  getEvents(params) {
+    return api.get('/participant/events', { params })
+  },
+  /** Your own participation record. params: type, outcome, range, search, page, limit */
+  getHistory(params) {
+    return api.get('/participant/history', { params })
+  },
+  /** Results you are allowed to see (list only). params: type, page, limit */
+  getResults(params) {
+    return api.get('/participant/results', { params })
+  },
+  /** Full election results for one election (fetched on demand). */
+  getElectionResults(eventId) {
+    return api.get(`/participant/election/events/${eventId}/results`)
+  },
   getLoginRedirect() {
     return api.get('/participant/login-redirect')
   },

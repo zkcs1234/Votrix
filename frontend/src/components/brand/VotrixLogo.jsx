@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import VotrixMark from '@/components/brand/VotrixMark'
+import { usePlatformStore } from '@/store/platform.store'
 
 const sizes = {
   sm: { mark: 'h-6 w-6', text: 'text-sm', gap: 'gap-2' },
@@ -17,6 +18,10 @@ export default function VotrixLogo({
 }) {
   const config = sizes[size] ?? sizes.md
   const toneClass = className || 'text-v-text'
+  // The wordmark follows the platform name set in Admin → System settings. The
+  // default name keeps the original styled wordmark (with the accented "I").
+  const platformName = usePlatformStore((s) => s.platformName)
+  const isDefaultBrand = platformName.trim().toUpperCase() === 'VOTRIX'
 
   const logo = (
     <div className={`inline-flex ${variant === 'mark' ? 'items-center' : 'flex-col items-center'} ${showTagline ? 'gap-2' : ''}`}>
@@ -24,12 +29,20 @@ export default function VotrixLogo({
         <VotrixMark className={`${config.mark} shrink-0`} style={toneClass.includes('text-white') ? { color: 'white' } : {}} title="" />
         {variant === 'full' && (
           <span
-            className={`${config.text} font-bold tracking-[0.14em] leading-none`}
+            className={`${config.text} max-w-[12rem] truncate font-bold tracking-[0.14em] leading-none`}
             style={{ color: toneClass.includes('text-white') ? 'white' : undefined }}
+            title={platformName}
           >
-            VOTR
-            <span className="text-v-primary">I</span>
-            X
+            {isDefaultBrand ? (
+              <>
+                VOTR
+                <span className="text-v-primary">I</span>
+                X
+              </>
+            ) : (
+              // A custom platform name (Admin → System settings) is shown as typed.
+              platformName
+            )}
           </span>
         )}
       </div>
@@ -46,7 +59,7 @@ export default function VotrixLogo({
       <Link
         to={linkTo}
         className="inline-flex shrink-0 transition-opacity hover:opacity-80"
-        aria-label="VOTRIX home"
+        aria-label={`${platformName} home`}
       >
         {logo}
       </Link>

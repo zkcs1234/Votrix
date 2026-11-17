@@ -4,6 +4,7 @@ import { CSRF_HEADER, getCsrfToken, setCsrfToken } from '@/utils/csrf'
 
 import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
+import { usePlatformStore } from '@/store/platform.store'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 import {competitionRetryDelay} from '@/utils/competitionRetry'
 const nativeRetryUntil=new Map()
@@ -13,9 +14,16 @@ const setupEndpoint=config=>String(config?.url??'').split('?')[0].replace(/\/(ev
 
 let lastToastAt = 0
 
+// The server answers every non-admin request with this while maintenance mode is
+// on. The app reacts by showing the maintenance screen, so no error toast.
+function isMaintenanceResponse(error) {
+  return error?.response?.status === 503 && error.response.data?.code === 'MAINTENANCE_MODE'
+}
+
 function maybeToastError(error) {
   const status = error.response?.status
   if (!status || status === 401 || status === 403) return
+  if (isMaintenanceResponse(error)) return
 
   const now = Date.now()
   if (now - lastToastAt < 800) return
@@ -69,6 +77,7 @@ export async function refreshSession() {
         return data
       })
       .catch(error => {
+        if (isMaintenanceResponse(error)) usePlatformStore.getState().setMaintenance(true)
         if ([401, 403].includes(error.response?.status) && useAuthStore.getState().user?.id === identity) {
           useAuthStore.getState().clearSession()
         }
@@ -83,10 +92,15 @@ const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete'])
 
 export { ensureCsrfToken }
 
+// A request can opt out of the identity binding with `{ skipIdentityCheck: true }`.
+// Only for public, session-less calls (e.g. the organizer invitation form): they
+// carry no account data, and the login being restored in the background on page
+// load must not make a valid response look stale.
 api.interceptors.request.use(async (config) => {
   const identity = useAuthStore.getState().user?.id ?? null
-  if (config._authIdentity === undefined) config._authIdentity = identity
-  else if (config._authIdentity !== identity) {
+  // Left unstamped, the response and error interceptors skip their identity checks.
+  if (config._authIdentity === undefined && !config.skipIdentityCheck) config._authIdentity = identity
+  else if (config._authIdentity !== undefined && config._authIdentity !== identity) {
     const stale = new Error('Request belongs to an earlier authentication identity')
     stale.staleIdentity = true
     throw stale
@@ -122,7 +136,7 @@ api.interceptors.request.use(async (config) => {
     }
   }
 
-  if (config._authIdentity !== (useAuthStore.getState().user?.id ?? null)) {
+  if (config._authIdentity !== undefined && config._authIdentity !== (useAuthStore.getState().user?.id ?? null)) {
     const stale = new Error('Authentication changed before the request could be sent')
     stale.staleIdentity = true
     throw stale
@@ -144,6 +158,7 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config
     const status = error.response?.status
+    if (isMaintenanceResponse(error)) usePlatformStore.getState().setMaintenance(true)
     if(import.meta.env.DEV&&nativeRequest(original)&&original?._setupStartedAt!==undefined)console.debug('[competition-setup] request failed',original.method?.toUpperCase(),setupEndpoint(original),Math.round(performance.now()-original._setupStartedAt),'ms',status??'cancelled')
     const message = String(error.response?.data?.message || '')
     if(status===429&&nativeRequest(original)){

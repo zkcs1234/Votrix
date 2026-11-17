@@ -50,6 +50,52 @@ export const csvUpload = multer({
   fileFilter: csvFileFilter,
 })
 
+// Organizer-application certificates: PDF / JPEG / PNG. The MIME check here is
+// only a first gate; certificate-storage.service verifies the real file type by
+// magic bytes before anything is stored.
+const CERTIFICATE_MIME_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
+export const CERTIFICATE_UPLOAD_MAX_FILES = 5
+export const CERTIFICATE_UPLOAD_MAX_BYTES = 8 * 1024 * 1024
+
+function certificateFileFilter(_req, file, cb) {
+  if (CERTIFICATE_MIME_TYPES.has(file.mimetype)) {
+    cb(null, true)
+    return
+  }
+  cb(new ApiError(400, 'Invalid file type. Upload PDF, JPEG, or PNG certificates.'))
+}
+
+export const certificateUpload = multer({
+  storage,
+  limits: {
+    fileSize: CERTIFICATE_UPLOAD_MAX_BYTES,
+    files: CERTIFICATE_UPLOAD_MAX_FILES,
+    fields: 20,
+    fieldSize: 64 * 1024,
+  },
+  fileFilter: certificateFileFilter,
+})
+
+const MULTER_MESSAGES = {
+  LIMIT_FILE_SIZE: `Each certificate must be ${CERTIFICATE_UPLOAD_MAX_BYTES / (1024 * 1024)} MB or smaller.`,
+  LIMIT_FILE_COUNT: `You can upload at most ${CERTIFICATE_UPLOAD_MAX_FILES} certificates.`,
+  LIMIT_UNEXPECTED_FILE: 'Unexpected file field.',
+}
+
+// Wraps multer so its own errors become clean 400s instead of reaching the
+// global error handler as unclassified 500s.
+export const uploadCertificates = (fieldName = 'certificates') => {
+  const handler = certificateUpload.array(fieldName, CERTIFICATE_UPLOAD_MAX_FILES)
+  return (req, res, next) =>
+    handler(req, res, (err) => {
+      if (!err) return next()
+      if (err instanceof multer.MulterError) {
+        return next(new ApiError(400, MULTER_MESSAGES[err.code] || 'Invalid upload'))
+      }
+      return next(err)
+    })
+}
+
 export const uploadSingle = (fieldName) => csvUpload.single(fieldName)
 export const uploadImage = (fieldName) => imageUpload.single(fieldName)
 export const uploadMultiple = (fieldName, maxCount = 10) => imageUpload.array(fieldName, Math.min(maxCount, 20))

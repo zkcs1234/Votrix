@@ -6,8 +6,8 @@ import FormAlert from '@/components/ui/FormAlert'
 import { useToast } from '@/hooks/useToast'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 
-// Phase 5: organizers invite existing students by cohort (Program or Year &
-// Section) instead of registering accounts. Shared by the election voters page
+// Phase 5: organizers invite existing students by cohort (Program)
+// instead of registering accounts. Shared by the election voters page
 // and the polling respondents page.
 //
 // Props:
@@ -16,10 +16,11 @@ import { getErrorMessage } from '@/utils/getErrorMessage'
 //   participantLabel – e.g. "voters" | "respondents"
 //   rosterLocked     – true once the event is active (no roster changes)
 export default function CohortInviteManager({ eventId, service, participantLabel = 'participants', rosterLocked = false }) {
-  const [cohorts, setCohorts] = useState({ programs: [], sections: [] })
+  const [cohorts, setCohorts] = useState({ programs: [] })
   const [enrolled, setEnrolled] = useState([])
   const [loading, setLoading] = useState(true)
-  const [cohortType, setCohortType] = useState('program')
+  // Students are grouped by Program only.
+  const cohortType = 'program'
   const [selected, setSelected] = useState(() => new Set())
   const [notify, setNotify] = useState(false)
   const [inviting, setInviting] = useState(false)
@@ -35,7 +36,7 @@ export default function CohortInviteManager({ eventId, service, participantLabel
         service.getCohorts(eventId),
         service.listVoters(eventId),
       ])
-      setCohorts({ programs: cohortData.programs ?? [], sections: cohortData.sections ?? [] })
+      setCohorts({ programs: cohortData.programs ?? [] })
       setEnrolled(Array.isArray(listData.voters) ? listData.voters : [])
       setError(null)
     } catch (err) {
@@ -50,13 +51,7 @@ export default function CohortInviteManager({ eventId, service, participantLabel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId])
 
-  const list = cohortType === 'program' ? cohorts.programs : cohorts.sections
-
-  // Reset the selection whenever the cohort dimension changes.
-  const switchType = (type) => {
-    setCohortType(type)
-    setSelected(new Set())
-  }
+  const list = cohorts.programs
 
   const toggle = (value) => {
     setSelected((current) => {
@@ -146,33 +141,15 @@ export default function CohortInviteManager({ eventId, service, participantLabel
             <div>
               <h2 className="v-section-title">Invite a cohort</h2>
               <p className="v-caption mt-1">
-                Choose a Program or Year &amp; Section to enroll eligible accounts as {participantLabel}.
+                Choose a Program to enroll eligible accounts as {participantLabel}.
                 Already-enrolled participants are skipped.
               </p>
             </div>
 
-            <div className="inline-flex flex-wrap gap-1 rounded-xl border border-v-border bg-v-surface-elevated p-1">
-              {[
-                { id: 'program', label: 'By Program' },
-                { id: 'year_section', label: 'By Year & Section' },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => switchType(opt.id)}
-                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                    cohortType === opt.id ? 'bg-v-primary text-white shadow-sm' : 'text-v-text-muted hover:bg-v-surface hover:text-v-text'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
             {list.length === 0 ? (
               <p className="v-caption">
-                No {cohortType === 'program' ? 'programs' : 'sections'} found in the voter pool. Ask an
-                admin to register voters and set up the taxonomy.
+                No programs found in the voter pool. Ask an
+                admin to register students first.
               </p>
             ) : (
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -263,7 +240,7 @@ export default function CohortInviteManager({ eventId, service, participantLabel
             <table className="v-table">
               <thead>
                 <tr>
-                  <th>School ID</th><th>Name</th><th>Email</th><th>Program</th><th>Year &amp; Section</th>
+                  <th>School ID</th><th>Name</th><th>Email</th><th>Program</th>
                   {!rosterLocked && <th className="text-right">Actions</th>}
                 </tr>
               </thead>
@@ -274,7 +251,6 @@ export default function CohortInviteManager({ eventId, service, participantLabel
                     <td>{[v.firstName, v.lastName].filter(Boolean).join(' ') || '—'}</td>
                     <td>{v.email}</td>
                     <td>{v.program || '—'}</td>
-                    <td>{v.yearSection || '—'}</td>
                     {!rosterLocked && (
                       <td>
                         <div className="flex justify-end">

@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { electionService } from '@/services/election.service'
 import { electionEventSchemaStep1, isoToLocalInput, localInputToIso } from '@/schemas/event.schemas'
 import ImageUploadField from '@/components/upload/ImageUploadField'
-import CalendarCard from '@/components/ui/CalendarCard'
+import EventDetailsFields from '@/components/organizer/EventDetailsFields'
+import { LIVE_FORM_MODE } from '@/hooks/useLiveForm'
 import Card from '@/components/ui/Card'
 import { getNextStage, stagePath } from '@/utils/eventStages'
 import StageFooter from '@/components/ui/StageFooter'
@@ -19,7 +20,7 @@ import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import { isSetupLocked } from '@/utils/constants'
 import EventStepper from '@/components/ui/EventStepper'
 
-import { INPUT_CLASS, LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
+import { LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
 const RESULTS_VISIBILITY_OPTIONS = [
   {
@@ -83,6 +84,7 @@ const [step, setStep] = useState(() => inferStepFromPath(location.pathname))
     watch,
     reset,
   } = useForm({
+    ...LIVE_FORM_MODE,
     resolver: zodResolver(electionEventSchemaStep1),
     defaultValues: {
       title: '',
@@ -380,90 +382,19 @@ const handleSubmitDetails = rhfHandleSubmit(async () => {
             </div>
             <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 m-0">
             {step === 'details' && (
-          <form className="space-y-4" onSubmit={handleSubmitDetails}>
-            <div className="v-form-field">
-              <label className={LABEL_CLASS} htmlFor="title">
-                Title <span className="text-v-danger">*</span>
-              </label>
-              <input
-                id="title"
-                className={INPUT_CLASS}
-                {...register('title')}
-                placeholder="Enter election title"
-              />
-              {errors.title && <p className="v-error-text">{errors.title.message}</p>}
-            </div>
-
-            <div className="v-form-field">
-              <label className={LABEL_CLASS} htmlFor="description">
-                Description
-              </label>
-              <textarea
-                id="description"
-                className={INPUT_CLASS}
-                rows={4}
-                {...register('description')}
-                placeholder="Enter election description (optional)"
-              />
-              {errors.description && <p className="v-error-text">{errors.description.message}</p>}
-              <p className={HELPER_TEXT}>Optional description for voters</p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="v-form-field">
-                <label className={LABEL_CLASS} htmlFor="startDate">
-                  Start Date and Time <span className="text-v-danger">*</span>
-                </label>
-                <Controller
-                  control={control}
-                  name="startDate"
-                  render={({ field }) => (
-                    <CalendarCard
-                      id="startDate"
-                      hasError={Boolean(errors.startDate)}
-                      value={field.value ?? ''}
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                      max={formValues.endDate || undefined}
-                      required
-                      disabled={saving || readOnly}
-                      twoStep
-                      confirmDate
-                      ariaDescribedBy={errors.startDate ? 'startDate-error' : undefined}
-                    />
-                  )}
-                />
-                {errors.startDate && <p id="startDate-error" className="v-error-text">{errors.startDate.message}</p>}
-              </div>
-
-              <div className="v-form-field">
-                <label className={LABEL_CLASS} htmlFor="endDate">
-                  End Date and Time <span className="text-v-danger">*</span>
-                </label>
-                <Controller
-                  control={control}
-                  name="endDate"
-                  render={({ field }) => (
-                    <CalendarCard
-                      id="endDate"
-                      hasError={Boolean(errors.endDate)}
-                      value={field.value ?? ''}
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                      min={formValues.startDate || undefined}
-                      required
-                      disabled={saving || readOnly}
-                      twoStep
-                      confirmDate
-                      ariaDescribedBy={errors.endDate ? 'endDate-error' : undefined}
-                    />
-                  )}
-                />
-                {errors.endDate && <p id="endDate-error" className="v-error-text">{errors.endDate.message}</p>}
-              </div>
-            </div>
+          <form className="space-y-4" onSubmit={handleSubmitDetails} noValidate>
+            <EventDetailsFields
+              register={register}
+              control={control}
+              errors={errors}
+              trigger={trigger}
+              getValues={getValues}
+              values={formValues}
+              disabled={saving || readOnly}
+              titlePlaceholder="Enter election title"
+              descriptionPlaceholder="Enter election description (optional)"
+              descriptionHint="Optional description for voters"
+            />
 
             <fieldset className="v-form-field">
               <legend className={LABEL_CLASS}>Election Settings — Results</legend>

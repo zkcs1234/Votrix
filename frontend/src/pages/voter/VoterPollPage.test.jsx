@@ -59,3 +59,37 @@ test('shows the poll title and styled back-to-dashboard link', async () => {
   expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/participant')
   expect(screen.getByText('Your responses are anonymous.')).toBeInTheDocument()
 })
+
+test('flags an unanswered required question where it is, on submit, and clears it as it is answered', async () => {
+  mocks.getPoll.mockResolvedValue({
+    data: {
+      pollOpen: true,
+      canSubmit: true,
+      questions: [
+        { id: 'q1', question: 'Comments', required: true, type: 'text', typeDef: { label: 'Text', ui: { input: 'textarea' }, answerFormat: { kind: 'text' } } },
+        { id: 'q2', question: 'Anything else', required: false, type: 'text', typeDef: { label: 'Text', ui: { input: 'textarea' }, answerFormat: { kind: 'text' } } },
+      ],
+      event: { title: 'Campus Survey' },
+    },
+  })
+
+  render(
+    <MemoryRouter initialEntries={['/participant/polling/events/poll-1']}>
+      <Routes>
+        <Route path="/participant/polling/events/:eventId" element={<VoterPollPage />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+
+  const comments = await screen.findByLabelText('Comments')
+  expect(screen.queryByText('This question is required.')).not.toBeInTheDocument() // nothing nags before any attempt
+
+  fireEvent.click(screen.getByRole('button', { name: 'Submit response' }))
+  expect(await screen.findByText('This question is required.')).toBeInTheDocument()
+  expect(screen.getByText('Answer the highlighted question to submit.')).toBeInTheDocument()
+  expect(screen.getAllByText('This question is required.')).toHaveLength(1) // the optional question is not flagged
+
+  fireEvent.change(comments, { target: { value: 'Great' } })
+  expect(screen.queryByText('This question is required.')).not.toBeInTheDocument()
+  expect(screen.queryByText('Answer the highlighted question to submit.')).not.toBeInTheDocument()
+})

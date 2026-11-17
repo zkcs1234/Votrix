@@ -10,6 +10,7 @@ import {
   SCORE_POLICIES,
 } from '../utils/constants.js'
 import { validateUUID } from '../utils/sanitize.js'
+import { validateChangeReasonShape } from '../utils/eventLifecycle.js'
 import { isValidCompetitionType, getTemplate } from '../modules/competition-templates.js'
 
 const ALLOWED_EVENT_STATUSES = new Set(Object.values(EVENT_STATUS))
@@ -45,6 +46,7 @@ export function validateCompetitionEvent(body, isCreate = false) {
   if (body.startDate !== undefined) payload.startDate = body.startDate
   if (body.endDate !== undefined) payload.endDate = body.endDate
   if (body.status !== undefined) payload.status = normalizeEventStatus(body.status)
+  if (body.changeReason !== undefined) payload.changeReason = validateChangeReasonShape(body.changeReason)
 
   // Phase 1: optional competition sub-type (nullable, validated against catalog).
   if (body.competitionType !== undefined) {

@@ -42,8 +42,12 @@ export const pageantService = {
   },
 
   // Pull a published (scheduled) competition back to draft so setup can be corrected.
-  unpublishEvent(eventId) {
-    return api.post(`${org}/events/${eventId}/unpublish`)
+  unpublishEvent(eventId, reason) {
+    return api.post(`${org}/events/${eventId}/unpublish`, reason ? { reason } : undefined)
+  },
+
+  getEditPolicy(eventId) {
+    return api.get(`${org}/events/${eventId}/edit-policy`)
   },
 
   uploadBanner(eventId, file) {

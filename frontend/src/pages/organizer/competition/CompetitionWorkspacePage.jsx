@@ -329,6 +329,13 @@ function StructureTab({ foundation, reload, readOnly }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const busyRef = useRef(false)
+  // Live checks: a field's message shows once it has been edited or left, or once
+  // Add was pressed, and updates as the organizer types.
+  const [touched, setTouched] = useState({})
+  const touch = key => () => setTouched(current => current[key] ? current : { ...current, [key]: true })
+  const nameProblem = !name.trim() ? 'Category name is required.' : ''
+  const weightProblem = String(weight).trim() === '' || !Number.isFinite(Number(weight)) ? 'Enter a weight between 0 and 100.'
+    : Number(weight) < 0 || Number(weight) > 100 ? 'Weight must be between 0 and 100.' : ''
 
   const totalWeight = useMemo(
     () => (foundation?.categories ?? []).reduce((s, c) => s + Number(c.weight), 0),
@@ -338,7 +345,7 @@ function StructureTab({ foundation, reload, readOnly }) {
   const submit = async (e) => {
     e.preventDefault()
     if (readOnly || busyRef.current) return
-    if (!name.trim() || !Number.isFinite(Number(weight)) || Number(weight) < 0 || Number(weight) > 100) { setError('Enter a category name and a weight between 0 and 100.'); return }
+    if (nameProblem || weightProblem) { setTouched({ name: true, weight: true }); return }
     busyRef.current = true
     setSaving(true)
     setError('')
@@ -351,6 +358,7 @@ function StructureTab({ foundation, reload, readOnly }) {
       setName('')
       setWeight(0)
       setDivisionId('')
+      setTouched({})
       await reload()
     } catch (err) {
       setError(getErrorMessage(err, 'Could not save category'))
@@ -370,29 +378,40 @@ function StructureTab({ foundation, reload, readOnly }) {
       </div>
       <form
         onSubmit={submit}
+        noValidate
         className={`grid gap-4 v-card p-6 ${divisionsEnabled ? 'sm:grid-cols-[1fr_120px_1fr_auto]' : 'sm:grid-cols-[1fr_120px_auto]'}`}
       >
         <div>
-          <label className={LABEL_CLASS}>Category name</label>
+          <label className={LABEL_CLASS} htmlFor="category-name">Category name</label>
           <input
-            className={INPUT_CLASS}
+            id="category-name"
+            className={`${INPUT_CLASS}${touched.name && nameProblem ? ' v-input-error' : ''}`}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); touch('name')() }}
+            onBlur={touch('name')}
             placeholder="e.g. Talent, Evening Gown"
-            required
+            aria-required="true"
+            aria-invalid={touched.name && nameProblem ? true : undefined}
+            aria-describedby={touched.name && nameProblem ? 'category-name-problem' : undefined}
           />
+          {touched.name && nameProblem && <p id="category-name-problem" className="v-error-text">{nameProblem}</p>}
         </div>
         <div>
-          <label className={LABEL_CLASS}>Weight %</label>
+          <label className={LABEL_CLASS} htmlFor="category-weight">Weight %</label>
           <input
+            id="category-weight"
             type="number"
             step="0.01"
-            className={INPUT_CLASS}
+            className={`${INPUT_CLASS}${touched.weight && weightProblem ? ' v-input-error' : ''}`}
             value={weight}
-            onChange={(e) => setWeight(e.target.value)}
+            onChange={(e) => { setWeight(e.target.value); touch('weight')() }}
+            onBlur={touch('weight')}
             min={0}
             max={100}
+            aria-invalid={touched.weight && weightProblem ? true : undefined}
+            aria-describedby={touched.weight && weightProblem ? 'category-weight-problem' : undefined}
           />
+          {touched.weight && weightProblem && <p id="category-weight-problem" className="v-error-text">{weightProblem}</p>}
         </div>
         {divisionsEnabled && (
           <div>
@@ -596,7 +615,11 @@ function DivisionsTab({ foundation, reload, readOnly }) {
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [divisionNameTouched, setDivisionNameTouched] = useState(false)
   const busyRef = useRef(false)
+  const typedDivision = name.trim().toLowerCase()
+  const divisionNameProblem = !typedDivision ? 'Division name is required.'
+    : divisions.some(item => String(item.name).trim().toLowerCase() === typedDivision) ? 'A division with this name already exists.' : ''
 
   const mutate = async operation => {
     if (readOnly || busyRef.current) return
@@ -612,11 +635,12 @@ function DivisionsTab({ foundation, reload, readOnly }) {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!name.trim()) { setError('Enter a division name.'); return }
+    if (divisionNameProblem) { setDivisionNameTouched(true); return }
     await mutate(async () => {
       await pageantService.createDivision(eventId, { name, description })
       setName('')
       setDescription('')
+      setDivisionNameTouched(false)
     })
   }
   const move = async (index, delta) => {
@@ -653,17 +677,21 @@ function DivisionsTab({ foundation, reload, readOnly }) {
 
       {divisionsEnabled && (
         <>
-          <form onSubmit={submit} className="grid gap-4 v-card p-6 sm:grid-cols-[1fr_2fr_auto]">
+          <form onSubmit={submit} noValidate className="grid gap-4 v-card p-6 sm:grid-cols-[1fr_2fr_auto]">
             <div>
               <label className={LABEL_CLASS} htmlFor="division-name">Division name</label>
               <input
                 id="division-name"
-                className={INPUT_CLASS}
+                className={`${INPUT_CLASS}${divisionNameTouched && divisionNameProblem ? ' v-input-error' : ''}`}
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => { setName(e.target.value); setDivisionNameTouched(true) }}
+                onBlur={() => setDivisionNameTouched(true)}
                 placeholder="e.g. Senior"
-                required
+                aria-required="true"
+                aria-invalid={divisionNameTouched && divisionNameProblem ? true : undefined}
+                aria-describedby={divisionNameTouched && divisionNameProblem ? 'division-name-problem' : undefined}
               />
+              {divisionNameTouched && divisionNameProblem && <p id="division-name-problem" className="v-error-text">{divisionNameProblem}</p>}
             </div>
             <div>
               <label className={LABEL_CLASS} htmlFor="division-description">Description (Optional)</label>
@@ -678,7 +706,7 @@ function DivisionsTab({ foundation, reload, readOnly }) {
             <div className="flex items-end">
               <button
                 type="submit"
-                disabled={saving || !name.trim()}
+                disabled={saving || Boolean(divisionNameProblem)}
                 className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white disabled:opacity-60"
               >
                 Add division

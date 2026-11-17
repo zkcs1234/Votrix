@@ -15,7 +15,7 @@ test('browser CSV download uses literal-safe text and retains numeric totals',()
  vi.stubGlobal('URL',{createObjectURL:()=> 'blob:fixture',revokeObjectURL:vi.fn()})
  const click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{})
  downloadCsv('competition.csv',[{contestant:'=1+1',score:89.33},{contestant:'Pending',score:null}])
- expect(payload).toEqual({text:'"contestant","score"\n"\'=1+1","89.33"\n"Pending",""',type:'text/csv;charset=utf-8'})
+ expect(payload).toEqual({text:'﻿"contestant","score"\n"\'=1+1","89.33"\n"Pending",""',type:'text/csv;charset=utf-8'})
  expect(click).toHaveBeenCalledTimes(1)
 })
 

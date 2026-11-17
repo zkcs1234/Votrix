@@ -5,7 +5,7 @@ import { DB_TABLES, USER_ROLES, PARTICIPANT_TYPES, ACCOUNT_STATUS, isParticipant
 import { hashPassword } from '../utils/password.js'
 import { generateTemporaryPassword } from '../utils/crypto.js'
 import { sanitizeUser } from '../utils/userMapper.js'
-import { getParticipantTaxonomy } from './participant-taxonomy.service.js'
+import { listActivePrograms } from './program.service.js'
 import { sendVoterAccountCreatedEmail } from './mailer.service.js'
 import { addParticipantTypeMembership, setParticipantTypeMembership } from './user-participant-type.service.js'
 
@@ -14,7 +14,7 @@ import { addParticipantTypeMembership, setParticipantTypeMembership } from './us
 // respondent pools. Both use shared account profile fields and separate type
 // memberships.
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+import { EMAIL_RE } from '../../../shared/form-rules.js'
 
 // Canonical field -> accepted header aliases (compared after normalization).
 const COLUMN_ALIASES = {
@@ -23,12 +23,13 @@ const COLUMN_ALIASES = {
   last_name: ['last_name', 'lastname', 'surname', 'family_name'],
   first_name: ['first_name', 'firstname', 'given_name', 'givenname'],
   program: ['program', 'course', 'strand'],
-  year_section: ['year_section', 'year_and_section', 'yearsection', 'section', 'yr_section'],
 }
 
-const REQUIRED_FIELDS = ['email', 'school_id', 'last_name', 'first_name', 'program', 'year_section']
+// Year & Section is no longer collected. An older file that still has that
+// column is accepted and the column is simply ignored.
+const REQUIRED_FIELDS = ['email', 'school_id', 'last_name', 'first_name', 'program']
 
-export const VOTER_CSV_TEMPLATE_HEADERS = ['email', 'school id', 'last name', 'first name', 'program', 'year & section']
+export const VOTER_CSV_TEMPLATE_HEADERS = ['email', 'school id', 'last name', 'first name', 'program']
 
 // Judges share the user identity fields; professional details are stored in
 // profile_data and Competition Judge eligibility is stored as a membership.
@@ -39,12 +40,13 @@ const JUDGE_COLUMN_ALIASES = {
   title: ['title', 'designation', 'honorific', 'position', 'rank'],
   affiliation: ['affiliation', 'organization', 'organisation', 'org', 'institution', 'company', 'department'],
   expertise: ['expertise', 'specialization', 'specialisation', 'specialty', 'field', 'expertise_area'],
-  organizers: ['organizers', 'organizer', 'organizer_emails', 'assigned_organizers', 'organizer_email'],
 }
 const JUDGE_REQUIRED_FIELDS = ['email', 'first_name', 'last_name']
 const JUDGE_OPTIONAL_FIELDS = ['title', 'affiliation', 'expertise']
 
-export const JUDGE_CSV_TEMPLATE_HEADERS = ['email', 'last name', 'first name', 'title', 'affiliation', 'expertise', 'organizers']
+// Judges are a global pool visible to every organizer, so the template has no
+// organizer column. A legacy "organizers" column in an older file is ignored.
+export const JUDGE_CSV_TEMPLATE_HEADERS = ['email', 'last name', 'first name', 'title', 'affiliation', 'expertise']
 
 function normalizeHeader(header) {
   return String(header ?? '')
@@ -52,6 +54,22 @@ function normalizeHeader(header) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
+}
+
+// The exports neutralize text that starts with = + - @ by adding a leading apostrophe
+// (so a spreadsheet will not run it as a formula). Take that apostrophe off again so a
+// file exported from the system imports back unchanged.
+function readCell(value) {
+  return String(value ?? '').trim().replace(/^'(?=[=+\-@\t\r])/, '')
+}
+
+// Columns in the file that the import does not use, by their original heading.
+function ignoredHeadings(headerRow, columnIndex) {
+  const used = new Set(Object.values(columnIndex))
+  return headerRow
+    .map((heading, idx) => ({ heading: String(heading ?? '').trim(), idx }))
+    .filter(({ heading, idx }) => heading && !used.has(idx))
+    .map(({ heading }) => heading)
 }
 
 function matchField(normalized, aliasMap) {
@@ -102,26 +120,26 @@ function parseVoterFile(buffer) {
   for (let i = headerIdx + 1; i < matrix.length; i += 1) {
     const cells = matrix[i] || []
     if (!cells.some((cell) => String(cell ?? '').trim() !== '')) continue // skip blank rows
-    const cell = (field) => String(cells[columnIndex[field]] ?? '').trim()
+    const cell = (field) => readCell(cells[columnIndex[field]])
     rows.push({
       email: cell('email').toLowerCase(),
       school_id: cell('school_id'),
       last_name: cell('last_name'),
       first_name: cell('first_name'),
       program: cell('program'),
-      year_section: cell('year_section'),
       rowNumber: i + 1, // 1-based source line
     })
   }
 
+  rows.ignoredColumns = ignoredHeadings(matrix[headerIdx], columnIndex)
   return rows
 }
 
-// Build case-insensitive lookup maps from the managed taxonomy so imported
-// values are validated and canonicalized to the admin's stored spelling.
-function taxonomyMatchers({ programs, sections }) {
-  const toMap = (list) => new Map(list.map((v) => [v.toLowerCase(), v]))
-  return { programMap: toMap(programs), sectionMap: toMap(sections) }
+// Case-insensitive lookup of the programs table so typed/imported values are
+// validated and canonicalized to the stored spelling (e.g. "bscs" -> "BSCS").
+async function loadProgramMap() {
+  const programs = await listActivePrograms()
+  return new Map(programs.map((name) => [name.toLowerCase(), name]))
 }
 
 async function findStudentByEmail(email) {
@@ -132,6 +150,34 @@ async function findStudentByEmail(email) {
     .maybeSingle()
   if (error) throw new ApiError(500, error.message)
   return data
+}
+
+// A participant is EITHER a student OR a judge, never both
+// (docs/plans/student-judge-separation-migration.md). These helpers refuse to
+// attach the other type to an account that already holds an active one. An
+// inactive (removed) membership does not count.
+const EXCLUSIVE_TYPE_LABEL = {
+  [PARTICIPANT_TYPES.STUDENT]: 'student',
+  [PARTICIPANT_TYPES.JUDGE]: 'judge',
+}
+
+async function otherCategoryConflict(userId, wantedType) {
+  const otherType = wantedType === PARTICIPANT_TYPES.STUDENT ? PARTICIPANT_TYPES.JUDGE : PARTICIPANT_TYPES.STUDENT
+  const { data, error } = await getClient()
+    .from(DB_TABLES.USER_PARTICIPANT_TYPES)
+    .select('participant_type')
+    .eq('user_id', userId)
+    .eq('participant_type', otherType)
+    .eq('is_active', true)
+    .maybeSingle()
+  if (error) throw new ApiError(500, error.message)
+  if (!data) return null
+  return `This email already belongs to a ${EXCLUSIVE_TYPE_LABEL[otherType]} account. A person is either a student or a judge, not both.`
+}
+
+async function assertNoOtherCategory(userId, wantedType) {
+  const conflict = await otherCategoryConflict(userId, wantedType)
+  if (conflict) throw new ApiError(409, conflict)
 }
 
 async function findStudentBySchoolId(schoolId, { excludeUserId } = {}) {
@@ -149,7 +195,7 @@ async function findStudentBySchoolId(schoolId, { excludeUserId } = {}) {
 // ---------------------------------------------------------------------------
 // Listing
 // ---------------------------------------------------------------------------
-async function listSchoolParticipantType(participantType, { search, program, yearSection, status, page = 1, limit = 50 } = {}) {
+async function listSchoolParticipantType(participantType, { search, program, status, page = 1, limit = 50 } = {}) {
   const safeLimit = Math.min(Math.max(1, parseInt(limit, 10) || 50), 200)
   const safePage = Math.max(1, parseInt(page, 10) || 1)
   const offset = (safePage - 1) * safeLimit
@@ -171,7 +217,6 @@ async function listSchoolParticipantType(participantType, { search, program, yea
     }
   }
   if (program) query = query.eq('program', program)
-  if (yearSection) query = query.eq('year_section', yearSection)
   if (status) query = query.eq('account_status', status)
 
   query = query.order('created_at', { ascending: false }).range(offset, offset + safeLimit - 1)
@@ -204,26 +249,21 @@ function validateRequired(row) {
   const errors = []
   if (!row.email) errors.push('email is required')
   else if (!EMAIL_RE.test(row.email)) errors.push('invalid email')
-  for (const f of ['school_id', 'last_name', 'first_name', 'program', 'year_section']) {
+  for (const f of ['school_id', 'last_name', 'first_name', 'program']) {
     if (!String(row[f] ?? '').trim()) errors.push(`${f.replace('_', ' ')} is required`)
   }
   return errors
 }
 
-// Validate + canonicalize program/year_section against the taxonomy maps.
-// Mutates a shallow copy and returns { row, errors }.
-function applyTaxonomy(row, { programMap, sectionMap }) {
+// Validate + canonicalize the program against the programs table.
+// Returns a shallow copy of the row and any errors.
+function applyProgram(row, programMap) {
   const errors = []
   const out = { ...row }
   if (row.program) {
     const canonical = programMap.get(row.program.toLowerCase())
-    if (!canonical) errors.push(`program "${row.program}" is not in the managed list`)
+    if (!canonical) errors.push(`program "${row.program}" is not in the program list`)
     else out.program = canonical
-  }
-  if (row.year_section) {
-    const canonical = sectionMap.get(row.year_section.toLowerCase())
-    if (!canonical) errors.push(`year & section "${row.year_section}" is not in the managed list`)
-    else out.year_section = canonical
   }
   return { row: out, errors }
 }
@@ -242,7 +282,6 @@ async function insertStudent(row, temporaryPassword, participantType) {
       last_name: row.last_name,
       school_id: row.school_id,
       program: row.program,
-      year_section: row.year_section,
     })
     .select('*')
     .single()
@@ -259,7 +298,6 @@ async function updateStudentProfile(userId, row) {
       last_name: row.last_name,
       school_id: row.school_id,
       program: row.program,
-      year_section: row.year_section,
     })
     .eq('id', userId)
     .select('*')
@@ -278,13 +316,11 @@ async function createSchoolParticipant(input, participantType) {
     last_name: String(input?.lastName ?? '').trim(),
     first_name: String(input?.firstName ?? '').trim(),
     program: String(input?.program ?? '').trim(),
-    year_section: String(input?.yearSection ?? '').trim(),
   }
 
   const baseErrors = validateRequired(row)
-  const taxonomy = await getParticipantTaxonomy()
-  const { row: canonical, errors: taxErrors } = applyTaxonomy(row, taxonomyMatchers(taxonomy))
-  const errors = [...baseErrors, ...taxErrors]
+  const { row: canonical, errors: programErrors } = applyProgram(row, await loadProgramMap())
+  const errors = [...baseErrors, ...programErrors]
   if (errors.length) throw new ApiError(400, 'Validation failed', { errors })
 
   const existingEmail = await findStudentByEmail(canonical.email)
@@ -292,7 +328,8 @@ async function createSchoolParticipant(input, participantType) {
     throw new ApiError(409, 'This email belongs to an admin or organizer account')
   }
   if (existingEmail) {
-    const sharedFields = ['school_id', 'first_name', 'last_name', 'program', 'year_section']
+    await assertNoOtherCategory(existingEmail.id, participantType)
+    const sharedFields = ['school_id', 'first_name', 'last_name', 'program']
     const conflicts = sharedFields.filter((field) => {
       const current = String(existingEmail[field] ?? '').trim().toLowerCase()
       const incoming = String(canonical[field] ?? '').trim().toLowerCase()
@@ -329,6 +366,51 @@ export async function createRespondent(input) {
 }
 
 // ---------------------------------------------------------------------------
+// Resend credentials
+// ---------------------------------------------------------------------------
+// The original temporary password is only ever stored as a hash, so it can't be
+// re-sent. A resend issues a NEW temporary password (replacing the old one) and
+// emails it. Only allowed while the account is still on its first-login
+// password: once the person has set their own password, replacing it would
+// lock them out; they use "Forgot password" instead.
+async function resendCredentials(user) {
+  if (user.account_status !== ACCOUNT_STATUS.ACTIVE) {
+    throw new ApiError(409, 'Restore this account before sending credentials.')
+  }
+  if (!user.must_change_password) {
+    throw new ApiError(
+      409,
+      'This person has already signed in and set their own password. Ask them to use "Forgot password" instead.',
+    )
+  }
+
+  const tempPassword = generateTemporaryPassword()
+  const passwordHash = await hashPassword(tempPassword)
+  const { error } = await getClient()
+    .from(DB_TABLES.USERS)
+    .update({ password: passwordHash, must_change_password: true })
+    .eq('id', user.id)
+  if (error) throw new ApiError(500, error.message)
+
+  const email = await sendVoterAccountCreatedEmail({
+    email: user.email,
+    temporaryPassword: tempPassword,
+    userId: user.id,
+    dedupeKey: `participant-credentials-resend:${user.id}:${Date.now()}`,
+  })
+
+  return { user: sanitizeUser(user), email }
+}
+
+export async function resendStudentCredentials(userId) {
+  return resendCredentials(await assertSchoolParticipant(userId, PARTICIPANT_TYPES.STUDENT))
+}
+
+export async function resendJudgeCredentials(userId) {
+  return resendCredentials(await assertJudge(userId))
+}
+
+// ---------------------------------------------------------------------------
 // Edit profile / status
 // ---------------------------------------------------------------------------
 async function assertSchoolParticipant(userId, participantType) {
@@ -361,13 +443,11 @@ async function updateSchoolParticipant(userId, input, participantType) {
     last_name: String(input?.lastName ?? current.last_name ?? '').trim(),
     first_name: String(input?.firstName ?? current.first_name ?? '').trim(),
     program: String(input?.program ?? current.program ?? '').trim(),
-    year_section: String(input?.yearSection ?? current.year_section ?? '').trim(),
   }
 
   const baseErrors = validateRequired(row).filter((e) => !e.startsWith('email')) // email not editable here
-  const taxonomy = await getParticipantTaxonomy()
-  const { row: canonical, errors: taxErrors } = applyTaxonomy(row, taxonomyMatchers(taxonomy))
-  const errors = [...baseErrors, ...taxErrors]
+  const { row: canonical, errors: programErrors } = applyProgram(row, await loadProgramMap())
+  const errors = [...baseErrors, ...programErrors]
   if (errors.length) throw new ApiError(400, 'Validation failed', { errors })
 
   const clash = await findStudentBySchoolId(canonical.school_id, { excludeUserId: userId })
@@ -427,8 +507,7 @@ async function previewSchoolParticipantImport(fileBuffer) {
   const fileRows = parseVoterFile(fileBuffer)
   if (!fileRows.length) throw new ApiError(400, 'No data rows found in the file.')
 
-  const taxonomy = await getParticipantTaxonomy()
-  const matchers = taxonomyMatchers(taxonomy)
+  const programMap = await loadProgramMap()
 
   const errors = []
   const seenEmails = new Set()
@@ -437,8 +516,8 @@ async function previewSchoolParticipantImport(fileBuffer) {
 
   for (const raw of fileRows) {
     const rowErrors = validateRequired(raw)
-    const { row, errors: taxErrors } = applyTaxonomy(raw, matchers)
-    rowErrors.push(...taxErrors)
+    const { row, errors: programErrors } = applyProgram(raw, programMap)
+    rowErrors.push(...programErrors)
 
     if (rowErrors.length) {
       errors.push(`Row ${raw.rowNumber}: ${rowErrors.join('; ')}`)
@@ -470,7 +549,12 @@ async function previewSchoolParticipantImport(fileBuffer) {
         errors.push(`Row ${row.rowNumber}: ${row.email} belongs to an admin or organizer account`)
         continue
       }
-      const sharedFields = ['school_id', 'first_name', 'last_name', 'program', 'year_section']
+      const categoryConflict = await otherCategoryConflict(existingEmail.id, PARTICIPANT_TYPES.STUDENT)
+      if (categoryConflict) {
+        errors.push(`Row ${row.rowNumber}: ${categoryConflict}`)
+        continue
+      }
+      const sharedFields = ['school_id', 'first_name', 'last_name', 'program']
       const conflicts = sharedFields.filter((field) => {
         const current = String(existingEmail[field] ?? '').trim().toLowerCase()
         const incoming = String(row[field] ?? '').trim().toLowerCase()
@@ -504,6 +588,7 @@ async function previewSchoolParticipantImport(fileBuffer) {
     valid: data.length,
     errors,
     data,
+    ignoredColumns: fileRows.ignoredColumns ?? [],
     summary: { newAccounts: newCount, existingAccounts: existingCount },
   }
 }
@@ -534,6 +619,7 @@ async function registerSchoolParticipantImport(parsedData, participantType) {
           if (row.type === 'existing') {
             const existing = await findStudentByEmail(row.email)
             if (!existing) throw new ApiError(409, 'account no longer exists')
+            await assertNoOtherCategory(existing.id, participantType)
             await updateStudentProfile(existing.id, row)
             await addParticipantTypeMembership(existing.id, participantType)
             results.push({
@@ -643,7 +729,7 @@ function parseJudgeFile(buffer) {
   for (let i = headerIdx + 1; i < matrix.length; i += 1) {
     const cells = matrix[i] || []
     if (!cells.some((cell) => String(cell ?? '').trim() !== '')) continue
-    const cell = (field) => (field in columnIndex ? String(cells[columnIndex[field]] ?? '').trim() : '')
+    const cell = (field) => (field in columnIndex ? readCell(cells[columnIndex[field]]) : '')
     rows.push({
       email: cell('email').toLowerCase(),
       first_name: cell('first_name'),
@@ -651,11 +737,10 @@ function parseJudgeFile(buffer) {
       title: cell('title'),
       affiliation: cell('affiliation'),
       expertise: cell('expertise'),
-      // Assigned-organizer emails, separated by ; | or ,
-      organizerEmails: cell('organizers').split(/[;|,]/).map((e) => e.trim()).filter(Boolean),
       rowNumber: i + 1,
     })
   }
+  rows.ignoredColumns = ignoredHeadings(matrix[headerIdx], columnIndex)
   return rows
 }
 
@@ -668,39 +753,16 @@ function validateJudgeRequired(row) {
   return errors
 }
 
-// Build the profile_data JSON, omitting empty optional fields. Carries the
-// admin-assigned organizer list (organizer plan O7/Phase E) when present.
+// Build the profile_data JSON, omitting empty optional fields. Judges are a
+// global pool: there is no per-organizer assignment, so any legacy
+// `organizerIds` value is dropped whenever a judge row is written.
 function judgeProfileData(row) {
   const data = {}
   for (const field of JUDGE_OPTIONAL_FIELDS) {
     const value = String(row[field] ?? '').trim()
     if (value) data[field] = value
   }
-  if (Array.isArray(row.organizerIds) && row.organizerIds.length) {
-    data.organizerIds = [...new Set(row.organizerIds.map(String))]
-  }
   return data
-}
-
-// Resolve a list of organizer emails to their user ids (skips unknown/non-
-// organizer emails). Returns { ids, unknown }.
-async function resolveOrganizerEmails(emails) {
-  const cleaned = [...new Set((emails ?? []).map((e) => String(e).trim().toLowerCase()).filter(Boolean))]
-  if (!cleaned.length) return { ids: [], unknown: [] }
-  const { data, error } = await getClient()
-    .from(DB_TABLES.USERS)
-    .select('id, email')
-    .eq('role', USER_ROLES.ORGANIZER)
-    .in('email', cleaned)
-  if (error) throw new ApiError(500, error.message)
-  const byEmail = new Map((data ?? []).map((u) => [u.email, u.id]))
-  const ids = []
-  const unknown = []
-  for (const e of cleaned) {
-    if (byEmail.has(e)) ids.push(byEmail.get(e))
-    else unknown.push(e)
-  }
-  return { ids, unknown }
 }
 
 async function insertJudge(row, temporaryPassword) {
@@ -802,7 +864,6 @@ export async function createJudge(input) {
     title: String(input?.title ?? '').trim(),
     affiliation: String(input?.affiliation ?? '').trim(),
     expertise: String(input?.expertise ?? '').trim(),
-    organizerIds: Array.isArray(input?.organizerIds) ? input.organizerIds : [],
   }
 
   const errors = validateJudgeRequired(row)
@@ -811,6 +872,7 @@ export async function createJudge(input) {
   const existing = await findStudentByEmail(row.email)
   if (existing) {
     if (judgeEmailConflict(existing)) throw new ApiError(409, 'This email is used by another account type')
+    await assertNoOtherCategory(existing.id, PARTICIPANT_TYPES.JUDGE)
     const nameConflicts = ['first_name', 'last_name'].filter((field) =>
       existing[field] && row[field] && existing[field].trim().toLowerCase() !== row[field].trim().toLowerCase(),
     )
@@ -838,7 +900,6 @@ export async function updateJudge(userId, input) {
     title: String(input?.title ?? existingData.title ?? '').trim(),
     affiliation: String(input?.affiliation ?? existingData.affiliation ?? '').trim(),
     expertise: String(input?.expertise ?? existingData.expertise ?? '').trim(),
-    organizerIds: Array.isArray(input?.organizerIds) ? input.organizerIds : (existingData.organizerIds ?? []),
   }
   const errors = validateJudgeRequired({ ...row, email: current.email })
   if (errors.length) throw new ApiError(400, 'Validation failed', { errors })
@@ -901,6 +962,11 @@ export async function previewJudgeImport(fileBuffer) {
         errors.push(`Row ${row.rowNumber}: ${row.email} is used by another account type`)
         continue
       }
+      const categoryConflict = await otherCategoryConflict(existing.id, PARTICIPANT_TYPES.JUDGE)
+      if (categoryConflict) {
+        errors.push(`Row ${row.rowNumber}: ${categoryConflict}`)
+        continue
+      }
       const nameConflicts = ['first_name', 'last_name'].filter((field) =>
         existing[field] && row[field] && existing[field].trim().toLowerCase() !== row[field].trim().toLowerCase(),
       )
@@ -916,22 +982,12 @@ export async function previewJudgeImport(fileBuffer) {
     }
   }
 
-  // Resolve assigned-organizer emails → ids for every kept row (Phase E).
-  for (const row of data) {
-    if (row.organizerEmails?.length) {
-      const { ids, unknown } = await resolveOrganizerEmails(row.organizerEmails)
-      row.organizerIds = ids
-      if (unknown.length) {
-        errors.push(`Row ${row.rowNumber}: unknown organizer email(s) ignored — ${unknown.join(', ')}`)
-      }
-    }
-  }
-
   return {
     total: fileRows.length,
     valid: data.length,
     errors,
     data,
+    ignoredColumns: fileRows.ignoredColumns ?? [],
     summary: { newAccounts: newCount, existingAccounts: existingCount },
   }
 }
@@ -952,6 +1008,7 @@ export async function registerJudgeImport(parsedData) {
           if (row.type === 'existing') {
             const existing = await findStudentByEmail(row.email)
             if (!existing) throw new ApiError(409, 'account no longer exists')
+            await assertNoOtherCategory(existing.id, PARTICIPANT_TYPES.JUDGE)
             await updateJudgeRow(existing.id, row)
             await addParticipantTypeMembership(existing.id, PARTICIPANT_TYPES.JUDGE)
             results.push({

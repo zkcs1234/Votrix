@@ -5,6 +5,7 @@ import { pollingService } from '@/services/polling.service'
 import Button from '@/components/ui/Button'
 import StageFooter from '@/components/ui/StageFooter'
 import ReadinessItem from '@/components/organizer/ReadinessItem'
+import PublishedEventEditPanel from '@/components/organizer/PublishedEventEditPanel'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { EVENT_STATUS, canUnpublishEventStatus } from '@/utils/constants'
@@ -14,7 +15,7 @@ import { EVENT_STATUS, canUnpublishEventStatus } from '@/utils/constants'
 export default function PollingReviewPage() {
   const { eventId } = useParams()
   const navigate = useNavigate()
-  const [status, setStatus] = useState(null)
+  const [event, setEvent] = useState(null)
   const [title, setTitle] = useState('')
   const [questionsCount, setQuestionsCount] = useState(0)
   const [respondentsCount, setRespondentsCount] = useState(0)
@@ -32,7 +33,7 @@ export default function PollingReviewPage() {
         pollingService.listQuestions(eventId),
         pollingService.listVoters(eventId),
       ])
-      setStatus(settings.settings?.status ?? null)
+      setEvent(settings.settings ?? null)
       setTitle(settings.settings?.title ?? '')
       setQuestionsCount(Array.isArray(q.questions) ? q.questions.length : 0)
       setRespondentsCount(Array.isArray(v.voters) ? v.voters.length : 0)
@@ -47,6 +48,7 @@ export default function PollingReviewPage() {
     load()
   }, [load])
 
+  const status = event?.status ?? null
   const isDraft = status === EVENT_STATUS.DRAFT
   const canUnpublish = canUnpublishEventStatus(status)
   // Publishing no longer requires respondents — they are invited after publish.
@@ -83,7 +85,7 @@ export default function PollingReviewPage() {
   if (loading) return <p className="v-caption">Loading…</p>
 
   return (
-    <div data-module="polling" className="mx-auto max-w-5xl space-y-6">
+    <div data-module="polling" className="mx-auto max-w-7xl space-y-6">
       <div className="v-card-md">
         <h2 className="v-page-title">Review &amp; Publish</h2>
           <p className="v-helper-text mt-1">
@@ -154,6 +156,14 @@ export default function PollingReviewPage() {
           </div>
         </div>
       )}
+
+      <PublishedEventEditPanel
+        eventId={eventId}
+        event={event}
+        service={pollingService}
+        noun="poll"
+        onChanged={load}
+      />
 
       <StageFooter
         module="polling"

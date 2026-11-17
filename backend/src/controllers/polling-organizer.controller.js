@@ -8,6 +8,7 @@ import {
   validateCustomType,
   validateCustomTypeUpdate,
 } from '../validators/polling.validator.js'
+import { validateChangeReasonShape } from '../utils/eventLifecycle.js'
 import { getEventCohorts, inviteCohort as inviteCohortService, removeEventParticipant } from '../services/cohort.service.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
@@ -43,8 +44,15 @@ export const publishEvent = asyncHandler(async (req, res) => {
 })
 
 export const unpublishEvent = asyncHandler(async (req, res) => {
-  const event = await pollingService.unpublishPollEvent(req.params.eventId, req.user.id)
+  const event = await pollingService.unpublishPollEvent(req.params.eventId, req.user.id, {
+    reason: validateChangeReasonShape(req.body?.reason),
+  })
   res.json({ success: true, event })
+})
+
+export const getEditPolicy = asyncHandler(async (req, res) => {
+  const policy = await pollingService.getPollEditPolicy(req.params.eventId, req.user.id)
+  res.json({ success: true, policy })
 })
 
 export const uploadBanner = asyncHandler(async (req, res) => {
@@ -52,6 +60,7 @@ export const uploadBanner = asyncHandler(async (req, res) => {
   const event = await pollingService.updatePollEvent(req.params.eventId, req.user.id, {
     banner: result.secure_url,
     image_asset_id: result.image_asset_id ?? null,
+    changeReason: validateChangeReasonShape(req.body?.changeReason),
   })
   res.json({ success: true, url: result.secure_url, event })
 })

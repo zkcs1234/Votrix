@@ -184,3 +184,25 @@ test('shows a new competition as selected while the save request is still pendin
   finishCreate({ data: { competition: { id: 'street-dance', name: 'Street Dance', origin: 'native', setup_revision: 1 } } })
   await waitFor(() => expect(f.editCompetition).toHaveBeenCalledTimes(1))
 })
+
+test('custom division form flags a blank or repeated name while typing and keeps Add disabled', async () => {
+  f.divisions = [{ id: 'women', name: 'Women' }]
+  renderPage()
+
+  fireEvent.click(await screen.findByRole('button', { name: /Add a custom division/ }))
+  const input = await screen.findByLabelText('Division name')
+  const add = screen.getByRole('button', { name: 'Add' })
+  expect(add).toBeDisabled()
+  expect(screen.queryByText('Enter a name to add it.')).not.toBeInTheDocument() // nothing nags before the box is touched
+
+  fireEvent.change(input, { target: { value: 'women' } })
+  expect(await screen.findByText('This division is already configured.')).toBeInTheDocument()
+  expect(input).toHaveAttribute('aria-invalid', 'true')
+  expect(add).toBeDisabled()
+
+  fireEvent.change(input, { target: { value: 'Teen Division' } })
+  await waitFor(() => expect(screen.queryByText('This division is already configured.')).not.toBeInTheDocument())
+  expect(add).toBeEnabled()
+  fireEvent.click(add)
+  await waitFor(() => expect(f.createDivision).toHaveBeenCalledWith('event', { name: 'Teen Division' }))
+})

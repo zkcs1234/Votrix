@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { LIVE_FORM_MODE } from '@/hooks/useLiveForm'
 import { Link } from 'react-router-dom'
 import { Mail, Send, ArrowLeft } from 'lucide-react'
 
@@ -21,6 +22,7 @@ export default function ForgotPasswordPage() {
     handleSubmit,
     formState: { errors },
   } = useForm({
+    ...LIVE_FORM_MODE,
     resolver: zodResolver(forgotPasswordSchema),
   })
 

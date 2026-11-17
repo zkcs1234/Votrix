@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
-import { validatePollAnswers } from '@/utils/pollValidation'
+import { pollAnswerErrors } from '@/utils/pollValidation'
 import { getDraftStorageKey } from '@/utils/draftStorage'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import FormAlert from '@/components/ui/FormAlert'
@@ -84,16 +84,30 @@ export default function VoterPollPage() {
     return Math.round((answeredCount / questions.length) * 100)
   }, [answeredCount, questions.length])
 
+  // Problems with the current answers, per question. A question's message shows once
+  // the voter has touched it (e.g. answered it and then cleared it) or has pressed
+  // Submit, and then updates live. Untouched questions are never flagged early.
+  const answerErrors = useMemo(() => pollAnswerErrors(questions, answers), [questions, answers])
+  const [touchedIds, setTouchedIds] = useState({})
+  const [attempted, setAttempted] = useState(false)
+  const shownError = (id) => (attempted || touchedIds[id] ? answerErrors[id] : undefined)
+  const shownCount = questions.filter((q) => shownError(q.id)).length
+
   const setAnswer = (questionId, value) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }))
+    setTouchedIds((prev) => (prev[questionId] ? prev : { ...prev, [questionId]: true }))
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    const validationError = validatePollAnswers(questions, answers)
-    if (validationError) {
-      setError(validationError)
+    const firstInvalid = questions.find((q) => answerErrors[q.id])
+    if (firstInvalid) {
+      setAttempted(true)
+      // The list scrolls, so bring the first problem into view.
+      const el = document.getElementById(`poll-question-${firstInvalid.id}`)
+      el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+      el?.querySelector?.('input, textarea, button')?.focus?.({ preventScroll: true })
       return
     }
 
@@ -114,6 +128,8 @@ export default function VoterPollPage() {
   const handleAnother = async () => {
     setDone(false)
     setAnswers({})
+    setTouchedIds({})
+    setAttempted(false)
     setLoading(true)
     try {
       await loadPoll()
@@ -267,9 +283,17 @@ export default function VoterPollPage() {
               value={answers[q.id]}
               onChange={(val) => setAnswer(q.id, val)}
               disabled={submitting || isArchived}
+              error={shownError(q.id)}
             />
           ))}
 
+          {attempted && shownCount > 0 && (
+            <FormAlert variant="error">
+              {shownCount === 1
+                ? 'Answer the highlighted question to submit.'
+                : `Answer the ${shownCount} highlighted questions to submit.`}
+            </FormAlert>
+          )}
           {error && <FormAlert variant="error">{error}</FormAlert>}
         </div>
       </div>

@@ -1,11 +1,13 @@
 import { ApiError } from '../utils/ApiError.js'
 import { sanitizeEmail, sanitizeString } from '../utils/sanitize.js'
+import { normalizePasswordInput } from '../utils/password.js'
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+import { EMAIL_RE } from '../../../shared/form-rules.js'
 
 // Unified login validator - handles admin, organizer, and voter
 export function validateLogin(body) {
-  const { email, password, remember } = body ?? {}
+  const { email, remember } = body ?? {}
+  const password = normalizePasswordInput(body?.password)
 
   if (!email?.trim() || !password) {
     throw new ApiError(400, 'Email and password are required')
@@ -19,7 +21,9 @@ export function validateLogin(body) {
 }
 
 export function validateChangePassword(body) {
-  const { currentPassword, newPassword, confirmPassword } = body ?? {}
+  const currentPassword = normalizePasswordInput(body?.currentPassword)
+  const newPassword = normalizePasswordInput(body?.newPassword)
+  const confirmPassword = normalizePasswordInput(body?.confirmPassword)
 
   if (!currentPassword || !newPassword || !confirmPassword) {
     throw new ApiError(400, 'All password fields are required')

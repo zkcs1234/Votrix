@@ -8,6 +8,12 @@ import VotrixLogo from '@/components/brand/VotrixLogo'
 import NotificationsModal from '@/components/ui/NotificationsModal'
 import GlobalSearch from '@/components/ui/GlobalSearch'
 import ProfileCard from '@/components/organizer/ProfileCard'
+import OfficerBanner from '@/components/organizer/OfficerBanner'
+import { MaintenanceAdminNotice } from '@/components/ui/MaintenanceNotices'
+import { usePlatformStore } from '@/store/platform.store'
+import { useOfficershipSync } from '@/hooks/useOfficershipSync'
+import { accountTypeLabel, membershipRows } from '@/utils/accountProfile'
+import { getOfficership, isOfficer, isOrganizerPath, participantChipLabel } from '@/utils/workspace'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import { competitionNavigationHref } from '@/utils/competitionNavigation'
 
@@ -339,6 +345,9 @@ export default function AppShell({
   eventId,
   footerLink,
   showSidebar = true,
+  // Always show the sidebar as a collapsed rail (no expand toggle). Used by task
+  // pages such as the ballot and the scoresheet.
+  railOnly = false,
   showSearch = true,
   showBackButton = false,
   backButtonPath = '/participant',
@@ -368,8 +377,15 @@ export default function AppShell({
   const { user, clearSession } = useAuth()
   const profileDropdownRef = useRef(null)
   const isOrganizer = user?.role === 'organizer'
+  // A student officer inside /organizer: same workspace, attributed to them.
+  const officership = getOfficership(user)
+  const isOfficerWorkspace = isOfficer(user) && isOrganizerPath(location.pathname)
+  useOfficershipSync(isOfficerWorkspace)
+  const maintenanceMode = usePlatformStore((s) => s.maintenanceMode)
 
-  const caption = sidebarCaption ?? (isOrganizer ? user?.organizationName : undefined)
+  const caption =
+    sidebarCaption ??
+    (isOrganizer ? user?.organizationName : isOfficerWorkspace ? officership.organizationName : undefined)
 
   const closeMobile = () => setMobileOpen(false)
 
@@ -420,7 +436,7 @@ export default function AppShell({
 
   const displayName = user?.username ?? user?.email ?? 'User'
   const initials = displayName.slice(0, 2).toUpperCase()
-  const roleLabel = ROLE_LABELS[user?.role] ?? 'Account'
+  const roleLabel = participantChipLabel(user, isOfficerWorkspace) ?? ROLE_LABELS[user?.role] ?? 'Account'
   // Organizers open the ProfileCard; everyone else opens the dropdown. One flag
   // drives the trigger's highlighted/open state for both.
   const profileOpen = isOrganizer ? profileCardOpen : profileDropdownOpen
@@ -509,8 +525,8 @@ export default function AppShell({
       location={location}
       footerLink={footerLink}
       onNavigate={closeMobile}
-      isCollapsed={isDesktop ? isCollapsed : false}
-      onToggleCollapse={isDesktop ? toggleCollapse : undefined}
+      isCollapsed={isDesktop ? railOnly || isCollapsed : false}
+      onToggleCollapse={isDesktop && !railOnly ? toggleCollapse : undefined}
       caption={caption}
     />
   )
@@ -519,12 +535,12 @@ export default function AppShell({
     <div
       data-module={moduleLabel?.toLowerCase().replace(/\s+/g, '-')}
       className="flex min-h-screen bg-v-bg"
-      style={{ '--sidebar-width': showSidebar ? (isCollapsed ? 'var(--v-rail-w)' : 'var(--v-sidebar-w)') : '0px' }}
+      style={{ '--sidebar-width': showSidebar ? (railOnly || isCollapsed ? 'var(--v-rail-w)' : 'var(--v-sidebar-w)') : '0px' }}
     >
       {showSidebar && (
         <aside
           className={`hidden shrink-0 bg-v-sidebar lg:block sticky top-0 self-start h-screen min-h-screen overflow-y-auto transition-[width,padding] duration-200 ease-in-out ${
-            isCollapsed ? 'w-18 px-3 py-6' : 'w-64 p-6'
+            railOnly || isCollapsed ? 'w-18 px-3 py-6' : 'w-64 p-6'
           }`}
         >
           {sidebar(true)}
@@ -663,17 +679,23 @@ export default function AppShell({
                   </div>
 
                   {/* Shared participant account details; fields can span multiple types. */}
-                  {(user?.firstName || user?.lastName || user?.schoolId || user?.program || user?.yearSection || user?.profileData?.title || user?.profileData?.affiliation || user?.profileData?.expertise) && (
+                  {(user?.firstName || user?.lastName || user?.schoolId || user?.program || user?.profileData?.title || user?.profileData?.affiliation || user?.profileData?.expertise || accountTypeLabel(user) || membershipRows(user).length > 0) && (
                     <dl className="border-b border-v-border px-4 py-3 space-y-2">
+                      <ProfileRow label="Account type" value={accountTypeLabel(user)} />
                       {[user.firstName, user.lastName].filter(Boolean).length > 0 && (
                         <ProfileRow label="Name" value={[user.firstName, user.lastName].filter(Boolean).join(' ')} />
                       )}
                       <ProfileRow label="School ID" value={user.schoolId} />
                       <ProfileRow label="Program" value={user.program} />
-                      <ProfileRow label="Year & Section" value={user.yearSection} />
                       <ProfileRow label="Title" value={user.profileData?.title} />
                       <ProfileRow label="Affiliation" value={user.profileData?.affiliation} />
                       <ProfileRow label="Expertise" value={user.profileData?.expertise} />
+                      {membershipRows(user).map((row) => (
+                        <ProfileRow key={row.label} label={row.label} value={row.value} />
+                      ))}
+                      <p className="pt-1 text-[11px] leading-snug text-v-text-subtle">
+                        Profile details are managed by an administrator.
+                      </p>
                     </dl>
                   )}
 
@@ -696,6 +718,8 @@ export default function AppShell({
           </div>
         </header>
 
+        {user?.role === 'admin' && maintenanceMode && <MaintenanceAdminNotice />}
+        {isOfficerWorkspace && <OfficerBanner officership={officership} />}
         <main className="v-page-enter flex-1 p-4 md:p-8">{children ?? <Outlet />}</main>
         <div id="stage-footer-portal" className="shrink-0 empty:hidden sticky bottom-0 z-40" />
       </div>

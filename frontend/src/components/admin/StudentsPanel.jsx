@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Users, UserPlus, Upload, Download, UserCheck, ShieldOff } from 'lucide-react'
+import { Users, UserPlus, Upload, Download, UserCheck, Archive } from 'lucide-react'
 import { adminService } from '@/services/admin.service'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -14,9 +14,17 @@ import { downloadBlob } from '@/utils/csvDownload'
 import AddStudentModal from './AddStudentModal'
 import EditStudentModal from './EditStudentModal'
 import ViewStudentDetailsModal from './ViewStudentDetailsModal'
-import StudentActionsMenu from './StudentActionsMenu'
+import AccountActionsMenu from './AccountActionsMenu'
 import AccountStatusConfirmModal from './AccountStatusConfirmModal'
-import CsvImportResults from './CsvImportResults'
+import CsvImportPreview from './CsvImportPreview'
+import { getEmailOutcomeMessage } from '@/utils/emailOutcome'
+
+const STUDENT_PREVIEW_COLUMNS = [
+  { header: 'Name', cell: (row) => [row.first_name, row.last_name].filter(Boolean).join(' ') },
+  { header: 'Email', cell: (row) => row.email },
+  { header: 'School ID', cell: (row) => row.school_id },
+  { header: 'Program', cell: (row) => row.program },
+]
 
 const STATUS_TONE = { active: 'success', suspended: 'danger', archived: 'default' }
 
@@ -25,8 +33,7 @@ function fullName(s) {
 }
 
 export default function StudentsPanel() {
-  const [voters, setVoters] = useState([])
-  const [respondents, setRespondents] = useState([])
+  const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -36,8 +43,10 @@ export default function StudentsPanel() {
   const [statusTarget, setStatusTarget] = useState(null)
   const [savingId, setSavingId] = useState(null)
   const [preview, setPreview] = useState(null)
+  const [registering, setRegistering] = useState(false)
   const fileRef = useRef(null)
-  const { success, error: toastError } = useToast()
+  const [resendingId, setResendingId] = useState(null)
+  const { success, warning, error: toastError } = useToast()
 
   useEffect(() => {
     fetchStudents()
@@ -46,12 +55,12 @@ export default function StudentsPanel() {
   const fetchStudents = async () => {
     setLoading(true)
     try {
-      const [votersRes, respondentsRes] = await Promise.all([
-        adminService.getVoters(),
-        adminService.getRespondents(),
-      ])
-      setVoters(votersRes.data.voters || [])
-      setRespondents(respondentsRes.data.respondents || [])
+      // A student has ONE participant type (STUDENT) that covers elections and
+      // polls, so there is a single list; the voters and respondents endpoints
+      // return the same students.
+      const { data } = await adminService.getVoters()
+      const list = data.voters || data.participants || []
+      setStudents([...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)))
     } catch (err) {
       toastError('Failed to load students')
     } finally {
@@ -59,35 +68,11 @@ export default function StudentsPanel() {
     }
   }
 
-  // Merge voters and respondents into unified student view
-  const students = useMemo(() => {
-    const voterMap = new Map(voters.map(v => [v.id, v]))
-    const respondentMap = new Map(respondents.map(r => [r.id, r]))
-    
-    const allUserIds = new Set([
-      ...voters.map(v => v.id),
-      ...respondents.map(r => r.id),
-    ])
-
-    return Array.from(allUserIds).map(userId => {
-      const voter = voterMap.get(userId)
-      const respondent = respondentMap.get(userId)
-      const user = voter || respondent
-      
-      return {
-        ...user,
-        hasVoterType: !!voter,
-        hasRespondentType: !!respondent,
-        isMissingType: !voter || !respondent,
-      }
-    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-  }, [voters, respondents])
-
   const summary = useMemo(() => {
     const total = students.length
     const active = students.filter(s => s.accountStatus === 'active').length
-    const suspended = students.filter(s => s.accountStatus === 'suspended').length
-    return { total, active, suspended }
+    const archived = students.filter(s => s.accountStatus === 'archived').length
+    return { total, active, archived }
   }, [students])
 
   const filteredStudents = useMemo(() => {
@@ -110,16 +95,9 @@ export default function StudentsPanel() {
   const handleStatus = async (student, accountStatus) => {
     setSavingId(student.id)
     try {
-      // Update both voter and respondent status if applicable
-      const promises = []
-      if (student.hasVoterType) {
-        promises.push(adminService.updateVoterStatus(student.id, accountStatus))
-      }
-      if (student.hasRespondentType) {
-        promises.push(adminService.updateRespondentStatus(student.id, accountStatus))
-      }
-      await Promise.all(promises)
-      
+      // One account, one status: a single call covers elections and polls.
+      await adminService.updateVoterStatus(student.id, accountStatus)
+
       success(`Student account ${accountStatus}`)
       setStatusTarget(null)
       await fetchStudents()
@@ -127,6 +105,19 @@ export default function StudentsPanel() {
       toastError(getErrorMessage(err, 'Failed to update status'))
     } finally {
       setSavingId(null)
+    }
+  }
+
+  const handleResend = async (student) => {
+    setResendingId(student.id)
+    try {
+      const { data } = await adminService.resendVoterCredentials(student.id)
+      if (data.email?.sent) success(`New credentials emailed to ${student.email}`)
+      else warning(getEmailOutcomeMessage(data.email))
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Failed to resend credentials'))
+    } finally {
+      setResendingId(null)
     }
   }
 
@@ -146,7 +137,7 @@ export default function StudentsPanel() {
       const response = await adminService.getVoterCsvTemplate()
       downloadBlob(response.data, 'student-import-template.csv')
     } catch (err) {
-      toastError('Failed to download template')
+      toastError('Failed to download form')
     }
   }
 
@@ -166,25 +157,18 @@ export default function StudentsPanel() {
   const handleCsvRegister = async () => {
     if (!preview?.data) return
 
+    setRegistering(true)
     try {
-      // Register all as voters first
+      // Registering creates each student with the single STUDENT type; there is
+      // nothing further to add per student.
       const { data } = await adminService.registerVotersCsv(preview.data)
-      
-      // Then add respondent membership for each successfully created user
-      const createdUsers = data.results?.filter(r => r.success && r.userId) || []
-      
-      for (const result of createdUsers) {
-        try {
-          await adminService.addRespondentMembership(result.userId)
-        } catch (membershipErr) {
-          console.warn(`Could not add respondent type for ${result.email}:`, membershipErr)
-        }
-      }
 
       setPreview({ ...preview, importResult: data })
       await fetchStudents()
     } catch (err) {
       toastError(getErrorMessage(err, 'Import failed'))
+    } finally {
+      setRegistering(false)
     }
   }
 
@@ -213,7 +197,7 @@ export default function StudentsPanel() {
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={downloadTemplate}>
               <Download className="h-4 w-4" strokeWidth={1.5} />
-              Template
+              Form
             </Button>
             <Button variant="secondary" onClick={handleExport}>
               <Download className="h-4 w-4" strokeWidth={1.5} />
@@ -235,7 +219,7 @@ export default function StudentsPanel() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard label="Total Students" value={summary.total} icon={Users} />
         <StatCard label="Active" value={summary.active} icon={UserCheck} />
-        <StatCard label="Suspended" value={summary.suspended} icon={ShieldOff} />
+        <StatCard label="Archived" value={summary.archived} icon={Archive} />
       </div>
 
       <Card>
@@ -258,7 +242,6 @@ export default function StudentsPanel() {
             >
               <option value="all">All</option>
               <option value="active">Active</option>
-              <option value="suspended">Suspended</option>
               <option value="archived">Archived</option>
             </select>
           </div>
@@ -272,7 +255,6 @@ export default function StudentsPanel() {
                 <th>Email</th>
                 <th>School ID</th>
                 <th>Program</th>
-                <th>Year/Section</th>
                 <th>Status</th>
                 <th className="text-right">Actions</th>
               </tr>
@@ -280,7 +262,7 @@ export default function StudentsPanel() {
             <tbody>
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center text-v-text-tertiary">
+                  <td colSpan={6} className="text-center text-v-text-tertiary">
                     {search || statusFilter !== 'all' ? 'No students match your filters' : 'No students yet'}
                   </td>
                 </tr>
@@ -291,19 +273,22 @@ export default function StudentsPanel() {
                     <td>{student.email}</td>
                     <td>{student.schoolId || '—'}</td>
                     <td>{student.program || '—'}</td>
-                    <td>{student.yearSection || '—'}</td>
                     <td>
                       <Badge tone={STATUS_TONE[student.accountStatus] || 'default'}>
                         {student.accountStatus}
                       </Badge>
                     </td>
                     <td className="text-right">
-                      <StudentActionsMenu
-                        student={student}
-                        onStatusChange={setStatusTarget}
-                        onEdit={setEditTarget}
-                        onViewDetails={setViewTarget}
-                        savingId={savingId}
+                      <AccountActionsMenu
+                        status={student.accountStatus}
+                        onEdit={() => setEditTarget(student)}
+                        onView={() => setViewTarget(student)}
+                        onResend={student.mustChangePassword && student.accountStatus === 'active' ? () => handleResend(student) : undefined}
+                        resending={resendingId === student.id}
+                        busyStatus={savingId === student.id ? statusTarget?.accountStatus : null}
+                        onStatusChange={(change) =>
+                          setStatusTarget({ ...change, user: student, name: fullName(student), email: student.email })
+                        }
                       />
                     </td>
                   </tr>
@@ -356,11 +341,14 @@ export default function StudentsPanel() {
 
       {/* CSV Import Preview/Results */}
       {preview && (
-        <CsvImportResults
-          preview={preview.data}
-          result={preview.importResult}
-          filename={preview.filename}
+        <CsvImportPreview
+          preview={{ ...preview.data, importResult: preview.importResult }}
+          columns={STUDENT_PREVIEW_COLUMNS}
+          noun="students"
+          resultsFilename="student-import-results.csv"
+          errorsFilename="student-import-errors.csv"
           onRegister={handleCsvRegister}
+          registering={registering}
           onClose={() => setPreview(null)}
         />
       )}

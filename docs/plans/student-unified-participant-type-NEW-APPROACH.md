@@ -1,5 +1,7 @@
 # ALTERNATIVE PLAN: Add "STUDENT" Participant Type (Cleaner Approach)
 
+> **Frontend status (Phase 3):** aligned. The admin Students panel loads one list, **Add Student** makes one `createVoter` request (the backend assigns `STUDENT`), CSV import registers once, and status changes make one call. The earlier "also add a respondent membership" step was removed; it called `POST /admin/respondents/:id/membership`, which never existed, so every Add Student showed a misleading "created as Voter only" warning. The student *View* modal no longer lists participant types. Still open from this plan: run migrations 135–137 on the database.
+
 ## The Better Solution
 
 Instead of giving students BOTH `ELECTION_VOTER` and `POLLING_RESPONDENT` types (which is messy), we should add a **NEW participant type called `STUDENT`** that can participate in BOTH elections and polling events.

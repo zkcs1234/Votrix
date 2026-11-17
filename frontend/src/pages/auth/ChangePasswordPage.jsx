@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { LIVE_FORM_MODE } from '@/hooks/useLiveForm'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Lock, ShieldCheck, ArrowRight, SkipForward } from 'lucide-react'
 
@@ -28,9 +29,18 @@ export default function ChangePasswordPage() {
     register,
     handleSubmit,
     formState: { errors },
+    getValues,
+    trigger,
   } = useForm({
+    ...LIVE_FORM_MODE,
     resolver: zodResolver(changePasswordSchema),
   })
+
+  // The "passwords must match" message belongs to the confirm box, so re-check it
+  // when the new password changes (but only once the user has typed a confirmation).
+  const revalidateConfirm = () => {
+    if (getValues('confirmPassword')) trigger('confirmPassword')
+  }
 
   const continueAfterPasswordChange = async (userRole) => {
     if (!isParticipantRole(userRole)) {
@@ -127,7 +137,7 @@ export default function ChangePasswordPage() {
           <PasswordInput
             id="newPassword"
             autoComplete="new-password"
-            {...register('newPassword')}
+            {...register('newPassword', { onChange: revalidateConfirm })}
           />
         </AuthFormField>
 

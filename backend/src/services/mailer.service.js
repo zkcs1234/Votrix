@@ -3,6 +3,9 @@ import { env } from '../config/env.js'
 import { sendEmail } from './email.service.js'
 import { organizerInvitationTemplate } from '../templates/email/organizerInvitation.js'
 import { organizerOnboardingTemplate } from '../templates/email/organizerOnboarding.js'
+import { organizerInviteLinkTemplate } from '../templates/email/organizerInviteLink.js'
+import { organizerApplicationDeclinedTemplate } from '../templates/email/organizerApplicationDeclined.js'
+import { officerAssignedTemplate } from '../templates/email/officerAssigned.js'
 import { voterInvitationTemplate } from '../templates/email/voterInvitation.js'
 import { voterAccountCreatedTemplate } from '../templates/email/voterAccountCreated.js'
 import { voterInvitationRegisteredTemplate } from '../templates/email/voterInvitationRegistered.js'
@@ -12,6 +15,8 @@ import { judgeInvitationTemplate } from '../templates/email/judgeInvitation.js'
 import { judgeInvitationRegisteredTemplate } from '../templates/email/judgeInvitationRegistered.js'
 import {
   organizerLoginUrl,
+  organizerApplyUrl,
+  organizerWorkspaceUrl,
   voterLoginUrl,
   participantEventUrl,
   competitionScoreUrl,
@@ -159,8 +164,64 @@ export async function sendOrganizerInvitationEmail({ email, temporaryPassword })
   })
 }
 
+// Organizer application flow — invitation link sent by an admin.
+export async function sendOrganizerInviteLinkEmail({ email, token, expiresAt, note }) {
+  const html = organizerInviteLinkTemplate({ applyUrl: organizerApplyUrl(token), expiresAt, note })
+
+  return sendWorkflowEmail({
+    to: email,
+    subject: 'You are invited to apply as a VOTRIX organizer',
+    html,
+    workflow: 'organizer-invite-link',
+    template: 'organizer-invite-link',
+    // The raw token is unique per invitation, so a resend is never mistaken
+    // for a duplicate of the previous email by the email guard.
+    dedupeKey: buildEmailDedupeKey({
+      to: email,
+      subject: `organizer-invite-link:${token.slice(0, 12)}`,
+      workflow: 'organizer-invite-link',
+      template: 'organizer-invite-link',
+    }),
+  })
+}
+
+// Tells a student they have been made an officer of an organization.
+export async function sendOfficerAssignedEmail({ email, studentName, organizationName, position }) {
+  const html = officerAssignedTemplate({
+    studentName,
+    organizationName,
+    position,
+    workspaceUrl: organizerWorkspaceUrl(),
+  })
+
+  return sendWorkflowEmail({
+    to: email,
+    subject: organizationName
+      ? `You've been added as an officer of ${organizationName}`
+      : "You've been added as an officer",
+    html,
+    workflow: 'organizer-officer-assigned',
+    template: 'officer-assigned',
+  })
+}
+
+export async function sendOrganizerApplicationDeclinedEmail({ email, organizerName, reason }) {
+  const html = organizerApplicationDeclinedTemplate({ organizerName, reason })
+
+  return sendWorkflowEmail({
+    to: email,
+    subject: 'Update on your VOTRIX organizer application',
+    html,
+    workflow: 'organizer-application-declined',
+    template: 'organizer-application-declined',
+  })
+}
+
 // Email A — account provisioning for admin-registered participants (plan D11).
-export async function sendVoterAccountCreatedEmail({ email, temporaryPassword }) {
+// `dedupeKey` is only passed by an admin-triggered resend: the guard counts any
+// earlier attempt (including a failed one) with the same key as a duplicate, so
+// a resend needs its own key or it would be suppressed.
+export async function sendVoterAccountCreatedEmail({ email, temporaryPassword, dedupeKey, userId }) {
   const html = voterAccountCreatedTemplate({
     email,
     temporaryPassword,
@@ -174,6 +235,8 @@ export async function sendVoterAccountCreatedEmail({ email, temporaryPassword })
     html,
     workflow: 'participant-account-created',
     template: 'voter-account-created',
+    ...(dedupeKey ? { dedupeKey } : {}),
+    ...(userId ? { userId } : {}),
   })
 }
 

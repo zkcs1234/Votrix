@@ -82,7 +82,7 @@ export default function ElectionGroupEligibility({ eventId, locked }) {
                   {voters.map((voter) => (
                     <label key={voter.id} className="flex items-start gap-2 text-sm text-v-text">
                       <input type="checkbox" checked={selected.includes(voter.id)} onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, voter.id] : ids.filter((id) => id !== voter.id))} />
-                      <span className="min-w-0 break-words">{voter.name || voter.email}<span className="ml-2 text-xs text-v-text-subtle">{voter.program} {voter.yearSection}</span></span>
+                      <span className="min-w-0 break-words">{voter.name || voter.email}<span className="ml-2 text-xs text-v-text-subtle">{voter.program}</span></span>
                     </label>
                   ))}
                 </div>

@@ -50,8 +50,13 @@ export const pollingService = {
   },
 
   // Pull a published (scheduled) poll back to draft so setup can be corrected.
-  unpublishEvent(eventId) {
-    return api.post(`${org}/events/${eventId}/unpublish`)
+  // `reason` is required by the server when pausing a live poll.
+  unpublishEvent(eventId, reason) {
+    return api.post(`${org}/events/${eventId}/unpublish`, reason ? { reason } : undefined)
+  },
+
+  getEditPolicy(eventId) {
+    return api.get(`${org}/events/${eventId}/edit-policy`)
   },
 
   listQuestions(eventId) {

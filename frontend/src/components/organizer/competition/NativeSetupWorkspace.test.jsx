@@ -388,6 +388,27 @@ describe('Native organizer setup connections',()=>{
   await waitFor(()=>expect(pageantService.createContestant).toHaveBeenCalledWith('event',expect.objectContaining({name:'Red Phoenix',entryType:'group'})))
   expect(service.addEntry).toHaveBeenCalledWith('event','child-0',{contestantId:'new-entry'})
  })
+ it('tells the organizer what is missing before an entry can be registered, instead of a silent disabled button',async()=>{
+  const competition={...children[0],participation_format:'group'}
+  service.list.mockResolvedValue({data:{competitions:[competition]}})
+  service.foundation.mockResolvedValue({data:foundation(competition)})
+  render(<MemoryRouter><NativeSetupWorkspace eventId="event" initialChildren={[competition]} stage="contestants"/></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button',{name:'Manage Entries Hip-Hop'}))
+  const name=await screen.findByLabelText('Entry name')
+  const save=screen.getByRole('button',{name:'Save & Add Next'})
+  expect(save).toBeDisabled()
+  expect(screen.getByText('Enter the entry name to continue.')).toBeInTheDocument()
+  expect(screen.queryByText('Entry name is required.')).not.toBeInTheDocument() // not before the field is touched
+
+  fireEvent.change(name,{target:{value:'   '}})
+  expect(screen.getByText('Entry name is required.')).toBeInTheDocument()
+  expect(name).toHaveAttribute('aria-invalid','true')
+
+  fireEvent.change(name,{target:{value:'Red Phoenix'}})
+  expect(screen.queryByText('Entry name is required.')).not.toBeInTheDocument()
+  expect(screen.queryByText('Enter the entry name to continue.')).not.toBeInTheDocument()
+  expect(save).toBeEnabled()
+ })
  it('requires and submits a configured Pageant division when creating a contestant',async()=>{
   const pageant={id:'pageant-child',event_id:'event',name:'Pageant',competition_type:'pageant',origin:'native'}
   pageantService.getEvent.mockResolvedValue({data:{event:{status:'draft',eventType:'competition_scoring',competitionType:'pageant'}}})

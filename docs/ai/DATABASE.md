@@ -508,6 +508,52 @@ Per-organization overrides / custom types.
 | `used_at` | TIMESTAMPTZ | nullable |
 | `created_at` | TIMESTAMPTZ | |
 
+### `organizer_invitations`
+(Added in migration 138. Named differently from the voter/judge `invitations` table on purpose.)
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID PK | |
+| `email` | VARCHAR(255) | NOT NULL, `CHECK (email = lower(email))` |
+| `token_hash` | TEXT | NOT NULL, UNIQUE — SHA-256 of the link token; the raw token is never stored |
+| `note` | TEXT | nullable |
+| `status` | VARCHAR(16) | `pending` (default) \| `used` \| `revoked`. "Expired" is derived from `expires_at`, never stored |
+| `expires_at` | TIMESTAMPTZ | NOT NULL |
+| `created_by` | UUID FK → `users.id` | ON DELETE SET NULL |
+| `used_at`, `revoked_at` | TIMESTAMPTZ | nullable |
+| `created_at` | TIMESTAMPTZ | |
+
+### `organizer_applications`
+(Added in migration 139.)
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID PK | |
+| `invitation_id` | UUID FK → `organizer_invitations.id` | NOT NULL, UNIQUE (one application per invitation), ON DELETE CASCADE |
+| `email` | VARCHAR(255) | NOT NULL, lower-case; copied from the invitation |
+| `organizer_name`, `position`, `organization_name`, `organization_type_display` | VARCHAR(255) | NOT NULL; mirror the `users` columns they are copied to on approval |
+| `requested_scope` | JSONB | NOT NULL, default `{"scopeType":"all","programs":[],"sections":[]}` — same shape as `users.scope` |
+| `certificates` | JSONB | NOT NULL, default `[]` — private-storage references |
+| `status` | VARCHAR(16) | `pending` (default) \| `approved` \| `declined` |
+| `decline_reason` | TEXT | nullable |
+| `reviewed_by`, `organizer_user_id` | UUID FK → `users.id` | ON DELETE SET NULL |
+| `reviewed_at`, `created_at`, `updated_at` | TIMESTAMPTZ | |
+
+### `organization_officers`
+(Added in migration 140.) Students an organizer has assigned to work in the organizer workspace as that organizer.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID PK | |
+| `organizer_id` | UUID FK → `users.id` | NOT NULL, ON DELETE CASCADE — the owner organizer (keyed here rather than `organizations.id`, which is created lazily) |
+| `student_id` | UUID FK → `users.id` | NOT NULL, ON DELETE CASCADE |
+| `position` | VARCHAR(255) | NOT NULL, free text |
+| `status` | VARCHAR(16) | `active` (default) \| `inactive` |
+| `assigned_by`, `deactivated_by` | UUID FK → `users.id` | ON DELETE SET NULL |
+| `assigned_at`, `deactivated_at`, `created_at`, `updated_at` | TIMESTAMPTZ | |
+
+Constraints: `UNIQUE (organizer_id, student_id)`; `CHECK (organizer_id <> student_id)`; **partial unique index `uq_organization_officers_one_active_per_student` on `(student_id) WHERE status = 'active'`** (one active officership per student); index `(organizer_id, status)`.
+
 ---
 
 ## Views
@@ -532,6 +578,10 @@ Per-organization overrides / custom types.
 | `001_initial_schema.sql` | Base schema: users, organizations, events, event_voters, invitations, positions, candidates, contestants, criteria, judge_scores, poll_questions, poll_answers |
 | `002_down_initial_schema.sql` | Rollback for 001 |
 | `003_password_reset_tokens.sql` | password_reset_tokens table + token_version on users |
+| *(004–137)* | *Not listed here; see `backend/src/database/migrations/` and `backend/src/database/README.md`* |
+| `138_organizer_invitations.sql` (+ `138_down_…`) | `organizer_invitations` |
+| `139_organizer_applications.sql` (+ `139_down_…`) | `organizer_applications` (depends on 138) |
+| `140_organization_officers.sql` (+ `140_down_…`) | `organization_officers` |
 | `004_election_module.sql` | election_votes table, voting_enabled column, first/last name on event_voters |
 | `005_pageant_module.sql` | scoring_enabled, is_judge, has_scored on event_voters |
 | `006_polling_module.sql` | poll_options, poll_submissions tables; polling columns on events |

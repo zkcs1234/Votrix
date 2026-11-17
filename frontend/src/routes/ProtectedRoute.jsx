@@ -1,7 +1,8 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { getRoleDashboardPath } from '@/utils/auth'
-import { isParticipantRole } from '@/utils/constants'
+import { USER_ROLES, isParticipantRole } from '@/utils/constants'
+import { isOfficer } from '@/utils/workspace'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 // Organizer onboarding was removed (organizer plan Phase C): the admin now
@@ -13,7 +14,7 @@ export default function ProtectedRoute({
   allowedRoles,
   allowPasswordChange = false,
 }) {
-  const { isAuthenticated, role, mustChangePassword, isBootstrapping } = useAuth()
+  const { isAuthenticated, role, user, mustChangePassword, isBootstrapping } = useAuth()
   const location = useLocation()
 
   if (isBootstrapping) {
@@ -37,7 +38,10 @@ export default function ProtectedRoute({
   }
 
   const participantRoleAllowed = allowedRoles?.some(isParticipantRole) && isParticipantRole(role)
-  if (allowedRoles?.length && !allowedRoles.includes(role) && !participantRoleAllowed) {
+  // An active student officer may open organizer pages (the server still
+  // verifies the officership on every request).
+  const officerAllowed = allowedRoles?.includes(USER_ROLES.ORGANIZER) && isOfficer(user)
+  if (allowedRoles?.length && !allowedRoles.includes(role) && !participantRoleAllowed && !officerAllowed) {
     return <Navigate to={getRoleDashboardPath(role)} replace />
   }
 

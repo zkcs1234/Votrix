@@ -11,7 +11,11 @@ export default function CompetitionRoundForm({ rounds, categories = [], division
   const localNameRef = useRef(null)
   const inputRef = nameInputRef || localNameRef
   const [values, setValues] = useState(() => roundFormValues(initialRound))
-  const [errors, setErrors] = useState({})
+  // Problems are derived from the current values on every change. A field's message
+  // shows once it has been edited or left (`touched`), or once Save was attempted,
+  // and then updates live.
+  const [touched, setTouched] = useState({})
+  const [attempted, setAttempted] = useState(false)
   const [requestError, setRequestError] = useState('')
   const [saving, setSaving] = useState(false)
   const combined = values.progression === 'weighted' && values.purpose !== 'special'
@@ -21,16 +25,19 @@ export default function CompetitionRoundForm({ rounds, categories = [], division
     ? [...ROUND_PURPOSES, { value: 'special', label: 'Special award', description: 'Keep this award separate from the overall competition result.' }] : ROUND_PURPOSES
   const scoreOptions = values.progression === 'carry_forward' || initialRound?.progression === 'carry_forward'
     ? [...ROUND_SCORE_USES, { value: 'carry_forward', label: 'Add earlier rounds’ scores', description: 'Keep the saved setting that adds earlier round scores to this result.' }] : ROUND_SCORE_USES
+  const checkedNow = validateRoundForm(values, rounds, initialRound)
+  const errors = Object.fromEntries(Object.entries(checkedNow.errors).filter(([key]) => attempted || touched[key]))
+  const touch = key => () => setTouched(current => current[key] ? current : { ...current, [key]: true })
   const update = (key, value) => {
     setValues(current => ({ ...current, [key]: value }))
-    setErrors(current => ({ ...current, [key]: undefined, ...(key === 'categoryId' || key === 'progression' ? { weight: undefined } : {}) }))
+    touch(key)()
     setRequestError('')
   }
   const submit = async event => {
     event.preventDefault()
     if (readOnly || saving) return
     const checked = validateRoundForm(values, rounds, initialRound)
-    setErrors(checked.errors)
+    setAttempted(true)
     if (Object.keys(checked.errors).length) {
       if (checked.errors.name) inputRef.current?.focus()
       return
@@ -39,7 +46,7 @@ export default function CompetitionRoundForm({ rounds, categories = [], division
     setRequestError('')
     try {
       await onSave(checked.payload)
-      if (!initialRound) setValues(roundFormValues(null))
+      if (!initialRound) { setValues(roundFormValues(null)); setTouched({}); setAttempted(false) }
     } catch (error) {
       setRequestError(getErrorMessage(error))
     } finally { setSaving(false) }
@@ -51,7 +58,7 @@ export default function CompetitionRoundForm({ rounds, categories = [], division
         <label className="sr-only" htmlFor={`${prefix}-name`}>Round name</label>
         <input ref={inputRef} id={`${prefix}-name`} className={`${INPUT_CLASS} min-h-11 w-full`} value={values.name} required autoFocus={Boolean(initialRound)}
           data-modal-autofocus={Boolean(initialRound) || undefined}
-          onChange={event => update('name', event.target.value)} placeholder="Round name, e.g. Preliminary"
+          onChange={event => update('name', event.target.value)} onBlur={touch('name')} placeholder="Round name, e.g. Preliminary"
           aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? `${prefix}-name-error` : undefined} />
         {errors.name && <p id={`${prefix}-name-error`} className="v-error-text mt-1">{errors.name}</p>}
       </div>
@@ -77,7 +84,7 @@ export default function CompetitionRoundForm({ rounds, categories = [], division
       {combined && <div>
         <label className={LABEL_CLASS} htmlFor={`${prefix}-weight`}>Contribution to combined result (%)</label>
         <input id={`${prefix}-weight`} type="number" step="0.01" min="0.01" max="100" required className={`${INPUT_CLASS} w-full sm:max-w-48`}
-          value={values.weight} onChange={event => update('weight', event.target.value)} aria-invalid={Boolean(errors.weight)} aria-describedby={`${prefix}-weight-hint${errors.weight ? ` ${prefix}-weight-error` : ''}`} />
+          value={values.weight} onChange={event => update('weight', event.target.value)} onBlur={touch('weight')} aria-invalid={Boolean(errors.weight)} aria-describedby={`${prefix}-weight-hint${errors.weight ? ` ${prefix}-weight-error` : ''}`} />
         <p id={`${prefix}-weight-hint`} className="mt-1 text-xs leading-relaxed text-v-text-subtle">
           {total.toFixed(2)}% already assigned · {Math.max(0, 100 - total).toFixed(2)}% available for {groupName}. Final totals are checked before publication.
         </p>{errors.weight && <p id={`${prefix}-weight-error`} className="v-error-text mt-1">{errors.weight}</p>}

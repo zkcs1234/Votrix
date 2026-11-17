@@ -15,10 +15,14 @@ import { recordEventActivity } from '../foundation/activity.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
 import { notifyAdminsEventPublished } from './notification.service.js'
 import {
-  assertEventUpdateAllowed,
+  assertPublishedEventUpdate,
+  assertChangeReason,
   assertSetupEditable,
   assertParticipantsEditable,
+  buildEditPolicy,
   canUnpublishEventStatus,
+  normalizeChangeReason,
+  summarizeChanges,
 } from '../utils/eventLifecycle.js'
 import { deleteDraft } from './draft.service.js'
 import { removeReferenceAndDeleteIfUnused } from './imageAsset.service.js'
@@ -254,7 +258,6 @@ export async function createElectionEvent(organizerId, payload) {
 
 export async function updateElectionEvent(eventId, organizerId, payload) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
-  assertSetupEditable(event)
 
   const nextStart = payload.startDate !== undefined ? payload.startDate : event.start_date
   const nextEnd = payload.endDate !== undefined ? payload.endDate : event.end_date
@@ -262,7 +265,8 @@ export async function updateElectionEvent(eventId, organizerId, payload) {
     throw new ApiError(400, 'End date must be on or after start date')
   }
 
-  assertEventUpdateAllowed(event, payload)
+  // Draft: free edit. Published: safe fields + schedule changes with a reason.
+  const changes = assertPublishedEventUpdate(event, payload)
 
   // Capture old image_asset_id before updating so we can clean it up if replaced
   const oldAssetId = event.image_asset_id ?? null
@@ -304,7 +308,13 @@ export async function updateElectionEvent(eventId, organizerId, payload) {
     action: 'election.event.update',
     entity: 'events',
     entityId: eventId,
-    details: { updates: Object.keys(updates) },
+    details: {
+      updates: Object.keys(updates),
+      changes: summarizeChanges(changes),
+      ...(event.status !== EVENT_STATUS.DRAFT
+        ? { statusAtEdit: event.status, reason: normalizeChangeReason(payload.changeReason) }
+        : {}),
+    },
   })
 
   invalidateDashboardCache(organizerId)
@@ -372,13 +382,13 @@ export async function getElectionGroupEligibility(eventId, organizerId, sectionI
   const voters = []
   for (let offset = 0; ; offset += 500) {
     const { data: rows, error: rosterError } = await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
-      .select('id, users!inner(email, first_name, last_name, program, year_section)')
+      .select('id, users!inner(email, first_name, last_name, program)')
       .eq('event_id', eventId).eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER).order('id').range(offset, offset + 499)
     if (rosterError) throw new ApiError(500, rosterError.message)
     for (const row of rows ?? []) {
       const profile = row.users
-      if (isAllAccess(scope) || isStudentInScope(scope, { program: profile.program, yearSection: profile.year_section })) {
-        voters.push({ id: row.id, email: profile.email, name: [profile.first_name, profile.last_name].filter(Boolean).join(' '), program: profile.program, yearSection: profile.year_section })
+      if (isAllAccess(scope) || isStudentInScope(scope, { program: profile.program })) {
+        voters.push({ id: row.id, email: profile.email, name: [profile.first_name, profile.last_name].filter(Boolean).join(' '), program: profile.program })
       }
     }
     if ((rows ?? []).length < 500) break
@@ -394,10 +404,10 @@ export async function setElectionGroupEligibility(eventId, organizerId, sectionI
   const ids = [...new Set(payload.participantIds)]
   const scope = await getOrganizerScope(organizerId)
   const { data: voters, error: rosterError } = ids.length ? await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id, users!inner(program, year_section)').eq('event_id', eventId)
+    .select('id, users!inner(program)').eq('event_id', eventId)
     .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER).in('id', ids) : { data: [], error: null }
   if (rosterError) throw new ApiError(500, rosterError.message)
-  const allowed = new Set((voters ?? []).filter((voter) => isAllAccess(scope) || isStudentInScope(scope, { program: voter.users?.program, yearSection: voter.users?.year_section })).map((voter) => voter.id))
+  const allowed = new Set((voters ?? []).filter((voter) => isAllAccess(scope) || isStudentInScope(scope, { program: voter.users?.program })).map((voter) => voter.id))
   if (ids.some((id) => !allowed.has(id))) throw new ApiError(400, 'Select enrolled voters within your organizer scope')
   await getElectionGroupEligibility(eventId, organizerId, sectionId)
   const { error } = await getClient().rpc('set_election_group_eligibility', {
@@ -560,7 +570,7 @@ export async function getPositionEligibilitySummary(eventId, organizerId) {
   const voters = []
   for (let offset = 0; ; offset += 500) {
     const { data: rows, error } = await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
-      .select('id, users!inner(program, year_section)')
+      .select('id, users!inner(program)')
       .eq('event_id', eventId)
       .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
       .order('id')
@@ -568,7 +578,7 @@ export async function getPositionEligibilitySummary(eventId, organizerId) {
     if (error) throw new ApiError(500, error.message)
     for (const row of rows ?? []) {
       const profile = row.users
-      if (isAllAccess(scope) || isStudentInScope(scope, { program: profile.program, yearSection: profile.year_section })) {
+      if (isAllAccess(scope) || isStudentInScope(scope, { program: profile.program })) {
         voters.push({ id: row.id, program: profile.program })
       }
     }
@@ -842,7 +852,18 @@ async function assertCandidateInEvent(eventId, candidateId) {
 }
 
 export async function updateCandidate(eventId, organizerId, candidateId, payload) {
-  assertSetupEditable(await assertOrganizerOwnsEvent(eventId, organizerId))
+  const event = await assertOrganizerOwnsEvent(eventId, organizerId)
+
+  // A candidate's display details (name spelling, photo, bio, platform) can be
+  // corrected on a published election with a reason. Adding, removing or moving
+  // candidates stays locked (see createCandidate / deleteCandidate).
+  const publishedEdit =
+    event.status === EVENT_STATUS.SCHEDULED || event.status === EVENT_STATUS.ACTIVE
+  if (publishedEdit) {
+    assertChangeReason(payload.changeReason, 'edit a candidate on a published election')
+  } else {
+    assertSetupEditable(event)
+  }
 
   await assertCandidateInEvent(eventId, candidateId)
 
@@ -887,7 +908,14 @@ export async function updateCandidate(eventId, organizerId, candidateId, payload
     action: 'election.candidate.update',
     entity: 'candidates',
     entityId: candidateId,
-    details: { name: data.name, changedKeys: Object.keys(updates), eventId },
+    details: {
+      name: data.name,
+      changedKeys: Object.keys(updates),
+      eventId,
+      ...(publishedEdit
+        ? { statusAtEdit: event.status, reason: normalizeChangeReason(payload.changeReason) }
+        : {}),
+    },
   })
 
   return mapCandidate(data)
@@ -959,7 +987,7 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
       created_at,
       user_id,
       metadata,
-      users!inner (id, email, first_name, last_name, school_id, program, year_section)
+      users!inner (id, email, first_name, last_name, school_id, program)
     `,
       { count: 'exact' }
     )
@@ -999,7 +1027,6 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
     lastName: row.users?.last_name ?? row.last_name,
     schoolId: row.users?.school_id ?? null,
     program: row.users?.program ?? null,
-    yearSection: row.users?.year_section ?? null,
     hasVoted: row.has_voted,
     createdAt: row.created_at,
     metadata: row.metadata ?? {},
@@ -1011,7 +1038,7 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
   const scope = await getOrganizerScope(organizerId)
   const scoped = !isAllAccess(scope)
   if (scoped) {
-    voters = voters.filter((v) => isStudentInScope(scope, { program: v.program, yearSection: v.yearSection }))
+    voters = voters.filter((v) => isStudentInScope(scope, { program: v.program }))
   }
 
   return {
@@ -1529,7 +1556,7 @@ async function fetchElectionResultsData(eventId, organizerId = null) {
       .eq('has_voted', true),
     getClient()
       .from(DB_TABLES.EVENT_PARTICIPANTS)
-      .select('id, has_voted, users!inner (id, email, first_name, last_name, school_id, program, year_section)')
+      .select('id, has_voted, users!inner (id, email, first_name, last_name, school_id, program)')
       .eq('event_id', eventId)
       .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
     getClient().from(DB_TABLES.ELECTION_VOTES).select('candidate_id, position_id, voter_id').eq('event_id', eventId),
@@ -1733,7 +1760,7 @@ async function fetchElectionResultsData(eventId, organizerId = null) {
   let scopedParticipants = participantRows ?? []
   if (scoped) {
     scopedParticipants = scopedParticipants.filter((row) =>
-      isStudentInScope(scope, { program: row.users?.program, yearSection: row.users?.year_section })
+      isStudentInScope(scope, { program: row.users?.program })
     )
   }
 
@@ -1743,15 +1770,12 @@ async function fetchElectionResultsData(eventId, organizerId = null) {
     firstName: row.users?.first_name ?? '',
     lastName: row.users?.last_name ?? '',
     program: row.users?.program ?? 'Unspecified',
-    yearSection: row.users?.year_section ?? 'Unspecified',
     hasVoted: Boolean(row.has_voted),
   }))
 
   voterParticipation.sort((a, b) => {
     const progCmp = a.program.localeCompare(b.program, undefined, { numeric: true })
     if (progCmp !== 0) return progCmp
-    const secCmp = a.yearSection.localeCompare(b.yearSection, undefined, { numeric: true })
-    if (secCmp !== 0) return secCmp
     const lastCmp = a.lastName.localeCompare(b.lastName, undefined, { numeric: true })
     if (lastCmp !== 0) return lastCmp
     return a.firstName.localeCompare(b.firstName, undefined, { numeric: true })
@@ -1767,7 +1791,6 @@ async function fetchElectionResultsData(eventId, organizerId = null) {
     partialTurnoutPercentage: computeTurnoutRate(partialVotedCount, total),
     overallParticipationPercentage: computeTurnoutRate(distinctParticipants.size, total),
     participationByProgram: participationBy('program'),
-    participationByYearSection: participationBy('year_section'),
     voterParticipation,
     liveTotalVotes,
     candidateResults,
@@ -2088,20 +2111,65 @@ export async function publishElectionEvent(eventId, organizerId) {
 }
 
 /**
+ * Number of ballot submissions and votes recorded for an election. Any value
+ * above zero means voting has really started and the setup can no longer be
+ * revised in place.
+ */
+async function countElectionActivity(eventId) {
+  const [submissions, votes] = await Promise.all([
+    getClient()
+      .from(DB_TABLES.ELECTION_BALLOT_SUBMISSIONS)
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId),
+    getClient()
+      .from(DB_TABLES.ELECTION_VOTES)
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId),
+  ])
+  if (submissions.error) throw new ApiError(500, submissions.error.message)
+  if (votes.error) throw new ApiError(500, votes.error.message)
+  return (submissions.count ?? 0) + (votes.count ?? 0)
+}
+
+/** What the organizer may currently do to this election (drives the UI). */
+export async function getElectionEditPolicy(eventId, organizerId) {
+  const event = await assertOrganizerOwnsEvent(eventId, organizerId)
+  if (event.event_type !== EVENT_TYPES.ELECTION) {
+    throw new ApiError(400, 'Not an election event')
+  }
+  const hasActivity =
+    event.status === EVENT_STATUS.ACTIVE ? (await countElectionActivity(eventId)) > 0 : false
+  return buildEditPolicy(event, { hasActivity })
+}
+
+/**
  * Pull a published election back to `draft` so its setup can be corrected.
  *
- * Only allowed while the event is still `scheduled` (published but voting has
- * not opened). Once `active` the schedule owns the event and this is one-way.
- * Drafts are excluded from the schedule sync, so voting stays closed.
+ * Allowed while the event is `scheduled` (published but voting has not opened),
+ * or while it is `active` ("pause and revise") provided nobody has voted yet and
+ * a reason is given. Drafts are excluded from the schedule sync and reject
+ * ballots, so voting stays closed until the organizer publishes again.
  */
-export async function unpublishElectionEvent(eventId, organizerId) {
+export async function unpublishElectionEvent(eventId, organizerId, { reason } = {}) {
   const event = await assertOrganizerOwnsEvent(eventId, organizerId)
 
   if (event.event_type !== EVENT_TYPES.ELECTION) {
     throw new ApiError(400, 'Not an election event')
   }
-  if (!canUnpublishEventStatus(event.status)) {
-    throw new ApiError(400, 'Only a scheduled event can be unpublished. Voting has already opened or the event is closed.')
+
+  const wasActive = event.status === EVENT_STATUS.ACTIVE
+  if (!canUnpublishEventStatus(event.status) && !wasActive) {
+    throw new ApiError(400, 'Only a scheduled or live event can be unpublished. This event is closed.')
+  }
+
+  if (wasActive) {
+    assertChangeReason(reason, 'pause a live election')
+    if ((await countElectionActivity(eventId)) > 0) {
+      throw new ApiError(
+        409,
+        'Voting has already started and ballots have been submitted, so this election can no longer be paused for revision.',
+      )
+    }
   }
 
   const { error } = await getClient()
@@ -2111,12 +2179,30 @@ export async function unpublishElectionEvent(eventId, organizerId) {
 
   if (error) throw new ApiError(500, error.message)
 
+  // A voter could have submitted between the check above and closing voting.
+  // Ballots are rejected once the event is a draft, so re-count now and put the
+  // election back if anything slipped in.
+  if (wasActive && (await countElectionActivity(eventId)) > 0) {
+    await getClient()
+      .from(DB_TABLES.EVENTS)
+      .update({ status: EVENT_STATUS.ACTIVE, voting_enabled: true })
+      .eq('id', eventId)
+    throw new ApiError(
+      409,
+      'A ballot was submitted while pausing, so the election was left open and can no longer be paused.',
+    )
+  }
+
   await recordAudit({
     userId: organizerId,
     action: 'election.event.unpublish',
     entity: 'events',
     entityId: eventId,
-    details: { title: event.title },
+    details: {
+      title: event.title,
+      fromStatus: event.status,
+      ...(wasActive ? { reason: normalizeChangeReason(reason) } : {}),
+    },
   })
 
   invalidateDashboardCache(organizerId)

@@ -8,6 +8,8 @@ import voterRoutes from './voter.routes.js'
 import notificationsRoutes from './notifications.routes.js'
 import webhooksRoutes from './webhooks.routes.js'
 import competitionPublicResultsRoutes from './competition-public-results.routes.js'
+import organizerApplyRoutes from './organizer-apply.routes.js'
+import platformPublicRoutes from './platform-public.routes.js'
 
 const router = Router()
 
@@ -22,6 +24,8 @@ router.get('/', publicApiLimiter, (_req, res) => {
 
 router.use('/health', healthRoutes)
 router.use('/public/competition',competitionPublicResultsRoutes)
+router.use('/public/organizer-apply', organizerApplyRoutes)
+router.use('/public/platform', platformPublicRoutes)
 router.use('/auth', authRoutes)
 router.use('/admin', adminRoutes)
 router.use('/organizer', organizerRoutes)

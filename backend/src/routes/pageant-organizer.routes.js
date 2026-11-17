@@ -34,6 +34,7 @@ router.patch('/events/:eventId', ctrl.updateEvent)
 router.patch('/events/:eventId/scoring', ctrl.setScoring)
 router.post('/events/:eventId/publish', ctrl.publishEvent)
 router.post('/events/:eventId/unpublish', ctrl.unpublishEvent)
+router.get('/events/:eventId/edit-policy', ctrl.getEditPolicy)
 router.post('/events/:eventId/banner', uploadLimiter, uploadImage('banner'), ctrl.uploadBanner)
 
 router.get('/events/:eventId/contestants', ctrl.listContestants)

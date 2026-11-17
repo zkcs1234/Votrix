@@ -24,15 +24,19 @@ function AdvancementForm({ round, onSave, onCancel, readOnly }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const needsAmount = ['top_n', 'top_percent', 'threshold'].includes(type)
+  const value = Number(amount)
+  // The problem with the current amount, derived on every change. It is shown once
+  // the amount has been edited or left (`amountTouched`), or when Save is pressed.
+  const amountProblem = needsAmount && (amount === '' || !Number.isFinite(value) || (type === 'top_n' && (!Number.isInteger(value) || value < 1))
+    || (type === 'top_percent' && (value <= 0 || value > 100)) || (type === 'threshold' && value < 0))
+    ? (type === 'top_n' ? 'Enter a whole number of entries greater than 0.' : type === 'top_percent' ? 'Enter a percentage greater than 0 and no more than 100.' : 'Enter a valid minimum score of 0 or more.')
+    : ''
+  const [amountTouched, setAmountTouched] = useState(false)
+  const shownProblem = error || (amountTouched ? amountProblem : '')
   const save = async event => {
     event.preventDefault()
     if (readOnly || busy) return
-    const value = Number(amount)
-    if (needsAmount && (amount === '' || !Number.isFinite(value) || (type === 'top_n' && (!Number.isInteger(value) || value < 1))
-      || (type === 'top_percent' && (value <= 0 || value > 100)) || (type === 'threshold' && value < 0))) {
-      setError(type === 'top_n' ? 'Enter a whole number of entries greater than 0.' : type === 'top_percent' ? 'Enter a percentage greater than 0 and no more than 100.' : 'Enter a valid minimum score of 0 or more.')
-      return
-    }
+    if (amountProblem) { setAmountTouched(true); return }
     setBusy(true); setError('')
     try { await onSave({ advancementType: type, advancementValue: needsAmount ? value : null, scorePolicy: policy }); onCancel() }
     catch (failure) { setError(getErrorMessage(failure)) }
@@ -51,12 +55,12 @@ function AdvancementForm({ round, onSave, onCancel, readOnly }) {
         {type === 'top_n' ? 'Number of entries advancing' : type === 'top_percent' ? 'Percentage of entries advancing' : 'Minimum score to qualify'}</label>
         <input id={`${prefix}-amount`} type="number" className={`${INPUT_CLASS} w-full sm:max-w-48`} value={amount}
           min={type === 'threshold' ? 0 : 1} max={type === 'top_percent' ? 100 : undefined} step={type === 'top_n' ? 1 : 'any'}
-          onChange={event => { setAmount(event.target.value); setError('') }} aria-invalid={Boolean(error)} />
+          onChange={event => { setAmount(event.target.value); setAmountTouched(true); setError('') }} onBlur={() => setAmountTouched(true)} aria-invalid={Boolean(shownProblem)} />
       </div>}
       <p className="text-xs leading-relaxed text-v-text-subtle">{type==='none'?'No elimination: eligible entries continue to the next main round without a qualification decision. Live Control activates judging separately.':'Review and finalize round standings, then confirm qualifiers in Tabulation before opening the next round in Live Control.'}</p>
       {['top_n','top_percent'].includes(type)&&<p className="text-xs text-v-text-subtle">Published shared cutoff ties advance together, so the approved count can exceed the requested number.</p>}
       <p className="text-xs leading-relaxed text-v-text-subtle">Entry eligibility is separate from Back to Zero, carry-forward, and weighted score combination. Configure score use in Next Round / Back to Zero.</p>
-      {error && <p role="alert" className="v-error-text">{error}</p>}
+      {shownProblem && <p role="alert" className="v-error-text">{shownProblem}</p>}
       <div className="flex flex-wrap justify-end gap-2"><Button variant="secondary" onClick={onCancel}>Cancel</Button><Button type="submit" loading={busy}>Save advancement</Button></div>
     </fieldset>
   </form>
@@ -71,11 +75,16 @@ function ProgressionForm({ round, rounds, categories, onSave, onCancel, readOnly
   const savedDestinationMissing = values.nextRoundId && !laterRounds.some(item => item.id === values.nextRoundId)
   const combined = values.progression === 'weighted' && round.purpose !== 'special'
   const available = Math.max(0, 100 - contributionTotal(rounds, round.categoryId, round.id))
+  // Contribution problems are derived from the current values and shown once the
+  // contribution has been edited or left, or when Save is pressed.
+  const weightProblem = validateRoundForm(values, rounds, round).errors.weight
+  const [weightTouched, setWeightTouched] = useState(false)
+  const shownError = error || (weightTouched ? weightProblem : '')
   const save = async event => {
     event.preventDefault()
     if (readOnly || busy) return
     const checked = validateRoundForm(values, rounds, round)
-    if (checked.errors.weight) { setError(checked.errors.weight); return }
+    if (checked.errors.weight) { setWeightTouched(true); return }
     if (values.nextRoundId && values.nextRoundId !== (round.nextRoundId ?? '') && !laterRounds.some(item => item.id === values.nextRoundId)) { setError('Choose a later round in this competition.'); return }
     const payload = { ...checked.payload }
     if ((values.nextRoundId || null) !== (round.nextRoundId ?? null)) payload.nextRoundId = values.nextRoundId || null
@@ -92,7 +101,8 @@ function ProgressionForm({ round, rounds, categories, onSave, onCancel, readOnly
       </div>
       {combined && <div><label className={LABEL_CLASS} htmlFor={`${prefix}-contribution`}>Contribution to combined result (%)</label>
         <input id={`${prefix}-contribution`} type="number" step="0.01" min="0.01" max="100" className={`${INPUT_CLASS} w-full sm:max-w-48`} value={values.weight}
-          onChange={event => { setValues({ ...values, weight: event.target.value }); setError('') }} />
+          onChange={event => { setValues({ ...values, weight: event.target.value }); setWeightTouched(true); setError('') }} onBlur={() => setWeightTouched(true)}
+          aria-invalid={Boolean(weightTouched && weightProblem)} />
         <p className="mt-1 text-xs text-v-text-subtle">{available.toFixed(2)}% available in {categories.find(category => category.id === round.categoryId)?.name || 'event-wide combined results'}.</p>
       </div>}
       {(round.purpose !== 'final'||values.nextRoundId) && <div><label className={LABEL_CLASS} htmlFor={`${prefix}-next`}>Next round</label>
@@ -102,7 +112,7 @@ function ProgressionForm({ round, rounds, categories, onSave, onCancel, readOnly
           {laterRounds.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select><p className="mt-1 text-xs text-v-text-subtle">{savedDestinationMissing ? 'The saved destination is unavailable or is an independent special award. Review and explicitly save a later main round; the historical choice stays visible.' : laterRounds.length ? 'All eligible entries continue when no elimination is configured; other rules require approved qualifiers. Live Control activates the destination separately.' : 'Create a later main round first, then return here to choose its source.'}</p>
       </div>}
-      {error && <p role="alert" className="v-error-text">{error}</p>}
+      {shownError && <p role="alert" className="v-error-text">{shownError}</p>}
       <div className="flex flex-wrap justify-end gap-2"><Button variant="secondary" onClick={onCancel}>Cancel</Button><Button type="submit" loading={busy}>Save progression</Button></div>
     </fieldset>
   </form>

@@ -1,5 +1,6 @@
 import { ApiError } from '../utils/ApiError.js'
 import { EVENT_STATUS } from '../utils/constants.js'
+import { validateChangeReasonShape } from '../utils/eventLifecycle.js'
 
 export const ELECTION_RESULTS_VISIBILITY = ['real_time', 'hidden', 'public']
 const ALLOWED_EVENT_STATUSES = new Set(Object.values(EVENT_STATUS))
@@ -64,6 +65,7 @@ export function validateUpdateEvent(body) {
   if (body.resultsVisibility !== undefined) {
     payload.resultsVisibility = normalizeResultsVisibility(body.resultsVisibility)
   }
+  if (body.changeReason !== undefined) payload.changeReason = validateChangeReasonShape(body.changeReason)
 
   return payload
 }

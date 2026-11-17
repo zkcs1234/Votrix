@@ -25,6 +25,22 @@ PostgreSQL schema for Supabase. All primary keys are **UUID** (`gen_random_uuid(
    finalized, advancement rosters are confirmed, and terminal results are
    published. Apply it after migrations through `128`.
 
+8. Migrations `138`–`140` add the organizer invitation/application flow and
+   student officers (`organizer_invitations`, `organizer_applications`,
+   `organization_officers`). They are additive and idempotent (`IF NOT EXISTS`);
+   nothing reads them until the matching backend code is deployed. Apply them in
+   numeric order **before** deploying that code. `138`/`139`/`140` only reference
+   `users`. Each new table is locked down for Supabase's public API (RLS on, no
+   policies, access revoked from `PUBLIC`/`anon`/`authenticated`, the same
+   convention as migration `101`); the backend's service-role key is unaffected.
+   Before applying, confirm `135`–`137` are applied: student officers are chosen
+   from accounts with an active `STUDENT` row in `user_participant_types`.
+   To roll back, run the down files in **reverse** order
+   (`140_down_…`, `139_down_…`, `138_down_…`): `139` has a foreign key to `138`,
+   so dropping `138` first is refused. Rolling back removes invitations,
+   applications and officer assignments but never touches `users`; organizer
+   accounts created by an approved application remain ordinary organizers.
+
 ## Entity relationship
 
 ```mermaid

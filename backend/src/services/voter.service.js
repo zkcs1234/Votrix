@@ -172,40 +172,50 @@ function classifyPoll(event) {
           : 'View poll',
     pollingEnabled: Boolean(event.pollingEnabled),
     pollAllowMultipleSubmissions: Boolean(event.pollAllowMultipleSubmissions),
+    pollAnonymous: Boolean(event.pollAnonymous ?? event.poll_anonymous),
     hasResponded: Boolean(event.hasResponded),
     pollOpen: open,
   }, 'polling')
 }
 
-export async function getVoterDashboard(voterId) {
+/**
+ * Every event the account is enrolled in, classified for the participant UI
+ * (bucket, status label, action path). Shared by the overview, My events,
+ * History and Results so they can never disagree. Election results are NOT
+ * fetched here.
+ */
+export async function loadClassifiedEvents(voterId) {
   const [elections, competitions, polls] = await Promise.all([
     listVoterElectionEvents(voterId),
     listJudgeCompetitionEvents(voterId),
     listVoterPollEvents(voterId),
   ])
 
-  // Fetch results for elections where voter can view them
-  const electionResults = {}
-  for (const election of elections) {
-    if (canVoterViewElectionResults(election)) {
-      try {
-        const results = await getVoterElectionResults(election.id, voterId)
-        electionResults[election.id] = results
-      } catch (err) {
-        // Ignore errors - results might not be available
-        console.error(`Failed to fetch results for election ${election.id}:`, err.message)
-      }
-    }
-  }
-
-  const events = [
-    ...elections.map((e) => ({
-      ...classifyElection(e),
-      results: electionResults[e.id] || null,
-    })),
+  return [
+    ...elections.map(classifyElection),
     ...competitions.map(classifyCompetition).flat(),
     ...polls.map(classifyPoll),
   ]
+}
+
+export async function getVoterDashboard(voterId, { includeResults = false } = {}) {
+  let events = await loadClassifiedEvents(voterId)
+
+  // Results bodies are heavy (one query set per election), so they are only
+  // attached when asked for. The Results page fetches them on demand instead.
+  if (includeResults) {
+    events = await Promise.all(
+      events.map(async (event) => {
+        if (event.eventType !== 'election' || !event.canViewResults) return event
+        try {
+          return { ...event, results: await getVoterElectionResults(event.id, voterId) }
+        } catch (err) {
+          console.error(`Failed to fetch results for election ${event.id}:`, err.message)
+          return { ...event, results: null }
+        }
+      }),
+    )
+  }
 
   const byBucket = (bucket) => events.filter((e) => e.bucket === bucket)
 

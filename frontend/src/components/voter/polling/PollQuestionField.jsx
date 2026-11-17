@@ -1,13 +1,17 @@
 // Phase 7 — Registry-driven poll question field. The `question.typeDef`
 // (loaded from the backend) decides which input renders. Adding a new
 // question type is a single SQL insert and (optionally) a new branch here.
-export default function PollQuestionField({ question, index, value, onChange, disabled }) {
+export default function PollQuestionField({ question, index, value, onChange, disabled, error }) {
   const q = question
   const def = q.typeDef
   const input = def?.ui?.input ?? 'unknown'
 
   return (
-    <fieldset className="v-card space-y-1 border border-v-border p-5 shadow-v-shadow-sm sm:p-6">
+    <fieldset
+      id={`poll-question-${q.id}`}
+      aria-invalid={error ? true : undefined}
+      className={`v-card space-y-1 border p-5 shadow-v-shadow-sm sm:p-6 ${error ? 'border-v-danger' : 'border-v-border'}`}
+    >
       <legend className="sr-only">
         Question {index + 1}: {q.question}
         {q.required ? ' (required)' : ''}
@@ -104,6 +108,12 @@ export default function PollQuestionField({ question, index, value, onChange, di
       {!['textarea', 'rating', 'likert', 'checkbox', 'ranking', 'radio'].includes(input) && (
         <p className="mt-4 text-sm text-v-text-subtle">
           This question uses an unsupported input type ({input}). Please contact the organizer.
+        </p>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-3 text-sm font-medium text-v-danger">
+          {error}
         </p>
       )}
     </fieldset>

@@ -3,7 +3,7 @@ import AppShell from '@/layouts/AppShell'
 
 const navItems = [
   { section: 'Workspace' },
-  { label: 'Overview', path: '/organizer', icon: LayoutDashboard },
+  { label: 'Organizer Dashboard', path: '/organizer', icon: LayoutDashboard },
   { label: 'Reports', path: '/organizer/reports', icon: BarChart3 },
 ]
 

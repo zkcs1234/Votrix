@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Users, CalendarDays, UserCheck, UserPlus, Zap, CheckSquare,
-  Vote, Trophy, BarChart2, CheckCircle2, AlertCircle, XCircle,
+  Users, CalendarDays, UserCheck, Zap, CheckSquare,
+  Vote, Trophy, BarChart2,
 } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
 import Card from '@/components/ui/Card'
 import FormAlert from '@/components/ui/FormAlert'
 import StatCard from '@/components/ui/StatCard'
-import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import { AreaChartView } from '@/components/charts'
 import {
@@ -29,58 +27,9 @@ const formatActivityTime = (timestamp) =>
     minute: '2-digit',
   })
 
-// Operational health summary built from the existing system-health endpoint.
-function HealthSummary({ health, unavailable }) {
-  if (unavailable) {
-    return (
-      <FormAlert variant="warning" title="Health status unavailable">
-        The health check could not be reached. Open System Health to retry.
-      </FormAlert>
-    )
-  }
-  if (!health) {
-    return <div className="h-16 animate-pulse rounded-lg bg-v-surface-elevated" aria-hidden />
-  }
-
-  const overall = health.overall
-  const variant = overall === 'healthy' ? 'success' : overall === 'degraded' ? 'warning' : 'error'
-  const title =
-    overall === 'healthy'
-      ? 'All core services operational'
-      : overall === 'degraded'
-        ? 'Some services are degraded'
-        : 'Service outage detected'
-  const checked = health.checkedAt ? ` Last checked ${format(parseISO(health.checkedAt), 'd MMM yyyy, HH:mm')}.` : ''
-
-  return (
-    <div className="space-y-3">
-      <FormAlert variant={variant} title={title}>
-        {`${(health.services ?? []).map((svc) => svc.service).join(', ')}${checked ? `.${checked}` : ''}`}
-      </FormAlert>
-      <ul className="divide-y divide-v-border text-sm">
-        {(health.services ?? []).map((svc) => {
-          const Icon = svc.status === 'healthy' ? CheckCircle2 : svc.status === 'degraded' ? AlertCircle : XCircle
-          const tone = svc.status === 'healthy' ? 'text-v-success' : svc.status === 'degraded' ? 'text-v-warning' : 'text-v-danger'
-          return (
-            <li key={svc.service} className="flex items-center justify-between gap-3 py-2">
-              <span className="capitalize text-v-text">{svc.service}</span>
-              <span className={`inline-flex items-center gap-1.5 font-medium capitalize ${tone}`}>
-                <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
-                {svc.status}
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-    </div>
-  )
-}
-
 export default function AdminDashboardPage() {
   const [dashboard, setDashboard] = useState(null)
   const [analytics, setAnalytics] = useState(null)
-  const [health, setHealth] = useState(null)
-  const [healthUnavailable, setHealthUnavailable] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -109,23 +58,6 @@ export default function AdminDashboardPage() {
     }
 
     load()
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  // Health is secondary: it loads independently so a slow or failing check
-  // never blocks or breaks the rest of the dashboard.
-  useEffect(() => {
-    let alive = true
-    adminService
-      .getSystemHealth()
-      .then(({ data }) => {
-        if (alive) setHealth(data)
-      })
-      .catch(() => {
-        if (alive) setHealthUnavailable(true)
-      })
     return () => {
       alive = false
     }
@@ -207,24 +139,8 @@ export default function AdminDashboardPage() {
   return (
     <div className="v-dashboard space-y-6">
       <PageHeader
-        title="Admin dashboard"
-        description="Platform-wide oversight, account administration and operational health."
-        actions={
-          <>
-            <Link to="/admin/users?tab=participants">
-              <Button variant="secondary">
-                <UserPlus className="h-4 w-4" strokeWidth={2} />
-                Add participant
-              </Button>
-            </Link>
-            <Link to="/admin/users?tab=organizers">
-              <Button>
-                <UserPlus className="h-4 w-4" strokeWidth={2} />
-                Add organizer
-              </Button>
-            </Link>
-          </>
-        }
+        title="Admin Dashboard"
+        description="Platform-wide oversight and account administration."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -264,7 +180,7 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div>
         <Card padding="sm">
           <div className="flex items-center justify-between gap-3">
             <h3 className="v-section-title">Recent platform activity</h3>
@@ -297,36 +213,6 @@ export default function AdminDashboardPage() {
             </div>
           )}
         </Card>
-
-        <div className="space-y-4">
-          <Card padding="sm">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="v-section-title">Operational health</h3>
-              <Link to="/admin/health" className="text-sm font-semibold text-v-primary hover:underline">
-                Open System Health →
-              </Link>
-            </div>
-            <div className="mt-3">
-              <HealthSummary health={health} unavailable={healthUnavailable} />
-            </div>
-          </Card>
-
-          <Card padding="sm">
-            <h3 className="v-section-title">Events by module</h3>
-            <ul className="mt-3 divide-y divide-v-border text-sm">
-              {[
-                ['Elections', electionEvents],
-                ['Competitions', competitionEvents],
-                ['Polling', pollingEvents],
-              ].map(([label, count]) => (
-                <li key={label} className="flex items-center justify-between py-2">
-                  <span className="text-v-text">{label}</span>
-                  <span className="font-medium tabular-nums text-v-text-muted">{eventCount(count)}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

@@ -12,6 +12,7 @@
  */
 
 import { db } from './db.js'
+import { getActor } from './requestContext.js'
 import { DB_TABLES } from '../utils/constants.js'
 import { ApiError } from '../utils/ApiError.js'
 
@@ -33,6 +34,14 @@ export async function recordAudit({ userId, action, entity, entityId, details } 
     return null
   }
 
+  // When a student officer is acting as the owner organizer, user_id stays the
+  // owner (so the owner and admins see everything done in the organization) and
+  // the real person is recorded in details.
+  const actor = getActor()
+  const auditDetails = actor
+    ? { ...(details ?? {}), actingUserId: actor.id, actingUserEmail: actor.email ?? null }
+    : details ?? null
+
   try {
     const client = db()
     const { data, error } = await client
@@ -42,7 +51,7 @@ export async function recordAudit({ userId, action, entity, entityId, details } 
         action,
         entity: entity ?? null,
         entity_id: entityId ?? null,
-        details: details ?? null,
+        details: auditDetails,
       })
       .select('*')
       .single()

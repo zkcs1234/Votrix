@@ -9,6 +9,7 @@ import {
   validateCandidate,
   validateElectionBallotSection,
 } from '../validators/election.validator.js'
+import { validateChangeReasonShape } from '../utils/eventLifecycle.js'
 import { getEventCohorts, inviteCohort as inviteCohortService, removeEventParticipant } from '../services/cohort.service.js'
 
 export const getDashboard = asyncHandler(async (req, res) => {
@@ -47,6 +48,7 @@ export const uploadBanner = asyncHandler(async (req, res) => {
   const event = await electionService.updateElectionEvent(req.params.eventId, req.user.id, {
     banner: result.secure_url,
     image_asset_id: result.image_asset_id ?? null,
+    changeReason: validateChangeReasonShape(req.body?.changeReason),
   })
   res.json({ success: true, url: result.secure_url, event })
 })
@@ -168,7 +170,7 @@ export const updateCandidate = asyncHandler(async (req, res) => {
     req.params.eventId,
     req.user.id,
     req.params.candidateId,
-    payload,
+    { ...payload, changeReason: validateChangeReasonShape(req.body?.changeReason) },
   )
   res.json({ success: true, candidate })
 })
@@ -184,7 +186,11 @@ export const uploadCandidatePhoto = asyncHandler(async (req, res) => {
     req.params.eventId,
     req.user.id,
     req.params.candidateId,
-    { photo: result.secure_url, image_asset_id: result.image_asset_id ?? null },
+    {
+      photo: result.secure_url,
+      image_asset_id: result.image_asset_id ?? null,
+      changeReason: validateChangeReasonShape(req.body?.changeReason),
+    },
   )
 
   res.json({ success: true, url: result.secure_url, candidate })
@@ -275,6 +281,12 @@ export const unpublishEvent = asyncHandler(async (req, res) => {
   const event = await electionService.unpublishElectionEvent(
     req.params.eventId,
     req.user.id,
+    { reason: validateChangeReasonShape(req.body?.reason) },
   )
   res.json({ success: true, event })
+})
+
+export const getEditPolicy = asyncHandler(async (req, res) => {
+  const policy = await electionService.getElectionEditPolicy(req.params.eventId, req.user.id)
+  res.json({ success: true, policy })
 })

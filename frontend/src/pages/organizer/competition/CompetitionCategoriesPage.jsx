@@ -27,6 +27,14 @@ export default function CompetitionCategoriesPage({ typeOnly = false }) {
   const [name, setName] = useState(''), [format, setFormat] = useState('individual')
   const [customOpen, setCustomOpen] = useState(false)
   const [error, setError] = useState(''), [loading, setLoading] = useState(!routePrefetch), [busy, setBusy] = useState(false)
+  // Live checks for the custom name form and the custom type box. A message shows
+  // once the box has been edited or left, and updates as the organizer types.
+  const [nameTouched, setNameTouched] = useState(false), [customTypeTouched, setCustomTypeTouched] = useState(false)
+  const typedName = name.trim().toLowerCase()
+  const nameProblem = !typedName ? 'Enter a name to add it.'
+    : (type === 'pageant' ? divisions : children).some(item => item.name.toLowerCase() === typedName)
+      ? (type === 'pageant' ? 'This division is already configured.' : 'This competition is already selected.') : ''
+  const customTypeProblem = type === 'other' && !customType.trim() ? 'Name your competition type to continue.' : ''
   const pending = useRef(null), operation = useRef(false)
 
   const load = useCallback(async () => {
@@ -310,7 +318,10 @@ export default function CompetitionCategoriesPage({ typeOnly = false }) {
         </label>
         {type === 'other' && <label className="block">
           <span className="v-label">Name your competition type</span>
-          <input className={INPUT_CLASS} maxLength={32} placeholder="e.g. Cultural Showcase" value={customType} onChange={e => setCustomType(e.target.value)} />
+          <input className={`${INPUT_CLASS}${customTypeTouched && customTypeProblem ? ' v-input-error' : ''}`} maxLength={32} placeholder="e.g. Cultural Showcase" value={customType} aria-required="true"
+            aria-invalid={customTypeTouched && customTypeProblem ? true : undefined} aria-describedby={customTypeTouched && customTypeProblem ? 'custom-type-problem' : undefined}
+            onChange={e => { setCustomType(e.target.value); setCustomTypeTouched(true) }} onBlur={() => setCustomTypeTouched(true)} />
+          {customTypeTouched && customTypeProblem && <span id="custom-type-problem" role="alert" className="v-error-text block">{customTypeProblem}</span>}
         </label>}
         {children.length > 0 && <Notice>Changing the saved type removes its dependent draft setup, but shared event entrants are retained.</Notice>}
       </fieldset>
@@ -319,7 +330,7 @@ export default function CompetitionCategoriesPage({ typeOnly = false }) {
   }
 
   const presets = COMPETITION_PRESETS[type] ?? []
-  return <section data-module="competition-scoring" className="mx-auto max-w-5xl space-y-7 pb-20">
+  return <section data-module="competition-scoring" className="mx-auto max-w-7xl space-y-7 pb-20">
     <header className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -366,11 +377,12 @@ export default function CompetitionCategoriesPage({ typeOnly = false }) {
             <div className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded border border-v-primary bg-v-primary text-white"><Plus className="h-3.5 w-3.5" /></span><span className="text-xs font-semibold text-v-text">Add a custom {type === 'pageant' ? 'division' : 'competition'}</span></div>
             <button type="button" className="text-xs text-v-text-subtle hover:text-v-text" onClick={() => { setCustomOpen(false); setName('') }}>Cancel</button>
           </div>
-          <form onSubmit={e => { e.preventDefault(); type === 'pageant' ? addPageantDivision(name) : add(name) }} className="grid gap-2">
-            <label><span className="v-label">{type === 'pageant' ? 'Division name' : 'Competition name'}</span><input autoFocus className={INPUT_CLASS} maxLength={200} required placeholder={type === 'pageant' ? 'e.g. Teen Division' : 'e.g. Original Song'} value={name} onChange={e => setName(e.target.value)} /></label>
+          <form noValidate onSubmit={e => { e.preventDefault(); if (nameProblem) { setNameTouched(true); return } type === 'pageant' ? addPageantDivision(name) : add(name) }} className="grid gap-2">
+            <label><span className="v-label">{type === 'pageant' ? 'Division name' : 'Competition name'}</span><input autoFocus className={`${INPUT_CLASS}${nameTouched && nameProblem ? ' v-input-error' : ''}`} maxLength={200} aria-required="true" aria-invalid={nameTouched && nameProblem ? true : undefined} aria-describedby={nameTouched && nameProblem ? 'custom-name-problem' : undefined} placeholder={type === 'pageant' ? 'e.g. Teen Division' : 'e.g. Original Song'} value={name} onChange={e => { setName(e.target.value); setNameTouched(true) }} onBlur={() => setNameTouched(true)} />
+              {nameTouched && nameProblem && <span id="custom-name-problem" className="v-error-text block">{nameProblem}</span>}</label>
             <div className="flex items-end gap-2">
               {type !== 'pageant' && <label className="min-w-0 flex-1"><span className="v-label">Participants</span><select className={INPUT_CLASS} value={format} onChange={e => setFormat(e.target.value)}>{PARTICIPATION_FORMATS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>}
-              <Button type="submit"><Plus className="h-4 w-4" />Add</Button>
+              <Button type="submit" disabled={Boolean(nameProblem)}><Plus className="h-4 w-4" />Add</Button>
             </div>
           </form>
         </div>}

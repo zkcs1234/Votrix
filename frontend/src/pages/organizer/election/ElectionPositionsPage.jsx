@@ -13,8 +13,8 @@ import useEventStatus from '@/hooks/useEventStatus'
 import { stagePath } from '@/utils/eventStages'
 import { firstIncompleteSectionId, groupHasPositions } from '@/utils/electionGroupProgress'
 
-import { INPUT_CLASS } from '@/utils/uiClasses'
-const inputClass = INPUT_CLASS
+import PositionForm from '@/components/organizer/election/PositionForm'
+import GroupNameForm from '@/components/organizer/election/GroupNameForm'
 
 export default function ElectionPositionsPage() {
   const { eventId } = useParams()
@@ -23,20 +23,12 @@ export default function ElectionPositionsPage() {
   const [sections, setSections] = useState([])
   const [completedSectionIds, setCompletedSectionIds] = useState([])
   const [sectionId, setSectionId] = useState('')
-  const [sectionName, setSectionName] = useState('')
   const [sectionSaving, setSectionSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [groupsLoading, setGroupsLoading] = useState(true)
   const positionRequest = useRef(0)
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [numberOfWinners, setNumberOfWinners] = useState(1)
-  // minVote removed – default is 1 (no minimum constraint)
-  const [maxVote, setMaxVote] = useState(1)
-  const [displayOrder, setDisplayOrder] = useState('')
+  const [renamingSectionId, setRenamingSectionId] = useState('')
   const [programs, setPrograms] = useState([])
-  const [eligibilityMode, setEligibilityMode] = useState('all')
-  const [selectedPrograms, setSelectedPrograms] = useState([])
   const [eligibilityDrafts, setEligibilityDrafts] = useState({})
   const [eligibilityModes, setEligibilityModes] = useState({})
   const [savingEligibility, setSavingEligibility] = useState('')
@@ -91,70 +83,41 @@ export default function ElectionPositionsPage() {
     load(sectionId)
   }, [eventId, sectionId, load])
 
-  const resetForm = () => {
-    setName('')
-    setDescription('')
-    setNumberOfWinners(1)
-    // setMinVote removed – no longer needed
-    setMaxVote(1)
-    setDisplayOrder('')
-    setEligibilityMode('all')
-    setSelectedPrograms([])
-  }
-
-  const handleCreate = async (e) => {
-    e.preventDefault()
-    if (!sectionId) { showError('Select an election group before adding a position'); return }
-    if (eligibilityMode === 'programs' && !selectedPrograms.length) {
-      showError('Select at least one program or allow all voters in the group')
-      return
-    }
-
-    // No need to validate minVote vs maxVote now
-    // Validation removed – minVote feature eliminated
-
+  // The form validates as the organizer types; this only performs the request.
+  // Resolves true on success so the form clears itself.
+  const handleCreate = async (payload) => {
+    if (!sectionId) { showError('Select an election group before adding a position'); return false }
     setSaving(true)
     try {
-      await electionService.createPosition(eventId, {
-        name,
-        description: description || null,
-        numberOfWinners: Number(numberOfWinners),
-        maxVote: Number(maxVote),
-        displayOrder: displayOrder === '' ? undefined : Number(displayOrder),
-        allowSkip: false,
-        eligiblePrograms: eligibilityMode === 'programs' ? selectedPrograms : [],
-      }, sectionId)
-      resetForm()
+      await electionService.createPosition(eventId, payload, sectionId)
       setLoading(true)
       load()
-      showSuccess(`Position "${name}" added`)
+      showSuccess(`Position "${payload.name}" added`)
+      return true
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to create position')
+      return false
     } finally {
       setSaving(false)
     }
   }
 
-  const handleCreateSection = async (e) => {
-    e.preventDefault()
-    if (!sectionName.trim()) { showError('Election group name is required'); return }
-    if (sections.some((section) => section.name.trim().toLowerCase() === sectionName.trim().toLowerCase())) {
-      showError('An election group with this name already exists'); return
-    }
+  const handleCreateSection = async (name) => {
     setSectionSaving(true)
     try {
       const { data } = await electionService.createBallotSection(eventId, {
-        name: sectionName.trim(),
+        name,
         displayOrder: sections.length,
       })
       setSections((current) => [...current, data.section])
       setCompletedSectionIds((current) => current.filter((id) => id !== data.section.id))
       setSectionId(data.section.id)
-      setSectionName('')
       setPositions([])
       showSuccess(`Election group "${data.section.name}" added`)
+      return true
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to add election group')
+      return false
     } finally {
       setSectionSaving(false)
     }
@@ -180,20 +143,17 @@ export default function ElectionPositionsPage() {
     }
   }
 
-  const handleRenameSection = async (section) => {
-    const entered = window.prompt('Election group name', section.name)
-    if (entered === null) return
-    const name = entered.trim()
-    if (!name) { showError('Election group name is required'); return }
-    if (name === section.name) return
-    if (sections.some((item) => item.id !== section.id && item.name.trim().toLowerCase() === name.toLowerCase())) {
-      showError('An election group with this name already exists'); return
-    }
+  // Inline rename (GroupNameForm validates required / length / duplicates live).
+  const handleRenameSection = async (section, name) => {
+    if (name === section.name) { setRenamingSectionId(''); return true }
     try {
       const { data } = await electionService.updateBallotSection(eventId, section.id, { name })
       setSections((current) => current.map((item) => item.id === section.id ? data.section : item))
+      setRenamingSectionId('')
+      return true
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to rename election group')
+      return false
     }
   }
 
@@ -234,10 +194,8 @@ export default function ElectionPositionsPage() {
   const handleSaveEligibility = async (position) => {
     const mode = eligibilityModes[position.id] ?? (position.eligiblePrograms?.length ? 'programs' : 'all')
     const eligiblePrograms = mode === 'all' ? [] : eligibilityDrafts[position.id] ?? position.eligiblePrograms ?? []
-    if (mode === 'programs' && !eligiblePrograms.length) {
-      showError('Select at least one program or choose all programs')
-      return
-    }
+    // The button is disabled (with a message) while this is true; guard anyway.
+    if (mode === 'programs' && !eligiblePrograms.length) return
     setSavingEligibility(position.id)
     try {
       const { data } = await electionService.updatePosition(eventId, position.id, { eligiblePrograms })
@@ -286,136 +244,55 @@ export default function ElectionPositionsPage() {
                 {!sections.length && <p className="v-caption">Create one election group to begin. Additional groups are optional.</p>}
                 <ol className="space-y-2">
                   {sections.map((section, index) => (
-                    <li key={section.id} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="min-w-0 truncate text-v-text">{index + 1}. {section.name}</span>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <button type="button" disabled={index === 0} onClick={() => handleMoveSection(section, -1)} aria-label={`Move ${section.name} up`}>↑</button>
-                        <button type="button" disabled={index === sections.length - 1} onClick={() => handleMoveSection(section, 1)} aria-label={`Move ${section.name} down`}>↓</button>
-                        <button type="button" onClick={() => handleRenameSection(section)} className="text-xs text-v-primary">Rename</button>
-                        <button type="button" onClick={() => handleDeleteSection(section)} className="text-xs text-v-danger">Delete</button>
-                      </div>
+                    <li key={section.id} className="text-sm">
+                      {renamingSectionId === section.id ? (
+                        <GroupNameForm
+                          initialName={section.name}
+                          otherNames={sections.filter((item) => item.id !== section.id).map((item) => item.name)}
+                          ariaLabel={`Rename ${section.name}`}
+                          submitLabel="Save name"
+                          savingLabel="Saving..."
+                          onSubmit={(name) => handleRenameSection(section, name)}
+                          onCancel={() => setRenamingSectionId('')}
+                          autoFocus
+                        />
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate text-v-text">{index + 1}. {section.name}</span>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <button type="button" disabled={index === 0} onClick={() => handleMoveSection(section, -1)} aria-label={`Move ${section.name} up`}>↑</button>
+                            <button type="button" disabled={index === sections.length - 1} onClick={() => handleMoveSection(section, 1)} aria-label={`Move ${section.name} down`}>↓</button>
+                            <button type="button" onClick={() => setRenamingSectionId(section.id)} className="text-xs text-v-primary">Rename</button>
+                            <button type="button" onClick={() => handleDeleteSection(section)} className="text-xs text-v-danger">Delete</button>
+                          </div>
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ol>
-                <form onSubmit={handleCreateSection} className="flex flex-col gap-2 border-t border-v-border pt-3">
-                <input
-                  className={`${inputClass} min-w-0 flex-1`}
-                  placeholder="e.g. SSG, FSTLP"
-                  aria-label="Election group name"
-                  maxLength={255}
-                  value={sectionName}
-                  onChange={(e) => setSectionName(e.target.value)}
-                  required
-                />
-                <button type="submit" disabled={sectionSaving} className="rounded-md bg-v-primary px-3 py-2 text-sm text-white disabled:opacity-50">
-                  {sectionSaving ? 'Adding...' : '+ Add Election Group'}
-                </button>
-                </form>
+                <div className="border-t border-v-border pt-3">
+                  <GroupNameForm
+                    otherNames={sections.map((section) => section.name)}
+                    placeholder="e.g. SSG, FSTLP"
+                    submitLabel="+ Add Election Group"
+                    savingLabel="Adding..."
+                    saving={sectionSaving}
+                    onSubmit={handleCreateSection}
+                  />
+                </div>
               </div>
             </details>
           )}
           {setupLocked ? (
             <ReadOnlyEventBanner status={status} noun="election" />
           ) : (
-        <form
-          onSubmit={handleCreate}
-          className="grid gap-4 v-card p-6 sm:grid-cols-2 mb-4"
-        >
-        <fieldset disabled={!sectionId || saving} className="contents">
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-sm text-v-text-muted">Position name</label>
-          <input
-            className={`${inputClass} w-full`}
-            placeholder="e.g. President"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-        </div>
-
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-sm text-v-text-muted">Description</label>
-          <textarea
-            className={`${inputClass} w-full`}
-            rows={2}
-            placeholder="Optional description shown on the ballot"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Number of winners</label>
-          <input
-            type="number"
-            min={1}
-            className={`${inputClass} w-full`}
-            value={numberOfWinners}
-            onChange={(e) => setNumberOfWinners(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Maximum Selections</label>
-          <input
-            type="number"
-            min={1}
-            className={`${inputClass} w-full`}
-            value={maxVote}
-            onChange={(e) => setMaxVote(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm text-v-text-muted">Display order</label>
-          <input
-            type="number"
-            min={0}
-            className={`${inputClass} w-full`}
-            placeholder="Auto"
-            value={displayOrder}
-            onChange={(e) => setDisplayOrder(e.target.value)}
-          />
-        </div>
-
-        {canManagePositionEligibility && <fieldset className="space-y-2 sm:col-span-2">
-          <legend className="mb-1 block text-sm text-v-text-muted">Who can vote for this position?</legend>
-          <label className="flex items-center gap-2 text-sm text-v-text">
-            <input type="radio" name="position-eligibility" checked={eligibilityMode === 'all'} onChange={() => setEligibilityMode('all')} />
-            All programs eligible for this group
-          </label>
-          <label className="flex items-center gap-2 text-sm text-v-text">
-            <input type="radio" name="position-eligibility" checked={eligibilityMode === 'programs'} onChange={() => setEligibilityMode('programs')} />
-            Only selected programs
-          </label>
-          {eligibilityMode === 'programs' && (
-            <div className="grid gap-2 rounded-lg border border-v-border p-3 sm:grid-cols-2">
-              {!programs.length && <p className="v-caption sm:col-span-2">No voter programs are available in your organizer scope.</p>}
-              {programs.map((program) => (
-                <label key={program} className="flex items-center gap-2 text-sm text-v-text">
-                  <input
-                    type="checkbox"
-                    checked={selectedPrograms.includes(program)}
-                    onChange={(event) => setSelectedPrograms((current) => event.target.checked
-                      ? [...current, program]
-                      : current.filter((value) => value !== program))}
-                  />
-                  {program}
-                </label>
-              ))}
-            </div>
-          )}
-        </fieldset>}
-
-        <button
-          type="submit"
-          disabled={saving || !sectionId}
-          className="rounded-lg bg-v-primary px-4 py-2 text-sm text-white hover:bg-v-primary-hover disabled:opacity-50 sm:col-span-2"
-        >
-          {saving ? 'Adding...' : 'Add position'}
-        </button>
-        </fieldset>
-      </form>
+        <PositionForm
+          sectionId={sectionId}
+          saving={saving}
+          canManageEligibility={canManagePositionEligibility}
+          programs={programs}
+          onCreate={handleCreate}
+        />
           )}
         </div>
       }
@@ -496,14 +373,28 @@ export default function ElectionPositionsPage() {
                         {!programs.length && <p className="v-caption sm:col-span-2">No voter programs are available in your organizer scope.</p>}
                       </div>
                     )}
-                    <button
-                      type="button"
-                      disabled={savingEligibility === p.id}
-                      onClick={() => handleSaveEligibility(p)}
-                      className="rounded-md bg-v-primary px-3 py-1.5 text-xs text-white disabled:opacity-50"
-                    >
-                      {savingEligibility === p.id ? 'Saving...' : 'Save eligibility'}
-                    </button>
+                    {(() => {
+                      const mode = eligibilityModes[p.id] ?? (p.eligiblePrograms?.length ? 'programs' : 'all')
+                      const chosen = eligibilityDrafts[p.id] ?? p.eligiblePrograms ?? []
+                      const needsPrograms = mode === 'programs' && !chosen.length
+                      return (
+                        <>
+                          {needsPrograms && (
+                            <p role="alert" className="v-error-text">
+                              Select at least one program, or choose all programs.
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            disabled={savingEligibility === p.id || needsPrograms}
+                            onClick={() => handleSaveEligibility(p)}
+                            className="rounded-md bg-v-primary px-3 py-1.5 text-xs text-white disabled:opacity-50"
+                          >
+                            {savingEligibility === p.id ? 'Saving...' : 'Save eligibility'}
+                          </button>
+                        </>
+                      )
+                    })()}
                   </div>
                 </details>
               )}

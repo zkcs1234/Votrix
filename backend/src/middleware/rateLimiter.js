@@ -280,6 +280,24 @@ export const publicApiLimiter = createLimiter({
   message: stdMessage('Too many public API requests. Please slow down.'),
 })
 
+// Officer management by an owner organizer (assign / deactivate / activate).
+// Keyed by req.user.id, which is the owner organizer.
+export const officerActionLimiter = createLimiter({
+  windowMs: ONE_HOUR,
+  max: parseEnvInt('RATE_LIMIT_OFFICER_ACTION_MAX', 60),
+  keyGenerator: createKey({ user: true, ip: true, suffix: 'officer' }),
+  message: stdMessage('Too many officer changes. Please try again later.'),
+})
+
+// Public organizer application submit (unauthenticated, accepts file uploads),
+// so it is limited per IP and much tighter than the general public limiter.
+export const organizerApplyLimiter = createLimiter({
+  windowMs: ONE_HOUR,
+  max: parseEnvInt('RATE_LIMIT_ORGANIZER_APPLY_MAX', 10),
+  keyGenerator: createKey({ ip: true, suffix: 'organizer-apply' }),
+  message: stdMessage('Too many application attempts. Please try again later.'),
+})
+
 // ───────────────────────────────────────────────
 // TEST UTILITIES
 // ───────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { electionService } from '@/services/election.service'
 import Button from '@/components/ui/Button'
 import StageFooter from '@/components/ui/StageFooter'
 import ReadinessItem from '@/components/organizer/ReadinessItem'
+import PublishedEventEditPanel from '@/components/organizer/PublishedEventEditPanel'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useToast } from '@/hooks/useToast'
 import { EVENT_STATUS, canUnpublishEventStatus } from '@/utils/constants'
@@ -185,6 +186,14 @@ export default function ElectionReviewPage() {
           </div>
         </div>
       )}
+
+      <PublishedEventEditPanel
+        eventId={eventId}
+        event={event}
+        service={electionService}
+        noun="election"
+        onChanged={load}
+      />
 
       <StageFooter
         module="election"

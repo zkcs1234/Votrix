@@ -18,6 +18,7 @@ router.patch('/events/:eventId', ctrl.updateEvent)
 router.get('/events/:eventId/settings', ctrl.getSettings)
 router.post('/events/:eventId/publish', ctrl.publishEvent)
 router.post('/events/:eventId/unpublish', ctrl.unpublishEvent)
+router.get('/events/:eventId/edit-policy', ctrl.getEditPolicy)
 router.post('/events/:eventId/banner', uploadLimiter, uploadImage('banner'), ctrl.uploadBanner)
 router.post('/events/:eventId/image', uploadLimiter, uploadImage('image'), ctrl.uploadGenericImage)
 

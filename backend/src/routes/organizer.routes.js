@@ -9,15 +9,22 @@ import electionOrganizerRoutes from './election-organizer.routes.js'
 import pageantOrganizerRoutes from './pageant-organizer.routes.js'
 import pollingOrganizerRoutes from './polling-organizer.routes.js'
 import reportsOrganizerRoutes from './reports-organizer.routes.js'
+import officersRoutes from './organizer-officers.routes.js'
+import { resolveOrganizerContext, requireOwnerOrganizer } from '../middleware/organizerContext.js'
 
 const router = Router()
 
-router.use(authenticate, authorize(USER_ROLES.ORGANIZER), requireActiveAccount)
+// resolveOrganizerContext lets an ACTIVE student officer use this whole router as
+// the owner organizer (see middleware/organizerContext.js). It is a no-op for
+// real organizers, and a student without an officership still falls through to
+// authorize(ORGANIZER) and gets the usual 403.
+router.use(authenticate, resolveOrganizerContext, authorize(USER_ROLES.ORGANIZER), requireActiveAccount)
 
 // Profile routes — placed BEFORE requirePasswordChanged so that organizers
 // can access their profile even if they haven't changed their password yet.
+// Reading is fine for an officer; editing the owner's profile is owner-only.
 router.get('/profile', organizerProfileController.getProfile)
-router.put('/profile', organizerProfileController.updateProfile)
+router.put('/profile', requireOwnerOrganizer, organizerProfileController.updateProfile)
 router.get('/profile/status', organizerProfileController.getProfileStatus)
 
 router.use(requirePasswordChanged)
@@ -35,7 +42,10 @@ router.get('/dashboard', requireProfileComplete, organizerController.getDashboar
 router.get('/analytics', requireProfileComplete, organizerController.getAnalytics)
 
 // Single centralized org logo endpoint (replaces the 3 module-specific ones)
-router.post('/organization/logo', requireProfileComplete, uploadLimiter, uploadImage('logo'), organizerController.uploadOrganizationLogo)
+router.post('/organization/logo', requireOwnerOrganizer, requireProfileComplete, uploadLimiter, uploadImage('logo'), organizerController.uploadOrganizationLogo)
+
+// Student officers — managed by the owner organizer only.
+router.use('/officers', requireProfileComplete, officersRoutes)
 
 // Voter management routes
 router.post('/events/:eventId/voters/invite', requireProfileComplete, emailLimiter, organizerController.inviteVoter)

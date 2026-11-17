@@ -209,3 +209,19 @@ test('deductions are optional and disabling rules requires explicit consent',()=
  window.confirm.mockReturnValue(true);fireEvent.click(screen.getByRole('radio',{name:/^No Deductions/}));expect(observe.mock.lastCall[0].scoringConfig.deductionRules).toEqual([])
  fireEvent.click(screen.getByRole('button',{name:'Preview Score Sheet'}));expect(within(screen.getByRole('region',{name:'Judge score sheet preview'})).getByText('Preview only')).toBeInTheDocument()
 })
+test('criterion dialog flags a duplicate name and an out-of-range weight as they are typed, before Save',()=>{
+ render(<Editor/>);fireEvent.click(screen.getByRole('button',{name:'Add Criterion',exact:true}))
+ const name=screen.getByLabelText('Major criterion name'),weight=screen.getByLabelText('Major criterion weight (%)')
+ expect(name).not.toHaveAttribute('aria-invalid','true') // a new, untouched dialog is not flagged
+ fireEvent.change(name,{target:{value:' technique '}})
+ expect(name).toHaveAttribute('aria-invalid','true')
+ expect(screen.getByText('This name is already used in this round.')).toBeInTheDocument()
+ fireEvent.change(name,{target:{value:'Presence'}})
+ expect(name).not.toHaveAttribute('aria-invalid','true')
+ expect(screen.queryByText('This name is already used in this round.')).not.toBeInTheDocument()
+ fireEvent.change(name,{target:{value:''}})
+ expect(screen.getByText('Criterion name is required.')).toBeInTheDocument()
+ expect(weight).not.toHaveAttribute('aria-invalid','true') // untouched weight is not flagged while the name is edited
+ fireEvent.change(weight,{target:{value:'150'}})
+ expect(weight).toHaveAttribute('aria-invalid','true')
+})

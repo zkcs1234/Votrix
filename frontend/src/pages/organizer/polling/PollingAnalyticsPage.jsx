@@ -88,8 +88,7 @@ export default function PollingAnalyticsPage() {
   const ratingDistros = buildPollingRatingDistributions(data)
   const trend = buildPollingParticipationTrend(data)
   const distributions = buildPollingQuestionDistribution(data)
-  const programParticipation = buildPollingParticipationGroups(data, 'program')
-  const yearSectionParticipation = buildPollingParticipationGroups(data, 'yearSection')
+  const programParticipation = buildPollingParticipationGroups(data)
   const responseActivity = (data?.responseActivity ?? []).map((item) => ({
     label: item.period,
     value: item.responses,
@@ -110,13 +109,10 @@ export default function PollingAnalyticsPage() {
       <AnalyticsStatsGrid stats={stats} columns={4} />
 
       <AnalyticsSection
-        title="Participation by program & year"
-        description="Response rate among registered respondents broken down by program and by year & section."
+        title="Participation by program"
+        description="Response rate among registered respondents broken down by program."
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ParticipationTable rows={programParticipation} />
-          <ParticipationTable rows={yearSectionParticipation} />
-        </div>
+        <ParticipationTable rows={programParticipation} />
       </AnalyticsSection>
 
       <AnalyticsSection

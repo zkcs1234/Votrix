@@ -2,11 +2,10 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import {
   createOrganizerAccount as createOrganizerWithProfile,
   updateOrganizer as updateOrganizerProfile,
-  previewOrganizerImport,
-  registerOrganizerImport,
-  ORGANIZER_CSV_TEMPLATE_HEADERS,
 } from '../services/admin-organizer.service.js'
 import { getAdminDashboardStats, getAdminAnalytics } from '../services/dashboard.service.js'
+import { getPlatformSettings, validatePlatformSettingValue } from '../services/platform-settings.service.js'
+import { resolveEmailQuotaSettings } from '../services/emailGuard.js'
 import { ACCOUNT_STATUS } from '../utils/constants.js'
 import {
   getOrganizersList,
@@ -26,6 +25,8 @@ import {
   exportRespondentsCSV,
   exportJudgesCSV,
   exportEventsCSV,
+  exportEventReportCSV,
+  csvWithBom,
   exportAuditLogsCSV,
 } from '../services/export.service.js'
 import { checkSystemHealth } from '../services/health.service.js'
@@ -34,6 +35,7 @@ import {
   getParticipantTaxonomy as fetchParticipantTaxonomy,
   updateParticipantTaxonomy as saveParticipantTaxonomy,
 } from '../services/participant-taxonomy.service.js'
+import { listActivePrograms } from '../services/program.service.js'
 import {
   listVoters as fetchVoters,
   createVoter as createVoterAccount,
@@ -57,6 +59,8 @@ import {
   removeJudgeMembership,
   previewJudgeImport,
   registerJudgeImport,
+  resendStudentCredentials,
+  resendJudgeCredentials,
   JUDGE_CSV_TEMPLATE_HEADERS,
 } from '../services/admin-participant.service.js'
 import {
@@ -107,7 +111,9 @@ function validateSystemSetting(body) {
   if (!isSerializableSettingValue(value)) {
     throw new ApiError(400, 'Setting value must be a JSON-serializable primitive or object')
   }
-  return { key, value, description }
+  // The platform name, maintenance mode and organizer limit drive real behavior,
+  // so they are validated strictly (and normalised, e.g. a trimmed name).
+  return { key, value: validatePlatformSettingValue(key, value), description }
 }
 
 export const createOrganizerAccount = asyncHandler(async (req, res) => {
@@ -145,36 +151,6 @@ export const updateOrganizer = asyncHandler(async (req, res) => {
   })
 
   res.json({ success: true, user })
-})
-
-export const previewOrganizersCsv = asyncHandler(async (req, res) => {
-  if (!req.file) throw new ApiError(400, 'CSV file required')
-  const result = await previewOrganizerImport(req.file.buffer)
-  res.json({ success: true, ...result })
-})
-
-export const registerOrganizersCsv = asyncHandler(async (req, res) => {
-  const { data } = req.body
-  if (!data || !Array.isArray(data)) throw new ApiError(400, 'Invalid import data')
-
-  const result = await registerOrganizerImport(data)
-
-  await createAuditLog({
-    userId: req.user.id,
-    action: 'IMPORT_ORGANIZERS',
-    entity: 'users',
-    details: { total: result.total, succeeded: result.succeeded, failed: result.failed },
-  })
-
-  res.json({ success: true, ...result })
-})
-
-export const getOrganizerCsvTemplate = asyncHandler(async (_req, res) => {
-  const header = ORGANIZER_CSV_TEMPLATE_HEADERS.join(',')
-  const example = ['organizer@example.com', 'Jane Cruz', 'SSG Adviser', 'Supreme Student Government', 'Student Organization', 'scoped', 'BSCS;BSIT', '3-A;3-B'].join(',')
-  res.setHeader('Content-Type', 'text/csv')
-  res.setHeader('Content-Disposition', 'attachment; filename="organizer-template.csv"')
-  res.send(`${header}\n${example}\n`)
 })
 
 export const updateOrganizerStatus = asyncHandler(async (req, res) => {
@@ -241,7 +217,16 @@ export const restoreEvent = asyncHandler(async (req, res) => {
 
 export const getSystemSettings = asyncHandler(async (_req, res) => {
   const settings = await fetchSystemSettings()
-  res.json({ success: true, settings })
+  // `effective` is what the platform actually uses right now (so the page can show
+  // the real default for a value nobody has saved yet, e.g. the email limit).
+  const platform = await getPlatformSettings({ force: true })
+  const effective = {
+    maintenanceMode: platform.maintenanceMode,
+    maxOrganizers: platform.maxOrganizers,
+    emailDailyLimit: (await resolveEmailQuotaSettings()).dailyLimit,
+    invitationExpiryDays: platform.invitationExpiryDays,
+  }
+  res.json({ success: true, settings, effective })
 })
 
 export const updateSystemSettings = asyncHandler(async (req, res) => {
@@ -392,7 +377,7 @@ export const exportOrganizersData = asyncHandler(async (req, res) => {
   await createAuditLog({ userId: req.user.id, action: 'EXPORT_ORGANIZERS', entity: 'users' })
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="organizers.csv"')
-  res.send(csv)
+  res.send(csvWithBom(csv))
 })
 
 export const exportVotersData = asyncHandler(async (req, res) => {
@@ -400,7 +385,7 @@ export const exportVotersData = asyncHandler(async (req, res) => {
   await createAuditLog({ userId: req.user.id, action: 'EXPORT_VOTERS', entity: 'users' })
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="voters.csv"')
-  res.send(csv)
+  res.send(csvWithBom(csv))
 })
 
 export const exportRespondentsData = asyncHandler(async (req, res) => {
@@ -408,7 +393,7 @@ export const exportRespondentsData = asyncHandler(async (req, res) => {
   await createAuditLog({ userId: req.user.id, action: 'EXPORT_POLLING_RESPONDENTS', entity: 'users' })
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="polling-respondents.csv"')
-  res.send(csv)
+  res.send(csvWithBom(csv))
 })
 
 export const exportJudgesData = asyncHandler(async (req, res) => {
@@ -416,12 +401,13 @@ export const exportJudgesData = asyncHandler(async (req, res) => {
   await createAuditLog({ userId: req.user.id, action: 'EXPORT_JUDGES', entity: 'users' })
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="judges.csv"')
-  res.send(csv)
+  res.send(csvWithBom(csv))
 })
 
 export const exportEventsData = asyncHandler(async (req, res) => {
   const { status, type, search, eventId } = req.query
-  const csv = await exportEventsCSV({ status, type, search, eventId })
+  // One event => a full report (summary, participants, structure); otherwise the list.
+  const csv = eventId ? await exportEventReportCSV(eventId) : await exportEventsCSV({ status, type, search })
   await createAuditLog({
     userId: req.user.id,
     action: 'EXPORT_EVENTS',
@@ -430,7 +416,7 @@ export const exportEventsData = asyncHandler(async (req, res) => {
   })
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="events.csv"')
-  res.send(csv)
+  res.send(csvWithBom(csv))
 })
 
 export const exportAuditLogsData = asyncHandler(async (req, res) => {
@@ -443,7 +429,7 @@ export const exportAuditLogsData = asyncHandler(async (req, res) => {
   })
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="audit-logs.csv"')
-  res.send(csv)
+  res.send(csvWithBom(csv))
 })
 
 export const getSystemHealth = asyncHandler(async (_req, res) => {
@@ -472,6 +458,12 @@ export const getParticipantTaxonomy = asyncHandler(async (_req, res) => {
   res.json({ success: true, taxonomy })
 })
 
+// Valid student programs (the `programs` table) for the Add/Edit Student forms.
+export const getPrograms = asyncHandler(async (_req, res) => {
+  const programs = await listActivePrograms()
+  res.json({ success: true, programs })
+})
+
 export const updateParticipantTaxonomy = asyncHandler(async (req, res) => {
   const taxonomy = await saveParticipantTaxonomy(req.body)
 
@@ -489,8 +481,8 @@ export const updateParticipantTaxonomy = asyncHandler(async (req, res) => {
 // Voter (student participant) registration — plan Phase 3
 // ---------------------------------------------------------------------------
 export const getVoters = asyncHandler(async (req, res) => {
-  const { search, program, yearSection, status, page, limit } = req.query ?? {}
-  const result = await fetchVoters({ search, program, yearSection, status, page, limit })
+  const { search, program, status, page, limit } = req.query ?? {}
+  const result = await fetchVoters({ search, program, status, page, limit })
   res.json({ success: true, ...result })
 })
 
@@ -539,6 +531,21 @@ export const updateVoterStatus = asyncHandler(async (req, res) => {
   res.json({ success: true, user })
 })
 
+export const resendVoterCredentials = asyncHandler(async (req, res) => {
+  const userId = validateUUID(req.params.userId, 'userId')
+  const { user, email } = await resendStudentCredentials(userId)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'RESEND_STUDENT_CREDENTIALS',
+    entity: 'users',
+    entityId: userId,
+    details: { emailSent: Boolean(email?.sent) },
+  })
+
+  res.json({ success: true, user, email })
+})
+
 export const removeVoterFromPool = asyncHandler(async (req, res) => {
   const userId = validateUUID(req.params.userId, 'userId')
   await removeVoterMembership(userId)
@@ -569,8 +576,8 @@ export const registerVotersCsv = asyncHandler(async (req, res) => {
 })
 
 export const getRespondents = asyncHandler(async (req, res) => {
-  const { search, program, yearSection, status, page, limit } = req.query ?? {}
-  const result = await fetchRespondents({ search, program, yearSection, status, page, limit })
+  const { search, program, status, page, limit } = req.query ?? {}
+  const result = await fetchRespondents({ search, program, status, page, limit })
   res.json({ success: true, ...result })
 })
 
@@ -639,20 +646,26 @@ export const registerRespondentsCsv = asyncHandler(async (req, res) => {
   res.json({ success: true, ...result })
 })
 
-export const getVoterCsvTemplate = asyncHandler(async (_req, res) => {
+// The sample row uses a program that really exists in the programs list, so a file
+// that keeps the sample row still passes the import's program check. The byte-order
+// mark makes Excel read accented names correctly.
+async function sendStudentTemplate(res, sampleEmail, filename) {
+  const programs = await listActivePrograms().catch(() => [])
   const header = VOTER_CSV_TEMPLATE_HEADERS.join(',')
-  const example = ['voter@example.com', '2021-00123', 'Dela Cruz', 'Juan', 'BSIT', '3-A'].join(',')
-  res.setHeader('Content-Type', 'text/csv')
-  res.setHeader('Content-Disposition', 'attachment; filename="voter-template.csv"')
-  res.send(`${header}\n${example}\n`)
+  const example = [sampleEmail, '2021-00123', 'Dela Cruz', 'Juan', programs[0] ?? 'BSCS'].join(',')
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+  res.send(csvWithBom(`${header}
+${example}
+`))
+}
+
+export const getVoterCsvTemplate = asyncHandler(async (_req, res) => {
+  await sendStudentTemplate(res, 'voter@example.com', 'voter-template.csv')
 })
 
 export const getRespondentCsvTemplate = asyncHandler(async (_req, res) => {
-  const header = VOTER_CSV_TEMPLATE_HEADERS.join(',')
-  const example = ['respondent@example.com', '2021-00123', 'Dela Cruz', 'Juan', 'BSIT', '3-A'].join(',')
-  res.setHeader('Content-Type', 'text/csv')
-  res.setHeader('Content-Disposition', 'attachment; filename="polling-respondent-template.csv"')
-  res.send(`${header}\n${example}\n`)
+  await sendStudentTemplate(res, 'respondent@example.com', 'polling-respondent-template.csv')
 })
 
 // ---------------------------------------------------------------------------
@@ -709,6 +722,21 @@ export const updateJudgeStatus = asyncHandler(async (req, res) => {
   res.json({ success: true, user })
 })
 
+export const resendJudgeCredentialsEmail = asyncHandler(async (req, res) => {
+  const userId = validateUUID(req.params.userId, 'userId')
+  const { user, email } = await resendJudgeCredentials(userId)
+
+  await createAuditLog({
+    userId: req.user.id,
+    action: 'RESEND_JUDGE_CREDENTIALS',
+    entity: 'users',
+    entityId: userId,
+    details: { emailSent: Boolean(email?.sent) },
+  })
+
+  res.json({ success: true, user, email })
+})
+
 export const removeJudgeFromPool = asyncHandler(async (req, res) => {
   const userId = validateUUID(req.params.userId, 'userId')
   await removeJudgeMembership(userId)
@@ -741,9 +769,11 @@ export const registerJudgesCsv = asyncHandler(async (req, res) => {
 export const getJudgeCsvTemplate = asyncHandler(async (_req, res) => {
   const header = JUDGE_CSV_TEMPLATE_HEADERS.join(',')
   const example = ['judge@example.com', 'Reyes', 'Maria', 'Prof.', 'College of Engineering', 'Robotics'].join(',')
-  res.setHeader('Content-Type', 'text/csv')
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
   res.setHeader('Content-Disposition', 'attachment; filename="judge-template.csv"')
-  res.send(`${header}\n${example}\n`)
+  res.send(csvWithBom(`${header}
+${example}
+`))
 })
 
 export const getAdminOverview = asyncHandler(async (_req, res) => {

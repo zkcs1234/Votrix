@@ -1,13 +1,28 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
 import * as voterService from '../services/voter.service.js'
 import * as participantService from '../services/participant.service.js'
+import * as portalService from '../services/participant-portal.service.js'
 import { db } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
 import { DB_TABLES } from '../utils/constants.js'
 
 export const getVoterOverview = asyncHandler(async (req, res) => {
-  const dashboard = await voterService.getVoterDashboard(req.user.id)
+  // `?include=results` keeps the old behaviour of embedding election results.
+  const includeResults = req.query.include === 'results'
+  const dashboard = await voterService.getVoterDashboard(req.user.id, { includeResults })
   res.json({ success: true, ...dashboard })
+})
+
+export const listMyEvents = asyncHandler(async (req, res) => {
+  res.json({ success: true, ...(await portalService.getParticipantEvents(req.user.id, req.query)) })
+})
+
+export const getMyHistory = asyncHandler(async (req, res) => {
+  res.json({ success: true, ...(await portalService.getParticipantHistory(req.user.id, req.query)) })
+})
+
+export const getMyResults = asyncHandler(async (req, res) => {
+  res.json({ success: true, ...(await portalService.getParticipantResults(req.user.id, req.query)) })
 })
 
 export const getVoterLoginRedirect = asyncHandler(async (req, res) => {
