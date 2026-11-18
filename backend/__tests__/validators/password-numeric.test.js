@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { validateChangePassword, validateLogin } from '../../src/validators/auth.validator.js'
-import { validateInviteVoter, validateResetPassword } from '../../src/validators/email.validator.js'
+import { validateResetPassword } from '../../src/validators/email.validator.js'
 import { normalizePasswordInput } from '../../src/utils/password.js'
 
 // A password made only of digits is a valid password. It must be accepted whether the
@@ -36,10 +36,6 @@ describe('numeric-only passwords', () => {
   test('login normalizes a numeric password so it compares against the stored hash as text', () => {
     expect(validateLogin({ email: 'a@b.co', password: 12345678 }).password).toBe('12345678')
     expect(validateLogin({ email: 'a@b.co', password: '12345678' }).password).toBe('12345678')
-  })
-
-  test('an optional temporary password can be all digits', () => {
-    expect(validateInviteVoter({ email: 'a@b.co', temporaryPassword: '12345678' }).temporaryPassword).toBe('12345678')
   })
 
   test.each([[{}], [[]], [null], [-5], [1.5], [Number.MAX_SAFE_INTEGER + 10]])('%j is not usable as a password', (value) => {

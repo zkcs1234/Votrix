@@ -30,6 +30,7 @@ export default function DashboardLayout({
   const officer = isOfficer(user)
   const inOrganizerWorkspace = officer && isOrganizerPath(pathname)
   const home = getRoleDashboardPath(role)
+  const onHomePage = pathname.replace(/\/+$/, '') === home
   const isAdmin = role === USER_ROLES.ADMIN
   const isOrganizer = role === USER_ROLES.ORGANIZER
   const isParticipant = isParticipantRole(role)
@@ -163,10 +164,13 @@ export default function DashboardLayout({
       moduleLabel={moduleLabelOverride ?? (isParticipant ? undefined : role)}
       headerLabel={isAdmin ? 'Administration' : undefined}
       sidebarCaption={isAdmin ? 'Administration' : undefined}
+      // The organizer's "Organizer home" link is for other pages. On the organizer
+      // dashboard itself it would just point at the page you are already on, so it
+      // is left out there.
       footerLink={
         isAdmin
           ? { to: '/admin', label: `← ${platformName} administration` }
-          : isOrganizer
+          : isOrganizer && !onHomePage
             ? { to: '/organizer', label: '← Organizer home' }
             : undefined
       }

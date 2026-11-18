@@ -3,10 +3,10 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import VoterPollPage from './VoterPollPage'
 
-const mocks = vi.hoisted(() => ({ getPoll: vi.fn() }))
+const mocks = vi.hoisted(() => ({ getPoll: vi.fn(), submitPoll: vi.fn() }))
 
 vi.mock('@/services/polling.service', () => ({
-  pollingService: { getPoll: mocks.getPoll },
+  pollingService: { getPoll: mocks.getPoll, submitPoll: mocks.submitPoll },
 }))
 
 vi.mock('@/hooks/useAuth', () => ({
@@ -92,4 +92,46 @@ test('flags an unanswered required question where it is, on submit, and clears i
   fireEvent.change(comments, { target: { value: 'Great' } })
   expect(screen.queryByText('This question is required.')).not.toBeInTheDocument()
   expect(screen.queryByText('Answer the highlighted question to submit.')).not.toBeInTheDocument()
+})
+
+
+test('stays inside the participant layout: Submit lives in the layout footer slot and still submits the form', async () => {
+  // The layout provides this slot (AppShell). The page must use it instead of a
+  // full-screen layer that would cover the header and sidebar.
+  const slot = document.createElement('div')
+  slot.id = 'stage-footer-portal'
+  document.body.appendChild(slot)
+  try {
+    mocks.submitPoll.mockResolvedValue({ data: { success: true } })
+    mocks.getPoll.mockResolvedValue({
+      data: {
+        pollOpen: true,
+        canSubmit: true,
+        questions: [
+          { id: 'q1', question: 'Comments', required: true, type: 'text', typeDef: { label: 'Text', ui: { input: 'textarea' }, answerFormat: { kind: 'text' } } },
+        ],
+        event: { title: 'Campus Survey' },
+      },
+    })
+    const { container } = render(
+      <MemoryRouter initialEntries={['/participant/polling/events/poll-1']}>
+        <Routes>
+          <Route path="/participant/polling/events/:eventId" element={<VoterPollPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    fireEvent.change(await screen.findByLabelText('Comments'), { target: { value: 'Great' } })
+    const submit = screen.getByRole('button', { name: 'Submit response' })
+    expect(slot).toContainElement(submit)
+    expect(container.querySelector('form')).not.toContainElement(submit)
+    // Nothing is pinned to the viewport on top of the layout.
+    expect(document.querySelector('.fixed.inset-0')).toBeNull()
+
+    fireEvent.click(submit)
+    await vi.waitFor(() => expect(mocks.submitPoll).toHaveBeenCalledTimes(1))
+    expect(mocks.submitPoll.mock.calls[0][1]).toEqual({ q1: 'Great' })
+  } finally {
+    slot.remove()
+  }
 })

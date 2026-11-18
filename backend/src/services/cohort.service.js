@@ -1,6 +1,13 @@
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, ACCOUNT_STATUS, COMPETITION_SCORING_EVENT_TYPES } from '../utils/constants.js'
+import {
+  DB_TABLES,
+  ACCOUNT_STATUS,
+  COMPETITION_SCORING_EVENT_TYPES,
+  EVENT_TYPES,
+  ELECTION_PARTICIPANT_TYPES,
+  POLLING_PARTICIPANT_TYPES,
+} from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { assertParticipantsEditable } from '../utils/eventLifecycle.js'
 import { registerParticipant, resolveParticipantType } from './participant.service.js'
@@ -17,6 +24,14 @@ import { getEmailQuotaSettings } from './emailGuard.js'
 // resolved from the event type, so the same logic serves both.
 
 const COHORT_COLUMN = { program: 'program' }
+
+// Enrollment rows for an event may carry STUDENT (current) or the legacy
+// per-event type, so "already enrolled" lookups accept both.
+function enrolledTypesFor(event, participantType) {
+  if (event.event_type === EVENT_TYPES.ELECTION) return ELECTION_PARTICIPANT_TYPES
+  if (event.event_type === EVENT_TYPES.POLLING) return POLLING_PARTICIPANT_TYPES
+  return [participantType]
+}
 
 // Tally a list of {program} rows into per-value counts.
 function tally(rows, column) {
@@ -52,7 +67,7 @@ export async function getEventCohorts(eventId, organizerId) {
     .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('users!inner (program)')
     .eq('event_id', eventId)
-    .eq('participant_type', participantType)
+    .in('participant_type', enrolledTypesFor(event, participantType))
   if (enrErr) throw new ApiError(500, enrErr.message)
 
   const enrolledStudents = (enrolled ?? [])
@@ -82,7 +97,7 @@ export async function getEventCohorts(eventId, organizerId) {
  * judge-only account cannot be enrolled here. Optionally emails an event
  * invitation (Email B — no credentials) to the newly enrolled.
  */
-export async function inviteCohort(eventId, organizerId, { cohortType, values, notify = false } = {}) {
+export async function inviteCohort(eventId, organizerId, { cohortType, values, notify = false, resendExisting = false } = {}) {
   await assertOrganizerOwnsEvent(eventId, organizerId)
   const event = await getEventById(eventId)
   assertParticipantsEditable(event)
@@ -128,9 +143,14 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
   const enrolledSet = new Set((existing ?? []).map((r) => r.user_id))
 
   const toEnroll = matchingAccounts.filter((s) => !enrolledSet.has(s.id))
+  // Email recipients: newly enrolled students, plus (on request) students who
+  // were already enrolled by an earlier invite that never emailed them.
+  const toEmail = notify
+    ? (resendExisting ? matchingAccounts : toEnroll)
+    : []
   if (notify) {
     const { bulkBatchLimit } = getEmailQuotaSettings()
-    if (toEnroll.length > bulkBatchLimit) {
+    if (toEmail.length > bulkBatchLimit) {
       throw new ApiError(400, `Cohort invite exceeds the email batch limit of ${bulkBatchLimit} recipients`)
     }
   }
@@ -167,7 +187,7 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
   }
 
   const emailSummary = {
-    requested: notify ? toEnroll.length : 0,
+    requested: toEmail.length,
     sent: 0,
     skipped: 0,
     duplicate: 0,
@@ -177,8 +197,8 @@ export async function inviteCohort(eventId, organizerId, { cohortType, values, n
   }
 
   let notified = 0
-  if (notify && toEnroll.length) {
-    for (const student of toEnroll) {
+  if (notify && toEmail.length) {
+    for (const student of toEmail) {
       try {
         const result = await sendVoterInvitationEmailRegistered({
           email: student.email,

@@ -191,18 +191,17 @@ it('minor create, range edit, and delete each revalidate saved inputs', async ()
   await waitFor(() => expect(pageantService.deleteMinorCriteria).toHaveBeenCalledTimes(1))
   expect(foundation.criteria[0].minorCriteria).toEqual([])
 })
-it('stale round-switch responses cannot overwrite a newer saved foundation', async () => {
+it('switching rounds reuses the loaded foundation instead of refetching it', async () => {
+  // Switching used to refetch the foundation, which allowed a slow, stale response
+  // to overwrite a newer one. It no longer refetches, so that race cannot happen.
   await open()
-  let resolveOld
-  const old = structuredClone(foundation)
-  pageantService.getFoundation.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+  const calls = pageantService.getFoundation.mock.calls.length
   fireEvent.click(card('Final'))
-  foundation.criteria[1].percentage = 100
   fireEvent.click(card('Preliminary'))
-  await screen.findByText('All Rounds Ready')
-  await act(async () => { resolveOld({ data: { foundation: old } }) })
-  expect(continueButton()).toBeEnabled()
-  expect(card('Final')).toHaveTextContent('100% · Complete')
+  expect(pageantService.getFoundation.mock.calls.length).toBe(calls)
+  expect(card('Preliminary')).toHaveAttribute('aria-pressed', 'true')
+  expect(card('Final')).toHaveTextContent('60% · In Progress')
+  expect(continueButton()).toBeDisabled()
 })
 it('places the Criteria wizard footer in its sticky portal and reserves content space', async () => {
   const portal = document.createElement('div'); portal.id = 'stage-footer-portal'; document.body.appendChild(portal)

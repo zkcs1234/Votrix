@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { pollingService } from '@/services/polling.service'
 import { pollAnswerErrors } from '@/utils/pollValidation'
 import { getDraftStorageKey } from '@/utils/draftStorage'
@@ -10,8 +10,21 @@ import PollQuestionField from '@/components/voter/polling/PollQuestionField'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
 import VoterDashboardLink from '@/components/voter/VoterDashboardLink'
 import { useAuth } from '@/hooks/useAuth'
-import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
+import ParticipantTaskFooter from '@/components/voter/ParticipantTaskFooter'
 import { getErrorMessage } from '@/utils/getErrorMessage'
+
+// Shown on the closed / done screens when the organizer lets students see results.
+function ViewResultsLink({ show }) {
+  if (!show) return null
+  return (
+    <Link
+      to="/participant/results"
+      className="mt-4 inline-block rounded-lg px-3 py-2 text-sm font-medium text-v-primary hover:bg-v-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v-primary"
+    >
+      View poll results
+    </Link>
+  )
+}
 
 export default function VoterPollPage() {
   const { eventId } = useParams()
@@ -176,6 +189,7 @@ export default function VoterPollPage() {
             Submit another response
           </button>
         )}
+        <div><ViewResultsLink show={poll?.canViewResults} /></div>
         <VoterDashboardLink className="mt-5" />
       </div>
     )
@@ -201,6 +215,7 @@ export default function VoterPollPage() {
           </p>
         )}
 
+        <div><ViewResultsLink show={poll?.canViewResults} /></div>
         <VoterDashboardLink className="mt-5" />
       </div>
     )
@@ -210,26 +225,22 @@ export default function VoterPollPage() {
     return (
       <div data-module="polling" className="mx-auto max-w-lg v-card p-8 text-center">
         <p className="text-v-text">You have already responded to this poll.</p>
+        <div><ViewResultsLink show={poll?.canViewResults} /></div>
         <VoterDashboardLink className="mt-5" />
       </div>
     )
   }
 
   return (
-    /*
-      Full-viewport shell using dynamic viewport height (dvh) so mobile
-      browser toolbars showing/hiding never shift the fixed footer.
-      Layout: [fixed progress bar] · [scrollable middle] · [fixed footer]
-      Mirrors the VoterEventPage (ballot) shell structure. Portaled to <body>
-      via FullscreenVotingShell so `position: fixed` pins to the viewport rather
-      than the animated <main>, keeping the progress bar and submit footer both
-      visible on mobile.
-    */
-    <FullscreenVotingShell>
-    <form onSubmit={handleSubmit} data-module="polling" className="fixed inset-0 z-50 flex h-dvh flex-col bg-v-surface">
-      {/* ===== FIXED TOP: Floating progress card (does not scroll) ===== */}
-      <div className="shrink-0">
-        <div className="mx-auto max-w-2xl px-4 pt-3 pb-1 md:px-8">
+    <>
+      {/*
+        The poll stays inside the participant layout, so the header and sidebar rail
+        remain visible. The progress card is sticky under the header and the Submit
+        bar is pinned in the layout's footer slot (ParticipantTaskFooter), so both
+        stay on screen on phones too.
+      */}
+      <form id="poll-form" onSubmit={handleSubmit} data-module="polling" className="mx-auto max-w-2xl space-y-6">
+        <div className="sticky top-[var(--v-header-h)] z-30 -mx-1 px-1 pt-1">
           <div className="v-card-sm p-3 shadow-v-shadow-md">
             <div className="flex items-center justify-between gap-2 text-sm">
               <span className="text-v-text-muted">
@@ -252,61 +263,53 @@ export default function VoterPollPage() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* ===== SCROLLABLE MIDDLE: header + questions scroll here ===== */}
-      <div className="flex-1 overflow-y-auto overscroll-contain">
-        <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8">
-          {/* Autosave restoration notification */}
-          {draftRestored && (
-            <div
-              className="rounded-lg border border-v-border bg-v-surface-elevated px-4 py-3 text-sm text-v-text-muted"
-              role="status"
-              aria-live="polite"
-            >
-              We restored your previous answers.
-            </div>
+        {/* Autosave restoration notification */}
+        {draftRestored && (
+          <div
+            className="rounded-lg border border-v-border bg-v-surface-elevated px-4 py-3 text-sm text-v-text-muted"
+            role="status"
+            aria-live="polite"
+          >
+            We restored your previous answers.
+          </div>
+        )}
+
+        <VoterEventHeader event={poll.event} eyebrow="Poll">
+          {voterName && <p>Responding as {voterName}</p>}
+          {poll.event.pollAnonymous && (
+            <p>Your responses are anonymous.</p>
           )}
+        </VoterEventHeader>
 
-          <VoterEventHeader event={poll.event} eyebrow="Poll">
-            {voterName && <p>Responding as {voterName}</p>}
-            {poll.event.pollAnonymous && (
-              <p>Your responses are anonymous.</p>
-            )}
-          </VoterEventHeader>
+        {questions.map((q, idx) => (
+          <PollQuestionField
+            key={q.id}
+            question={q}
+            index={idx}
+            value={answers[q.id]}
+            onChange={(val) => setAnswer(q.id, val)}
+            disabled={submitting || isArchived}
+            error={shownError(q.id)}
+          />
+        ))}
 
-          {questions.map((q, idx) => (
-            <PollQuestionField
-              key={q.id}
-              question={q}
-              index={idx}
-              value={answers[q.id]}
-              onChange={(val) => setAnswer(q.id, val)}
-              disabled={submitting || isArchived}
-              error={shownError(q.id)}
-            />
-          ))}
+        {attempted && shownCount > 0 && (
+          <FormAlert variant="error">
+            {shownCount === 1
+              ? 'Answer the highlighted question to submit.'
+              : `Answer the ${shownCount} highlighted questions to submit.`}
+          </FormAlert>
+        )}
+        {error && <FormAlert variant="error">{error}</FormAlert>}
+      </form>
 
-          {attempted && shownCount > 0 && (
-            <FormAlert variant="error">
-              {shownCount === 1
-                ? 'Answer the highlighted question to submit.'
-                : `Answer the ${shownCount} highlighted questions to submit.`}
-            </FormAlert>
-          )}
-          {error && <FormAlert variant="error">{error}</FormAlert>}
-        </div>
-      </div>
-
-      {/* ===== FIXED BOTTOM: Submit footer (does not scroll) ===== */}
-      <div className="shrink-0 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:px-8 pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto max-w-2xl">
-          <Button type="submit" loading={submitting} disabled={submitting || isArchived} className="w-full">
-            {submitting ? 'Submitting…' : 'Submit response'}
-          </Button>
-        </div>
-      </div>
-    </form>
-    </FullscreenVotingShell>
+      <ParticipantTaskFooter>
+        {/* This bar renders outside the <form> in the DOM, so it points at the form by id. */}
+        <Button type="submit" form="poll-form" loading={submitting} disabled={submitting || isArchived} className="w-full">
+          {submitting ? 'Submitting…' : 'Submit response'}
+        </Button>
+      </ParticipantTaskFooter>
+    </>
   )
 }

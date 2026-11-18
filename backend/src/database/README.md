@@ -41,6 +41,17 @@ PostgreSQL schema for Supabase. All primary keys are **UUID** (`gen_random_uuid(
    applications and officer assignments but never touches `users`; organizer
    accounts created by an approved application remain ordinary organizers.
 
+9. Migration `145_student_type_election_poll_functions.sql` makes the election and
+   poll database functions accept `STUDENT` enrollments (`cast_election_ballot`,
+   `cast_poll_response`, `election_group_is_eligible`,
+   `set_election_group_eligibility`). Since `136` a student is enrolled with
+   `event_participants.participant_type = 'STUDENT'`, but these functions only
+   matched the legacy `ELECTION_VOTER` / `POLLING_RESPONDENT` values, so a
+   program-invited student could not vote or submit a poll. They now accept both.
+   Idempotent. Apply it after `136` and **before** students use ballots or polls.
+   Its down file is a no-op (the legacy-only definitions are in `080`, `087`,
+   `130`); rolling back would stop every `STUDENT` enrollment from voting.
+
 ## Entity relationship
 
 ```mermaid

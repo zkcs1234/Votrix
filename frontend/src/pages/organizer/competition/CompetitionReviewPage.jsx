@@ -59,7 +59,11 @@ function LegacyCompetitionReviewPage() {
       setLoadError('')
       setRulesConfirmed(!!found.foundation?.scoringConfig?.confirmed)
       setScoringReadiness(found.foundation.scoringRulesReadiness ?? scoringRuleReadiness(found.foundation))
-      setJudgesCount(Array.isArray(jud.judges) ? jud.judges.length : 0)
+      // Same rule as the server: only active scoring judges count (reviewers and
+      // inactive judges do not satisfy "at least one judge").
+      setJudgesCount(Array.isArray(jud.judges)
+        ? jud.judges.filter((j) => j.isActive !== false && j.role !== 'score_reviewer').length
+        : 0)
     } catch (err) {
       if (request === requestRef.current) setLoadError(err.response?.data?.message || 'Could not confirm saved setup. Reload before publishing.')
     } finally {

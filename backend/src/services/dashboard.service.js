@@ -7,7 +7,10 @@ import {
   COMPETITION_SCORING_EVENT_TYPES,
   USER_ROLES,
   PARTICIPANT_TYPES,
+  ELECTION_PARTICIPANT_TYPES,
+  POLLING_PARTICIPANT_TYPES,
 } from '../utils/constants.js'
+import { getOrganizerScope, isStudentInScope, isAllAccess, scopedSelect, applyStudentScope } from './organizer-scope.service.js'
 import { getActiveSessionsForEvents } from './competition-session.service.js'
 import { activeSessionsForOrganizer } from './competition-native-scoring.service.js'
 
@@ -57,6 +60,43 @@ async function countRows(queryBuilder) {
   const { count, error } = await queryBuilder
   if (error) throw new ApiError(500, error.message)
   return count ?? 0
+}
+
+/**
+ * Judge score submissions across these competition events, whichever scoring
+ * engine each event uses:
+ *  - workflow events: one competition_round_submissions row per judge per round;
+ *  - native competitions: one current submission (head) per judge per session;
+ *  - older events: the judge's has_scored flag (one per judge).
+ * The older count excludes workflow events so a judge is never counted twice.
+ */
+async function countScoreSubmissions(eventIds) {
+  const client = getClient()
+  const workflow = countRows(
+    client
+      .from('competition_round_submissions')
+      .select('*', { count: 'exact', head: true })
+      .in('event_id', eventIds)
+      .eq('status', 'submitted'),
+  )
+  // The native tables only exist once those migrations are applied.
+  const native = countRows(
+    client
+      .from('competition_child_submission_heads')
+      .select('session_id, competition_child_sessions!inner(event_id)', { count: 'exact', head: true })
+      .in('competition_child_sessions.event_id', eventIds),
+  ).catch(() => 0)
+  const legacy = countRows(
+    client
+      .from(DB_TABLES.EVENT_PARTICIPANTS)
+      .select('id, events!inner(official_rules_id)', { count: 'exact', head: true })
+      .in('event_id', eventIds)
+      .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+      .eq('has_scored', true)
+      .is('events.official_rules_id', null),
+  )
+  const [workflowCount, nativeCount, legacyCount] = await Promise.all([workflow, native, legacy])
+  return workflowCount + nativeCount + legacyCount
 }
 
 async function getEventRowsByOrganizer(organizerId) {
@@ -336,6 +376,20 @@ export async function getAdminAnalytics() {
 export async function getOrganizerDashboardStats(organizerId) {
   const events = await getEventRowsByOrganizer(organizerId)
   const { electionEventIds, competitionEventIds, pollingEventIds } = collectEventIdsByType(events)
+  // Student counts follow the organizer's program scope (same rule as the
+  // Voters / Respondents rosters). Judges are a global pool and are not scoped.
+  const scope = await getOrganizerScope(organizerId)
+  const studentCount = (eventIds, types, extra = (q) => q) =>
+    countRows(
+      extra(applyStudentScope(
+        getClient()
+          .from(DB_TABLES.EVENT_PARTICIPANTS)
+          .select(scopedSelect(scope), { count: 'exact', head: true })
+          .in('event_id', eventIds)
+          .in('participant_type', types),
+        scope,
+      )),
+    )
 
   // Fetch the single organization for this organizer and the organizer's profile logo.
   const [{ data: orgData }, { data: userData }] = await Promise.all([
@@ -359,21 +413,15 @@ export async function getOrganizerDashboardStats(organizerId) {
     electionVotes,
     judgeScores,
     pollAnswers,
+    pollSubmissions,
+    scoreSubmissions,
     votedElection,
     submittedJudges,
     respondedPoll,
   ] = await Promise.all([
     // Registered participants counted BY TYPE and scoped to the matching event
     // type — no more blending voters, judges, and respondents into one number.
-    electionEventIds.length
-      ? countRows(
-          getClient()
-            .from(DB_TABLES.EVENT_PARTICIPANTS)
-            .select('*', { count: 'exact', head: true })
-            .in('event_id', electionEventIds)
-            .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
-        )
-      : Promise.resolve(0),
+    electionEventIds.length ? studentCount(electionEventIds, ELECTION_PARTICIPANT_TYPES) : Promise.resolve(0),
     competitionEventIds.length
       ? countRows(
           getClient()
@@ -383,15 +431,7 @@ export async function getOrganizerDashboardStats(organizerId) {
             .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE),
         )
       : Promise.resolve(0),
-    pollingEventIds.length
-      ? countRows(
-          getClient()
-            .from(DB_TABLES.EVENT_PARTICIPANTS)
-            .select('*', { count: 'exact', head: true })
-            .in('event_id', pollingEventIds)
-            .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT),
-        )
-      : Promise.resolve(0),
+    pollingEventIds.length ? studentCount(pollingEventIds, POLLING_PARTICIPANT_TYPES) : Promise.resolve(0),
     electionEventIds.length
       ? countRows(
           getClient().from(DB_TABLES.ELECTION_VOTES).select('*', { count: 'exact', head: true }).in('event_id', electionEventIds),
@@ -413,15 +453,18 @@ export async function getOrganizerDashboardStats(organizerId) {
             .in('poll_questions.event_id', pollingEventIds),
         )
       : Promise.resolve(0),
-    electionEventIds.length
+    // One row per completed poll response (a poll answer is one row per question).
+    pollingEventIds.length
       ? countRows(
           getClient()
-            .from(DB_TABLES.EVENT_PARTICIPANTS)
+            .from(DB_TABLES.POLL_SUBMISSIONS)
             .select('*', { count: 'exact', head: true })
-            .in('event_id', electionEventIds)
-            .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
-            .eq('has_voted', true),
+            .in('event_id', pollingEventIds),
         )
+      : Promise.resolve(0),
+    competitionEventIds.length ? countScoreSubmissions(competitionEventIds) : Promise.resolve(0),
+    electionEventIds.length
+      ? studentCount(electionEventIds, ELECTION_PARTICIPANT_TYPES, (q) => q.eq('has_voted', true))
       : Promise.resolve(0),
     competitionEventIds.length
       ? countRows(
@@ -434,14 +477,7 @@ export async function getOrganizerDashboardStats(organizerId) {
         )
       : Promise.resolve(0),
     pollingEventIds.length
-      ? countRows(
-          getClient()
-            .from(DB_TABLES.EVENT_PARTICIPANTS)
-            .select('*', { count: 'exact', head: true })
-            .in('event_id', pollingEventIds)
-            .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
-            .eq('has_responded', true),
-        )
+      ? studentCount(pollingEventIds, POLLING_PARTICIPANT_TYPES, (q) => q.eq('has_responded', true))
       : Promise.resolve(0),
   ])
 
@@ -497,7 +533,13 @@ return {
       assignedVoters,
       assignedJudges,
       assignedRespondents,
+      // Legacy blend of raw rows (votes + criterion scores + poll answers). Kept for
+      // older clients; the organizer dashboard now shows the specific numbers below.
       totalVotesCast: electionVotes + judgeScores + pollAnswers,
+      // Completed poll responses (submissions, not per-question answers).
+      pollSubmissions,
+      // Judge score submissions (a judge submitting a round), not criterion rows.
+      scoreSubmissions,
       electionParticipants: votedElection,
       pageantParticipants: submittedJudges,
       pollingParticipants: respondedPoll,
@@ -509,10 +551,11 @@ return {
 export async function getOrganizerAnalytics(organizerId) {
   const events = await getEventRowsByOrganizer(organizerId)
   const { electionEventIds, competitionEventIds, pollingEventIds } = collectEventIdsByType(events)
+  const scope = await getOrganizerScope(organizerId)
 
   const [participantRowsRes, electionVotesRes, judgeScoresRes, pollAnswersRes] = await Promise.all([
     events.length
-      ? getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('event_id, participant_type, has_voted, has_scored, has_responded').in('event_id', events.map((e) => e.id))
+      ? getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('event_id, participant_type, has_voted, has_scored, has_responded, users(program)').in('event_id', events.map((e) => e.id))
       : Promise.resolve({ data: [], error: null }),
     electionEventIds.length
       ? getClient().from(DB_TABLES.ELECTION_VOTES).select('created_at, event_id').in('event_id', electionEventIds)
@@ -530,9 +573,14 @@ export async function getOrganizerAnalytics(organizerId) {
   if (judgeScoresRes.error) throw new ApiError(500, judgeScoresRes.error.message)
   if (pollAnswersRes.error) throw new ApiError(500, pollAnswersRes.error.message)
 
-  const voterRows = participantRowsRes.data ?? []
-  const electionAssigned = voterRows.filter((r) => electionEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.ELECTION_VOTER).length
-  const electionVoted = voterRows.filter((r) => electionEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.ELECTION_VOTER && r.has_voted).length
+  // Judges are not scoped; students are limited to the organizer's programs.
+  const voterRows = (participantRowsRes.data ?? []).filter(
+    (r) => r.participant_type === PARTICIPANT_TYPES.COMPETITION_JUDGE
+      || isAllAccess(scope)
+      || isStudentInScope(scope, { program: r.users?.program }),
+  )
+  const electionAssigned = voterRows.filter((r) => electionEventIds.includes(r.event_id) && ELECTION_PARTICIPANT_TYPES.includes(r.participant_type)).length
+  const electionVoted = voterRows.filter((r) => electionEventIds.includes(r.event_id) && ELECTION_PARTICIPANT_TYPES.includes(r.participant_type) && r.has_voted).length
 
   const pageantJudges = voterRows.filter(
     (r) => competitionEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.COMPETITION_JUDGE,
@@ -541,9 +589,9 @@ export async function getOrganizerAnalytics(organizerId) {
     (r) => competitionEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.COMPETITION_JUDGE && r.has_scored,
   ).length
 
-  const pollingAssigned = voterRows.filter((r) => pollingEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.POLLING_RESPONDENT).length
+  const pollingAssigned = voterRows.filter((r) => pollingEventIds.includes(r.event_id) && POLLING_PARTICIPANT_TYPES.includes(r.participant_type)).length
   const pollingResponded = voterRows.filter(
-    (r) => pollingEventIds.includes(r.event_id) && r.participant_type === PARTICIPANT_TYPES.POLLING_RESPONDENT && r.has_responded,
+    (r) => pollingEventIds.includes(r.event_id) && POLLING_PARTICIPANT_TYPES.includes(r.participant_type) && r.has_responded,
   ).length
 
   const participationGrowth = aggregateByMonth([

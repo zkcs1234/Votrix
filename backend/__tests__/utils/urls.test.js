@@ -16,3 +16,13 @@ describe('participant event URLs', () => {
     )
   })
 })
+
+describe('participant links point at the participant portal', () => {
+  test.each([
+    [eventUrl('e1'), '/participant/events/e1'],
+    [pollingEventUrl('p1'), '/participant/polling/events/p1'],
+    [competitionScoreUrl('c1'), '/participant/competition/events/c1/score'],
+  ])('%s', (url, path) => {
+    expect(new URL(url).pathname).toBe(path)
+  })
+})

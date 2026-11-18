@@ -47,14 +47,9 @@ router.post('/organization/logo', requireOwnerOrganizer, requireProfileComplete,
 // Student officers — managed by the owner organizer only.
 router.use('/officers', requireProfileComplete, officersRoutes)
 
-// Voter management routes
-router.post('/events/:eventId/voters/invite', requireProfileComplete, emailLimiter, organizerController.inviteVoter)
-router.post(
-  '/events/:eventId/voters/:voterId/resend-invitation',
-  requireProfileComplete,
-  emailLimiter,
-  organizerController.resendInvitation,
-)
+// Organizers no longer enroll voters by email: the admin owns accounts and
+// organizers invite existing students by program through each module's
+// /events/:eventId/invite-cohort route, which enforces the organizer's scope.
 router.post('/events/:eventId/notify', requireProfileComplete, emailLimiter, organizerController.sendEventNotification)
 
 export default router

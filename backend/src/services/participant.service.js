@@ -113,6 +113,19 @@ export function resolveParticipantType(eventType) {
 }
 
 /**
+ * Map an event-level participant_type to the account-level eligibility type
+ * stored in user_participant_types (STUDENT / JUDGE / ORGANIZER).
+ */
+export function resolveEligibilityType(participantType) {
+  if (participantType === PARTICIPANT_TYPES.COMPETITION_JUDGE) return PARTICIPANT_TYPES.JUDGE
+  if (
+    participantType === PARTICIPANT_TYPES.ELECTION_VOTER ||
+    participantType === PARTICIPANT_TYPES.POLLING_RESPONDENT
+  ) return PARTICIPANT_TYPES.STUDENT
+  return participantType
+}
+
+/**
  * Register a user as a participant in an event.
  * If the user is already enrolled, updates the participant type (if changed).
  */
@@ -128,10 +141,20 @@ export async function registerParticipant(eventId, userId, options = {}) {
   if (!event) throw new ApiError(404, 'Event not found')
 
   const expectedType = resolveParticipantType(event.event_type)
-  if (participantType && participantType !== expectedType) {
+  // Legacy per-event values (ELECTION_VOTER / POLLING_RESPONDENT) are aliases
+  // of STUDENT for their own event type; anything else is a real mismatch.
+  const acceptedTypes = new Set([
+    expectedType,
+    ...(event.event_type === EVENT_TYPES.ELECTION ? [PARTICIPANT_TYPES.ELECTION_VOTER] : []),
+    ...(event.event_type === EVENT_TYPES.POLLING ? [PARTICIPANT_TYPES.POLLING_RESPONDENT] : []),
+  ])
+  if (participantType && !acceptedTypes.has(participantType)) {
     throw new ApiError(400, 'Participant type does not match the event type')
   }
   const resolvedType = expectedType
+  // The account-level eligibility pool uses STUDENT / JUDGE, while the
+  // event-level role for judges is COMPETITION_JUDGE.
+  const eligibilityType = resolveEligibilityType(resolvedType)
 
   const { data: account, error: accountError } = await db()
     .from(DB_TABLES.USERS)
@@ -146,7 +169,7 @@ export async function registerParticipant(eventId, userId, options = {}) {
     throw new ApiError(403, 'Participant account is not active')
   }
 
-  if (!(await hasParticipantTypeMembership(userId, resolvedType))) {
+  if (!(await hasParticipantTypeMembership(userId, eligibilityType))) {
     throw new ApiError(403, 'Account is not eligible for this participant type')
   }
 

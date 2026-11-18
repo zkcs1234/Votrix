@@ -4,6 +4,7 @@ import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import CompetitionEventFormPage from './CompetitionEventFormPage'
 import { pageantService } from '@/services/pageant.service'
 import { draftService } from '@/services/draft.service'
+import { chooseDateTime } from '@/test/pickDateTime'
 
 const drafts = vi.hoisted(() => ({ saveDraft: vi.fn(), saveDraftAsync: vi.fn(), deleteDraft: vi.fn(), draft: null }))
 const progress = vi.hoisted(() => ({ completedKeys: [], markComplete: vi.fn(), reset: vi.fn() }))
@@ -29,20 +30,6 @@ function open(path = '/organizer/competition/events/new') {
     <Route path="/organizer/competition/events/:eventId/edit" element={<CompetitionEventFormPage />} />
     <Route path="/organizer/competition/events/:eventId/categories" element={<p>Created categories</p>} />
   </Routes></MemoryRouter>)
-}
-function chooseDateTime(label, date, hour, minute, period) {
-  fireEvent.click(screen.getByLabelText(new RegExp(`^${label}`)))
-  const now = new Date()
-  const monthOffset = (date.getFullYear() - now.getFullYear()) * 12 + date.getMonth() - now.getMonth()
-  for (let i = 0; i < Math.abs(monthOffset); i += 1) {
-    fireEvent.click(screen.getByRole('button', { name: monthOffset < 0 ? 'Previous month' : 'Next month' }))
-  }
-  fireEvent.click(screen.getByRole('button', { name: date.toDateString() }))
-  fireEvent.click(screen.getByRole('button', { name: 'Time' }))
-  fireEvent.click(screen.getByRole('button', { name: `Hour ${hour}` }))
-  fireEvent.click(screen.getByRole('button', { name: `Minute ${minute}` }))
-  fireEvent.click(screen.getByRole('button', { name: period }))
-  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
 }
 function fillDetails() {
   fireEvent.change(screen.getByLabelText(/^Title/), { target: { value: 'Campus Finals' } })

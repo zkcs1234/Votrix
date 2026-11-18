@@ -5,8 +5,11 @@ import {
   EVENT_TYPES,
   COMPETITION_SCORING_EVENT_TYPES,
   PARTICIPANT_TYPES,
+  ELECTION_PARTICIPANT_TYPES,
+  POLLING_PARTICIPANT_TYPES,
 } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent } from './event.service.js'
+import { getOrganizerScope, isStudentInScope, isAllAccess } from './organizer-scope.service.js'
 import { listElectionEvents, getElectionAnalytics, listPositions, listElectionBallotSections } from './election.service.js'
 import { listCompetitionEvents, getLiveRankings, getCompetitionResults } from './pageant.service.js'
 import { listPollEvents, getPollAnalytics } from './polling.service.js'
@@ -19,6 +22,33 @@ function pct(part, total) {
 
 const rowsToCsv = serializeCsv
 
+const PAGE_SIZE = 1000
+
+// Supabase returns at most 1000 rows per request, so counting by data.length
+// silently capped large rosters. Page through the rows instead.
+async function fetchAllRows(buildQuery) {
+  const rows = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await buildQuery().order('id').range(from, from + PAGE_SIZE - 1)
+    if (error) throw new ApiError(500, error.message)
+    rows.push(...(data ?? []))
+    if ((data ?? []).length < PAGE_SIZE) break
+  }
+  return rows
+}
+
+// Enrolled students of these events, limited to the organizer's program scope.
+async function fetchScopedStudents(eventIds, types, scope) {
+  const rows = await fetchAllRows(() => getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('id, event_id, has_voted, has_responded, users(program)')
+    .in('event_id', eventIds)
+    .in('participant_type', types))
+  return isAllAccess(scope)
+    ? rows
+    : rows.filter((row) => isStudentInScope(scope, { program: row.users?.program }))
+}
+
 export async function getReportsOverview(organizerId) {
   const [elections, competitions, polls] = await Promise.all([
     listElectionEvents(organizerId),
@@ -30,10 +60,11 @@ export async function getReportsOverview(organizerId) {
   const competitionIds = competitions.map((e) => e.id)
   const pollIds = polls.map((e) => e.id)
 
+  const scope = await getOrganizerScope(organizerId)
   const [electionStats, competitionStats, pollStats] = await Promise.all([
-    loadElectionStats(electionIds),
+    loadElectionStats(electionIds, scope),
     loadCompetitionStats(competitionIds),
-    loadPollStats(pollIds),
+    loadPollStats(pollIds, scope),
   ])
 
   return {
@@ -56,22 +87,16 @@ export async function getReportsOverview(organizerId) {
   }
 }
 
-async function loadElectionStats(eventIds) {
+async function loadElectionStats(eventIds, scope) {
   const map = {}
   if (!eventIds.length) return map
 
-  const [totalRes, votedRes] = await Promise.all([
-    getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
-    getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER).eq('has_voted', true),
-  ])
-
+  const students = await fetchScopedStudents(eventIds, ELECTION_PARTICIPANT_TYPES, scope)
   const totalByEvent = {}
-  for (const row of totalRes.data ?? []) {
-    totalByEvent[row.event_id] = (totalByEvent[row.event_id] ?? 0) + 1
-  }
   const votedByEvent = {}
-  for (const row of votedRes.data ?? []) {
-    votedByEvent[row.event_id] = (votedByEvent[row.event_id] ?? 0) + 1
+  for (const row of students) {
+    totalByEvent[row.event_id] = (totalByEvent[row.event_id] ?? 0) + 1
+    if (row.has_voted) votedByEvent[row.event_id] = (votedByEvent[row.event_id] ?? 0) + 1
   }
 
   for (const eventId of eventIds) {
@@ -108,21 +133,21 @@ async function loadCompetitionStats(eventIds) {
   return map
 }
 
-async function loadPollStats(eventIds) {
+async function loadPollStats(eventIds, scope) {
   const map = {}
   if (!eventIds.length) return map
 
-  const [submissionsRes, respondentsRes] = await Promise.all([
-    getClient().from(DB_TABLES.POLL_SUBMISSIONS).select('event_id', { count: 'exact' }).in('event_id', eventIds),
-    getClient().from(DB_TABLES.EVENT_PARTICIPANTS).select('event_id', { count: 'exact' }).in('event_id', eventIds).eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT),
+  const [submissions, students] = await Promise.all([
+    fetchAllRows(() => getClient().from(DB_TABLES.POLL_SUBMISSIONS).select('id, event_id').in('event_id', eventIds)),
+    fetchScopedStudents(eventIds, POLLING_PARTICIPANT_TYPES, scope),
   ])
 
   const submissionsByEvent = {}
-  for (const row of submissionsRes.data ?? []) {
+  for (const row of submissions) {
     submissionsByEvent[row.event_id] = (submissionsByEvent[row.event_id] ?? 0) + 1
   }
   const respondentsByEvent = {}
-  for (const row of respondentsRes.data ?? []) {
+  for (const row of students) {
     respondentsByEvent[row.event_id] = (respondentsByEvent[row.event_id] ?? 0) + 1
   }
 
@@ -196,7 +221,6 @@ export async function getElectionReport(eventId, organizerId) {
       turnoutPercentage: analytics.turnoutPercentage,
     },
     participationByProgram: analytics.participationByProgram ?? [],
-    participationByYearSection: analytics.participationByYearSection ?? [],
     voterParticipation: analytics.voterParticipation ?? [],
     voteSummary: {
       liveTotalVotes: analytics.liveTotalVotes,
@@ -273,11 +297,7 @@ export async function getPollingReport(eventId, organizerId) {
 
   const analytics = await getPollAnalytics(eventId, organizerId)
 
-  const { count: enrolled } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('*', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+  const enrolled = (await fetchScopedStudents([eventId], POLLING_PARTICIPANT_TYPES, await getOrganizerScope(organizerId))).length
 
   return {
     generatedAt: new Date().toISOString(),
@@ -298,7 +318,6 @@ export async function getPollingReport(eventId, organizerId) {
       pollAnonymous: analytics.pollAnonymous,
     },
     participationByProgram: analytics.participationByProgram ?? [],
-    participationByYearSection: analytics.participationByYearSection ?? [],
     respondentParticipation: analytics.respondentParticipation ?? [],
     responseActivity: analytics.responseActivity ?? [],
     questions: analytics.questions,

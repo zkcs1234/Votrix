@@ -144,6 +144,12 @@ export const PARTICIPANT_TYPES = {
   POLLING_RESPONDENT: 'POLLING_RESPONDENT', // Specific event role
 }
 
+// event_participants.participant_type values that count as an enrolled
+// student for each event type. Cohort invites save STUDENT; the legacy
+// per-event values may still exist on older rows, so readers accept both.
+export const ELECTION_PARTICIPANT_TYPES = [PARTICIPANT_TYPES.STUDENT, PARTICIPANT_TYPES.ELECTION_VOTER]
+export const POLLING_PARTICIPANT_TYPES = [PARTICIPANT_TYPES.STUDENT, PARTICIPANT_TYPES.POLLING_RESPONDENT]
+
 // Labels for participant types (for frontend display)
 export const PARTICIPANT_TYPE_LABELS = {
   [PARTICIPANT_TYPES.STUDENT]: { label: 'Student', color: 'blue', icon: 'GraduationCap' },
@@ -155,14 +161,15 @@ export const PARTICIPANT_TYPE_LABELS = {
   [PARTICIPANT_TYPES.POLLING_RESPONDENT]: { label: 'Respondent', color: 'cyan', icon: 'BarChart2' },
 }
 
-// system_settings key holding the admin-managed lists of valid Programs and
-// Year & Sections used by election/polling participant cohorts. Shape:
-//   { programs: string[], sections: string[] }
+// system_settings key holding the admin-managed list of valid Programs used by
+// election/polling participant cohorts. Students are identified by Program only
+// now; the stored `sections` list is a leftover and nothing organizer-side reads
+// it. Shape: { programs: string[], sections: string[] }
 export const PARTICIPANT_TAXONOMY_SETTING_KEY = 'participant_taxonomy'
 
 // Organizer voter-scope types (organizer plan O3/O5). Stored on users.scope.
-//   - ALL    → unrestricted (sees every program/section)
-//   - SCOPED → limited to scope.programs (optionally narrowed by scope.sections)
+//   - ALL    → unrestricted (sees every program)
+//   - SCOPED → limited to scope.programs (an empty list matches no one)
 export const ORGANIZER_SCOPE_TYPES = {
   ALL: 'all',
   SCOPED: 'scoped',

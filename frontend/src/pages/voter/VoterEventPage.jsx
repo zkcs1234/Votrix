@@ -9,7 +9,7 @@ import Button from '@/components/ui/Button'
 import VoterEventHeader from '@/components/voter/VoterEventHeader'
 import VoterDashboardLink from '@/components/voter/VoterDashboardLink'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
-import FullscreenVotingShell from '@/components/voter/FullscreenVotingShell'
+import ParticipantTaskFooter from '@/components/voter/ParticipantTaskFooter'
 import { getErrorMessage } from '@/utils/getErrorMessage'
 
 function validateSelections(positions, selections) {
@@ -309,50 +309,42 @@ export default function VoterEventPage() {
   }
 
   return (
-    /*
-      Full-viewport shell using dynamic viewport height (dvh) so mobile
-      browser toolbars showing/hiding never shift the fixed footer.
-      Layout: [fixed progress bar] · [scrollable middle] · [fixed footer]
-      Portaled to <body> so `position: fixed` pins to the viewport (see
-      FullscreenVotingShell) — otherwise the animated <main> traps it and the
-      progress bar and submit footer cannot both stay on screen on mobile.
-    */
-    <FullscreenVotingShell>
-    <div data-module="election" className="fixed inset-0 z-50 flex h-dvh flex-col bg-v-surface">
-      {/* ===== FIXED TOP: Floating progress card (does not scroll) ===== */}
+    <>
+    {/*
+      The ballot stays inside the participant layout, so the header and sidebar
+      rail remain visible. The progress card is sticky under the header and the
+      Review / Submit bar is pinned in the layout's footer slot
+      (ParticipantTaskFooter), so both stay on screen on phones too.
+    */}
+    <div data-module="election" className="mx-auto max-w-2xl space-y-6">
       {!isReviewing && (
-        <div className="shrink-0">
-          <div className="mx-auto max-w-2xl px-4 pt-3 pb-1 md:px-8">
-            <div className="v-card-sm p-3 shadow-v-shadow-md">
-              <div className="flex items-center justify-between gap-2 text-sm">
-                <span className="v-caption">
-                  Ballot {currentSectionNumber} of {totalSections}
-                  <span className="text-v-text-subtle">
-                    {' · '}
-                    {completedSections} submitted
-                  </span>
+        <div className="sticky top-[var(--v-header-h)] z-30 -mx-1 px-1 pt-1">
+          <div className="v-card-sm p-3 shadow-v-shadow-md">
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <span className="v-caption">
+                Ballot {currentSectionNumber} of {totalSections}
+                <span className="text-v-text-subtle">
+                  {' · '}
+                  {completedSections} submitted
                 </span>
-                <span className="v-caption font-medium">{progress}%</span>
-              </div>
-              <div
-                className="mt-2 h-1.5 overflow-hidden rounded-full bg-v-surface-elevated"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={progress}
-                aria-label="Ballot progress"
-              >
-                <div className="h-full bg-v-primary transition-all duration-300" style={{ width: `${progress}%` }} />
-              </div>
+              </span>
+              <span className="v-caption font-medium">{progress}%</span>
+            </div>
+            <div
+              className="mt-2 h-1.5 overflow-hidden rounded-full bg-v-surface-elevated"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              aria-label="Ballot progress"
+            >
+              <div className="h-full bg-v-primary transition-all duration-300" style={{ width: `${progress}%` }} />
             </div>
           </div>
         </div>
       )}
 
-      {/* ===== SCROLLABLE MIDDLE: header + ballot content scroll here ===== */}
-      <div className="flex-1 overflow-y-auto overscroll-contain">
-        <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-8">
-          <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
+      <VoterEventHeader event={ballot.event} eyebrow="Election ballot" />
 
           {sectionNotice && !isReviewing && (
             <p role="status" className="rounded-lg border border-v-success/30 bg-v-success/10 px-4 py-3 text-sm text-v-success">
@@ -419,12 +411,9 @@ export default function VoterEventPage() {
               {error && <FormAlert variant="error">{error}</FormAlert>}
             </>
           )}
-        </div>
-      </div>
+    </div>
 
-      {/* ===== FIXED BOTTOM: Submit footer (does not scroll) ===== */}
-      <div className="shrink-0 border-t border-v-border bg-v-surface px-4 py-3 shadow-v-shadow md:px-8 pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto max-w-2xl">
+    <ParticipantTaskFooter>
           {isReviewing ? (
             <div className="flex flex-wrap gap-3 justify-end">
               <Button
@@ -452,9 +441,7 @@ export default function VoterEventPage() {
               </p>
             </div>
           )}
-        </div>
-      </div>
-    </div>
-    </FullscreenVotingShell>
+    </ParticipantTaskFooter>
+    </>
   )
 }

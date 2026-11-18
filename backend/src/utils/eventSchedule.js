@@ -63,3 +63,26 @@ export function canVoterViewElectionResults(event, now = new Date()) {
     lifecycle === 'archived'
   return endPassed || finalized
 }
+
+/**
+ * Whether an enrolled student may view poll results (student-facing visibility).
+ * Same three modes as elections:
+ * - hidden: never
+ * - real_time: any time while enrolled (including while the poll is open)
+ * - public: only once the poll has concluded — its end date or expiry has
+ *   passed, or the poll is completed/archived. Unlike elections, a poll that is
+ *   merely paused never counts as concluded.
+ * A missing/unknown setting is treated as hidden so nothing leaks by accident.
+ */
+export function canVoterViewPollResults(event, now = new Date()) {
+  const visibility = event.results_visibility ?? event.resultsVisibility ?? 'hidden'
+  if (visibility === 'real_time') return true
+  if (visibility !== 'public') return false
+  const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime()
+  const end = event.end_date ?? event.endDate
+  const expires = event.poll_expires_at ?? event.pollExpiresAt
+  const endPassed = Boolean(end && new Date(end).getTime() < nowMs)
+  const expired = Boolean(expires && new Date(expires).getTime() < nowMs)
+  const status = event.status
+  return endPassed || expired || status === 'completed' || status === 'archived'
+}

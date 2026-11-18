@@ -132,7 +132,7 @@ export default function HistoryReceipt({ row }) {
         )}
         {row.results?.state === 'pending' && (
           <span className="self-center text-sm text-v-text-muted">
-            Results appear after voting closes{row.results.availableAfter ? ` on ${formatDate(row.results.availableAfter)}` : ''}.
+            Results appear after {row.eventType === 'polling' ? 'the poll' : 'voting'} closes{row.results.availableAfter ? ` on ${formatDate(row.results.availableAfter)}` : ''}.
           </span>
         )}
         {row.scoresheetPath && (

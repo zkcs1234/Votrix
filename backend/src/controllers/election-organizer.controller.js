@@ -219,8 +219,8 @@ export const getCohorts = asyncHandler(async (req, res) => {
 })
 
 export const inviteCohort = asyncHandler(async (req, res) => {
-  const { cohortType, values, notify } = req.body ?? {}
-  const result = await inviteCohortService(req.params.eventId, req.user.id, { cohortType, values, notify })
+  const { cohortType, values, notify, resendExisting } = req.body ?? {}
+  const result = await inviteCohortService(req.params.eventId, req.user.id, { cohortType, values, notify, resendExisting })
   res.json({ success: true, ...result })
 })
 

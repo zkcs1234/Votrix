@@ -71,6 +71,7 @@ export const pollingEventSchema = z.object({
   endDate: z.string().min(1, 'End date is required').refine(isValidDateString, 'Invalid end date'),
   pollAnonymous: z.boolean().optional(),
   pollAllowMultipleSubmissions: z.boolean().optional(),
+  resultsVisibility: z.enum(['real_time', 'hidden', 'public']).optional(),
 })
 
 export const pollingEventSchemaEdit = pollingEventSchema.superRefine((data, context) => {

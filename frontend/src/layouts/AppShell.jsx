@@ -345,8 +345,10 @@ export default function AppShell({
   eventId,
   footerLink,
   showSidebar = true,
-  // Always show the sidebar as a collapsed rail (no expand toggle). Used by task
-  // pages such as the ballot and the scoresheet.
+  // Open the sidebar as a collapsed rail, like the data-heavy focus pages. Used by
+  // task pages (ballot, poll, scoresheet) so the task gets the width. The
+  // expand/collapse toggle stays available as a temporary override; it is never
+  // saved as the resting preference.
   railOnly = false,
   showSearch = true,
   showBackButton = false,
@@ -365,6 +367,7 @@ export default function AppShell({
   const [isCollapsed, setIsCollapsed] = useState(
     () =>
       isNarrow ||
+      railOnly ||
       (typeof window !== 'undefined' && isFocusPath(window.location.pathname)) ||
       readCollapsedPref(),
   )
@@ -405,7 +408,7 @@ export default function AppShell({
       // Persist only as a resting preference — a wide, non-focus screen. On a
       // narrow screen or a data-heavy focus page the toggle is a temporary
       // override that resets the next time that context changes.
-      if (!isNarrow && !isFocusPath(location.pathname)) {
+      if (!isNarrow && !railOnly && !isFocusPath(location.pathname)) {
         try {
           localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next))
         } catch {
@@ -431,8 +434,8 @@ export default function AppShell({
   // preference. Runs on breakpoint crossings and on navigation into/out of a
   // focus page, which is what makes the collapse feel automatic.
   useEffect(() => {
-    setIsCollapsed(isNarrow || isFocusPath(location.pathname) ? true : readCollapsedPref())
-  }, [isNarrow, location.pathname])
+    setIsCollapsed(isNarrow || railOnly || isFocusPath(location.pathname) ? true : readCollapsedPref())
+  }, [isNarrow, railOnly, location.pathname])
 
   const displayName = user?.username ?? user?.email ?? 'User'
   const initials = displayName.slice(0, 2).toUpperCase()
@@ -525,8 +528,8 @@ export default function AppShell({
       location={location}
       footerLink={footerLink}
       onNavigate={closeMobile}
-      isCollapsed={isDesktop ? railOnly || isCollapsed : false}
-      onToggleCollapse={isDesktop && !railOnly ? toggleCollapse : undefined}
+      isCollapsed={isDesktop ? isCollapsed : false}
+      onToggleCollapse={isDesktop ? toggleCollapse : undefined}
       caption={caption}
     />
   )
@@ -535,12 +538,12 @@ export default function AppShell({
     <div
       data-module={moduleLabel?.toLowerCase().replace(/\s+/g, '-')}
       className="flex min-h-screen bg-v-bg"
-      style={{ '--sidebar-width': showSidebar ? (railOnly || isCollapsed ? 'var(--v-rail-w)' : 'var(--v-sidebar-w)') : '0px' }}
+      style={{ '--sidebar-width': showSidebar ? (isCollapsed ? 'var(--v-rail-w)' : 'var(--v-sidebar-w)') : '0px' }}
     >
       {showSidebar && (
         <aside
           className={`hidden shrink-0 bg-v-sidebar lg:block sticky top-0 self-start h-screen min-h-screen overflow-y-auto transition-[width,padding] duration-200 ease-in-out ${
-            railOnly || isCollapsed ? 'w-18 px-3 py-6' : 'w-64 p-6'
+            isCollapsed ? 'w-18 px-3 py-6' : 'w-64 p-6'
           }`}
         >
           {sidebar(true)}
@@ -611,17 +614,14 @@ export default function AppShell({
               <button
                 type="button"
                 onClick={() => setNotificationsOpen((prev) => !prev)}
-                className={`relative flex items-center gap-2 rounded-lg border border-v-border p-2 transition hover:bg-v-surface-elevated pointer-coarse:min-h-11 pointer-coarse:min-w-11 lg:px-3 ${
+                className={`relative flex items-center gap-2 rounded-lg border border-v-border p-2 transition hover:bg-v-surface-elevated pointer-coarse:min-h-11 pointer-coarse:min-w-11 ${
                   notificationsOpen ? 'bg-v-surface-elevated text-v-text' : 'text-v-text-muted'
                 }`}
                 aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
               >
                 <Bell className="h-5 w-5" strokeWidth={1.5} />
-                <span className="hidden text-sm font-medium lg:inline" aria-hidden="true">
-                  Notifications{unreadCount > 0 ? ` (${unreadCount > 99 ? '99+' : unreadCount})` : ''}
-                </span>
                 {unreadCount > 0 && (
-                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-v-danger px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white lg:hidden">
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-v-danger px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}

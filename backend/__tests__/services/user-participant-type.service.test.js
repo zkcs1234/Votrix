@@ -24,25 +24,25 @@ describe('user participant type memberships', () => {
   beforeEach(() => vi.clearAllMocks())
 
   test('adds a type idempotently and reactivates a previous membership', async () => {
-    const membership = { user_id: 'user-1', participant_type: PARTICIPANT_TYPES.ELECTION_VOTER, is_active: true }
+    const membership = { user_id: 'user-1', participant_type: PARTICIPANT_TYPES.STUDENT, is_active: true }
     const query = makeQuery(membership)
     const from = vi.fn().mockReturnValue(query)
     db.mockReturnValue({ from })
 
-    await expect(addParticipantTypeMembership('user-1', PARTICIPANT_TYPES.ELECTION_VOTER, 'admin-1'))
+    await expect(addParticipantTypeMembership('user-1', PARTICIPANT_TYPES.STUDENT, 'admin-1'))
       .resolves.toEqual(membership)
 
     expect(from).toHaveBeenCalledWith('user_participant_types')
     expect(query.upsert).toHaveBeenCalledWith({
       user_id: 'user-1',
-      participant_type: PARTICIPANT_TYPES.ELECTION_VOTER,
+      participant_type: PARTICIPANT_TYPES.STUDENT,
       is_active: true,
       created_by: 'admin-1',
     }, { onConflict: 'user_id,participant_type' })
   })
 
   test('rejects unknown participant types before querying the database', async () => {
-    await expect(addParticipantTypeMembership('user-1', 'STUDENT'))
+    await expect(addParticipantTypeMembership('user-1', 'NOT_A_TYPE'))
       .rejects.toThrow('Invalid participant type')
     expect(db).not.toHaveBeenCalled()
   })
@@ -51,18 +51,18 @@ describe('user participant type memberships', () => {
     const query = makeQuery({ user_id: 'user-1' })
     db.mockReturnValue({ from: vi.fn().mockReturnValue(query) })
 
-    await expect(hasParticipantTypeMembership('user-1', PARTICIPANT_TYPES.POLLING_RESPONDENT)).resolves.toBe(true)
+    await expect(hasParticipantTypeMembership('user-1', PARTICIPANT_TYPES.STUDENT)).resolves.toBe(true)
     expect(query.eq).toHaveBeenCalledWith('is_active', true)
   })
 
   test('deactivates one membership without deleting its row', async () => {
-    const membership = { user_id: 'user-1', participant_type: PARTICIPANT_TYPES.COMPETITION_JUDGE, is_active: false }
+    const membership = { user_id: 'user-1', participant_type: PARTICIPANT_TYPES.JUDGE, is_active: false }
     const query = makeQuery(membership)
     db.mockReturnValue({ from: vi.fn().mockReturnValue(query) })
 
-    await expect(setParticipantTypeMembership('user-1', PARTICIPANT_TYPES.COMPETITION_JUDGE, false))
+    await expect(setParticipantTypeMembership('user-1', PARTICIPANT_TYPES.JUDGE, false))
       .resolves.toEqual(membership)
     expect(query.update).toHaveBeenCalledWith({ is_active: false })
-    expect(query.eq).toHaveBeenCalledWith('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    expect(query.eq).toHaveBeenCalledWith('participant_type', PARTICIPANT_TYPES.JUDGE)
   })
 })

@@ -117,3 +117,21 @@ describe('polling.validator — validatePollAnswers', () => {
     expect(validatePollAnswers({ answers })).toBe(answers)
   })
 })
+
+describe('polling.validator — validatePollEvent banner', () => {
+  const base = { title: 'Poll', startDate: '2030-01-01T00:00:00Z', endDate: '2030-01-02T00:00:00Z' }
+
+  test('keeps the banner so a poll created from a draft is not created without it', () => {
+    expect(validatePollEvent({ ...base, banner: ' https://cdn/banner.png ' }, true).banner).toBe('https://cdn/banner.png')
+  })
+
+  test('leaves the banner out when it was not sent, so an update does not clear it', () => {
+    expect('banner' in validatePollEvent({ title: 'New title' })).toBe(false)
+  })
+
+  test('an explicit null or blank banner clears it, and a non-string is rejected', () => {
+    expect(validatePollEvent({ banner: null }).banner).toBeNull()
+    expect(validatePollEvent({ banner: '  ' }).banner).toBeNull()
+    expect(() => validatePollEvent({ banner: 42 })).toThrow(/Invalid banner/)
+  })
+})

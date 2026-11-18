@@ -23,6 +23,7 @@ export default function CohortInviteManager({ eventId, service, participantLabel
   const cohortType = 'program'
   const [selected, setSelected] = useState(() => new Set())
   const [notify, setNotify] = useState(false)
+  const [resendExisting, setResendExisting] = useState(false)
   const [inviting, setInviting] = useState(false)
   const [removingId, setRemovingId] = useState(null)
   const [inviteSummary, setInviteSummary] = useState(null)
@@ -77,6 +78,7 @@ export default function CohortInviteManager({ eventId, service, participantLabel
         cohortType,
         values: [...selected],
         notify,
+        resendExisting: notify && resendExisting,
       })
 
       const summary = data?.emailSummary || data?.summary || null
@@ -89,7 +91,10 @@ export default function CohortInviteManager({ eventId, service, participantLabel
       success(
         `Enrolled ${data.enrolled} ${participantLabel}` +
           (data.alreadyEnrolled ? ` (${data.alreadyEnrolled} already enrolled)` : '') +
-          (notify ? ` · ${data.notified ?? summary?.sent ?? 0} emailed${emailSummaryText}` : ''),
+          (notify ? ` · ${data.notified ?? summary?.sent ?? 0} emailed${emailSummaryText}` : '') +
+          (notify && summary && !summary.requested
+            ? ` — nobody new to email. Tick "Also email … already enrolled" to re-send.`
+            : ''),
       )
       setSelected(new Set())
       await load()
@@ -175,10 +180,18 @@ export default function CohortInviteManager({ eventId, service, participantLabel
             )}
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-v-border pt-4">
-              <label className="flex items-center gap-2 text-sm text-v-text-muted">
-                <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} className="h-4 w-4" />
-                Email an invitation to newly enrolled {participantLabel}
-              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm text-v-text-muted">
+                  <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} className="h-4 w-4" />
+                  Email an invitation to newly enrolled {participantLabel}
+                </label>
+                {notify && (
+                  <label className="flex items-center gap-2 text-sm text-v-text-muted">
+                    <input type="checkbox" checked={resendExisting} onChange={(e) => setResendExisting(e.target.checked)} className="h-4 w-4" />
+                    Also email {participantLabel} in the selected programs who are already enrolled
+                  </label>
+                )}
+              </div>
               <Button onClick={handleInvite} loading={inviting} disabled={selected.size === 0}>
                 <Send className="h-4 w-4" strokeWidth={2} />
                 Invite {selected.size ? `${selectedTotal} ${participantLabel}` : ''}

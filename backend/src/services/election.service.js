@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { eligibleGroups, isPositionProgramEligible, validateGroupName } from '../utils/electionGroups.js'
 import { db as getClient } from '../foundation/db.js'
 import { ApiError } from '../utils/ApiError.js'
-import { DB_TABLES, EVENT_STATUS, EVENT_TYPES, PARTICIPANT_TYPES } from '../utils/constants.js'
+import { DB_TABLES, EVENT_STATUS, EVENT_TYPES, PARTICIPANT_TYPES, ELECTION_PARTICIPANT_TYPES } from '../utils/constants.js'
 import { isElectionVotingOpen, canVoterViewElectionResults } from '../utils/eventSchedule.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import { getOrganizerScope, isStudentInScope, isAllAccess, areCohortValuesInScope } from './organizer-scope.service.js'
@@ -19,6 +19,7 @@ import {
   assertChangeReason,
   assertSetupEditable,
   assertParticipantsEditable,
+  assertEndDateNotPassed,
   buildEditPolicy,
   canUnpublishEventStatus,
   normalizeChangeReason,
@@ -136,9 +137,9 @@ export async function getOrganizerDashboard(organizerId) {
       const [participantsRes, votesRes] = await Promise.all([
         getClient()
           .from(DB_TABLES.EVENT_PARTICIPANTS)
-          .select('event_id, has_voted')
+          .select('event_id, has_voted, users(program)')
           .in('event_id', eventIds)
-          .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
+          .in('participant_type', ELECTION_PARTICIPANT_TYPES),
         getClient()
           .from(DB_TABLES.ELECTION_VOTES)
           .select('*', { count: 'exact', head: true })
@@ -148,7 +149,10 @@ export async function getOrganizerDashboard(organizerId) {
       if (participantsRes.error) throw new ApiError(500, participantsRes.error.message)
       if (votesRes.error) throw new ApiError(500, votesRes.error.message)
 
+      // Voter counts follow the organizer's program scope (as the roster does).
+      const scope = await getOrganizerScope(organizerId)
       for (const row of participantsRes.data ?? []) {
+        if (!isAllAccess(scope) && !isStudentInScope(scope, { program: row.users?.program })) continue
         const bucket = perEvent.get(row.event_id)
         if (!bucket) continue
         bucket.registered += 1
@@ -383,7 +387,7 @@ export async function getElectionGroupEligibility(eventId, organizerId, sectionI
   for (let offset = 0; ; offset += 500) {
     const { data: rows, error: rosterError } = await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
       .select('id, users!inner(email, first_name, last_name, program)')
-      .eq('event_id', eventId).eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER).order('id').range(offset, offset + 499)
+      .eq('event_id', eventId).in('participant_type', ELECTION_PARTICIPANT_TYPES).order('id').range(offset, offset + 499)
     if (rosterError) throw new ApiError(500, rosterError.message)
     for (const row of rows ?? []) {
       const profile = row.users
@@ -405,7 +409,7 @@ export async function setElectionGroupEligibility(eventId, organizerId, sectionI
   const scope = await getOrganizerScope(organizerId)
   const { data: voters, error: rosterError } = ids.length ? await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('id, users!inner(program)').eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER).in('id', ids) : { data: [], error: null }
+    .in('participant_type', ELECTION_PARTICIPANT_TYPES).in('id', ids) : { data: [], error: null }
   if (rosterError) throw new ApiError(500, rosterError.message)
   const allowed = new Set((voters ?? []).filter((voter) => isAllAccess(scope) || isStudentInScope(scope, { program: voter.users?.program })).map((voter) => voter.id))
   if (ids.some((id) => !allowed.has(id))) throw new ApiError(400, 'Select enrolled voters within your organizer scope')
@@ -572,7 +576,7 @@ export async function getPositionEligibilitySummary(eventId, organizerId) {
     const { data: rows, error } = await getClient().from(DB_TABLES.EVENT_PARTICIPANTS)
       .select('id, users!inner(program)')
       .eq('event_id', eventId)
-      .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
+      .in('participant_type', ELECTION_PARTICIPANT_TYPES)
       .order('id')
       .range(offset, offset + 499)
     if (error) throw new ApiError(500, error.message)
@@ -992,7 +996,7 @@ export async function listEventVoters(eventId, organizerId, page = 1, limit = 50
       { count: 'exact' }
     )
     .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
+    .in('participant_type', ELECTION_PARTICIPANT_TYPES)
     .order('created_at', { ascending: false })
     .range(from, to)
 
@@ -1386,14 +1390,14 @@ export async function submitBallot(eventId, voterId, payload) {
     .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
+    .in('participant_type', ELECTION_PARTICIPANT_TYPES)
     .eq('has_voted', true)
 
   const { count: totalVoters } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
+    .in('participant_type', ELECTION_PARTICIPANT_TYPES)
 
   const { count: votesCast } = await getClient()
     .from(DB_TABLES.ELECTION_VOTES)
@@ -1409,7 +1413,7 @@ export async function submitBallot(eventId, voterId, payload) {
     .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
+    .in('participant_type', ELECTION_PARTICIPANT_TYPES)
 
   const { data: completionState, error: completionError } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
@@ -1488,7 +1492,7 @@ export async function listVoterElectionEvents(voterId) {
     `,
     )
     .eq('user_id', voterId)
-    .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
+    .in('participant_type', ELECTION_PARTICIPANT_TYPES)
     .neq('events.status', EVENT_STATUS.ARCHIVED)
 
   if (error) throw new ApiError(500, error.message)
@@ -1539,7 +1543,7 @@ async function fetchElectionResultsData(eventId, organizerId = null) {
   const [
     { count: totalVoters, error: evErr },
     { count: votedCount, error: votedErr },
-    { data: participantRows, error: participantErr },
+    { data: allParticipantRows, error: participantErr },
     { data: voteRows, error: voteErr },
     { data: candidates, error: candErr },
   ] = await Promise.all([
@@ -1547,18 +1551,18 @@ async function fetchElectionResultsData(eventId, organizerId = null) {
       .from(DB_TABLES.EVENT_PARTICIPANTS)
       .select('*', { count: 'exact', head: true })
       .eq('event_id', eventId)
-      .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
+      .in('participant_type', ELECTION_PARTICIPANT_TYPES),
     getClient()
       .from(DB_TABLES.EVENT_PARTICIPANTS)
       .select('*', { count: 'exact', head: true })
       .eq('event_id', eventId)
-      .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER)
+      .in('participant_type', ELECTION_PARTICIPANT_TYPES)
       .eq('has_voted', true),
     getClient()
       .from(DB_TABLES.EVENT_PARTICIPANTS)
       .select('id, has_voted, users!inner (id, email, first_name, last_name, school_id, program)')
       .eq('event_id', eventId)
-      .eq('participant_type', PARTICIPANT_TYPES.ELECTION_VOTER),
+      .in('participant_type', ELECTION_PARTICIPANT_TYPES),
     getClient().from(DB_TABLES.ELECTION_VOTES).select('candidate_id, position_id, voter_id').eq('event_id', eventId),
     getClient().from(DB_TABLES.CANDIDATES).select('id, name, position_id, positions!inner(event_id)').eq('positions.event_id', eventId),
   ])
@@ -1574,8 +1578,20 @@ async function fetchElectionResultsData(eventId, organizerId = null) {
     voteCountByCandidate[v.candidate_id] = (voteCountByCandidate[v.candidate_id] || 0) + 1
   }
 
-  const total = totalVoters ?? 0
-  const voted = votedCount ?? 0
+  // Participant counts and breakdowns follow the organizer's program scope, the
+  // same as the Voters roster, so every number on the page agrees. Vote tallies
+  // (who won) stay event-wide. Voter-facing results pass no organizer and so are
+  // never scoped.
+  const scope = organizerId ? await getOrganizerScope(organizerId) : null
+  const scoped = scope ? !isAllAccess(scope) : false
+  const participantRows = scoped
+    ? (allParticipantRows ?? []).filter((row) => isStudentInScope(scope, { program: row.users?.program }))
+    : (allParticipantRows ?? [])
+  const inScopeUserIds = new Set(participantRows.map((row) => row.users?.id).filter(Boolean))
+  const inScopeParticipantIds = new Set(participantRows.map((row) => row.id))
+
+  const total = scoped ? participantRows.length : (totalVoters ?? 0)
+  const voted = scoped ? participantRows.filter((row) => row.has_voted).length : (votedCount ?? 0)
   const turnoutPercentage = computeTurnoutRate(voted, total)
 
   const participationBy = (field) => {
@@ -1638,7 +1654,7 @@ async function fetchElectionResultsData(eventId, organizerId = null) {
         && isPositionProgramEligible(position, participant.users?.program)
     }).length
     const positionVoterIds = new Set((voteRows ?? [])
-      .filter((vote) => vote.position_id === position.id)
+      .filter((vote) => vote.position_id === position.id && (!scoped || inScopeUserIds.has(vote.voter_id)))
       .map((vote) => vote.voter_id))
     const positionVotedCount = positionVoterIds.size
     const winnersCount = position.numberOfWinners || 1
@@ -1723,15 +1739,17 @@ async function fetchElectionResultsData(eventId, organizerId = null) {
     .eq('event_id', eventId)
   if (sectionSubmissionError) throw new ApiError(500, sectionSubmissionError.message)
 
+  const scopedSubmissionRows = (sectionSubmissionRows ?? [])
+    .filter((submission) => !scoped || inScopeParticipantIds.has(submission.participant_id))
   const submissionsBySection = new Map()
-  for (const submission of sectionSubmissionRows ?? []) {
+  for (const submission of scopedSubmissionRows) {
     submissionsBySection.set(
       submission.ballot_section_id,
       (submissionsBySection.get(submission.ballot_section_id) ?? 0) + 1,
     )
   }
 
-  const distinctParticipants = new Set((sectionSubmissionRows ?? []).map((r) => r.participant_id))
+  const distinctParticipants = new Set(scopedSubmissionRows.map((r) => r.participant_id))
   const partialVotedCount = Math.max(0, distinctParticipants.size - voted)
 
   const sectionSummaries = (sectionRows ?? []).map((section) => {
@@ -1754,17 +1772,7 @@ async function fetchElectionResultsData(eventId, organizerId = null) {
     }
   })
 
-  const scope = organizerId ? await getOrganizerScope(organizerId) : null
-  const scoped = scope ? !isAllAccess(scope) : false
-
-  let scopedParticipants = participantRows ?? []
-  if (scoped) {
-    scopedParticipants = scopedParticipants.filter((row) =>
-      isStudentInScope(scope, { program: row.users?.program })
-    )
-  }
-
-  const voterParticipation = scopedParticipants.map((row) => ({
+  const voterParticipation = participantRows.map((row) => ({
     id: row.id,
     schoolId: row.users?.school_id ?? null,
     firstName: row.users?.first_name ?? '',
@@ -2070,17 +2078,31 @@ export async function publishElectionEvent(eventId, organizerId) {
     if (candidates.length === 0) {
       throw new ApiError(400, `Add at least one candidate to ${section.name} before publishing.`)
     }
+    // The review page requires a candidate for every position; enforce the same
+    // rule here so the API cannot publish a ballot with an empty position.
+    const withCandidates = new Set(candidates.map((candidate) => candidate.positionId))
+    const empty = positions.find((position) => !withCandidates.has(position.id))
+    if (empty) {
+      throw new ApiError(400, `Add at least one candidate to the position "${empty.name}" in ${section.name} before publishing.`)
+    }
   }
+  assertEndDateNotPassed(event, 'event')
 
   // Voters are no longer required at publish time — they are registered and
   // invited after publishing, on the Voters step, within email resend limits.
 
-  const { error } = await getClient()
+  // Only flip an election that is still a draft, so a double click or a second
+  // tab cannot publish twice (and notify admins twice).
+  const { data: changed, error } = await getClient()
     .from(DB_TABLES.EVENTS)
     .update({ status: 'scheduled' })
     .eq('id', eventId)
+    .eq('status', 'draft')
+    .select('id')
+    .maybeSingle()
 
   if (error) throw new ApiError(500, error.message)
+  if (!changed) throw new ApiError(409, 'This event has already been published')
 
   // Hand the event to the scheduler; it decides scheduled/active/completed
   // purely from the dates. The status may change again immediately here.

@@ -87,55 +87,11 @@ export const pollingService = {
     return api.get(`${org}/events/${eventId}/analytics`)
   },
 
-  inviteRespondent(eventId, payload) {
-    return api.post(`${org}/events/${eventId}/respondents/invite`, payload)
-  },
-
-  inviteExistingRespondent(eventId, email) {
-    return api.post(`${org}/events/${eventId}/respondents/invite-existing`, { email })
-  },
-
-  importCsv(eventId, file) {
-    const form = new FormData()
-    form.append('file', file)
-    return api.post(`${org}/events/${eventId}/respondents/import`, form)
-  },
-
-  // Register respondent (no email sent)
-  registerRespondent(eventId, payload) {
-    return api.post(`${org}/events/${eventId}/respondents/register`, payload)
-  },
-
-  // Register existing respondent (no email sent)
-  registerExistingRespondent(eventId, email) {
-    return api.post(`${org}/events/${eventId}/respondents/register-existing`, { email })
-  },
-
-  // Send invitation for specific respondent
-  sendInvitation(eventId, voterId) {
-    return api.post(`${org}/events/${eventId}/respondents/${voterId}/send-invitation`)
-  },
-
-  // Send all pending invitations
-  sendAllInvitations(eventId) {
-    return api.post(`${org}/events/${eventId}/respondents/send-all`)
-  },
-
-  // Preview CSV without registering
-  previewCsv(eventId, file) {
-    const form = new FormData()
-    form.append('file', file)
-    return api.post(`${org}/events/${eventId}/respondents/import-preview`, form)
-  },
-
-  // Register respondents from previewed CSV data
-  registerCsv(eventId, data) {
-    return api.post(`${org}/events/${eventId}/respondents/import-register`, { data })
-  },
-
   // List voters/respondents for an event
-  listVoters(eventId) {
-    return api.get(`${org}/events/${eventId}/voters`)
+  listVoters(eventId, { page = 1, limit = 500 } = {}) {
+    // The backend paginates (default 50); ask for a full page so a large roster
+    // is not silently cut off in the enrolled list.
+    return api.get(`${org}/events/${eventId}/voters`, { params: { page, limit } })
   },
 
   // Cohort invite (plan Phase 5).
@@ -172,6 +128,11 @@ export const pollingService = {
 
   getPoll(eventId) {
     return api.get(`${voter}/events/${eventId}`)
+  },
+
+  /** Aggregate results for one poll (only when its results visibility allows). */
+  getPollResults(eventId) {
+    return api.get(`${voter}/events/${eventId}/results`)
   },
 
   submitPoll(eventId, answers, options = {}) {

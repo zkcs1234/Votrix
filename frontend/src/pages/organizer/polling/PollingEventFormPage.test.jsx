@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import PollingEventFormPage from './PollingEventFormPage'
+import { chooseDateTime, daysFromToday } from '@/test/pickDateTime'
 
 const mocks = vi.hoisted(() => ({
   getSettings: vi.fn(),
@@ -39,21 +40,6 @@ vi.mock('@/hooks/useEventProgress', () => ({ default: () => ({
 vi.mock('@/hooks/useSilentDraftAutosave', () => ({ default: vi.fn() }))
 vi.mock('@/components/upload/ImageUploadField', () => ({ default: () => <div>Poll banner upload</div> }))
 
-function chooseDateTime(fieldName, date, hour) {
-  fireEvent.click(screen.getByLabelText(new RegExp(`^${fieldName}`)))
-  const now = new Date()
-  const monthDelta = (date.getFullYear() - now.getFullYear()) * 12 + date.getMonth() - now.getMonth()
-  for (let index = 0; index < Math.abs(monthDelta); index += 1) {
-    fireEvent.click(screen.getByRole('button', { name: monthDelta > 0 ? 'Next month' : 'Previous month' }))
-  }
-  fireEvent.click(screen.getByRole('button', { name: date.toDateString() }))
-  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
-  fireEvent.click(screen.getByRole('button', { name: `Hour ${hour % 12 || 12}` }))
-  fireEvent.click(screen.getByRole('button', { name: 'Minute 0' }))
-  fireEvent.click(screen.getByRole('button', { name: hour >= 12 ? 'PM' : 'AM' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Done' }))
-}
-
 function renderForm() {
   render(<MemoryRouter initialEntries={['/organizer/polling/events/new']}><Routes>
     <Route path="/organizer/polling/events/new" element={<PollingEventFormPage />} />
@@ -63,12 +49,14 @@ function renderForm() {
   </Routes></MemoryRouter>)
 }
 
+// Dates are relative to today because the picker does not accept past dates.
+const start = daysFromToday(2)
+const end = daysFromToday(4)
+
 async function fillSchedule() {
   fireEvent.change(screen.getByLabelText(/^Poll title/), { target: { value: 'Campus poll' } })
-  const start = new Date(2026, 9, 20)
-  const end = new Date(2026, 9, 22)
-  chooseDateTime('Start Date and Time', start, 9)
-  chooseDateTime('End Date and Time', end, 17)
+  chooseDateTime('Start Date and Time', start, 9, 0, 'AM')
+  chooseDateTime('End Date and Time', end, 5, 0, 'PM')
   fireEvent.click(screen.getByRole('button', { name: 'Next: Branding' }))
   await screen.findByText('Poll banner upload')
   fireEvent.click(screen.getByRole('button', { name: 'Next: Settings' }))
@@ -104,23 +92,21 @@ it('uses the event end date as the poll expiration', async () => {
   const [, payload] = mocks.publishDraft.mock.calls[0]
   expect(payload).toMatchObject({
     title: 'Campus poll',
-    startDate: new Date(2026, 9, 20, 9).toISOString(),
-    endDate: new Date(2026, 9, 22, 17).toISOString(),
-    pollExpiresAt: new Date(2026, 9, 22, 17).toISOString(),
+    startDate: new Date(start.getFullYear(), start.getMonth(), start.getDate(), 9).toISOString(),
+    endDate: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 17).toISOString(),
+    pollExpiresAt: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 17).toISOString(),
   })
 })
 
-it('rejects an event end before its start before creating the event', async () => {
+it('does not let the end be set before the start before creating the event', async () => {
   renderForm()
   fireEvent.change(screen.getByLabelText(/^Poll title/), { target: { value: 'Campus poll' } })
-  chooseDateTime('Start Date and Time', new Date(2026, 9, 20), 9)
-  chooseDateTime('End Date and Time', new Date(2026, 9, 22), 17)
-  fireEvent.change(screen.getByLabelText(/^End Date and Time/), {
-    target: { value: '2026-10-19T17:00' },
-  })
-  fireEvent.click(screen.getByRole('button', { name: 'Next: Branding' }))
+  chooseDateTime('Start Date and Time', start, 9, 0, 'AM')
 
-  expect(await screen.findByText('End date must be on or after start date')).toBeInTheDocument()
+  // The picker itself refuses a day earlier than the start, so an invalid range
+  // cannot be entered (the schema still rejects one that arrives another way).
+  fireEvent.click(screen.getByLabelText(/^End Date and Time/))
+  expect(screen.getByRole('button', { name: daysFromToday(1).toDateString() })).toBeDisabled()
   expect(mocks.publishDraft).not.toHaveBeenCalled()
 })
 
@@ -150,13 +136,14 @@ it('uses the event end date when updating polling settings', async () => {
 })
 
 it('replaces a legacy saved expiration with the updated event end date', async () => {
+  const savedEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 17)
   mocks.getSettings.mockResolvedValue({ data: { settings: {
     id: 'poll-id',
     title: 'Saved poll',
     description: '',
-    startDate: '2026-10-20T09:00:00.000Z',
-    endDate: '2026-10-22T17:00:00.000Z',
-    pollExpiresAt: '2026-10-21T12:00:00.000Z',
+    startDate: new Date(start.getFullYear(), start.getMonth(), start.getDate(), 9).toISOString(),
+    endDate: savedEnd.toISOString(),
+    pollExpiresAt: new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1, 12).toISOString(),
     status: 'draft',
     pollAnonymous: false,
     pollAllowMultipleSubmissions: false,
@@ -166,12 +153,12 @@ it('replaces a legacy saved expiration with the updated event end date', async (
   </Routes></MemoryRouter>)
 
   await screen.findByLabelText(/^Start Date and Time/)
-  chooseDateTime('Start Date and Time', new Date(2026, 9, 22), 16)
+  chooseDateTime('Start Date and Time', end, 4, 0, 'PM')
   fireEvent.click(screen.getByRole('button', { name: 'Next: Branding' }))
 
   await waitFor(() => expect(mocks.updateEvent).toHaveBeenCalledWith('poll-id', expect.objectContaining({
-    startDate: new Date(2026, 9, 22, 16).toISOString(),
-    endDate: '2026-10-22T17:00:00.000Z',
-    pollExpiresAt: '2026-10-22T17:00:00.000Z',
+    startDate: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 16).toISOString(),
+    endDate: savedEnd.toISOString(),
+    pollExpiresAt: savedEnd.toISOString(),
   })))
 })

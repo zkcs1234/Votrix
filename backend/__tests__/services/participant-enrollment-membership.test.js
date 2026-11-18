@@ -28,7 +28,7 @@ describe('event participant enrollment membership guard', () => {
     vi.clearAllMocks()
     eventQuery = makeQuery({ event_type: 'election' })
     accountQuery = makeQuery({ role: 'participant', account_status: 'active' })
-    enrollmentQuery = makeQuery({ id: 'enrollment-1', participant_type: PARTICIPANT_TYPES.ELECTION_VOTER })
+    enrollmentQuery = makeQuery({ id: 'enrollment-1', participant_type: PARTICIPANT_TYPES.STUDENT })
     from = vi.fn((table) => table === 'events' ? eventQuery : table === 'users' ? accountQuery : enrollmentQuery)
     db.mockReturnValue({ from })
   })
@@ -62,17 +62,39 @@ describe('event participant enrollment membership guard', () => {
     expect(enrollmentQuery.upsert).not.toHaveBeenCalled()
   })
 
-  test('enrolls an eligible account with the event-derived type', async () => {
+  test('enrolls an eligible student in an election as STUDENT', async () => {
     hasParticipantTypeMembership.mockResolvedValue(true)
 
     await expect(registerParticipant('event-1', 'user-1')).resolves.toEqual({
       id: 'enrollment-1',
-      participant_type: PARTICIPANT_TYPES.ELECTION_VOTER,
+      participant_type: PARTICIPANT_TYPES.STUDENT,
     })
+    expect(hasParticipantTypeMembership).toHaveBeenCalledWith('user-1', PARTICIPANT_TYPES.STUDENT)
     expect(enrollmentQuery.upsert).toHaveBeenCalledWith(expect.objectContaining({
       event_id: 'event-1',
       user_id: 'user-1',
-      participant_type: PARTICIPANT_TYPES.ELECTION_VOTER,
+      participant_type: PARTICIPANT_TYPES.STUDENT,
+    }), expect.any(Object))
+  })
+
+  test('accepts the legacy ELECTION_VOTER value as an alias of STUDENT for an election', async () => {
+    hasParticipantTypeMembership.mockResolvedValue(true)
+
+    await registerParticipant('event-1', 'user-1', { participantType: PARTICIPANT_TYPES.ELECTION_VOTER })
+    expect(enrollmentQuery.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      participant_type: PARTICIPANT_TYPES.STUDENT,
+    }), expect.any(Object))
+  })
+
+  test('enrolls a judge as COMPETITION_JUDGE after checking JUDGE eligibility', async () => {
+    eventQuery = makeQuery({ event_type: 'competition_scoring' })
+    from.mockImplementation((table) => table === 'events' ? eventQuery : table === 'users' ? accountQuery : enrollmentQuery)
+    hasParticipantTypeMembership.mockResolvedValue(true)
+
+    await registerParticipant('event-1', 'judge-1', { participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE })
+    expect(hasParticipantTypeMembership).toHaveBeenCalledWith('judge-1', PARTICIPANT_TYPES.JUDGE)
+    expect(enrollmentQuery.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      participant_type: PARTICIPANT_TYPES.COMPETITION_JUDGE,
     }), expect.any(Object))
   })
 })

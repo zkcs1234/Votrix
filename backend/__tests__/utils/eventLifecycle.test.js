@@ -7,6 +7,7 @@ import {
   getEventChanges,
   summarizeChanges,
   validateChangeReasonShape,
+  assertEndDateNotPassed,
 } from '../../src/utils/eventLifecycle.js'
 
 const NOW = new Date('2026-06-15T12:00:00Z')
@@ -267,5 +268,26 @@ describe('assertEventOperational', () => {
 
   it('allows operational activity for non-archived events', () => {
     expect(() => assertEventOperational({ status: 'active' })).not.toThrow()
+  })
+})
+
+
+describe('assertEndDateNotPassed', () => {
+  const now = new Date('2026-06-01T12:00:00Z')
+
+  it('accepts a future or missing end date', () => {
+    expect(() => assertEndDateNotPassed({ end_date: '2026-07-01T00:00:00Z' }, 'poll', now)).not.toThrow()
+    expect(() => assertEndDateNotPassed({ endDate: '2026-07-01T00:00:00Z' }, 'poll', now)).not.toThrow()
+    expect(() => assertEndDateNotPassed({}, 'poll', now)).not.toThrow()
+  })
+
+  it('rejects an end date in the past with a clear 400', () => {
+    expect(() => assertEndDateNotPassed({ end_date: '2026-05-01T00:00:00Z' }, 'poll', now))
+      .toThrow(/poll's end date has already passed/)
+    try {
+      assertEndDateNotPassed({ end_date: '2026-05-01T00:00:00Z' }, 'event', now)
+    } catch (error) {
+      expect(error.statusCode).toBe(400)
+    }
   })
 })

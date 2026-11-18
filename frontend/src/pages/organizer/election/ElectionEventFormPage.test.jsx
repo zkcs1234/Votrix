@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import ElectionEventFormPage from './ElectionEventFormPage'
+import { chooseDateTime } from '@/test/pickDateTime'
 
 const mocks = vi.hoisted(() => ({
   saveDraft: vi.fn(), saveDraftAsync: vi.fn(), deleteDraft: vi.fn(),
@@ -29,17 +30,6 @@ function renderForm() {
     <ElectionEventFormPage /><Location />
   </MemoryRouter>)
 }
-function chooseDateTime(fieldName, day, hour, minute, period) {
-  const input = screen.getByLabelText(new RegExp(`^${fieldName}`))
-  fireEvent.click(input)
-  fireEvent.click(screen.getByRole('button', { name: day.toDateString() }))
-  fireEvent.click(screen.getByRole('button', { name: 'Time' }))
-  fireEvent.click(screen.getByRole('button', { name: `Hour ${hour}` }))
-  fireEvent.click(screen.getByRole('button', { name: `Minute ${minute}` }))
-  fireEvent.click(screen.getByRole('button', { name: period }))
-  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
-}
-
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.saveDraft.mockResolvedValue(null)
@@ -78,16 +68,21 @@ it('shows the shared numbered setup progress on election details', () => {
   expect(screen.queryByRole('heading', { name: 'Draft protection' })).not.toBeInTheDocument()
 })
 
-it('retains the existing same-day end-before-start validation', async () => {
+it('does not let the end be set before the start on the same day', async () => {
   renderForm()
   const now = new Date()
   const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
   fireEvent.change(screen.getByRole('textbox', { name: /^Title/ }), { target: { value: 'Validation election' } })
   chooseDateTime('Start Date and Time', day, 3, 20, 'PM')
-  chooseDateTime('End Date and Time', day, 12, 0, 'AM')
-  fireEvent.click(screen.getByRole('button', { name: 'Next: Branding' }))
-  expect(await screen.findByText('End date must be on or after start date')).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Create & continue' })).not.toBeInTheDocument()
+
+  // The picker enforces the order itself: an earlier time that day is disabled,
+  // so an invalid range cannot be entered (the schema still rejects one that
+  // arrives some other way; see event.schemas.test.js).
+  fireEvent.click(screen.getByLabelText(/^End Date and Time/))
+  fireEvent.click(screen.getByRole('button', { name: day.toDateString() }))
+  fireEvent.click(screen.getByRole('button', { name: 'Time' }))
+  fireEvent.click(screen.getByRole('button', { name: 'AM' }))
+  expect(screen.getByRole('button', { name: 'Hour 12' })).toBeDisabled()
   expect(mocks.publishDraft).not.toHaveBeenCalled()
   expect(mocks.saveDraftAsync).not.toHaveBeenCalled()
 })

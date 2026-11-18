@@ -126,38 +126,6 @@ export const pageantService = {
     return api.get(`${org}/events/${eventId}/judges-v2`)
   },
 
-  inviteJudge(eventId, payload) {
-    return api.post(`${org}/events/${eventId}/judges/invite`, payload)
-  },
-
-  importJudgesCsv(eventId, file) {
-    const form = new FormData()
-    form.append('file', file)
-    return api.post(`${org}/events/${eventId}/judges/import`, form)
-  },
-
-  registerJudge(eventId, payload) {
-    return api.post(`${org}/events/${eventId}/judges/register`, payload)
-  },
-
-  sendJudgeInvitation(eventId, userId) {
-    return api.post(`${org}/events/${eventId}/judges/${userId}/send-invitation`)
-  },
-
-  sendAllJudgeInvitations(eventId) {
-    return api.post(`${org}/events/${eventId}/judges/send-all`)
-  },
-
-  previewJudgesCsv(eventId, file) {
-    const form = new FormData()
-    form.append('file', file)
-    return api.post(`${org}/events/${eventId}/judges/import-preview`, form)
-  },
-
-  registerJudgesCsv(eventId, data) {
-    return api.post(`${org}/events/${eventId}/judges/import-register`, { data })
-  },
-
   getRankings(eventId, params = {}) {
     return api.get(`${org}/events/${eventId}/rankings`, { params })
   },
@@ -255,9 +223,6 @@ export const pageantService = {
   // Updates, deletes, and assignments use event_participants.id.
   listJudgesV2(eventId) {
     return api.get(`${org}/events/${eventId}/judges-v2`)
-  },
-  inviteJudgeV2(eventId, payload) {
-    return api.post(`${org}/events/${eventId}/judges-v2/invite`, payload)
   },
   updateJudgeV2(eventId, participantId, payload) {
     return api.patch(`${org}/events/${eventId}/judges-v2/${participantId}`, payload)

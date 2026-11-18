@@ -265,7 +265,7 @@ function buildHistoryRow(candidate, sources) {
   }
 
   let results = { state: 'none' }
-  if (event.eventType === 'election') results = electionResultsState(event)
+  if (event.eventType === 'election' || event.eventType === 'polling') results = electionResultsState(event)
   else if (isJudge) {
     const publication = sources.published.find((p) => p.event_id === event.id)
     if (publication) results = { state: 'available', publishedAt: publication.published_at }
@@ -369,6 +369,24 @@ function electionResultItem(event, now) {
   return { ...base, state: 'pending', availableAfter: event.endDate ?? null }
 }
 
+// Polls use the same three visibility modes as elections. Hidden polls are never
+// listed; a poll whose results appear later is listed as "pending".
+function pollResultItem(event, now) {
+  const closed = isEventClosed(event, now)
+  const base = {
+    kind: 'poll',
+    id: `poll:${event.id}`,
+    eventId: event.id,
+    title: event.title,
+    organizationName: event.organizationName ?? null,
+    closedAt: event.endDate ?? null,
+    resultsVisibility: event.resultsVisibility ?? 'hidden',
+  }
+  if (event.canViewResults) return { ...base, state: closed ? 'final' : 'live' }
+  if (base.resultsVisibility === 'hidden') return null
+  return { ...base, state: 'pending', availableAfter: event.endDate ?? null }
+}
+
 async function workflowCompetitionItem(event, userId) {
   const data = await judgePublishedResults(event.id, userId)
   if (!data?.publishedAt || !data.results?.length) return null
@@ -429,18 +447,25 @@ async function nativeCompetitionItems(event) {
  * Results the participant may see. Lists only; election result bodies are
  * fetched on demand from the existing per-election endpoint. Hidden elections
  * and unpublished competitions are never listed; an election whose results
- * appear later is listed as "pending". Polls are not included (no results
- * visibility setting exists for them).
+ * appear later is listed as "pending". Polls follow the same rules via their
+ * own results visibility setting; poll result bodies are fetched on demand.
  */
 export async function getParticipantResults(userId, query = {}) {
   const now = new Date()
-  const kind = ['election', 'competition'].includes(query.type) ? query.type : null
+  const kind = ['election', 'poll', 'competition'].includes(query.type) ? query.type : null
   const events = await loadClassifiedEvents(userId)
 
   const items = events
     .filter((e) => e.eventType === 'election')
     .map((e) => electionResultItem(e, now))
     .filter(Boolean)
+
+  items.push(
+    ...events
+      .filter((e) => e.eventType === 'polling')
+      .map((e) => pollResultItem(e, now))
+      .filter(Boolean),
+  )
 
   const competitionEvents = events.filter((e) => e.eventType === 'competition_scoring')
   const settled = await Promise.allSettled(

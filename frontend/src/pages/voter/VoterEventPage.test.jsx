@@ -52,3 +52,38 @@ test('shows ballot load errors and recovers when retry succeeds', async () => {
   expect(await screen.findByText('Voting is not open for this event yet.')).toBeInTheDocument()
   expect(mocks.getBallot).toHaveBeenCalledTimes(2)
 })
+
+test('stays inside the participant layout: the Review bar lives in the layout footer slot', async () => {
+  const slot = document.createElement('div')
+  slot.id = 'stage-footer-portal'
+  document.body.appendChild(slot)
+  try {
+    mocks.getBallot.mockResolvedValue({
+      data: {
+        votingOpen: true,
+        ballotSectionId: 'section-1',
+        currentSection: { id: 'section-1', name: 'General section' },
+        sections: [{ id: 'section-1', name: 'General section' }],
+        positions: [{
+          id: 'p1', name: 'President', maxVote: 1, allowSkip: false,
+          candidates: [{ id: 'c1', name: 'Ana Reyes' }],
+        }],
+        event: { title: 'Campus Election' },
+      },
+    })
+    render(
+      <MemoryRouter initialEntries={['/participant/events/election-1']}>
+        <Routes>
+          <Route path="/participant/events/:eventId" element={<VoterEventPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Campus Election' })).toBeInTheDocument()
+    expect(slot).toContainElement(screen.getByRole('button', { name: 'Review ballot' }))
+    // Nothing is pinned to the viewport on top of the layout.
+    expect(document.querySelector('.fixed.inset-0')).toBeNull()
+  } finally {
+    slot.remove()
+  }
+})

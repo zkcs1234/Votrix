@@ -13,18 +13,6 @@ export function validateEmailField(email) {
   return email.trim().toLowerCase()
 }
 
-export function validateInviteVoter(body) {
-  const email = validateEmailField(body?.email)
-  const temporaryPassword = normalizePasswordInput(body?.temporaryPassword)
-
-  // temporaryPassword is optional — backend will auto-generate if not provided
-  if (temporaryPassword && temporaryPassword.length < 8) {
-    throw new ApiError(400, 'Temporary password must be at least 8 characters')
-  }
-
-  return { email, temporaryPassword: temporaryPassword || undefined }
-}
-
 export function validateEventNotification(body) {
   const message = body?.message?.trim()
   if (!message) {

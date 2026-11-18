@@ -104,8 +104,6 @@
 - `GET /api/organizer/overview`
 - `GET /api/organizer/dashboard`
 - `GET /api/organizer/analytics`
-- `POST /api/organizer/events/:eventId/voters/invite`
-- `POST /api/organizer/events/:eventId/voters/:voterId/resend-invitation`
 - `POST /api/organizer/events/:eventId/notify`
 
 **Dependencies:** `resend`

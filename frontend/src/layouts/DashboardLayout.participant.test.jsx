@@ -120,23 +120,33 @@ describe('student officer', () => {
   })
 })
 
-describe('task pages keep a collapsed rail', () => {
+describe('task pages open with a collapsed rail that can be expanded', () => {
   it('shows the expand/collapse toggle on list pages', () => {
     renderAt('/participant/history')
     expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument()
   })
 
-  it('railOnly stays collapsed with no toggle, but the pages are still one click away', () => {
+  it('railOnly opens collapsed but keeps the toggle, and the pages are still one click away', () => {
     renderAt('/participant/events/e1', { railOnly: true })
-    expect(screen.queryByRole('button', { name: 'Collapse sidebar' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Expand sidebar' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument()
     expect(link('History')).toHaveAttribute('href', '/participant/history')
   })
 
-  it('railOnly ignores a saved "expanded" preference', () => {
+  it('railOnly ignores a saved "expanded" preference when it opens', () => {
     localStorage.setItem('votrix.sidebar.collapsed', 'false')
     const { container } = renderAt('/participant/events/e1', { railOnly: true })
     expect(container.querySelector('aside')).toHaveClass('w-18')
+  })
+
+  it('railOnly can be expanded and collapsed again without changing the saved preference', () => {
+    localStorage.setItem('votrix.sidebar.collapsed', 'true')
+    const { container } = renderAt('/participant/events/e1', { railOnly: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+    expect(container.querySelector('aside')).toHaveClass('w-64')
+    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
+    expect(container.querySelector('aside')).toHaveClass('w-18')
+    expect(localStorage.getItem('votrix.sidebar.collapsed')).toBe('true')
   })
 })
 

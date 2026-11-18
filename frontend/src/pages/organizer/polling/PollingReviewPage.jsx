@@ -20,6 +20,9 @@ export default function PollingReviewPage() {
   const [questionsCount, setQuestionsCount] = useState(0)
   const [respondentsCount, setRespondentsCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  // When the data was last read; the end-date check compares against this, not the render clock.
+  const [loadedAt, setLoadedAt] = useState(0)
   const [publishing, setPublishing] = useState(false)
   const [unpublishing, setUnpublishing] = useState(false)
   const { success, error: showError } = useToast()
@@ -28,6 +31,8 @@ export default function PollingReviewPage() {
 
   const load = useCallback(async () => {
     try {
+      setLoadError('')
+      setLoadedAt(Date.now())
       const [{ data: settings }, { data: q }, { data: v }] = await Promise.all([
         pollingService.getSettings(eventId),
         pollingService.listQuestions(eventId),
@@ -36,9 +41,11 @@ export default function PollingReviewPage() {
       setEvent(settings.settings ?? null)
       setTitle(settings.settings?.title ?? '')
       setQuestionsCount(Array.isArray(q.questions) ? q.questions.length : 0)
-      setRespondentsCount(Array.isArray(v.voters) ? v.voters.length : 0)
+      // meta.total is the whole roster; voters.length is only the first page.
+      setRespondentsCount(v.meta?.total ?? (Array.isArray(v.voters) ? v.voters.length : 0))
     } catch (err) {
       console.error('Failed to load review data:', err)
+      setLoadError(err.response?.data?.message || 'Could not load the saved poll setup. Reload before publishing.')
     } finally {
       setLoading(false)
     }
@@ -51,11 +58,13 @@ export default function PollingReviewPage() {
   const status = event?.status ?? null
   const isDraft = status === EVENT_STATUS.DRAFT
   const canUnpublish = canUnpublishEventStatus(status)
+  // An end date in the past would send the poll straight to "completed".
+  const endDateOk = !event?.endDate || new Date(event.endDate).getTime() >= loadedAt
   // Publishing no longer requires respondents — they are invited after publish.
-  const publishReady = questionsCount > 0
+  const publishReady = !loadError && questionsCount > 0 && endDateOk
 
   const handlePublish = async () => {
-    if (!publishReady) return
+    if (!publishReady || publishing) return
     setPublishing(true)
     try {
       await pollingService.publishEvent(eventId)
@@ -63,6 +72,7 @@ export default function PollingReviewPage() {
       await load()
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to publish poll')
+      await load()
     } finally {
       setPublishing(false)
     }
@@ -94,11 +104,19 @@ export default function PollingReviewPage() {
         </p>
       </div>
 
+      {loadError && (
+        <div role="alert" className="v-card-sm space-y-2">
+          <p className="v-error-text">{loadError}</p>
+          <Button variant="secondary" onClick={() => { setLoading(true); load() }}>Reload saved setup</Button>
+        </div>
+      )}
+
       <div className="v-card-md">
         <h3 className="v-section-title mb-3">{title || 'Untitled poll'}</h3>
-        <dl className="grid gap-3 sm:grid-cols-2">
+        <dl className="grid gap-3 sm:grid-cols-3">
           <SummaryStat label="Questions" value={questionsCount} />
           <SummaryStat label="Registered respondents" value={respondentsCount} />
+          <SummaryStat label="Results for respondents" value={RESULTS_LABEL[event?.resultsVisibility] ?? RESULTS_LABEL.hidden} />
         </dl>
       </div>
 
@@ -106,16 +124,17 @@ export default function PollingReviewPage() {
         <div className="v-card-sm">
           <h3 className="v-label mb-1">Ready to publish?</h3>
           <p className="v-helper-text mb-3">
-            You need at least one question before publishing. Respondents can be registered and
-            invited afterwards.
+            You need at least one question and an end date in the future before publishing.
+            Respondents can be registered and invited afterwards.
           </p>
           <ul className="space-y-1.5">
             <ReadinessItem ok={questionsCount > 0} label="At least one question" />
+            <ReadinessItem ok={endDateOk} label="End date has not passed" />
           </ul>
         </div>
       )}
 
-      {!isDraft && (
+      {event && !isDraft && (
         <div className="flex items-start gap-3 rounded-2xl border border-v-border bg-v-surface-elevated p-4">
           <div className="rounded-full bg-emerald-500/15 p-1.5 text-emerald-500">
             {status === EVENT_STATUS.SCHEDULED ? (
@@ -148,6 +167,11 @@ export default function PollingReviewPage() {
                   <Undo2 className="h-4 w-4" strokeWidth={1.5} />
                   Unpublish to draft
                 </Button>
+                {status === EVENT_STATUS.SCHEDULED && (
+                  <Button variant="secondary" onClick={() => navigate(`/organizer/polling/events/${eventId}/respondents`)}>
+                    Manage respondents
+                  </Button>
+                )}
                 <Button onClick={() => navigate(`/organizer/polling/events/${eventId}/analytics`)}>
                   Continue to Analytics
                 </Button>
@@ -180,6 +204,12 @@ export default function PollingReviewPage() {
       />
     </div>
   )
+}
+
+const RESULTS_LABEL = {
+  hidden: 'Hidden',
+  public: 'After the poll closes',
+  real_time: 'Real-time',
 }
 
 function SummaryStat({ label, value }) {

@@ -779,7 +779,8 @@ export async function pickJudges(eventId, organizerId, { userIds, notify = false
   const { data: membershipRows, error } = await getClient()
     .from(DB_TABLES.USER_PARTICIPANT_TYPES)
     .select('users!user_participant_types_user_id_fkey!inner(id, email, first_name, last_name, account_status)')
-    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
+    // user_participant_types holds eligibility (JUDGE), not the per-event role.
+    .eq('participant_type', PARTICIPANT_TYPES.JUDGE)
     .eq('is_active', true)
     .eq('users.account_status', ACCOUNT_STATUS.ACTIVE)
     .in('user_id', userIds)
@@ -836,33 +837,6 @@ export async function pickJudges(eventId, organizerId, { userIds, notify = false
   })
 
   return { matched: judges.length, enrolled: toEnroll.length, alreadyEnrolled: enrolledSet.size, notified }
-}
-
-export async function inviteCompetitionJudge(eventId, organizerId, payload) {
-  await assertCompetitionEvent(eventId, organizerId)
-  const { inviteJudge } = await import('./pageant.service.js')
-  const { user } = await inviteJudge(eventId, organizerId, {
-    email: payload.email,
-    temporaryPassword: payload.temporaryPassword,
-    firstName: payload.firstName,
-    lastName: payload.lastName,
-  })
-
-  const role = isValidJudgeRole(payload.role) ? payload.role : JUDGE_ROLES.JUDGE
-  const { data, error } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .update({
-      judge_role: role,
-      display_name: [payload.firstName, payload.lastName].filter(Boolean).join(' ') || user.email,
-      is_active: true,
-    })
-    .eq('event_id', eventId)
-    .eq('user_id', user.id)
-    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
-    .select('id, event_id, user_id, has_scored, judge_role, display_name, is_active, created_at, updated_at, users (id, email)')
-    .single()
-  if (error) throw new ApiError(500, error.message)
-  return mapJudge(data)
 }
 
 export async function updateCompetitionJudge(eventId, organizerId, judgeId, payload) {

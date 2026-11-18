@@ -15,11 +15,11 @@ export function adminLoginUrl() {
 }
 
 export function eventUrl(eventId) {
-  return `${base}/voter/events/${eventId}`
+  return `${base}/participant/events/${eventId}`
 }
 
 export function pollingEventUrl(eventId) {
-  return `${base}/voter/polling/events/${eventId}`
+  return `${base}/participant/polling/events/${eventId}`
 }
 
 export function participantEventUrl(eventId, eventType) {
@@ -31,11 +31,11 @@ export function participantEventUrl(eventId, eventType) {
 }
 
 export function pageantScoreUrl(eventId) {
-  return `${base}/voter/competition/events/${eventId}/score`
+  return `${base}/participant/competition/events/${eventId}/score`
 }
 
 export function competitionScoreUrl(eventId) {
-  return `${base}/voter/competition/events/${eventId}/score`
+  return `${base}/participant/competition/events/${eventId}/score`
 }
 
 export function passwordResetUrl(token) {

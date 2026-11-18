@@ -5,6 +5,7 @@ import { enrichEventWithParticipantType } from './participant.service.js'
 import { PARTICIPANT_TYPES } from '../utils/constants.js'
 import {
   canVoterViewElectionResults,
+  canVoterViewPollResults,
   isCompetitionScoringOpen,
   isElectionVotingOpen,
   isPollOpen as isPollOpenForSchedule,
@@ -173,6 +174,9 @@ function classifyPoll(event) {
     pollingEnabled: Boolean(event.pollingEnabled),
     pollAllowMultipleSubmissions: Boolean(event.pollAllowMultipleSubmissions),
     pollAnonymous: Boolean(event.pollAnonymous ?? event.poll_anonymous),
+    resultsVisibility: event.resultsVisibility ?? 'hidden',
+    canViewResults: canVoterViewPollResults(event),
+    eventStatus: event.status,
     hasResponded: Boolean(event.hasResponded),
     pollOpen: open,
   }, 'polling')

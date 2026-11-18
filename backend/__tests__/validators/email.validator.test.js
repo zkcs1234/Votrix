@@ -1,7 +1,6 @@
 import { ApiError } from '../../src/utils/ApiError.js'
 import {
   validateEmailField,
-  validateInviteVoter,
   validateEventNotification,
   validateForgotPassword,
   validateResetPassword
@@ -32,38 +31,6 @@ describe('Email Validators', () => {
 
     test('should throw error for email without domain', () => {
       expect(() => validateEmailField('test@')).toThrow(ApiError)
-    })
-  })
-
-  describe('validateInviteVoter', () => {
-    test('should allow missing password because the backend auto-generates one', () => {
-      expect(validateInviteVoter({ email: 'voter@example.com' })).toEqual({
-        email: 'voter@example.com',
-        temporaryPassword: undefined,
-      })
-    })
-
-    test('should return data with password when provided', () => {
-      const result = validateInviteVoter({
-        email: 'voter@example.com',
-        temporaryPassword: 'password123'
-      })
-      expect(result).toEqual({ email: 'voter@example.com', temporaryPassword: 'password123' })
-    })
-
-    test('should throw error when email is missing', () => {
-      expect(() => validateInviteVoter({})).toThrow(ApiError)
-    })
-
-    test('should throw error for invalid email format', () => {
-      expect(() => validateInviteVoter({ email: 'invalid' })).toThrow(ApiError)
-    })
-
-    test('should throw error when temporaryPassword is less than 8 characters', () => {
-      expect(() => validateInviteVoter({
-        email: 'voter@example.com',
-        temporaryPassword: 'short'
-      })).toThrow(ApiError)
     })
   })
 

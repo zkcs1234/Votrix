@@ -1,7 +1,6 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
-import { inviteVoterToEvent, resendVoterInvitation } from '../services/invitation.service.js'
 import { notifyEventParticipants } from '../services/event.service.js'
-import { validateInviteVoter, validateEventNotification } from '../validators/email.validator.js'
+import { validateEventNotification } from '../validators/email.validator.js'
 import {
   getOrganizerDashboardStats,
   getOrganizerAnalytics,
@@ -24,36 +23,6 @@ export const getDashboard = asyncHandler(async (req, res) => {
 export const getAnalytics = asyncHandler(async (req, res) => {
   const analytics = await getOrganizerAnalytics(req.user.id)
   res.json({ success: true, ...analytics })
-})
-
-export const inviteVoter = asyncHandler(async (req, res) => {
-  const payload = validateInviteVoter(req.body)
-  const result = await inviteVoterToEvent({
-    eventId: req.params.eventId,
-    email: payload.email,
-    organizerId: req.user.id,
-    temporaryPassword: payload.temporaryPassword,
-  })
-
-  res.status(201).json({
-    success: true,
-    message: 'Voter invitation processed',
-    ...result,
-  })
-})
-
-export const resendInvitation = asyncHandler(async (req, res) => {
-  const result = await resendVoterInvitation({
-    eventId: req.params.eventId,
-    voterId: req.params.voterId,
-    organizerId: req.user.id,
-  })
-
-  res.json({
-    success: true,
-    message: 'Invitation resent',
-    ...result,
-  })
 })
 
 export const sendEventNotification = asyncHandler(async (req, res) => {

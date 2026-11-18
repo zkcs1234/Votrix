@@ -41,13 +41,14 @@ export async function getOrganizerScope(organizerId) {
   return normalizeScope(data?.scope)
 }
 
-// Does a given student (by program) fall inside the scope? An empty program
-// list means the scope is not constrained by program.
+// Does a given student (by program) fall inside the scope? A scoped organizer
+// sees only the programs on their list; a scoped scope with an empty list (the
+// admin forms no longer allow it, but older rows may exist) sees no students,
+// never everyone.
 export function isStudentInScope(scope, { program } = {}) {
   const s = normalizeScope(scope)
   if (s.scopeType === ORGANIZER_SCOPE_TYPES.ALL) return true
-  if (s.programs.length && !s.programs.includes(program)) return false
-  return true
+  return s.programs.includes(program)
 }
 
 // Are the given program values all inside scope? Used by the invite guard so an
@@ -55,8 +56,6 @@ export function isStudentInScope(scope, { program } = {}) {
 export function areCohortValuesInScope(scope, values) {
   const s = normalizeScope(scope)
   if (s.scopeType === ORGANIZER_SCOPE_TYPES.ALL) return true
-  // An empty program list means "not constrained".
-  if (!s.programs.length) return true
   return toList(values).every((v) => s.programs.includes(v))
 }
 
@@ -64,7 +63,18 @@ export function areCohortValuesInScope(scope, values) {
 export function filterCohortsForScope(scope, { programs = [] } = {}) {
   const s = normalizeScope(scope)
   if (s.scopeType === ORGANIZER_SCOPE_TYPES.ALL) return { programs }
-  return {
-    programs: s.programs.length ? programs.filter((p) => s.programs.includes(p.value ?? p)) : programs,
-  }
+  return { programs: programs.filter((p) => s.programs.includes(p.value ?? p)) }
+}
+
+// Counting enrolled students in SQL. A query on event_participants must select
+// `users!inner(program)` for applyStudentScope to filter on it; scopedSelect adds
+// that join only when the scope actually restricts students.
+export function scopedSelect(scope, columns = '*') {
+  return isAllAccess(scope) ? columns : `${columns}, users!inner(program)`
+}
+
+export function applyStudentScope(query, scope) {
+  const s = normalizeScope(scope)
+  if (s.scopeType === ORGANIZER_SCOPE_TYPES.ALL) return query
+  return query.in('users.program', s.programs)
 }

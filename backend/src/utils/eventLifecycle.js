@@ -45,6 +45,18 @@ export function assertSetupEditable(event) {
   }
 }
 
+// Publishing an event whose end date is already in the past would send it
+// straight to "completed" without ever opening. Reject it with a clear message.
+export function assertEndDateNotPassed(event, noun = 'event', now = new Date()) {
+  const end = event?.end_date ?? event?.endDate
+  if (end && new Date(end).getTime() < now.getTime()) {
+    throw new ApiError(
+      400,
+      `This ${noun}'s end date has already passed. Move the end date to the future before publishing.`,
+    )
+  }
+}
+
 // Guard for participant-roster mutations (register / invite / import / resend).
 // Throws 409 once voting or scoring is open.
 export function assertParticipantsEditable(event) {

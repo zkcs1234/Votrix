@@ -24,7 +24,26 @@ import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog'
 import EventStepper from '@/components/ui/EventStepper'
 import ReadOnlyEventBanner from '@/components/organizer/ReadOnlyEventBanner'
 import { isSetupLocked } from '@/utils/constants'
+import { LABEL_CLASS, HELPER_TEXT } from '@/utils/uiClasses'
 
+
+const RESULTS_VISIBILITY_OPTIONS = [
+  {
+    value: 'hidden',
+    label: 'Hidden results',
+    hint: 'Results are never shown to respondents.',
+  },
+  {
+    value: 'public',
+    label: 'Show after the poll closes',
+    hint: 'Respondents can view the results once the poll has ended.',
+  },
+  {
+    value: 'real_time',
+    label: 'Real-time results',
+    hint: 'Respondents can view results at any time, including while the poll is open.',
+  },
+]
 
 function inferStepFromPath(pathname) {
   if (pathname.includes('/branding')) return 'branding'
@@ -80,6 +99,7 @@ const { eventId } = useParams()
       endDate: '',
       pollAnonymous: false,
       pollAllowMultipleSubmissions: false,
+      resultsVisibility: 'hidden',
     },
   })
 
@@ -108,6 +128,7 @@ const { eventId } = useParams()
     endDate: data.endDate,
     pollAnonymous: data.pollAnonymous,
     pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
+    resultsVisibility: data.resultsVisibility,
     banner: currentBanner,
     payload: {
       ...data,
@@ -115,6 +136,7 @@ const { eventId } = useParams()
       endDate: data.endDate,
       pollAnonymous: data.pollAnonymous,
       pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions,
+      resultsVisibility: data.resultsVisibility,
     },
   }), [banner, getValues, step])
 
@@ -140,6 +162,7 @@ useEffect(() => {
       endDate: '',
       pollAnonymous: false,
       pollAllowMultipleSubmissions: false,
+      resultsVisibility: 'hidden',
     })
     resetProgress()
     // sessionKey intentionally gates re-runs; resets run on every new session.
@@ -160,6 +183,7 @@ useEffect(() => {
       endDate: payload.endDate ?? '',
       pollAnonymous: payload.pollAnonymous ?? false,
       pollAllowMultipleSubmissions: payload.pollAllowMultipleSubmissions ?? false,
+      resultsVisibility: payload.resultsVisibility ?? 'hidden',
     })
     setBanner(draft.banner ?? null)
     if (draft.banner) {
@@ -196,6 +220,7 @@ useEffect(() => {
           endDate: isoToLocalInput(e.endDate),
           pollAnonymous: e.pollAnonymous || false,
           pollAllowMultipleSubmissions: e.pollAllowMultipleSubmissions || false,
+          resultsVisibility: e.resultsVisibility ?? 'hidden',
         })
         setBanner(e.banner)
         if (e.banner) markComplete('branding')
@@ -272,6 +297,7 @@ useEffect(() => {
       const isValid = await trigger([
         'pollAnonymous',
         'pollAllowMultipleSubmissions',
+        'resultsVisibility',
       ])
       if (!isValid) {
         setSaving(false)
@@ -322,6 +348,7 @@ useEffect(() => {
       pollExpiresAt: localInputToIso(data.endDate),
       pollAnonymous: data.pollAnonymous || false,
       pollAllowMultipleSubmissions: data.pollAllowMultipleSubmissions || false,
+      resultsVisibility: data.resultsVisibility || 'hidden',
     }
   }
 
@@ -469,6 +496,37 @@ useEffect(() => {
               </label>
               <p className="v-caption -mt-2 pl-7">Allow respondents to submit more than once</p>
             </div>
+
+            <fieldset className="v-form-field">
+              <legend className={LABEL_CLASS}>Results for respondents</legend>
+              <p className="v-caption mt-0.5">
+                Choose when enrolled students can see the poll results. Only totals are shown —
+                never who answered, and never written-in answers.
+              </p>
+              <div className="mt-2 space-y-2">
+                {RESULTS_VISIBILITY_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 transition ${
+                      (formValues.resultsVisibility ?? 'hidden') === opt.value
+                        ? 'border-v-primary bg-v-surface-elevated'
+                        : 'border-v-border hover:border-v-border-strong'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      className="mt-1"
+                      value={opt.value}
+                      {...register('resultsVisibility')}
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-v-text">{opt.label}</span>
+                      <span className={HELPER_TEXT}>{opt.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
 
             {error && <p className="v-error-text">{error}</p>}
           </form>

@@ -42,3 +42,11 @@ test('shows scoring open with the green check status treatment',()=>{
  expect(status).toHaveClass('bg-emerald-100','border-emerald-500','text-emerald-800')
  expect(status.querySelector('svg')).toHaveAttribute('aria-hidden','true')
 })
+
+test('a poll whose results the student may view says results are available',()=>{
+ const poll={id:'poll-1',title:'Campus poll',eventType:'polling',bucket:'completed',statusLabel:'Responded',actionPath:'/participant/polling/events/poll-1',canViewResults:true}
+ const {rerender}=render(<MemoryRouter><VoterEventCard event={poll}/></MemoryRouter>)
+ expect(screen.getByText('Results available')).toBeInTheDocument()
+ rerender(<MemoryRouter><VoterEventCard event={{...poll,canViewResults:false}}/></MemoryRouter>)
+ expect(screen.queryByText('Results available')).not.toBeInTheDocument()
+})

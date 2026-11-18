@@ -144,7 +144,7 @@ function RadioInput({ options, value, onChange, disabled, required, questionLabe
             <img
               src={o.imageUrl}
               alt={o.label}
-              className="ml-auto h-10 w-10 rounded-lg border border-v-border object-cover"
+              className="ml-auto h-16 w-16 shrink-0 rounded-lg border border-v-border object-cover"
               loading="lazy"
             />
           )}
@@ -182,7 +182,7 @@ function CheckboxInput({ options, value, onChange, disabled, questionLabel }) {
             <img
               src={o.imageUrl}
               alt={o.label}
-              className="ml-auto h-10 w-10 rounded-lg border border-v-border object-cover"
+              className="ml-auto h-16 w-16 shrink-0 rounded-lg border border-v-border object-cover"
               loading="lazy"
             />
           )}
@@ -273,6 +273,14 @@ function RankingInput({ options, value, onChange, disabled, questionLabel }) {
           >
             <div className="flex items-center gap-3">
               <span className="w-6 text-center text-v-text-muted">{i + 1}</span>
+              {o.imageUrl && (
+                <img
+                  src={o.imageUrl}
+                  alt=""
+                  className="h-14 w-14 shrink-0 rounded-lg border border-v-border object-cover"
+                  loading="lazy"
+                />
+              )}
               <span className="text-v-text">{o.label}</span>
             </div>
             <div className="flex items-center gap-2 text-sm" role="group" aria-label={`Rank controls for ${o.label}`}>

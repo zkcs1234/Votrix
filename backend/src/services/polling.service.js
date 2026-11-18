@@ -20,21 +20,16 @@ import {
   validateTypeConfig,
   buildAnalytics,
 } from '../modules/poll-question-types.js'
-import { isPollOpen as isPollOpenForEvent } from '../utils/eventSchedule.js'
+import { isPollOpen as isPollOpenForEvent, canVoterViewPollResults } from '../utils/eventSchedule.js'
 import { emitToEvent, emitToEventOrganizer, emitToUser, emitToRole } from '../websocket/ws-emitter.js'
-import { registerParticipant } from './participant.service.js'
-import { hashPassword } from '../utils/password.js'
-import { generateTemporaryPassword } from '../utils/crypto.js'
-import { findUserByEmail, findUserById, sanitizeUser } from './user.service.js'
-import { sendVoterInvitationEmail, sendVoterInvitationEmailRegistered } from './mailer.service.js'
-import { createNotification, notifyAdminsEventPublished } from './notification.service.js'
-import { USER_ROLES, COMPETITION_SCORING_EVENT_TYPES, PARTICIPANT_TYPES, isParticipantRole } from '../utils/constants.js'
+import { notifyAdminsEventPublished } from './notification.service.js'
+import { POLLING_PARTICIPANT_TYPES } from '../utils/constants.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
 import {
   assertPublishedEventUpdate,
   assertChangeReason,
   assertSetupEditable,
-  assertParticipantsEditable,
+  assertEndDateNotPassed,
   buildEditPolicy,
   canUnpublishEventStatus,
   normalizeChangeReason,
@@ -67,6 +62,8 @@ function mapPollEvent(row) {
     pollAnonymous: Boolean(row.poll_anonymous),
     pollAllowMultipleSubmissions: Boolean(row.poll_allow_multiple_submissions),
     pollExpiresAt: row.poll_expires_at,
+    // Student-facing results visibility. Anything missing is hidden by default.
+    resultsVisibility: row.results_visibility ?? 'hidden',
     startDate: row.start_date,
     endDate: row.end_date,
     organization: org
@@ -152,19 +149,6 @@ function computeParticipationRate(responded, total) {
   return Math.round((responded / total) * 10000) / 100
 }
 
-async function ensureRespondentAccount(email) {
-  const normalizedEmail = email.toLowerCase().trim()
-  const existing = await findUserByEmail(normalizedEmail)
-
-  if (!existing) {
-    throw new ApiError(404, 'Participant account not found. Ask an administrator to add this account to the respondent pool.')
-  }
-  if (!isParticipantRole(existing.role)) {
-    throw new ApiError(409, 'This email is already used by another account type')
-  }
-  return { user: sanitizeUser(existing), isNew: false }
-}
-
 export async function listEventRespondents(eventId, organizerId, page = 1, limit = 50) {
   await assertPollingEvent(eventId, organizerId)
 
@@ -184,7 +168,7 @@ export async function listEventRespondents(eventId, organizerId, page = 1, limit
       users!inner (id, email, first_name, last_name, school_id, program)
     `, { count: 'exact' })
     .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+    .in('participant_type', POLLING_PARTICIPANT_TYPES)
     .order('created_at', { ascending: false })
     .range(from, to)
 
@@ -239,270 +223,6 @@ export async function listEventRespondents(eventId, organizerId, page = 1, limit
   }
 }
 
-export async function registerRespondentToPoll({ eventId, email, organizerId }) {
-  assertParticipantsEditable(await assertPollingEvent(eventId, organizerId))
-
-  const { user, isNew } = await ensureRespondentAccount(email)
-
-  await registerParticipant(eventId, user.id, {
-    participantType: PARTICIPANT_TYPES.POLLING_RESPONDENT,
-  })
-
-  try {
-    await getClient().from(DB_TABLES.INVITATIONS).upsert(
-      { event_id: eventId, voter_id: user.id, invitation_sent: false },
-      { onConflict: 'event_id,voter_id', ignoreDuplicates: false },
-    )
-  } catch (dbErr) {
-    console.error('[polling] invitations upsert failed:', dbErr.message)
-    throw new ApiError(500, 'Failed to create invitation record')
-  }
-
-  recordEventActivity({
-    eventId,
-    action: 'polling.respondent.register',
-    userId: organizerId,
-    module: 'polling',
-    details: { respondentUserId: user.id, email: user.email, isNewRespondent: isNew },
-  })
-
-  return {
-    user: sanitizeUser(user),
-    isNewRespondent: isNew,
-    invitationSent: false,
-    temporaryPassword: null,
-  }
-}
-
-export async function registerExistingRespondent({ eventId, email, organizerId }) {
-  assertParticipantsEditable(await assertPollingEvent(eventId, organizerId))
-
-  const voter = await findUserByEmail(email.toLowerCase().trim())
-  if (!voter) {
-    throw new ApiError(404, 'Respondent not found. Use the register flow to create a new respondent account.')
-  }
-
-  if (!isParticipantRole(voter.role)) {
-    throw new ApiError(400, 'This email belongs to a different account type')
-  }
-
-  const { data: existing } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id')
-    .eq('event_id', eventId)
-    .eq('user_id', voter.id)
-    .maybeSingle()
-
-  if (existing) {
-    throw new ApiError(409, 'Respondent is already enrolled in this event')
-  }
-
-  await registerParticipant(eventId, voter.id, { participantType: PARTICIPANT_TYPES.POLLING_RESPONDENT })
-
-  try {
-    await getClient().from(DB_TABLES.INVITATIONS).insert({
-      event_id: eventId,
-      voter_id: voter.id,
-      invitation_sent: false,
-    })
-  } catch (dbErr) {
-    console.error('[polling] invitations insert failed:', dbErr.message)
-    throw new ApiError(500, 'Failed to create invitation record')
-  }
-
-  recordEventActivity({
-    eventId,
-    action: 'polling.respondent.register',
-    userId: organizerId,
-    module: 'polling',
-    details: { respondentUserId: voter.id, email: voter.email, existingAccount: true },
-  })
-
-  return { user: sanitizeUser(voter), invitationSent: false }
-}
-
-export async function sendRespondentInvitation({ eventId, voterId, organizerId }) {
-  await assertPollingEvent(eventId, organizerId)
-  const event = await getEventById(eventId)
-  assertParticipantsEditable(event)
-  const voter = await findUserById(voterId)
-
-  if (!voter || !isParticipantRole(voter.role)) {
-    throw new ApiError(404, 'Respondent not found')
-  }
-
-  const { data: enrollment, error: enrollmentError } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id')
-    .eq('event_id', eventId)
-    .eq('user_id', voterId)
-    .maybeSingle()
-
-  if (enrollmentError) throw new ApiError(500, enrollmentError.message)
-  if (!enrollment) {
-    throw new ApiError(404, 'Respondent is not enrolled in this event')
-  }
-
-  // A voter who has already set their own password (must_change_password = false)
-  // is an existing account — send the registered email and never reset their password.
-  const isExistingAccount = !voter.must_change_password
-
-  let tempPassword = null
-  let emailResult = null
-
-  if (isExistingAccount) {
-    emailResult = await sendVoterInvitationEmailRegistered({
-      email: voter.email,
-      eventId: event.id,
-      eventTitle: event.title,
-      eventType: event.event_type,
-    })
-  } else {
-    tempPassword = generateTemporaryPassword()
-    const passwordHash = await hashPassword(tempPassword)
-
-    await getClient()
-      .from(DB_TABLES.USERS)
-      .update({ password: passwordHash, must_change_password: true })
-      .eq('id', voterId)
-
-    emailResult = await sendVoterInvitationEmail({
-      email: voter.email,
-      temporaryPassword: tempPassword,
-      eventId: event.id,
-      eventTitle: event.title,
-      eventType: event.event_type,
-    })
-  }
-
-  if (emailResult?.sent) {
-    try {
-      await getClient()
-        .from(DB_TABLES.INVITATIONS)
-        .update({ invitation_sent: true, is_new_account: !isExistingAccount })
-        .eq('event_id', eventId)
-        .eq('voter_id', voterId)
-    } catch (dbErr) {
-      console.error('[polling] failed to mark invitation_sent=true:', dbErr.message)
-    }
-
-    try {
-      await createNotification({
-        userId: voterId,
-        type: isExistingAccount ? 'voter.invitation.registered' : 'voter.invitation',
-        title: `You're invited to ${event.title}`,
-        message: isExistingAccount
-          ? `You've been added to ${event.title}. Sign in with your existing password.`
-          : `Your invitation for ${event.title} has been sent. Sign in to review your participation details.`,
-        actionUrl: COMPETITION_SCORING_EVENT_TYPES.has(event.event_type)
-          ? `/participant/competition/events/${event.id}/score`
-          : event.event_type === 'polling'
-            ? `/participant/polling/events/${event.id}`
-            : `/participant/events/${event.id}`,
-        entity: 'events',
-        entityId: event.id,
-        metadata: { eventType: event.event_type, organizationName: event.organizations?.organization_name },
-      })
-    } catch (notifErr) {
-      console.error('[polling] createNotification failed:', notifErr.message)
-    }
-  }
-
-  recordEventActivity({
-    eventId,
-    action: 'polling.respondent.invitation.send',
-    userId: organizerId,
-    module: 'polling',
-    details: { respondentUserId: voterId, email: voter.email, sent: emailResult?.sent || false },
-  })
-
-  return { user: voter, email: emailResult, invitationSent: emailResult?.sent, temporaryPassword: tempPassword }
-}
-
-export async function sendAllPendingRespondentInvitations({ eventId, organizerId }) {
-  await assertPollingEvent(eventId, organizerId)
-  const event = await getEventById(eventId)
-  assertParticipantsEditable(event)
-
-  const { data: pendingRespondents, error: pendingError } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .select('id, voter_id, users (id, email, must_change_password)')
-    .eq('event_id', eventId)
-    .eq('invitation_sent', false)
-
-  if (pendingError) throw new ApiError(500, pendingError.message)
-
-  if (!pendingRespondents?.length) {
-    return { total: 0, sent: 0, failed: 0, results: [] }
-  }
-
-  const results = []
-  let sentCount = 0
-  let failedCount = 0
-
-  for (const pending of pendingRespondents) {
-    const voter = pending.users
-    // A voter who has already set their own password is an existing account.
-    const isExistingAccount = !voter.must_change_password
-    let tempPassword = null
-    let emailResult = null
-
-    try {
-      if (isExistingAccount) {
-        emailResult = await sendVoterInvitationEmailRegistered({
-          email: voter.email,
-          eventId: event.id,
-          eventTitle: event.title,
-          eventType: event.event_type,
-        })
-      } else {
-        tempPassword = generateTemporaryPassword()
-        const passwordHash = await hashPassword(tempPassword)
-
-        await getClient()
-          .from(DB_TABLES.USERS)
-          .update({ password: passwordHash, must_change_password: true })
-          .eq('id', voter.id)
-
-        emailResult = await sendVoterInvitationEmail({
-          email: voter.email,
-          temporaryPassword: tempPassword,
-          eventId: event.id,
-          eventTitle: event.title,
-          eventType: event.event_type,
-        })
-      }
-
-      if (emailResult?.sent) {
-        await getClient()
-          .from(DB_TABLES.INVITATIONS)
-          .update({ invitation_sent: true, is_new_account: !isExistingAccount })
-          .eq('event_id', eventId)
-          .eq('voter_id', voter.id)
-
-        sentCount++
-        results.push({ voterId: voter.id, email: voter.email, success: true, temporaryPassword: tempPassword })
-      } else {
-        failedCount++
-        results.push({ voterId: voter.id, email: voter.email, success: false, error: emailResult?.error || 'Email delivery failed' })
-      }
-    } catch (err) {
-      failedCount++
-      results.push({ voterId: voter.id, email: voter.email, success: false, error: err.message })
-    }
-  }
-
-  recordEventActivity({
-    eventId,
-    action: 'polling.respondent.invitation.send_all',
-    userId: organizerId,
-    module: 'polling',
-    details: { total: pendingRespondents.length, sent: sentCount, failed: failedCount },
-  })
-
-  return { total: pendingRespondents.length, sent: sentCount, failed: failedCount, results }
-}
-
 // ——— Organizer: events ———
 
 export async function getOrganizerDashboard(organizerId) {
@@ -532,9 +252,9 @@ export async function getOrganizerDashboard(organizerId) {
     const [respondentRowsRes, answersRes] = await Promise.all([
       getClient()
         .from(DB_TABLES.EVENT_PARTICIPANTS)
-        .select('event_id, has_responded')
+        .select('event_id, has_responded, users(program)')
         .in('event_id', eventIds)
-        .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT),
+        .in('participant_type', POLLING_PARTICIPANT_TYPES),
       getClient()
         .from(DB_TABLES.POLL_ANSWERS)
         .select('id, poll_questions!inner(event_id)', { count: 'exact', head: true })
@@ -544,7 +264,10 @@ export async function getOrganizerDashboard(organizerId) {
     if (respondentRowsRes.error) throw new ApiError(500, respondentRowsRes.error.message)
     if (answersRes.error) throw new ApiError(500, answersRes.error.message)
 
+    // Respondent counts follow the organizer's program scope (as the roster does).
+    const scope = await getOrganizerScope(organizerId)
     for (const row of respondentRowsRes.data ?? []) {
+      if (!isAllAccess(scope) && !isStudentInScope(scope, { program: row.users?.program })) continue
       const bucket = perEvent.get(row.event_id)
       if (!bucket) continue
       bucket.assigned += 1
@@ -590,7 +313,7 @@ export async function listPollEvents(organizerId, { limit = 200, offset = 0 } = 
   const org = await getOrCreatePollingOrganization(organizerId)
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENTS)
-    .select('id, title, description, banner, status, event_type, polling_enabled, poll_anonymous, poll_allow_multiple_submissions, poll_expires_at, start_date, end_date')
+    .select('id, title, description, banner, status, event_type, polling_enabled, poll_anonymous, poll_allow_multiple_submissions, poll_expires_at, results_visibility, start_date, end_date')
     .eq('organization_id', org.id)
     .eq('event_type', EVENT_TYPES.POLLING)
     .neq('status', EVENT_STATUS.ARCHIVED)
@@ -621,6 +344,7 @@ export async function createPollEvent(organizerId, payload) {
       poll_anonymous: Boolean(payload.pollAnonymous),
       poll_allow_multiple_submissions: Boolean(payload.pollAllowMultipleSubmissions),
       poll_expires_at: payload.pollExpiresAt ?? null,
+      results_visibility: payload.resultsVisibility ?? 'hidden',
     })
     .select('*')
     .single()
@@ -665,6 +389,7 @@ export async function updatePollEvent(eventId, organizerId, payload) {
     updates.poll_allow_multiple_submissions = payload.pollAllowMultipleSubmissions
   }
   if (payload.pollExpiresAt !== undefined) updates.poll_expires_at = payload.pollExpiresAt
+  if (payload.resultsVisibility !== undefined) updates.results_visibility = payload.resultsVisibility
   if (payload.banner !== undefined) updates.banner = payload.banner
   if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
 
@@ -720,8 +445,8 @@ export async function getPollSettings(eventId, organizerId) {
  * timing always comes from the dates, never from this action.
  *
  * Guarded so a poll can only be published once, and only when it has the
- * minimum content needed to run: at least one question and one registered
- * respondent.
+ * minimum content needed to run: at least one question and an end date that has
+ * not already passed. Respondents are invited after publishing.
  */
 export async function publishPollEvent(eventId, organizerId) {
   const event = await assertPollingEvent(eventId, organizerId)
@@ -734,16 +459,23 @@ export async function publishPollEvent(eventId, organizerId) {
   if (questions.length === 0) {
     throw new ApiError(400, 'Add at least one question before publishing.')
   }
+  assertEndDateNotPassed(event, 'poll')
 
   // Respondents are no longer required at publish time — they are registered and
   // invited after publishing, on the Respondents step, within email resend limits.
 
-  const { error } = await getClient()
+  // Only flip a poll that is still a draft, so a double click or a second tab
+  // cannot publish twice (and notify admins twice).
+  const { data: changed, error } = await getClient()
     .from(DB_TABLES.EVENTS)
     .update({ status: 'scheduled' })
     .eq('id', eventId)
+    .eq('status', 'draft')
+    .select('id')
+    .maybeSingle()
 
   if (error) throw new ApiError(500, error.message)
+  if (!changed) throw new ApiError(409, 'This poll has already been published')
 
   // Hand the event to the scheduler; it decides scheduled/active/completed
   // purely from the dates. The status may change again immediately here.
@@ -855,6 +587,12 @@ export async function unpublishPollEvent(eventId, organizerId, { reason } = {}) 
 
 // ——— Questions & options ———
 
+// The question payload carries the image asset as imageAssetId (validator) or
+// image_asset_id (internal callers). undefined means "not part of this update".
+function questionImageAssetId(payload) {
+  return payload.imageAssetId !== undefined ? payload.imageAssetId : payload.image_asset_id
+}
+
 async function loadOptionsForQuestions(questionIds) {
   if (!questionIds.length) return {}
 
@@ -913,7 +651,9 @@ export async function createQuestion(eventId, organizerId, payload) {
       required: payload.required !== false,
 type_config: typeConfig,
       image_url: payload.imageUrl ?? null,
-      image_asset_id: payload.image_asset_id ?? null,
+      // The validator returns camelCase (imageAssetId). Reading only image_asset_id
+      // left every question's asset unreferenced, so it was never counted as in use.
+      image_asset_id: questionImageAssetId(payload) ?? null,
     })
     .select('*')
     .single()
@@ -946,8 +686,9 @@ export async function updateQuestion(eventId, organizerId, questionId, payload) 
   const registry = await loadQuestionTypeRegistry(orgId)
 
   // Capture old image_asset_id before updating so we can clean it up if replaced
+  const newAssetId = questionImageAssetId(payload)
   let oldAssetId = null
-  if (payload.image_asset_id !== undefined) {
+  if (newAssetId !== undefined) {
     const { data: prev } = await getClient()
       .from(DB_TABLES.POLL_QUESTIONS)
       .select('image_asset_id')
@@ -967,7 +708,7 @@ export async function updateQuestion(eventId, organizerId, questionId, payload) 
   if (payload.sortOrder !== undefined) updates.sort_order = payload.sortOrder
   if (payload.required !== undefined) updates.required = payload.required
   if (payload.imageUrl !== undefined) updates.image_url = payload.imageUrl
-  if (payload.image_asset_id !== undefined) updates.image_asset_id = payload.image_asset_id
+  if (newAssetId !== undefined) updates.image_asset_id = newAssetId
   if (payload.typeConfig !== undefined) {
     let def = typeDef
     if (!def) {
@@ -990,7 +731,7 @@ export async function updateQuestion(eventId, organizerId, questionId, payload) 
   if (!question) throw new ApiError(404, 'Question not found')
 
   // Cleanup old image asset if it was replaced
-  if (oldAssetId && oldAssetId !== payload.image_asset_id) {
+  if (oldAssetId && oldAssetId !== newAssetId) {
     removeReferenceAndDeleteIfUnused(oldAssetId).catch((err) =>
       console.error('[polling] Old question image cleanup error:', err.message),
     )
@@ -1270,10 +1011,12 @@ const rows = options.map((o, i) => ({
 export async function assertVoterCanRespond(eventId, voterId) {
   const { data, error } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id, event_id, user_id, has_responded')
+    // events!inner makes `events.status` a valid filter; without the embed PostgREST
+    // rejects it with "'events' is not an embedded resource".
+    .select('id, event_id, user_id, has_responded, events!inner(status)')
     .eq('event_id', eventId)
     .eq('user_id', voterId)
-    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+    .in('participant_type', POLLING_PARTICIPANT_TYPES)
     .neq('events.status', EVENT_STATUS.ARCHIVED)
     .maybeSingle()
 
@@ -1312,6 +1055,108 @@ export async function getPollForVoter(eventId, voterId) {
     pollOpen: open,
     canSubmit: canSubmitAgain,
     submissionCount: count ?? 0,
+    canViewResults: canVoterViewPollResults(event),
+  }
+}
+
+// ——— Voter: view poll results ———
+
+const RESULT_PAGE_SIZE = 1000
+
+/**
+ * Aggregate poll results an enrolled student is allowed to see.
+ *
+ * Gated by the poll's results_visibility (hidden / real_time / public). Only
+ * totals are returned: never respondent identities, the respondent list, or
+ * free-text answers (which could identify someone even in a named poll).
+ */
+export async function getPollResultsForVoter(eventId, voterId) {
+  await assertVoterCanRespond(eventId, voterId)
+  const event = await getEventById(eventId)
+
+  if (event.event_type !== EVENT_TYPES.POLLING) {
+    throw new ApiError(400, 'Not a polling event')
+  }
+  if (event.status === 'draft') {
+    throw new ApiError(403, 'Results are not available yet')
+  }
+  if (!canVoterViewPollResults(event)) {
+    throw new ApiError(403, 'Results are not available yet')
+  }
+
+  const registry = await loadQuestionTypeRegistry(event.organizations?.id)
+  const questions = await listQuestionsPublic(eventId, registry)
+
+  const answersByQuestion = new Map(questions.map((q) => [q.id, []]))
+  const questionIds = questions.map((q) => q.id)
+  if (questionIds.length) {
+    for (let from = 0; ; from += RESULT_PAGE_SIZE) {
+      const { data, error } = await getClient()
+        .from(DB_TABLES.POLL_ANSWERS)
+        .select('question_id, answer')
+        .in('question_id', questionIds)
+        .order('id')
+        .range(from, from + RESULT_PAGE_SIZE - 1)
+      if (error) throw new ApiError(500, error.message)
+      for (const row of data ?? []) answersByQuestion.get(row.question_id)?.push(row)
+      if ((data ?? []).length < RESULT_PAGE_SIZE) break
+    }
+  }
+
+  const { count: totalSubmissions, error: submissionError } = await getClient()
+    .from(DB_TABLES.POLL_SUBMISSIONS)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+  if (submissionError) throw new ApiError(500, submissionError.message)
+
+  const { count: enrolled, error: enrolledError } = await getClient()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('*', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .in('participant_type', POLLING_PARTICIPANT_TYPES)
+  if (enrolledError) throw new ApiError(500, enrolledError.message)
+
+  let hiddenTextQuestions = 0
+  const results = []
+  for (const q of questions) {
+    const typeDef = registry.find((r) => r.key === q.type) ?? null
+    const answers = answersByQuestion.get(q.id) ?? []
+    const stats = buildAnalytics({
+      question: q,
+      answers,
+      options: q.options,
+      typeDef,
+      typeConfig: q.typeConfig ?? {},
+      // Always treated as anonymous here so no respondent id is ever attached.
+      anonymous: true,
+    })
+    if (stats.kind === 'text') {
+      hiddenTextQuestions += 1
+      continue
+    }
+    results.push({
+      questionId: q.id,
+      question: q.question,
+      type: q.type,
+      typeLabel: typeDef?.label ?? q.type,
+      responseCount: answers.length,
+      ...stats,
+    })
+  }
+
+  const open = isPollOpen(event)
+  return {
+    event: {
+      id: event.id,
+      title: event.title,
+      resultsVisibility: event.results_visibility ?? 'hidden',
+      // "live" while the poll is still collecting responses.
+      final: !open,
+    },
+    totalSubmissions: totalSubmissions ?? 0,
+    enrolledRespondents: enrolled ?? 0,
+    hiddenTextQuestions,
+    questions: results,
   }
 }
 
@@ -1421,14 +1266,14 @@ export async function submitPollResponse(eventId, voterId, answers, startedAt) {
     .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+    .in('participant_type', POLLING_PARTICIPANT_TYPES)
     .eq('has_responded', true)
 
   const { count: totalVoters } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('*', { count: 'exact', head: true })
     .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+    .in('participant_type', POLLING_PARTICIPANT_TYPES)
 
   const { count: responsesSubmitted } = await getClient()
     .from(DB_TABLES.POLL_SUBMISSIONS)
@@ -1485,6 +1330,7 @@ export async function listVoterPollEvents(voterId) {
         poll_anonymous,
         poll_allow_multiple_submissions,
         poll_expires_at,
+        results_visibility,
         start_date,
         end_date,
         organization_id,
@@ -1497,7 +1343,7 @@ export async function listVoterPollEvents(voterId) {
     `,
     )
     .eq('user_id', voterId)
-    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+    .in('participant_type', POLLING_PARTICIPANT_TYPES)
 
   if (error) throw new ApiError(500, error.message)
 
@@ -1527,21 +1373,24 @@ export async function getPollAnalytics(eventId, organizerId) {
 
   if (submissionErr) throw new ApiError(500, submissionErr.message)
 
-  // Enrolled respondents — the denominator for "Total respondents" and the
-  // response-rate stat on the analytics dashboard.
-  const { count: enrolledRespondents } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('*', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
-
-  const { data: participantRows, error: participantErr } = await getClient()
+  const { data: allParticipantRows, error: participantErr } = await getClient()
     .from(DB_TABLES.EVENT_PARTICIPANTS)
     .select('id, has_responded, users!inner (id, email, first_name, last_name, school_id, program)')
     .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.POLLING_RESPONDENT)
+    .in('participant_type', POLLING_PARTICIPANT_TYPES)
 
   if (participantErr) throw new ApiError(500, participantErr.message)
+
+  // Respondent counts and breakdowns follow the organizer's program scope, the
+  // same as the Respondents roster. Answer tallies stay poll-wide (an anonymous
+  // poll cannot attribute answers to a program).
+  const scope = organizerId ? await getOrganizerScope(organizerId) : null
+  const participantRows = scope && !isAllAccess(scope)
+    ? (allParticipantRows ?? []).filter((row) => isStudentInScope(scope, { program: row.users?.program }))
+    : (allParticipantRows ?? [])
+  // Enrolled respondents — the denominator for "Total respondents" and the
+  // response-rate stat on the analytics dashboard.
+  const enrolledRespondents = participantRows.length
 
   // Compute average completion time (in seconds) for submissions that have started_at
   const { data: completionTimes, error: ctErr } = await getClient()
@@ -1620,17 +1469,7 @@ export async function getPollAnalytics(eventId, organizerId) {
     }
   })
 
-  const scope = organizerId ? await getOrganizerScope(organizerId) : null
-  const scoped = scope ? !isAllAccess(scope) : false
-
-  let scopedParticipants = participantRows ?? []
-  if (scoped) {
-    scopedParticipants = scopedParticipants.filter((row) =>
-      isStudentInScope(scope, { program: row.users?.program })
-    )
-  }
-
-  const respondentParticipation = scopedParticipants.map((row) => ({
+  const respondentParticipation = participantRows.map((row) => ({
     id: row.id,
     schoolId: row.users?.school_id ?? null,
     firstName: row.users?.first_name ?? '',

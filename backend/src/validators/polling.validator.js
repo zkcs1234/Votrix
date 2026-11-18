@@ -1,6 +1,8 @@
 import { ApiError } from '../utils/ApiError.js'
 import { validateChangeReasonShape } from '../utils/eventLifecycle.js'
 
+const POLL_RESULTS_VISIBILITY = ['real_time', 'hidden', 'public']
+
 export function validatePollEvent(body, isCreate = false) {
   if (isCreate && !body?.title?.trim()) {
     throw new ApiError(400, 'Poll title is required')
@@ -18,6 +20,14 @@ export function validatePollEvent(body, isCreate = false) {
   if (body.description !== undefined) payload.description = body.description?.trim() || null
   if (body.startDate !== undefined) payload.startDate = body.startDate
   if (body.endDate !== undefined) payload.endDate = body.endDate
+  // The banner arrives from the draft (Create flow) or an explicit update. Without
+  // this the validator dropped it, so a poll created from a draft lost its banner.
+  if (body.banner !== undefined) {
+    if (body.banner !== null && typeof body.banner !== 'string') {
+      throw new ApiError(400, 'Invalid banner')
+    }
+    payload.banner = body.banner?.trim() || null
+  }
   if (body.pollExpiresAt !== undefined) {
     if (
       body.pollExpiresAt !== null &&
@@ -30,6 +40,12 @@ export function validatePollEvent(body, isCreate = false) {
   }
   if (body.changeReason !== undefined) payload.changeReason = validateChangeReasonShape(body.changeReason)
   if (body.pollAnonymous !== undefined) payload.pollAnonymous = Boolean(body.pollAnonymous)
+  if (body.resultsVisibility !== undefined) {
+    if (!POLL_RESULTS_VISIBILITY.includes(body.resultsVisibility)) {
+      throw new ApiError(400, `resultsVisibility must be one of ${POLL_RESULTS_VISIBILITY.join(', ')}`)
+    }
+    payload.resultsVisibility = body.resultsVisibility
+  }
   if (body.pollAllowMultipleSubmissions !== undefined) {
     payload.pollAllowMultipleSubmissions = Boolean(body.pollAllowMultipleSubmissions)
   }

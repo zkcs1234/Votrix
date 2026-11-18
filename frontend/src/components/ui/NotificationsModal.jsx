@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
 import { X } from 'lucide-react'
@@ -35,7 +36,7 @@ function NotificationCard({ notification, onMarkRead }) {
           : 'border-v-border bg-v-surface-elevated/40'
       }`}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3">
         <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-medium text-v-text">{notification.title}</h3>
@@ -47,11 +48,11 @@ function NotificationCard({ notification, onMarkRead }) {
           </p>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:flex-col sm:items-end sm:gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           {actionAvailable && (
             <Link
               to={notification.action_url}
-              className="inline-flex items-center justify-center rounded-lg border border-v-border-strong bg-v-surface px-2 py-1 text-xs font-medium text-v-text transition hover:bg-v-surface-elevated sm:px-2.5"
+              className="inline-flex items-center justify-center rounded-lg border border-v-border-strong bg-v-surface px-2 py-1 text-xs font-medium text-v-text transition hover:bg-v-surface-elevated"
             >
               Open
             </Link>
@@ -59,7 +60,7 @@ function NotificationCard({ notification, onMarkRead }) {
           {unread && (
             <Button
               size="sm"
-              className="!px-2 !py-1 !text-xs sm:!px-2.5 sm:!py-1"
+              className="!px-2 !py-1 !text-xs"
               onClick={() => onMarkRead(notification.id)}
             >
               Mark read
@@ -155,14 +156,32 @@ export default function NotificationsModal({ onClose }) {
     }
   }
 
-  return (
-    <>
-      <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
+  // Escape closes it, like any dialog.
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:absolute sm:inset-auto sm:right-0 sm:top-[calc(100%+0.5rem)] sm:block sm:p-0">
-        <div className="flex w-full flex-col overflow-hidden rounded-2xl border border-v-border bg-v-surface shadow-v-shadow-xl sm:w-[380px] max-h-[85vh]">
+  // One design at every screen size: a centered dialog (the phone layout), rendered
+  // in <body> so the header's stacking context cannot put other bars above it.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-3"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="notifications-title"
+        onClick={(event) => event.stopPropagation()}
+        className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-v-border bg-v-surface shadow-v-shadow-xl"
+      >
           <div className="flex shrink-0 items-center justify-between border-b border-v-border p-4">
-            <h2 className="text-lg font-semibold text-v-text">Notifications</h2>
+            <h2 id="notifications-title" className="text-lg font-semibold text-v-text">Notifications</h2>
             <Button size="sm" variant="secondary" onClick={onClose} className="!p-1">
               <X className="h-4 w-4" strokeWidth={2} />
             </Button>
@@ -231,9 +250,9 @@ export default function NotificationsModal({ onClose }) {
               </div>
             )}
           </div>
-        </div>
       </div>
-    </>
+    </div>,
+    document.body,
   )
 }
 

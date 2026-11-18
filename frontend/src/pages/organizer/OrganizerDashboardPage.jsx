@@ -21,6 +21,8 @@ import ElectionSVG from '@/assets/module/undraw_voting_3ygx.svg'
 import CompetitionSVG from '@/assets/module/pageant-amico.svg'
 import PollingSVG from '@/assets/module/undraw_data_25jw.svg'
 
+const MODULE_LABEL = { election: 'Election', competition_scoring: 'Competition', polling: 'Polling' }
+
 export default function OrganizerDashboardPage() {
   const { user } = useAuth()
   const [dashboard, setDashboard] = useState(null)
@@ -234,20 +236,37 @@ export default function OrganizerDashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Total events" value={stats?.totalEvents ?? 0} icon={CalendarDays} />
         <StatCard label="Active events" value={stats?.activeEvents ?? 0} icon={Zap} />
         <StatCard label="Finished events" value={stats?.finishedEvents ?? 0} icon={CheckCircle2} />
+      </div>
+
+      {/* Participants per module, with how many of them have taken part. Students
+          follow the organizer's program scope; judges are a global pool. */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Registered voters"
+          label="Election voters"
           value={stats?.assignedVoters ?? 0}
-          hint="Election voters only"
+          hint={`${stats?.electionParticipants ?? 0} have voted`}
           icon={Users}
         />
         <StatCard
-          label="Votes & responses"
-          value={stats?.totalVotesCast ?? 0}
-          hint="Votes, scores and poll answers"
+          label="Poll respondents"
+          value={stats?.assignedRespondents ?? 0}
+          hint={`${stats?.pollingParticipants ?? 0} have responded`}
+          icon={BarChart2}
+        />
+        <StatCard
+          label="Judges"
+          value={stats?.assignedJudges ?? 0}
+          hint={`${stats?.scoreSubmissions ?? 0} score submissions`}
+          icon={Trophy}
+        />
+        <StatCard
+          label="Ballots, responses & scores"
+          value={(stats?.electionParticipants ?? 0) + (stats?.pollSubmissions ?? 0) + (stats?.scoreSubmissions ?? 0)}
+          hint="Ballots, poll responses and judge score submissions"
           icon={CheckSquare}
         />
       </div>
@@ -349,7 +368,7 @@ export default function OrganizerDashboardPage() {
           <div className="mt-3">
             <PieChartView
               data={participation.map((row) => ({
-                name: row.module,
+                name: MODULE_LABEL[row.module] ?? row.module,
                 value: row.participated,
               }))}
               dataKey="value"
@@ -357,7 +376,7 @@ export default function OrganizerDashboardPage() {
               height={240}
               showLegend
               valueFormatter={(value, name) => {
-                const row = participation.find((r) => r.module === name)
+                const row = participation.find((r) => (MODULE_LABEL[r.module] ?? r.module) === name)
                 return row ? `${value} (${row.rate}%)` : String(value)
               }}
             />

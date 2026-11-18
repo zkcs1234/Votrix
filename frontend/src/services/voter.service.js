@@ -20,6 +20,10 @@ export const voterService = {
   getElectionResults(eventId) {
     return api.get(`/participant/election/events/${eventId}/results`)
   },
+  /** Aggregate poll results for one poll (fetched on demand). */
+  getPollResults(eventId) {
+    return api.get(`/participant/polling/events/${eventId}/results`)
+  },
   getLoginRedirect() {
     return api.get('/participant/login-redirect')
   },

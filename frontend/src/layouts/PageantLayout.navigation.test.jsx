@@ -86,3 +86,15 @@ test.each([
   expect(screen.getByRole('link', { name: 'Branding' })).toHaveAttribute('href', `${base}/new/branding`)
   expect(screen.getByRole('link', { name: 'Event Details' })).toHaveAttribute('aria-current', 'page')
 })
+
+test('the polling sidebar lists the setup steps in the same order as the stage footer', async () => {
+  const { EVENT_STAGES } = await import('@/utils/eventStages')
+  await act(async () => mountSetupLayout(PollingLayout, '/organizer/polling/events', '/organizer/polling/events/event/settings'))
+  const labels = ['Event Details', 'Branding', 'Settings', 'Builder', 'Respondents', 'Review & Publish']
+  const links = labels.map((label) => screen.getAllByRole('link', { name: new RegExp(`^${label}`) })[0])
+  // Document order in the sidebar equals the order of the stages (Settings before Builder).
+  for (let i = 1; i < links.length; i += 1) {
+    expect(links[i - 1].compareDocumentPosition(links[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  }
+  expect(EVENT_STAGES.polling.slice(0, 6).map((stage) => stage.key)).toEqual(['details', 'branding', 'settings', 'builder', 'respondents', 'review'])
+})

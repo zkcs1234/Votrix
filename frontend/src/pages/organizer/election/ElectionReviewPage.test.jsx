@@ -67,3 +67,29 @@ test('allows a complete single-group election to publish without adding another 
   fireEvent.click(publishButton)
   await waitFor(() => expect(mocks.publishEvent).toHaveBeenCalledWith('event'))
 })
+
+test('shows the whole roster size from meta.total, not just the first page', async () => {
+  mocks.listVoters.mockResolvedValue({ data: { voters: new Array(3).fill({}), meta: { total: 742 } } })
+  renderPage()
+  expect(await screen.findByText('742')).toBeInTheDocument()
+})
+
+test('a failed load shows an error with a reload button and blocks publishing', async () => {
+  mocks.getEvent.mockRejectedValue({ response: { data: { message: 'Boom' } } })
+  renderPage()
+  expect(await screen.findByRole('alert')).toHaveTextContent('Boom')
+  expect(screen.getByRole('button', { name: 'Reload saved setup' })).toBeInTheDocument()
+  expect(screen.queryByText('This event is closed')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Finish & Publish' })).not.toBeInTheDocument()
+})
+
+test('blocks publishing when the end date has already passed', async () => {
+  mocks.candidates = [
+    { id: 'candidate-1', positionId: 'president' },
+    { id: 'candidate-2', positionId: 'secretary' },
+  ]
+  mocks.getEvent.mockResolvedValue({ data: { event: { title: 'Old', status: 'draft', endDate: '2020-01-01T00:00:00Z' } } })
+  renderPage()
+  expect(await screen.findByText('End date has not passed')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Finish & Publish' })).toBeDisabled()
+})

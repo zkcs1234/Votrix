@@ -179,11 +179,10 @@ Full organizer dashboard.
 ### `GET /api/organizer/analytics`
 Organizer event analytics.
 
-### `POST /api/organizer/events/:eventId/voters/invite`
-Invite voter to any organizer event.
-
-### `POST /api/organizer/events/:eventId/voters/:voterId/resend-invitation`
-Resend invitation email to voter.
+> The per-event `voters/invite` and `voters/:voterId/resend-invitation` routes were
+> removed: they enrolled any existing student by email without checking the
+> organizer's scope. Organizers invite students by program through each module's
+> `POST …/events/:eventId/invite-cohort`, which enforces the scope.
 
 ### `POST /api/organizer/events/:eventId/notify`
 Send event notification email to all voters.

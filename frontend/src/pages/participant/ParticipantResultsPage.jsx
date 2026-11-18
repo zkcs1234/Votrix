@@ -13,6 +13,7 @@ import FormAlert from '@/components/ui/FormAlert'
 import PlacementBadge from '@/components/ui/PlacementBadge'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import ElectionResultsCard from '@/components/voter/ElectionResultsCard'
+import PollResultsCard from '@/components/voter/polling/PollResultsCard'
 
 const STATE_BADGE = {
   final: { tone: 'success', label: 'Final' },
@@ -97,6 +98,66 @@ function ElectionItem({ item }) {
   )
 }
 
+// Same on-demand pattern as elections: the list only says results exist, and the
+// aggregate is fetched from the endpoint that applies the poll's visibility rule.
+function PollItem({ item }) {
+  const [open, setOpen] = useState(false)
+  const [results, setResults] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const toggle = useCallback(async () => {
+    if (open) {
+      setOpen(false)
+      return
+    }
+    setOpen(true)
+    if (results || loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      const { data } = await voterService.getPollResults(item.eventId)
+      setResults(data.results)
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'These results could not be loaded.')
+    } finally {
+      setLoading(false)
+    }
+  }, [open, results, loading, item.eventId])
+
+  if (item.state === 'pending') {
+    return (
+      <Card padding="sm">
+        <ItemHeader item={item} subtitle={item.availableAfter ? `Results appear after the poll closes on ${formatDate(item.availableAfter)}` : 'Results appear after the poll closes'} />
+      </Card>
+    )
+  }
+
+  return (
+    <Card padding="sm" className="space-y-3">
+      <ItemHeader
+        item={item}
+        subtitle={
+          item.state === 'live'
+            ? 'Provisional until the poll closes'
+            : item.closedAt ? `Closed ${formatDate(item.closedAt)}` : null
+        }
+      />
+      <Button variant="secondary" size="sm" onClick={toggle} aria-expanded={open}>
+        {open ? 'Hide results' : 'View results'}
+      </Button>
+      {open && loading && <SkeletonList count={2} />}
+      {open && error && (
+        <FormAlert variant="error">
+          {error}{' '}
+          <button type="button" className="underline" onClick={() => { setOpen(false); setResults(null) }}>Try again</button>
+        </FormAlert>
+      )}
+      {open && results && <PollResultsCard results={results} pollTitle={item.title} />}
+    </Card>
+  )
+}
+
 function CompetitionItem({ item }) {
   const names = [item.competitionName, item.roundName].filter(Boolean).join(' · ')
   return (
@@ -133,8 +194,8 @@ function CompetitionItem({ item }) {
   )
 }
 
-// What the participant is allowed to see: election results and official
-// published competition standings. Hidden or unpublished results are not listed.
+// What the participant is allowed to see: election and poll results (per the
+// organizer's visibility setting) and official published competition standings. Hidden or unpublished results are not listed.
 export default function ParticipantResultsPage() {
   const list = usePortalList(voterService.getResults, { limit: 50 })
   useSocketEvent('election:voting-toggled', list.reload)
@@ -157,6 +218,7 @@ export default function ParticipantResultsPage() {
           tabs={[
             { value: 'all', label: 'All' },
             { value: 'election', label: 'Elections' },
+            { value: 'poll', label: 'Polls' },
             { value: 'competition', label: 'Competitions' },
           ]}
         />
@@ -178,7 +240,9 @@ export default function ParticipantResultsPage() {
         <ul className="grid items-start gap-3 lg:grid-cols-2">
           {shown.map((item) => (
             <li key={item.id}>
-              {item.kind === 'election' ? <ElectionItem item={item} /> : <CompetitionItem item={item} />}
+              {item.kind === 'election' ? <ElectionItem item={item} />
+                : item.kind === 'poll' ? <PollItem item={item} />
+                  : <CompetitionItem item={item} />}
             </li>
           ))}
         </ul>

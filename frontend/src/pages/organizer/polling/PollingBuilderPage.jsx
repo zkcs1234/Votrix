@@ -176,6 +176,11 @@ export default function PollingBuilderPage() {
   const [formKey, setFormKey] = useState(0)
   const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
+  // Image uploads in flight, per-slot failures, and keys that reset an upload field
+  // (its local preview) after a failed upload.
+  const [uploading, setUploading] = useState(0)
+  const [uploadErrors, setUploadErrors] = useState({})
+  const [imageResets, setImageResets] = useState({})
   const [error, setError] = useState(null)
   // Fields the organizer has left at least once; their messages show from then on, live.
   const [touched, setTouched] = useState({})
@@ -273,33 +278,49 @@ const handleTypeChange = (typeKey) => {
     setForm(next)
   }
 
+  // Slots: 'question' for the question image, `option-${index}` for an option.
+  const applyImage = (isOption, optionIndex, imageUrl, imageAssetId) => {
+    // Functional update: the upload takes a while, and the typed text or another
+    // option's image may have changed meanwhile. Writing back a stale copy of the
+    // form would silently drop those edits.
+    setForm((current) => {
+      if (!isOption) return { ...current, imageUrl, imageAssetId }
+      const options = [...current.options]
+      if (!options[optionIndex]) return current
+      options[optionIndex] = { ...options[optionIndex], imageUrl, imageAssetId }
+      return { ...current, options }
+    })
+  }
+
   const handleImageSelect = async (file, isOption = false, optionIndex = null) => {
+    const slot = isOption ? `option-${optionIndex}` : 'question'
+    setUploadErrors((prev) => ({ ...prev, [slot]: null }))
     if (!file) {
-      if (isOption) {
-        const options = [...form.options]
-        options[optionIndex] = { ...options[optionIndex], imageUrl: '', imageAssetId: null }
-        setForm({ ...form, options })
-      } else {
-        setForm({ ...form, imageUrl: '', imageAssetId: null })
-      }
+      applyImage(isOption, optionIndex, '', null)
       return
     }
+    setUploading((count) => count + 1)
     try {
       const { data } = await pollingService.uploadGenericImage(eventId, file)
-      if (isOption) {
-        const options = [...form.options]
-        options[optionIndex] = { ...options[optionIndex], imageUrl: data.url, imageAssetId: data.image_asset_id ?? null }
-        setForm({ ...form, options })
-      } else {
-        setForm({ ...form, imageUrl: data.url, imageAssetId: data.image_asset_id ?? null })
-      }
-    } catch {
-      setError('Failed to upload image')
+      if (!data?.url) throw new Error('No image URL returned')
+      applyImage(isOption, optionIndex, data.url, data.image_asset_id ?? null)
+    } catch (err) {
+      // The field already showed a local preview of the chosen file, which would
+      // look like a saved image. Say it failed and reset the field so it doesn't.
+      setUploadErrors((prev) => ({
+        ...prev,
+        [slot]: err.response?.data?.message || 'The image could not be uploaded. Choose it again.',
+      }))
+      setImageResets((prev) => ({ ...prev, [slot]: (prev[slot] ?? 0) + 1 }))
+    } finally {
+      setUploading((count) => count - 1)
     }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    // Saving before an upload finishes would store the question without its image.
+    if (uploading > 0) return
     if (formInvalid) {
       // The button is disabled, but Enter can still submit: reveal every message.
       setTouched({ question: true, options: true, all: true })
@@ -438,12 +459,14 @@ const handleTypeChange = (typeKey) => {
         {/* Question image */}
         <div>
           <ImageUploadField
+            key={`question-${imageResets.question ?? 0}`}
             label="Question image (optional)"
             variant="photo"
             currentUrl={form.imageUrl}
             onFileSelect={(file) => handleImageSelect(file, false)}
             disabled={saving}
           />
+          {uploadErrors.question && <p role="alert" className="mt-1 text-sm text-v-danger">{uploadErrors.question}</p>}
         </div>
 
         {/* Per-type config — rendered dynamically from configSchema. */}
@@ -537,12 +560,14 @@ const handleTypeChange = (typeKey) => {
                 </div>
                 <div className="mt-2 w-48">
                   <ImageUploadField
+                    key={`option-${i}-${imageResets[`option-${i}`] ?? 0}`}
                     hint="Option image (optional)"
                     variant="photo"
                     currentUrl={opt.imageUrl}
                     onFileSelect={(file) => handleImageSelect(file, true, i)}
                     disabled={saving}
                   />
+                  {uploadErrors[`option-${i}`] && <p role="alert" className="mt-1 text-sm text-v-danger">{uploadErrors[`option-${i}`]}</p>}
                 </div>
               </div>
             ))}
@@ -569,11 +594,12 @@ onClick={() => setForm({ ...form, options: [...form.options, { label: '', imageU
         </label>
 
         {error && <p className="text-sm text-v-danger">{error}</p>}
+        {uploading > 0 && <p role="status" className="text-sm text-v-text-muted">Uploading image… you can save once it finishes.</p>}
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="submit"
-            disabled={saving || formInvalid}
+            disabled={saving || formInvalid || uploading > 0}
             className="v-btn-primary disabled:opacity-60"
           >
             {editingId ? 'Update' : 'Add question'}

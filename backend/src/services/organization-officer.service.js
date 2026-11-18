@@ -211,7 +211,8 @@ export async function listCandidates(organizerId, { search, limit = 20 } = {}) {
     .eq('account_status', ACCOUNT_STATUS.ACTIVE)
 
   if (scope.scopeType === ORGANIZER_SCOPE_TYPES.SCOPED) {
-    if (scope.programs.length) query = query.in('program', scope.programs)
+    // An empty program list matches no one (same rule as isStudentInScope).
+    query = query.in('program', scope.programs)
   }
 
   if (search) {

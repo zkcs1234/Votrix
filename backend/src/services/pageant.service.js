@@ -6,8 +6,6 @@ import {
   EVENT_STATUS,
   COMPETITION_SCORING_EVENT_TYPES,
   PARTICIPANT_TYPES,
-  USER_ROLES,
-  isParticipantRole,
 } from '../utils/constants.js'
 import { assertOrganizerOwnsEvent, getEventById } from './event.service.js'
 import {
@@ -15,11 +13,6 @@ import {
   getOrCreateCompetitionScoringOrganization,
   mapOrganization,
 } from './organization.service.js'
-import { hashPassword } from '../utils/password.js'
-import { generateTemporaryPassword } from '../utils/crypto.js'
-import { findUserByEmail, sanitizeUser } from './user.service.js'
-import { sendJudgeInvitationEmail, sendJudgeInvitationEmailRegistered } from './mailer.service.js'
-import { registerParticipant } from './participant.service.js'
 import {
   computeRankings,
   resolveScoreBounds,
@@ -29,12 +22,10 @@ import { isCompetitionScoringOpen } from '../utils/eventSchedule.js'
 import { emitToEvent } from '../websocket/ws-emitter.js'
 import { mapEvent } from '../foundation/mapper.js'
 import { syncEventSchedules } from './event-schedule-sync.service.js'
-import { notifyAdminsEventPublished } from './notification.service.js'
 import {
   EDIT_CLASS,
   assertPublishedEventUpdate,
   assertSetupEditable,
-  assertParticipantsEditable,
   buildEditPolicy,
   canUnpublishEventStatus,
   normalizeChangeReason,
@@ -480,93 +471,12 @@ export async function setEventScoring(eventId, organizerId, scoringEnabled) {
   return mapEvent(data)
 }
 
-// ——— Publish (finish setup → release to schedule) ———
-
-/**
- * Publish a fully-built competition that is still in the `draft` (setup) state.
- *
- * Publishing does NOT start scoring. It only releases the event from the setup
- * flow into the normal schedule-driven lifecycle by flipping `draft` →
- * `scheduled`; the schedule sync then reconciles it to `scheduled` / `active` /
- * `completed` based on the event's start/end dates. Scoring goes live
- * separately, when the organizer starts a live session from Live Control.
- *
- * Guarded so an event can only be published once, and only when it has the
- * minimum content needed to run: at least one contestant, one active judge, and
- * one criterion. The stricter run-time rules (criteria weights totalling 100%,
- * rounds with assigned contestants) are enforced when the session is started.
- */
-export async function publishCompetitionEvent(eventId, organizerId) {
-  const event = await assertCompetitionEvent(eventId, organizerId)
-
-  if (event.status !== 'draft') {
-    throw new ApiError(400, 'This event has already been published')
-  }
-  const { getCompetitionFoundation } = await import('./competition.service.js')
-  const { assertCriteriaReady } = await import('./competition-workflow.service.js')
-  assertCriteriaReady(await getCompetitionFoundation(eventId, organizerId))
-
-  const { count: contestantCount, error: contestantErr } = await getClient()
-    .from(DB_TABLES.CONTESTANTS)
-    .select('id', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-  if (contestantErr) throw new ApiError(500, contestantErr.message)
-  if (!contestantCount || contestantCount === 0) {
-    throw new ApiError(400, 'Add at least one contestant before publishing.')
-  }
-
-  const { count: judgeCount, error: judgeErr } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('id', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
-    .eq('is_active', true)
-  if (judgeErr) throw new ApiError(500, judgeErr.message)
-  if (!judgeCount || judgeCount === 0) {
-    throw new ApiError(400, 'Add at least one judge before publishing.')
-  }
-
-  const { count: criterionCount, error: criterionErr } = await getClient()
-    .from(DB_TABLES.CRITERIA)
-    .select('id', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-  if (criterionErr) throw new ApiError(500, criterionErr.message)
-  if (!criterionCount || criterionCount === 0) {
-    throw new ApiError(400, 'Add at least one criterion before publishing.')
-  }
-
-  const { error } = await getClient()
-    .from(DB_TABLES.EVENTS)
-    .update({ status: 'scheduled' })
-    .eq('id', eventId)
-
-  if (error) throw new ApiError(500, error.message)
-
-  // Hand the event to the scheduler; it decides scheduled/active/completed
-  // purely from the dates. The status may change again immediately here.
-  await syncEventSchedules().catch((err) => {
-    console.error('[competition] schedule sync failed after publish:', err.message)
-  })
-
-  recordEventActivity({
-    eventId,
-    action: 'competition.event.publish',
-    userId: organizerId,
-    module: 'competition',
-    details: { title: event.title },
-  })
-
-  // Let admins know a new event went live. Non-fatal — never block publishing.
-  await notifyAdminsEventPublished({
-    eventId,
-    title: event.title,
-    eventType: event.event_type,
-  }).catch((err) => console.error('[competition] admin publish notification failed (non-fatal):', err.message))
-
-  // Re-read so the returned status reflects any reconciliation the sync applied.
-  const published = await getEventById(eventId)
-  return mapEvent(published)
-}
+// ——— Publish ———
+// Publishing a competition (draft -> scheduled) is done by the rules freeze
+// (`freezeRules` in competition-workflow.service.js, or `completeNativeCreation`
+// for native competitions), which also validates and acknowledges the scoring
+// rules. The old direct publish that lived here skipped those checks and was
+// no longer called.
 
 /**
  * Pull a published competition back to `draft` so its setup can be corrected.
@@ -1082,308 +992,8 @@ export async function deleteCriteria(eventId, organizerId, criteriaId) {
 
 // ——— Judges ———
 
-async function ensureJudgeAccount(email) {
-  const normalizedEmail = email.toLowerCase().trim()
-  const existing = await findUserByEmail(normalizedEmail)
-
-  if (!existing) {
-    throw new ApiError(404, 'Participant account not found. Ask an administrator to add this account to the Competition Judge pool.')
-  }
-  if (!isParticipantRole(existing.role)) {
-    throw new ApiError(409, 'This email is already used by another account type')
-  }
-  return { user: sanitizeUser(existing), isNew: false }
-}
-
 function resolveDisplayName(firstName, lastName, fallback = null) {
   return [firstName, lastName].filter(Boolean).join(' ') || fallback
-}
-
-async function upsertJudgeInvitationStatus(eventId, userId, values) {
-  const { error } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .upsert(
-      { event_id: eventId, voter_id: userId, ...values },
-      { onConflict: 'event_id,voter_id', ignoreDuplicates: false },
-    )
-
-  if (error) throw new ApiError(500, error.message)
-}
-
-export async function inviteJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName }) {
-  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
-  const event = await getEventById(eventId)
-
-  const tempPassword = temporaryPassword || generateTemporaryPassword()
-  // Existing judges keep their own password — never reset. isNew decides which email to send.
-  const { user, isNew } = await ensureJudgeAccount(email, tempPassword, false)
-
-  await registerParticipant(eventId, user.id, {
-    participantType: 'COMPETITION_JUDGE',
-    firstName: firstName || null,
-    lastName: lastName || null,
-    judgeRole: 'judge',
-    displayName: resolveDisplayName(firstName, lastName, user.email),
-    isActive: true,
-  })
-
-  const emailResult = isNew
-    ? await sendJudgeInvitationEmail({
-        email: user.email,
-        temporaryPassword: tempPassword,
-        eventId: event.id,
-        eventTitle: event.title,
-      })
-    : await sendJudgeInvitationEmailRegistered({
-        email: user.email,
-        eventId: event.id,
-        eventTitle: event.title,
-      })
-
-  recordEventActivity({
-    eventId,
-    action: 'competition.judge.invite',
-    userId: organizerId,
-    module: 'competition',
-    details: { judgeUserId: user.id, email: user.email, isNewJudge: isNew, emailSent: emailResult?.sent ?? null },
-  })
-
-  return { user: sanitizeUser(user), isNewJudge: isNew, email: emailResult }
-}
-
-/**
- * Register a judge WITHOUT sending invitation email.
- * @param {string} eventId
- * @param {string} organizerId
- * @param {Object} params
- * @param {string} params.email
- * @param {string} [params.temporaryPassword]
- * @param {string} [params.firstName]
- * @param {string} [params.lastName]
- * @param {boolean} [params.resetPasswordForExisting] - If false, won't reset password for existing judges (default: false for manual)
- */
-export async function registerJudge(eventId, organizerId, { email, temporaryPassword, firstName, lastName, resetPasswordForExisting = false }) {
-  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
-
-  const tempPassword = temporaryPassword || generateTemporaryPassword()
-  const { user, isNew } = await ensureJudgeAccount(email, tempPassword, resetPasswordForExisting)
-
-  await registerParticipant(eventId, user.id, {
-    participantType: PARTICIPANT_TYPES.COMPETITION_JUDGE,
-    firstName: firstName || null,
-    lastName: lastName || null,
-    judgeRole: 'judge',
-    displayName: resolveDisplayName(firstName, lastName, user.email),
-    isActive: true,
-  })
-
-  try {
-    await upsertJudgeInvitationStatus(eventId, user.id, { invitation_sent: false })
-  } catch (dbErr) {
-    console.error('[registerJudge] invitations upsert failed:', dbErr.message)
-  }
-
-  recordEventActivity({
-    eventId,
-    action: 'competition.judge.register',
-    userId: organizerId,
-    module: 'competition',
-    details: { judgeUserId: user.id, email: user.email, isNewJudge: isNew },
-  })
-
-  return { user, isNewJudge: isNew, invitationSent: false }
-}
-
-/**
- * Send invitation email for an already-registered judge.
- * If judge has an existing account, sends "you're invited" email without password reset.
- * If judge is new, generates temp password and sends it.
- */
-export async function sendJudgeInvitation(eventId, organizerId, judgeId) {
-  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
-  const event = await getEventById(eventId)
-
-  const { data: judgeRow, error: judgeRowErr } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('user_id, users (id, email, must_change_password)')
-    .eq('user_id', judgeId)
-    .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
-    .maybeSingle()
-
-  if (judgeRowErr) throw new ApiError(500, judgeRowErr.message)
-  if (!judgeRow) {
-    console.error(`[sendJudgeInvitation] judge participant not found for judgeId=${judgeId}, eventId=${eventId}`)
-    throw new ApiError(404, 'Judge is not enrolled in this event')
-  }
-
-  const userId = judgeRow.user_id
-  const judgeEmail = judgeRow.users?.email
-  const invitationType = 'registered'
-  let emailResult = null
-
-  try {
-    emailResult = await sendJudgeInvitationEmailRegistered({
-      email: judgeEmail,
-      eventId: event.id,
-      eventTitle: event.title,
-    })
-  } catch (emailError) {
-    console.error(`[sendJudgeInvitation] email sending failed for ${judgeEmail}:`, emailError.message)
-    emailResult = { 
-      sent: false, 
-      error: emailError.message || 'Failed to send invitation email',
-      retryable: emailError.message?.includes('Network connectivity') || emailError.message?.includes('Unable to reach')
-    }
-  }
-
-  if (emailResult?.sent) {
-    try {
-      await upsertJudgeInvitationStatus(eventId, userId, {
-        invitation_sent: true,
-        is_new_account: false,
-      })
-    } catch (dbErr) {
-      console.error('[sendJudgeInvitation] failed to mark invitation_sent=true:', dbErr.message)
-      throw new ApiError(500, 'Invitation email was sent, but the system could not mark it as sent. Please refresh and try again if it still shows pending.')
-    }
-  }
-
-  recordEventActivity({
-    eventId,
-    action: 'competition.judge.invitation.send',
-    userId: organizerId,
-    module: 'competition',
-    details: { judgeUserId: userId, email: judgeEmail, invitationType, sent: emailResult?.sent || false },
-  })
-
-  return {
-    email: emailResult,
-    invitationSent: emailResult?.sent || false,
-    invitationType,
-    temporaryPassword: null,
-    message: emailResult?.sent
-      ? `Invitation sent successfully to ${judgeEmail}`
-      : `Invitation failed: ${emailResult?.error || 'Unknown error'}`
-  }
-}
-
-/**
- * Send all pending judge invitations for an event.
- * Handles both new and existing accounts appropriately.
- */
-export async function sendAllPendingJudgeInvitations(eventId, organizerId) {
-  assertParticipantsEditable(await assertCompetitionEvent(eventId, organizerId))
-  const event = await getEventById(eventId)
-
-  // Start from event_participants — the source of truth for enrolled judges.
-  const { data: judgeParticipants, error: jpErr } = await getClient()
-    .from(DB_TABLES.EVENT_PARTICIPANTS)
-    .select('user_id, users (id, email, must_change_password)')
-    .eq('event_id', eventId)
-    .eq('participant_type', PARTICIPANT_TYPES.COMPETITION_JUDGE)
-
-  if (jpErr) throw new ApiError(500, jpErr.message)
-  if (!judgeParticipants?.length) return { total: 0, sent: 0, failed: 0, results: [] }
-
-  // Check which judges already had their invitation sent
-  const judgeUserIds = judgeParticipants.map((j) => j.user_id)
-  const { data: existingInvitations } = await getClient()
-    .from(DB_TABLES.INVITATIONS)
-    .select('voter_id, invitation_sent')
-    .eq('event_id', eventId)
-    .in('voter_id', judgeUserIds)
-
-  const sentSet = new Set(
-    (existingInvitations ?? []).filter((inv) => inv.invitation_sent).map((inv) => inv.voter_id),
-  )
-
-  // Only process judges whose invitation hasn't been sent yet
-  const pendingJudges = judgeParticipants.filter((j) => !sentSet.has(j.user_id))
-
-  console.log(`[sendAllPendingJudgeInvitations] total=${judgeParticipants.length}, alreadySent=${sentSet.size}, pending=${pendingJudges.length}`)
-
-  if (!pendingJudges.length) return { total: 0, sent: 0, failed: 0, results: [] }
-
-  let sent = 0, failed = 0
-  const results = []
-
-  for (const p of pendingJudges) {
-    const judgeEmail = p.users?.email
-    // A judge who has already set their own password is an existing account.
-    const isExistingAccount = !p.users?.must_change_password
-
-    let tempPassword = null
-    let emailResult = null
-    let invitationType = isExistingAccount ? 'existing' : 'new'
-
-    try {
-      if (isExistingAccount) {
-        // Existing account - send registered email without password reset
-        emailResult = await sendJudgeInvitationEmailRegistered({
-          email: judgeEmail,
-          eventId: event.id,
-          eventTitle: event.title,
-        })
-      } else {
-        // New account - generate temp password
-        tempPassword = generateTemporaryPassword()
-        const passwordHash = await hashPassword(tempPassword)
-
-        await getClient().from(DB_TABLES.USERS).update({ password: passwordHash, must_change_password: true }).eq('id', p.user_id)
-
-        emailResult = await sendJudgeInvitationEmail({
-          email: judgeEmail,
-          temporaryPassword: tempPassword,
-          eventId: event.id,
-          eventTitle: event.title,
-        })
-      }
-
-      if (emailResult?.sent) {
-        await upsertJudgeInvitationStatus(eventId, p.user_id, {
-          invitation_sent: true,
-          is_new_account: !isExistingAccount,
-        })
-        sent++
-        results.push({
-          judgeId: p.user_id,
-          email: judgeEmail,
-          success: true,
-          invitationType,
-          temporaryPassword: tempPassword,
-        })
-      } else {
-        failed++
-        results.push({
-          judgeId: p.user_id,
-          email: judgeEmail,
-          success: false,
-          invitationType,
-          error: emailResult?.error || 'Email delivery failed',
-        })
-      }
-    } catch (err) {
-      failed++
-      results.push({
-        judgeId: p.user_id,
-        email: judgeEmail,
-        success: false,
-        invitationType,
-        error: err.message,
-      })
-    }
-  }
-
-  recordEventActivity({
-    eventId,
-    action: 'competition.judge.invitation.send_all',
-    userId: organizerId,
-    module: 'competition',
-    details: { total: pendingJudges.length, sent, failed },
-  })
-
-  return { total: pendingJudges.length, sent, failed, results }
 }
 
 export function mergeJudgeRows(participantRow = null, compatibilityRow = null) {

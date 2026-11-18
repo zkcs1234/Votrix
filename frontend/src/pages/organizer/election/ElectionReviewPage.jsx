@@ -22,6 +22,9 @@ export default function ElectionReviewPage() {
   const [groupReadiness, setGroupReadiness] = useState([])
   const [votersCount, setVotersCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  // When the data was last read; the end-date check compares against this, not the render clock.
+  const [loadedAt, setLoadedAt] = useState(0)
   const [publishing, setPublishing] = useState(false)
   const [unpublishing, setUnpublishing] = useState(false)
   const { success, error: showError } = useToast()
@@ -30,6 +33,8 @@ export default function ElectionReviewPage() {
 
   const load = useCallback(async () => {
     try {
+      setLoadError('')
+      setLoadedAt(Date.now())
       const [{ data: ev }, { data: sectionData }, { data: vot }] = await Promise.all([
         electionService.getEvent(eventId),
         electionService.listBallotSections(eventId),
@@ -55,9 +60,11 @@ export default function ElectionReviewPage() {
       setGroupReadiness(readiness)
       setPositionsCount(readiness.reduce((count, group) => count + group.positionsCount, 0))
       setCandidatesCount(readiness.reduce((count, group) => count + group.candidatesCount, 0))
-      setVotersCount(Array.isArray(vot.voters) ? vot.voters.length : 0)
+      // meta.total is the whole roster; voters.length is only the first page.
+      setVotersCount(vot.meta?.total ?? (Array.isArray(vot.voters) ? vot.voters.length : 0))
     } catch (err) {
       console.error('Failed to load review data:', err)
+      setLoadError(err.response?.data?.message || 'Could not load the saved election setup. Reload before publishing.')
     } finally {
       setLoading(false)
     }
@@ -70,11 +77,13 @@ export default function ElectionReviewPage() {
   const status = event?.status ?? null
   const isDraft = status === EVENT_STATUS.DRAFT
   const canUnpublish = canUnpublishEventStatus(status)
+  // An end date in the past would send the election straight to "completed".
+  const endDateOk = !event?.endDate || new Date(event.endDate).getTime() >= loadedAt
   // Publishing no longer requires voters — they are invited after publish.
-  const publishReady = groupReadiness.length > 0 && groupReadiness.every((group) => group.ready)
+  const publishReady = !loadError && endDateOk && groupReadiness.length > 0 && groupReadiness.every((group) => group.ready)
 
   const handlePublish = async () => {
-    if (!publishReady) return
+    if (!publishReady || publishing) return
     setPublishing(true)
     try {
       await electionService.publishEvent(eventId)
@@ -82,6 +91,7 @@ export default function ElectionReviewPage() {
       await load()
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to publish event')
+      await load()
     } finally {
       setPublishing(false)
     }
@@ -113,6 +123,13 @@ export default function ElectionReviewPage() {
         </p>
       </div>
 
+      {loadError && (
+        <div role="alert" className="v-card-sm space-y-2">
+          <p className="v-error-text">{loadError}</p>
+          <Button variant="secondary" onClick={() => { setLoading(true); load() }}>Reload saved setup</Button>
+        </div>
+      )}
+
       {/* Event summary */}
       <div className="v-card-sm">
         <h3 className="v-label mb-3">{event?.title || 'Untitled event'}</h3>
@@ -132,6 +149,7 @@ export default function ElectionReviewPage() {
           </p>
           <ul className="space-y-3">
             {!groupReadiness.length && <ReadinessItem ok={false} label="Create at least one election group" />}
+            <ReadinessItem ok={endDateOk} label="End date has not passed" />
             {groupReadiness.map((group) => (
               <li key={group.id} className="space-y-1.5">
                 <p className="text-sm font-medium text-v-text">{group.name}</p>
@@ -145,7 +163,7 @@ export default function ElectionReviewPage() {
         </div>
       )}
 
-      {!isDraft && (
+      {event && !isDraft && (
         <div className="flex items-start gap-3 rounded-2xl border border-v-border bg-v-surface-elevated p-4">
           <div className="rounded-full bg-emerald-500/15 p-1.5 text-emerald-500">
             {status === EVENT_STATUS.SCHEDULED ? (
@@ -178,6 +196,11 @@ export default function ElectionReviewPage() {
                   <Undo2 className="h-4 w-4" strokeWidth={1.5} />
                   Unpublish to draft
                 </Button>
+                {status === EVENT_STATUS.SCHEDULED && (
+                  <Button variant="secondary" onClick={() => navigate(`/organizer/election/events/${eventId}/voters`)}>
+                    Manage voters
+                  </Button>
+                )}
                 <Button onClick={() => navigate(`/organizer/election/events/${eventId}/analytics`)}>
                   Continue to Analytics
                 </Button>

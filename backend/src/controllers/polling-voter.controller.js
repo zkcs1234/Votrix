@@ -12,6 +12,11 @@ export const getPoll = asyncHandler(async (req, res) => {
   res.json({ success: true, ...data })
 })
 
+export const getPollResults = asyncHandler(async (req, res) => {
+  const results = await pollingService.getPollResultsForVoter(req.params.eventId, req.user.id)
+  res.json({ success: true, results })
+})
+
 export const submitPoll = asyncHandler(async (req, res) => {
   const answers = validatePollAnswers(req.body)
   const startedAt = req.body?.startedAt || null

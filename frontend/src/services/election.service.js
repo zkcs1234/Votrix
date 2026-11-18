@@ -121,32 +121,6 @@ export const electionService = {
     return api.delete(`${base}/events/${eventId}/participants/${userId}`)
   },
 
-  registerVoter(eventId, payload) {
-    return api.post(`${base}/events/${eventId}/voters/register`, payload)
-  },
-
-  registerExistingVoter(eventId, email) {
-    return api.post(`${base}/events/${eventId}/voters/register-existing`, { email })
-  },
-
-  sendInvitation(eventId, voterId) {
-    return api.post(`${base}/events/${eventId}/voters/${voterId}/send-invitation`)
-  },
-
-  sendAllInvitations(eventId) {
-    return api.post(`${base}/events/${eventId}/voters/send-all`)
-  },
-
-  previewCsv(eventId, file) {
-    const form = new FormData()
-    form.append('file', file)
-    return api.post(`${base}/events/${eventId}/voters/import-preview`, form)
-  },
-
-  registerCsv(eventId, data) {
-    return api.post(`${base}/events/${eventId}/voters/import-register`, { data })
-  },
-
   getAnalytics(eventId) {
     return api.get(`${base}/events/${eventId}/analytics`)
   },
