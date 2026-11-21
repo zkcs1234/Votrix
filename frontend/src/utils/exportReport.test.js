@@ -5,6 +5,7 @@ import {
  downloadExcel,
  downloadJudgeScoreSheetsExcel,
 } from './exportReport'
+import { readXlsx, toBytes } from '@/test/readXlsx'
 
 beforeEach(()=>vi.useFakeTimers())
 afterEach(()=>{vi.runOnlyPendingTimers();vi.restoreAllMocks();vi.unstubAllGlobals();vi.useRealTimers()})
@@ -19,15 +20,20 @@ test('browser CSV download uses literal-safe text and retains numeric totals',()
  expect(click).toHaveBeenCalledTimes(1)
 })
 
-test('SpreadsheetML download keeps formula-looking names explicitly typed as text',()=>{
- let text
- vi.stubGlobal('Blob',class {constructor(parts){text=parts.join('')}})
+test('Excel download is a real .xlsx file that keeps formula-looking names as text',async()=>{
+ let blob,name
+ vi.stubGlobal('Blob',class {constructor(parts,options){this.parts=parts;this.type=options.type;blob=this}})
  vi.stubGlobal('URL',{createObjectURL:()=> 'blob:fixture',revokeObjectURL:vi.fn()})
- vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{})
- downloadExcel('competition',[{name:'Results',rows:[{contestant:'=1+1',score:89.33}]}])
- expect(text).toContain('<Data ss:Type="String">=1+1</Data>')
- expect(text).toContain('<Data ss:Type="Number">89.33</Data>')
- expect(text).not.toContain('ss:Formula')
+ vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(function(){name=this.download})
+ downloadExcel('competition.xls',[{name:'Results',rows:[{contestant:'=1+1',score:89.33}]}])
+ expect(name).toBe('competition.xlsx')
+ expect(blob.type).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+ const {sheets}=readXlsx(await toBytes(blob.parts[0]))
+ expect(sheets.map(sheet=>sheet.name)).toEqual(['Results'])
+ expect(sheets[0].xml).toContain('<t xml:space="preserve">=1+1</t>')
+ expect(sheets[0].xml).toContain('<v>89.33</v>')
+ expect(sheets[0].xml).toContain('state="frozen"')
+ expect(sheets[0].xml).not.toContain('<f>')
 })
 
 test('judge score sheet builder creates one raw-score matrix per submitted judge',()=>{
@@ -73,12 +79,12 @@ test('judge score sheet builder creates one raw-score matrix per submitted judge
  expect(sheets[1].rows.map(row=>row.scores[0])).toEqual([7,10])
 })
 
-test('judge score sheet workbook styles the matrix and escapes formula-like text',()=>{
- let text
- vi.stubGlobal('Blob',class {constructor(parts){text=parts.join('')}})
+test('judge score sheet workbook is a styled .xlsx and escapes formula-like text',async()=>{
+ let blob,name
+ vi.stubGlobal('Blob',class {constructor(parts,options){this.parts=parts;this.type=options.type;blob=this}})
  vi.stubGlobal('URL',{createObjectURL:()=> 'blob:fixture',revokeObjectURL:vi.fn()})
- vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{})
- downloadJudgeScoreSheetsExcel('judges.xls',[{
+ vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(function(){name=this.download})
+ downloadJudgeScoreSheetsExcel('judges.xlsx',[{
   name:'Judge One',
   judgeName:'Judge One',
   eventName:'Event & Festival',
@@ -92,13 +98,18 @@ test('judge score sheet workbook styles the matrix and escapes formula-like text
   entries:[{label:'Entry 1\n=Formula Contestant'}],
   rows:[{name:'Technique <Final>',weight:100,scores:[8]}],
  }])
- expect(text).toContain('ss:Name="Judge One"')
- expect(text).toContain('ss:MergeAcross="2"')
- expect(text).toContain('OFFICIAL JUDGE SCORE SHEET')
- expect(text).toContain('#172B56')
- expect(text).toContain('Technique &lt;Final&gt;')
- expect(text).toContain('Entry 1\n=Formula Contestant')
- expect(text).toContain('100%</Data>')
- expect(text).toContain('<Data ss:Type="Number">8</Data>')
- expect(text).not.toContain('ss:Formula')
+ expect(name).toBe('judges.xlsx')
+ const {files,sheets}=readXlsx(await toBytes(blob.parts[0]))
+ const xml=sheets[0].xml
+ expect(sheets[0].name).toBe('Judge One')
+ expect(xml).toContain('<mergeCell ref="A1:C1"/>')
+ expect(xml).toContain('OFFICIAL JUDGE SCORE SHEET')
+ expect(xml).toContain('Event &amp; Festival')
+ expect(xml).toContain('Technique &lt;Final&gt;')
+ expect(xml).toContain('Entry 1\n=Formula Contestant')
+ expect(xml).toContain('100%')
+ expect(xml).toContain('<v>8</v>')
+ expect(xml).toContain('orientation="landscape"')
+ expect(files['xl/styles.xml']).toContain('FF172B56')
+ expect(xml).not.toContain('<f>')
 })

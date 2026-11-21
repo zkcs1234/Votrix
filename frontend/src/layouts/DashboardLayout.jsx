@@ -4,7 +4,6 @@ import { getRoleDashboardPath } from '@/utils/auth'
 import { USER_ROLES, isParticipantRole } from '@/utils/constants'
 import { effectiveWorkspaceRole, isOfficer, isOrganizerPath } from '@/utils/workspace'
 import { useParticipantSync } from '@/hooks/useParticipantSync'
-import { usePlatformStore } from '@/store/platform.store'
 import AppShell from '@/layouts/AppShell'
 import {
   LayoutDashboard, Users, CalendarDays, Settings, ClipboardList, BarChart3,
@@ -22,7 +21,6 @@ export default function DashboardLayout({
   backButtonPath = '/participant',
 }) {
   const { role: accountRole, user } = useAuth()
-  const platformName = usePlatformStore((s) => s.platformName)
   const { pathname } = useLocation()
   // A student officer is rendered with the organizer layout while inside
   // /organizer (see utils/workspace.js); everywhere else they are a participant.
@@ -168,11 +166,9 @@ export default function DashboardLayout({
       // dashboard itself it would just point at the page you are already on, so it
       // is left out there.
       footerLink={
-        isAdmin
-          ? { to: '/admin', label: `← ${platformName} administration` }
-          : isOrganizer && !onHomePage
-            ? { to: '/organizer', label: '← Organizer home' }
-            : undefined
+        isOrganizer && !onHomePage
+          ? { to: '/organizer', label: '← Organizer home' }
+          : undefined
       }
       homeLink={home}
       navItems={navItems}

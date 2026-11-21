@@ -25,6 +25,8 @@ import { nativeCompetitionService } from '@/services/competition-native.service'
 import { nativeResultsService } from '@/services/competition-native-results.service'
 import { nativeTabulationService as service } from '@/services/competition-native-tabulation.service'
 import { downloadBlob } from '@/utils/csvDownload'
+import { exportFileName } from '@/utils/exportFilename'
+import { buildScoreMatrix } from '@/utils/competitionScoreMatrix'
 import {
   buildJudgeScoreSheetData,
   downloadCsv,
@@ -132,12 +134,61 @@ function getApplicableDeductionRules(configuration,roundId,owner='organizer') {
   return applicableDeductionRules(configuration,roundId,owner)
 }
 
-function downloadTableReport(filename, headers, rows, { format = 'csv', title = 'Competition Tabulation', subtitle = '', source = null, roundId = null } = {}) {
+// The "Info" sheet at the end of an Excel export: what this file is, which rules
+// produced it and how current it is, so a copy found later can still be trusted.
+function exportInfoSheet(context, sources, label) {
+  const configuration = sources?.rules?.configuration_snapshot
+  const method =
+    configuration?.rounds?.find((round) => round.id === (context.roundId ?? null))?.calculationMethod ??
+    configuration?.scoringConfig?.calculationMethod ??
+    ''
+  const status = sources?.calculation
+    ? sources.calculation.finalized ? 'Official (finalized)' : 'Calculated, not finalized'
+    : 'Original submissions, not calculated'
+  return {
+    name: 'Info',
+    rows: [
+      ['Export', label],
+      ['Event', context.eventName ?? sources?.eventName ?? ''],
+      ['Competition', context.competitionName ?? ''],
+      ['Round', context.roundName ?? ''],
+      ['Scoring method', method],
+      ['Rules version', sources?.rules?.version ?? sources?.rules?.id ?? ''],
+      ['Results status', status],
+      ['Exported', new Date().toLocaleString()],
+      ['Source digest', sources?.sourceDigest ?? ''],
+    ].map(([Field, Value]) => ({ Field, Value })),
+  }
+}
+
+function withExtension(filename, extension) {
+  return filename.replace(/\.(csv|xlsx|xls|pdf)$/, `.${extension}`)
+}
+
+function downloadTableReport(filename, headers, rows, { format = 'csv', title = 'Competition Tabulation', subtitle = '', source = null, roundId = null, info = null } = {}) {
   const records = tabulationDeductionReport(tabulationReportRecords(headers, rows),source,roundId)
   headers = [...new Set(records.flatMap(record=>Object.keys(record)))]
-  if (format === 'xls') downloadExcel(filename.replace(/\.csv$/, '.xls'), [{ name: 'Tabulation', rows: records }])
-  else if (format === 'pdf') downloadPdf(filename.replace(/\.csv$/, '.pdf'), { title, subtitle, generatedAt: new Date(), sections: [{ title: 'Current round records', kind: 'table', columns: headers.map(header => ({ key: header, label: header })), rows: records }] })
+  if (format === 'xlsx') downloadExcel(withExtension(filename, 'xlsx'), [{ name: 'Tabulation', rows: records }, ...(info ? [exportInfoSheet(info.context, info.sources, info.label ?? title)] : [])])
+  else if (format === 'pdf') downloadPdf(withExtension(filename, 'pdf'), { title, subtitle, generatedAt: new Date(), sections: [{ title: 'Current round records', kind: 'table', columns: headers.map(header => ({ key: header, label: header })), rows: records }] })
   else downloadCsv(filename, records)
+}
+
+// One row per entry (see utils/competitionScoreMatrix.js).
+function downloadMatrixReport(matrix, context, sources, format) {
+  const ext = format === 'xlsx' ? 'xlsx' : format === 'pdf' ? 'pdf' : 'csv'
+  const filename = exportFileName({ competition: context.competitionName, round: context.roundName, kind: 'score-matrix', ext })
+  if (format === 'xlsx') {
+    downloadExcel(filename, [{ name: 'Score matrix', rows: matrix.records }, exportInfoSheet(context, sources, 'Score matrix')])
+  } else if (format === 'pdf') {
+    downloadPdf(filename, {
+      title: 'Score Matrix',
+      subtitle: `${context.competitionName} / ${context.roundName} / ${matrix.status}`,
+      generatedAt: new Date(),
+      sections: [{ title: 'Results', kind: 'table', columns: matrix.headers.map((header) => ({ key: header, label: header })), rows: matrix.records }],
+    })
+  } else {
+    downloadCsv(filename, matrix.records)
+  }
 }
 
 export function NativeTabulationBoundary({ eventId, Legacy, initialSection = 'overview', workspace = null }) {
@@ -670,7 +721,7 @@ export default function NativeTabulationWorkspace({
         throw new Error('The selected round no longer has complete current sources.')
       }
 
-      if (exportType === 'judge' && exportFormat === 'xls') {
+      if (exportType === 'judge' && exportFormat === 'xlsx') {
         const selectedJudge = judgeSelection === 'all'
           ? null
           : sources.progress?.find(judge => judge.judgeId === judgeSelection && judge.submitted)
@@ -687,9 +738,11 @@ export default function NativeTabulationWorkspace({
         if (identityRef.current !== exportIdentity || sequence.current !== exportSequence) return
         const sheets = buildJudgeScoreSheetData(sources, exportContext, judgeSelection)
         downloadJudgeScoreSheetsExcel(
-          `competition-${exportContext.competitionId}-${exportContext.roundId ?? 'single'}-judge-score-sheets.xls`,
+          exportFileName({ competition: exportContext.competitionName, round: exportContext.roundName, kind: 'judge-score-sheets', ext: 'xlsx' }),
           sheets,
         )
+      } else if (exportType === 'matrix') {
+        downloadMatrixReport(buildScoreMatrix(sources, exportContext), exportContext, sources, exportFormat)
       } else if (exportType === 'deductions') {
         const rules = getApplicableDeductionRules(
           sources.rules?.configuration_snapshot,
@@ -743,7 +796,7 @@ export default function NativeTabulationWorkspace({
           choices.find(context=>context.roundId===record.round_id)?.roundName??exportContext.roundName,
           record.description,record.reason,record.judgeName,'',record.amount,record.units,'Submitted with judge sheet','','','','','Judge',
         ]))
-        downloadTableReport('competition-deduction-report.csv', headers, rows, {format:exportFormat,title:'Deduction Report',subtitle:`${exportContext.competitionName} / ${exportContext.roundName}`})
+        downloadTableReport(exportFileName({competition:exportContext.competitionName,round:exportContext.roundName,kind:'deduction-report',ext:'csv'}), headers, rows, {format:exportFormat,title:'Deduction Report',subtitle:`${exportContext.competitionName} / ${exportContext.roundName}`,info:{context:exportContext,sources,label:'Deduction report'}})
       } else if (exportType === 'tabulation') {
         const configuration = sources.rules?.configuration_snapshot
         const configuredCriteria = getCriteria(configuration, exportContext.roundId)
@@ -895,7 +948,7 @@ export default function NativeTabulationWorkspace({
           }
           if(divisionColumn>=0)rows.slice(firstEntryRow).forEach(row=>{row[divisionColumn]=entry?.divisionName??''})
         }
-        downloadTableReport('competition-combined-scores.csv', headers, rows, {format:exportFormat,title:'Combined Scores',source:sources,roundId:exportContext.roundId,subtitle:`${exportContext.competitionName} / ${exportContext.roundName} / ${sources.calculation?.finalized?'Finalized calculation':sources.calculation?'Draft calculation':'Original submissions'}`})
+        downloadTableReport(exportFileName({competition:exportContext.competitionName,round:exportContext.roundName,kind:'combined-scores',ext:'csv'}), headers, rows, {format:exportFormat,title:'Combined Scores',source:sources,roundId:exportContext.roundId,info:{context:exportContext,sources,label:'Combined scores'},subtitle:`${exportContext.competitionName} / ${exportContext.roundName} / ${sources.calculation?.finalized?'Finalized calculation':sources.calculation?'Draft calculation':'Original submissions'}`})
       } else {
         let kind = exportType
         let judgeId
@@ -938,7 +991,7 @@ export default function NativeTabulationWorkspace({
         )
         if (identityRef.current !== exportIdentity || sequence.current !== exportSequence) return
         downloadBlob(
-          `competition-${exportContext.competitionId}-${exportContext.roundId ?? 'single'}-${kind}.csv`,
+          exportFileName({ competition: exportContext.competitionName, round: exportContext.roundName, kind: kind === 'worksheets' ? 'judge-sheets' : kind === 'final' ? 'official-results' : kind === 'tabulation' ? 'tabulation' : 'judge-sheet', ext: 'csv' }),
           response.data,
         )
       }
@@ -961,6 +1014,7 @@ export default function NativeTabulationWorkspace({
 
   const exportLabels = {
     judge: 'Judge Score Sheets',
+    matrix: 'Score Matrix',
     tabulation: 'Combined Scores',
     final: 'Official Results',
     ...(deductionsEnabled||judgeDeductionsEnabled ? { deductions: 'Deduction Report' } : {}),
@@ -1934,6 +1988,7 @@ export default function NativeTabulationWorkspace({
                     <span className="block font-medium">{label}</span>
                     <span className="text-xs text-v-text-muted">
                       {type === 'judge' && 'Original individual or all judge sheets'}
+                      {type === 'matrix' && 'One row per entry: judge totals, final score and rank'}
                       {type === 'tabulation' && 'Current combined scoring spreadsheet'}
                       {type === 'deductions' && 'Decisions and review statuses'}
                       {type === 'final' && 'Current published official results'}
@@ -1943,7 +1998,7 @@ export default function NativeTabulationWorkspace({
                 <div className="mt-1 border-t border-v-border pt-1">
                   {[
                     ['CSV', 'csv'],
-                    ['Excel', 'xls'],
+                    ['Excel', 'xlsx'],
                     ['PDF', 'pdf'],
                   ].map(([label, format]) => (
                     <button
@@ -2229,8 +2284,8 @@ export default function NativeTabulationWorkspace({
             )}
             <label className="block text-sm">
               File format
-              <select className="v-input mt-1" aria-label="Export format" value={exportFormat} disabled={exportBusy || !['judge','tabulation','deductions'].includes(exportType)} onChange={event => setExportFormat(event.target.value)}>
-                <option value="csv">CSV</option>{['judge','tabulation','deductions'].includes(exportType)&&<option value="xls">Excel (.xls)</option>}{['tabulation','deductions'].includes(exportType)&&<option value="pdf">PDF (print)</option>}
+              <select className="v-input mt-1" aria-label="Export format" value={exportFormat} disabled={exportBusy || !['judge','matrix','tabulation','deductions'].includes(exportType)} onChange={event => setExportFormat(event.target.value)}>
+                <option value="csv">CSV</option>{['judge','matrix','tabulation','deductions'].includes(exportType)&&<option value="xlsx">Excel (.xlsx)</option>}{['matrix','tabulation','deductions'].includes(exportType)&&<option value="pdf">PDF (print)</option>}
               </select>
             </label>
             {exportSnapshotStatus === 'ready' && exportSnapshot?.complete && (
@@ -2341,7 +2396,7 @@ export default function NativeTabulationWorkspace({
                 }
                 onClick={() => runExport()}
               >
-                Export {exportFormat==='xls'?'Excel':exportFormat.toUpperCase()}
+                Export {exportFormat==='xlsx'?'Excel':exportFormat.toUpperCase()}
               </Button>
             </div>
           </div>

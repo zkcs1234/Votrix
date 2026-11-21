@@ -10,6 +10,7 @@ import { ACCOUNT_STATUS } from '../utils/constants.js'
 import {
   getOrganizersList,
   getGlobalEvents as fetchGlobalEvents,
+  getEventParticipants as fetchEventParticipants,
   getSystemSettings as fetchSystemSettings,
   saveSystemSetting,
   getAuditLogs as fetchAuditLogs,
@@ -208,6 +209,11 @@ export const getOrganizers = asyncHandler(async (_req, res) => {
 export const getGlobalEvents = asyncHandler(async (_req, res) => {
   const events = await fetchGlobalEvents()
   res.json({ success: true, events })
+})
+
+export const getEventParticipants = asyncHandler(async (req, res) => {
+  const { participants, summary } = await fetchEventParticipants(req.params.eventId)
+  res.json({ success: true, participants, summary })
 })
 
 export const restoreEvent = asyncHandler(async (req, res) => {

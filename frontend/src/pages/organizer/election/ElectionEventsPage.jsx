@@ -1,13 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
-import { Plus, Edit2, Eye } from 'lucide-react'
+import { Eye } from 'lucide-react'
 import { electionService } from '@/services/election.service'
-import { EVENT_STATUS } from '@/utils/constants'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import { useSocketEvent } from '@/hooks/useSocketEvent'
 import Button from '@/components/ui/Button'
-import Badge from '@/components/ui/Badge'
-import FormAlert from '@/components/ui/FormAlert'
+import EventListCard, { EventListHeader, EventListSkeleton, EventListEmpty, EventListError } from '@/components/organizer/EventList'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import useDraft from '@/hooks/useDraft'
 import DraftBanner from '@/components/organizer/DraftBanner'
@@ -108,65 +105,20 @@ function BallotPreviewModal({ eventId, onClose }) {
 
 function EventCard({ event, onPreview }) {
   return (
-    <article aria-labelledby={`election-event-${event.id}`} className="flex min-w-0 flex-col gap-4 rounded-2xl border border-v-border bg-v-surface p-5 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h3 id={`election-event-${event.id}`} className="min-w-0 wrap-break-word text-lg font-medium text-v-text">
-            <Link to={`/organizer/election/events/${event.id}/positions`} className="hover:text-v-primary">
-              {event.title}
-            </Link>
-          </h3>
-          <Badge
-            tone={event.status === EVENT_STATUS.ACTIVE ? 'success' : event.status === EVENT_STATUS.CANCELLED ? 'danger' : 'default'}
-            className="capitalize"
-          >
-            {event.status === EVENT_STATUS.DRAFT ? 'Setup — not published' : event.status}
-          </Badge>
-          {event.electionStatus && (
-            <span className="v-badge v-badge-info text-xs">{event.electionStatus}</span>
-          )}
-        </div>
-        {event.description && (
-          <p className="mt-2 whitespace-pre-line wrap-break-word text-sm text-v-text-muted">{event.description}</p>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0">
+    <EventListCard
+      module="election"
+      event={event}
+      titleHref={`/organizer/election/events/${event.id}/positions`}
+      editHref={`/organizer/election/events/${event.id}/edit`}
+      continueSetupHref={`/organizer/election/events/${event.id}/positions`}
+      badges={event.electionStatus && <span className="v-badge v-badge-info text-xs">{event.electionStatus}</span>}
+      actions={
         <Button variant="secondary" onClick={() => onPreview(event.id)}>
           <Eye className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
           Preview
         </Button>
-        <Link
-          to={`/organizer/election/events/${event.id}/edit`}
-          className="v-btn-primary"
-        >
-          <Edit2 className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          Manage
-        </Link>
-        {event.status === EVENT_STATUS.DRAFT && (
-          <Link
-            to={`/organizer/election/events/${event.id}/positions`}
-            className="v-btn-secondary"
-          >
-            Continue setup
-          </Link>
-        )}
-      </div>
-    </article>
-  )
-}
-
-function EventCardSkeleton() {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-v-border bg-v-surface p-5">
-      <div className="space-y-2">
-        <div className="h-5 w-48 animate-pulse rounded-lg bg-v-surface-elevated" />
-        <div className="h-4 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
-      </div>
-      <div className="flex gap-2">
-        <div className="h-7 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
-        <div className="h-7 w-16 animate-pulse rounded-lg bg-v-surface-elevated" />
-      </div>
-    </div>
+      }
+    />
   )
 }
 
@@ -212,16 +164,8 @@ export default function ElectionEventsPage() {
   if (loading || showLoader) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="h-7 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
-          <div className="h-9 w-24 animate-pulse rounded-lg bg-v-surface-elevated" />
-        </div>
-
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <EventCardSkeleton key={i} />
-          ))}
-        </div>
+        <div className="h-9 w-32 animate-pulse rounded-lg bg-v-surface-elevated" />
+        <EventListSkeleton rows={5} />
       </div>
     )
   }
@@ -235,15 +179,7 @@ export default function ElectionEventsPage() {
         />
       )}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold text-v-text">Events</h2>
-        <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0">
-          <Link to="/organizer/election/events/new" className="inline-flex items-center gap-2 rounded-lg bg-v-primary px-4 py-2 text-sm font-medium text-white hover:bg-v-primary-hover">
-            <Plus className="h-4 w-4" strokeWidth={2} />
-            New event
-          </Link>
-        </div>
-      </div>
+      <EventListHeader title="Elections" newEventPath="/organizer/election/events/new" />
 
       {hasDraft && (
         <DraftBanner
@@ -257,32 +193,16 @@ export default function ElectionEventsPage() {
       )}
 
       {error ? (
-        <div className="space-y-3">
-          <FormAlert variant="error">{error}</FormAlert>
-          <Button variant="secondary" onClick={load}>Retry loading elections</Button>
-        </div>
+        <EventListError message={error} retryLabel="Retry loading elections" onRetry={load} />
       ) : (
-      <div className="space-y-3">
-        {events.map((event) => (
-          <EventCard
-            key={event.id}
-            event={event}
-            onPreview={setPreviewEventId}
-          />
-        ))}
-        {!events.length && (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-v-border bg-v-surface p-6 text-center">
-            <div>
-              <p className="font-medium text-v-text">No election events yet.</p>
-              <p className="v-caption mt-1">Create an election event to get started.</p>
-            </div>
-            <Link to="/organizer/election/events/new" className="v-btn-primary">
-              <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-              New event
-            </Link>
-          </div>
-        )}
-      </div>
+        <div className="space-y-3">
+          {events.map((event) => (
+            <EventCard key={event.id} event={event} onPreview={setPreviewEventId} />
+          ))}
+          {!events.length && (
+            <EventListEmpty title="No election events yet." hint="Create an election event to get started." />
+          )}
+        </div>
       )}
     </div>
   )

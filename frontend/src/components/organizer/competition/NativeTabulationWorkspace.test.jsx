@@ -230,24 +230,24 @@ test('judge score sheets can export a formatted Excel matrix from fresh raw subm
  f.buildJudgeScoreSheetData.mockReturnValue(workbook)
  await renderReady();fireEvent.click(screen.getByText('Export',{selector:'summary'}));fireEvent.click(screen.getByRole('button',{name:/Judge Score Sheets/}))
  const dialog=await screen.findByRole('dialog');await waitFor(()=>expect(f.snapshot).toHaveBeenCalledTimes(2))
- fireEvent.change(within(dialog).getByRole('combobox',{name:'Export format'}),{target:{value:'xls'}})
+ fireEvent.change(within(dialog).getByRole('combobox',{name:'Export format'}),{target:{value:'xlsx'}})
  fireEvent.change(within(dialog).getByRole('combobox',{name:'Export judges'}),{target:{value:'judge1'}})
  fireEvent.click(within(dialog).getByRole('button',{name:'Export Excel'}))
  await waitFor(()=>expect(f.export).toHaveBeenCalledWith('event','a',expect.objectContaining({kind:'judge',sourceDigest:'digest',judgeId:'judge1',submissionId:'submission-a'})))
  expect(f.buildJudgeScoreSheetData).toHaveBeenCalledWith(expect.objectContaining({complete:true,submissions:expect.any(Array)}),choices[0],'judge1')
- expect(f.downloadJudgeScoreSheetsExcel).toHaveBeenCalledWith('competition-a-single-judge-score-sheets.xls',workbook)
+ expect(f.downloadJudgeScoreSheetsExcel).toHaveBeenCalledWith(expect.stringMatching(/-judge-score-sheets-\d{4}-\d{2}-\d{2}\.xlsx$/),workbook)
 })
 test('Download all judges exports a multi-sheet Excel workbook regardless of the selected judge',async()=>{
  const workbook=[{name:'Maria Santos',rows:[]}]
  f.buildJudgeScoreSheetData.mockReturnValue(workbook)
  await renderReady();fireEvent.click(screen.getByText('Export',{selector:'summary'}));fireEvent.click(screen.getByRole('button',{name:/Judge Score Sheets/}))
  const dialog=await screen.findByRole('dialog');await waitFor(()=>expect(f.snapshot).toHaveBeenCalledTimes(2))
- fireEvent.change(within(dialog).getByRole('combobox',{name:'Export format'}),{target:{value:'xls'}})
+ fireEvent.change(within(dialog).getByRole('combobox',{name:'Export format'}),{target:{value:'xlsx'}})
  fireEvent.change(within(dialog).getByRole('combobox',{name:'Export judges'}),{target:{value:'judge1'}})
  fireEvent.click(within(dialog).getByRole('button',{name:'Download all judges'}))
  await waitFor(()=>expect(f.export).toHaveBeenCalledWith('event','a',expect.objectContaining({kind:'worksheets',sourceDigest:'digest'})))
  expect(f.buildJudgeScoreSheetData).toHaveBeenCalledWith(expect.objectContaining({complete:true,submissions:expect.any(Array)}),choices[0],'all')
- expect(f.downloadJudgeScoreSheetsExcel).toHaveBeenCalledWith('competition-a-single-judge-score-sheets.xls',workbook)
+ expect(f.downloadJudgeScoreSheetsExcel).toHaveBeenCalledWith(expect.stringMatching(/-judge-score-sheets-\d{4}-\d{2}-\d{2}\.xlsx$/),workbook)
 })
 test('combined score export is entry-by-entry and includes only backend calculation results',async()=>{
  await renderReady();fireEvent.click(screen.getByText('Export',{selector:'summary'}));fireEvent.click(screen.getByRole('button',{name:/Combined Scores/}))
@@ -522,7 +522,7 @@ test('multiple-round categories hand off to the earliest unfinished round in the
  expect(f.owned).toHaveBeenCalledWith('event','a','a-final')
 })
 
-test.each([['Excel','xls','downloadExcel'],['PDF','pdf','downloadPdf']])('combined %s export uses current rows and explicitly labels unfinalized results',async(label,format,helper)=>{
+test.each([['Excel','xlsx','downloadExcel'],['PDF','pdf','downloadPdf']])('combined %s export uses current rows and explicitly labels unfinalized results',async(label,format,helper)=>{
  await renderReady();fireEvent.click(screen.getByText('Export',{selector:'summary'}));fireEvent.click(screen.getByRole('button',{name:`Export All Entries (${label})`}))
  const dialog=await screen.findByRole('dialog');await waitFor(()=>expect(f.snapshot).toHaveBeenCalledTimes(2))
  expect(within(dialog).getByRole('combobox',{name:'Export format'})).toHaveValue(format)
@@ -530,7 +530,7 @@ test.each([['Excel','xls','downloadExcel'],['PDF','pdf','downloadPdf']])('combin
  await waitFor(()=>expect(f[helper]).toHaveBeenCalled())
  const [filename,payload]=f[helper].mock.calls[0]
  expect(filename).toMatch(new RegExp(`\\.${format}$`))
- const records=format==='xls'?payload[0].rows:payload.sections[0].rows
+ const records=format==='xlsx'?payload[0].rows:payload.sections[0].rows
  expect(records).toEqual(expect.arrayContaining([expect.objectContaining({'Record type':'Calculated result','Calculated score':80,'Official final score':''})]))
  expect(JSON.stringify(payload)).not.toContain('Dancer b')
 })
@@ -804,4 +804,17 @@ test('Round 1 can finalize directly, confirm qualifiers and hand off to Round 2'
  await screen.findByRole('heading',{name:'Destination Live Control'})
  expect(screen.getByLabelText('Current URL')).toHaveTextContent('/live?competitionId=a&roundId=final')
  expect(f.calculate).not.toHaveBeenCalled()
+})
+
+test('Score Matrix exports one row per entry as Excel with an Info sheet',async()=>{
+ await renderReady();fireEvent.click(screen.getByText('Export',{selector:'summary'}));fireEvent.click(screen.getByRole('button',{name:/^Score Matrixs*One row per entry/}))
+ const dialog=await screen.findByRole('dialog');await waitFor(()=>expect(f.snapshot).toHaveBeenCalledTimes(2))
+ fireEvent.change(within(dialog).getByRole('combobox',{name:'Export format'}),{target:{value:'xlsx'}})
+ fireEvent.click(within(dialog).getByRole('button',{name:'Export Excel'}))
+ await waitFor(()=>expect(f.downloadExcel).toHaveBeenCalled())
+ const [filename,sheets]=f.downloadExcel.mock.calls[0]
+ expect(filename).toMatch(/-score-matrix-\d{4}-\d{2}-\d{2}\.xlsx$/)
+ expect(sheets.map(sheet=>sheet.name)).toEqual(['Score matrix','Info'])
+ expect(sheets[0].rows[0]).toEqual(expect.objectContaining({Rank:expect.anything(),'Final score':80}))
+ expect(sheets[1].rows).toEqual(expect.arrayContaining([{Field:'Export',Value:'Score matrix'}]))
 })

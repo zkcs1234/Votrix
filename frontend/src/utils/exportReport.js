@@ -6,8 +6,9 @@
  * for PDF/JSON) and triggers a browser download.
  *
  *   - CSV:        RFC-4180-ish escaping, plain text
- *   - Excel:      SpreadsheetML 2003 XML (.xls) — opens in Excel, Numbers,
- *                 and LibreOffice without any third-party dependency
+ *   - Excel:      a real .xlsx workbook (see xlsxWriter.js) — opens in Excel,
+ *                 Numbers and LibreOffice without a format warning and
+ *                 without any third-party dependency
  *   - JSON:       Pretty-printed JSON
  *   - PDF:        Opens a print-styled HTML window so the user can use
  *                 the browser's "Save as PDF" action. Self-contained:
@@ -16,6 +17,7 @@
  */
 
 import { serializeCsv } from '../../../shared/csv-export.js'
+import { buildXlsx, XLSX_MIME } from './xlsxWriter'
 
 const escapeXml = (s) =>
   String(s ?? '')
@@ -52,14 +54,29 @@ export function downloadCsv(filename, rows) {
 
 /* ----------------------- Excel ----------------------- */
 
+const xlsxFilename = (filename) => `${String(filename).replace(/\.xlsx?$/i, '')}.xlsx`
+
+function downloadXlsxFile(filename, sheets) {
+  const bytes = buildXlsx(sheets)
+  downloadBlob(new Blob([bytes], { type: XLSX_MIME }), xlsxFilename(filename))
+}
+
+// Column width (in characters) that fits the longest value, within sensible bounds.
+function fitWidth(label, values) {
+  const lineLength = (value) => Math.max(...String(value ?? '').split('\n').map((line) => line.length))
+  const longest = values.reduce((max, value) => Math.max(max, lineLength(value)), String(label).length)
+  return Math.min(60, Math.max(10, longest + 2))
+}
+
 /**
- * Generate a SpreadsheetML 2003 XML workbook (.xls) from one or more sheets.
- * Each sheet is { name: string, rows: Array<Record<string, any>> }.
- * Opens in Excel, Numbers, and LibreOffice without any dependency.
+ * Download one or more sheets as a real .xlsx workbook.
+ * Each sheet is { name: string, rows: Array<Record<string, any>> }: a styled,
+ * frozen header row followed by one row per record. Numbers stay numeric; text
+ * (including anything that looks like a formula) is always stored as text.
  */
 export function downloadExcel(filename, sheets) {
   if (!sheets || !sheets.length) return
-  const sheetEntries = sheets
+  const workbookSheets = sheets
     .map((sheet, sheetIdx) => {
       const rows = sheet?.rows ?? []
       const headers = Array.from(
@@ -68,52 +85,21 @@ export function downloadExcel(filename, sheets) {
           return set
         }, new Set()),
       )
-      if (!headers.length) return ''
-      const headerRow = `<Row>${headers
-        .map((h) => `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`)
-        .join('')}</Row>`
-      const dataRows = rows
-        .map((r) => {
-          const cells = headers
-            .map((h) => {
-              const v = r?.[h]
-              if (v === null || v === undefined || v === '') {
-                return '<Cell><Data ss:Type="String"></Data></Cell>'
-              }
-              if (typeof v === 'number' && Number.isFinite(v)) {
-                return `<Cell><Data ss:Type="Number">${v}</Data></Cell>`
-              }
-              return `<Cell><Data ss:Type="String">${escapeXml(v)}</Data></Cell>`
-            })
-            .join('')
-          return `<Row>${cells}</Row>`
-        })
-        .join('')
-      return `<Worksheet ss:Name="${escapeXml(sheet.name ?? `Sheet${sheetIdx + 1}`)}"><Table>${headerRow}${dataRows}</Table></Worksheet>`
+      if (!headers.length) return null
+      return {
+        name: sheet.name ?? `Sheet${sheetIdx + 1}`,
+        freezeRows: 1,
+        widths: headers.map((h) => fitWidth(h, rows.map((r) => r?.[h]))),
+        rows: [
+          headers.map((h) => ({ v: h, s: 'header' })),
+          ...rows.map((r) => headers.map((h) => r?.[h] ?? null)),
+        ],
+      }
     })
     .filter(Boolean)
-    .join('')
-
-  const xml = `<?xml version="1.0"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
-  xmlns:o="urn:schemas-microsoft-com:office:office"
-  xmlns:x="urn:schemas-microsoft-com:office:excel"
-  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
-  xmlns:html="http://www.w3.org/TR/REC-html40">
-<Styles><Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Calibri" ss:Size="11"/></Style></Styles>
-${sheetEntries}
-</Workbook>`
-  const blob = new Blob([xml], { type: 'application/vnd.ms-excel' })
-  downloadBlob(blob, filename.endsWith('.xls') ? filename : `${filename}.xls`)
+  if (!workbookSheets.length) return
+  downloadXlsxFile(filename, workbookSheets)
 }
-
-const escapeStyledXml = value => String(value ?? '')
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;')
-  .replace(/'/g, '&apos;')
 
 const safeSheetName = (name, index) => {
   const cleaned = String(name || `Judge ${index + 1}`)
@@ -230,31 +216,46 @@ export function buildJudgeScoreSheetData(sources, context, judgeSelection = 'all
   })
 }
 
+const percentText = (value) => `${Number(value).toFixed(2).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')}%`
+
 export function downloadJudgeScoreSheetsExcel(filename, sheets) {
   if (!sheets?.length) throw new Error('No judge score sheets are available for this export.')
   const workbookSheets = sheets.map(sheet => {
     const columnCount = 2 + sheet.entries.length
-    const cell = (value, style = 'Default', mergeAcross = null) =>
-      `<Cell ss:StyleID="${style}"${mergeAcross == null ? '' : ` ss:MergeAcross="${mergeAcross}"`}><Data ss:Type="${typeof value === 'number' && Number.isFinite(value) ? 'Number' : 'String'}">${escapeStyledXml(value)}</Data></Cell>`
+    const meta = (label, value) => [{ v: label, s: 'label' }, { v: value, s: 'value' }]
     const rows = [
-      `<Row ss:Height="32">${cell('VOTRIX  |  OFFICIAL JUDGE SCORE SHEET', 'Title', columnCount - 1)}</Row>`,
-      `<Row>${cell('Event', 'MetadataLabel')}${cell(sheet.eventName, 'MetadataValue')}</Row>`,
-      `<Row>${cell('Competition', 'MetadataLabel')}${cell(sheet.competitionName, 'MetadataValue')}</Row>`,
-      `<Row>${cell('Round', 'MetadataLabel')}${cell(sheet.roundName, 'MetadataValue')}</Row>`,
-      `<Row>${cell('Judge', 'MetadataLabel')}${cell(sheet.judgeName, 'MetadataValue')}</Row>`,
-      `<Row>${cell('Scoring method', 'MetadataLabel')}${cell(sheet.methodName, 'MetadataValue')}</Row>`,
-      '<Row/>',
-      `<Row ss:Height="38">${cell('SCORING CRITERIA', 'TableHeader')}${cell(sheet.weightHeader, 'TableHeader')}${sheet.entries.map(entry => cell(entry.label, 'TableHeader')).join('')}</Row>`,
-      ...sheet.rows.map(row =>
-        `<Row ss:Height="27">${cell(row.name)}${cell(sheet.pointsBasis ? row.maxPoints : `${Number(row.weight).toFixed(2).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')}%`, 'Weight')}${row.scores.map(score => cell(score, 'Score')).join('')}</Row>`,
-      ),
-      `<Row ss:Height="24">${cell(sheet.totalLabel, 'TotalLabel')}${cell(sheet.pointsBasis ? sheet.total : `${Number(sheet.total).toFixed(2).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')}%`, 'TotalValue')}${Array.from({ length: columnCount - 2 }, () => cell('', 'TotalValue')).join('')}</Row>`,
+      [{ v: 'VOTRIX  |  OFFICIAL JUDGE SCORE SHEET', s: 'title' }],
+      meta('Event', sheet.eventName),
+      meta('Competition', sheet.competitionName),
+      meta('Round', sheet.roundName),
+      meta('Judge', sheet.judgeName),
+      meta('Scoring method', sheet.methodName),
+      [],
+      [{ v: 'SCORING CRITERIA', s: 'header' }, { v: sheet.weightHeader, s: 'header' }, ...sheet.entries.map(entry => ({ v: entry.label, s: 'header' }))],
+      ...sheet.rows.map(row => [
+        row.name,
+        { v: sheet.pointsBasis ? row.maxPoints : percentText(row.weight), s: 'center' },
+        ...row.scores.map(score => ({ v: score, s: 'center' })),
+      ]),
+      [
+        { v: sheet.totalLabel, s: 'totalLabel' },
+        { v: sheet.pointsBasis ? sheet.total : percentText(sheet.total), s: 'totalValue' },
+        ...Array.from({ length: columnCount - 2 }, () => ({ v: null, s: 'totalValue' })),
+      ],
     ]
-    const widths = `<Column ss:Width="270"/><Column ss:Width="82"/>${sheet.entries.map(() => '<Column ss:Width="140"/>').join('')}`
-    return `<Worksheet ss:Name="${escapeStyledXml(sheet.name)}"><Table>${widths}${rows.join('')}</Table><WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><PageSetup><Layout x:Orientation="Landscape"/></PageSetup><Print><ValidPrinterInfo/><FitWidth>1</FitWidth><FitHeight>0</FitHeight></Print><Selected/></WorksheetOptions></Worksheet>`
-  }).join('')
-  const xml = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Styles><Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Arial" ss:Size="11"/><Alignment ss:Vertical="Center"/></Style><Style ss:ID="Title"><Font ss:FontName="Arial" ss:Size="16" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#172B56" ss:Pattern="Solid"/><Alignment ss:Vertical="Center" ss:Horizontal="Left"/></Style><Style ss:ID="MetadataLabel"><Font ss:Bold="1"/><Alignment ss:Vertical="Center"/></Style><Style ss:ID="MetadataValue"><Alignment ss:Vertical="Center"/></Style><Style ss:ID="TableHeader"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#2455D6" ss:Pattern="Solid"/><Alignment ss:Vertical="Center" ss:Horizontal="Center" ss:WrapText="1"/></Style><Style ss:ID="Weight"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style><Style ss:ID="Score"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style><Style ss:ID="TotalLabel"><Font ss:Bold="1"/><Interior ss:Color="#DCEBFF" ss:Pattern="Solid"/><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#B7CEF7"/></Borders></Style><Style ss:ID="TotalValue"><Font ss:Bold="1"/><Interior ss:Color="#DCEBFF" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#B7CEF7"/></Borders></Style></Styles>${workbookSheets}</Workbook>`
-  downloadBlob(new Blob([xml], { type: 'application/vnd.ms-excel' }), filename.endsWith('.xls') ? filename : `${filename}.xls`)
+    const headerRow = 7
+    const heights = { 0: 32, [headerRow]: 38, [rows.length - 1]: 24 }
+    sheet.rows.forEach((_, index) => { heights[headerRow + 1 + index] = 27 })
+    return {
+      name: sheet.name,
+      rows,
+      heights,
+      widths: [38, 12, ...sheet.entries.map(() => 20)],
+      merges: columnCount > 1 ? [[0, 0, 0, columnCount - 1]] : [],
+      landscape: true,
+    }
+  })
+  downloadXlsxFile(filename, workbookSheets)
 }
 
 /* ----------------------- PDF ----------------------- */

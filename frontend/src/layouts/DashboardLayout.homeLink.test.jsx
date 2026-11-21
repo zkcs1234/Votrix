@@ -64,9 +64,11 @@ describe('sidebar "back to home" link', () => {
   describe('admin', () => {
     beforeEach(() => { user = { id: 'a1', role: 'admin', email: 'a@example.com' } })
 
-    it('is unchanged: the administration link stays on every admin page', () => {
+    it('has no administration link in the sidebar', () => {
       renderAt('/admin')
-      expect(homeLink()).toHaveAttribute('href', '/admin')
+      expect(homeLink()).toBeNull()
+      renderAt('/admin/events')
+      expect(homeLink()).toBeNull()
     })
   })
 })

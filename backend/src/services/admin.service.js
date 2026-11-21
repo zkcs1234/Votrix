@@ -148,6 +148,70 @@ export async function getGlobalEvents() {
   })
 }
 
+// Most participant rows one event detail view loads. Larger events are flagged as
+// truncated (the full list is in the "Export Event Report" CSV).
+const EVENT_PARTICIPANT_LIMIT = 1000
+
+/**
+ * Participant records of one event, for the admin Events detail view: who is
+ * enrolled and whether they have voted / scored / responded, plus the headline
+ * counts. Read-only.
+ */
+export async function getEventParticipants(eventId) {
+  const eventResult = await db().from(DB_TABLES.EVENTS).select('id').eq('id', eventId).maybeSingle()
+  const event = await wrap(eventResult, { context: 'admin.getEventParticipants.event' })
+  if (!event) throw notFound('Event not found')
+
+  const enrolledResult = await db()
+    .from(DB_TABLES.EVENT_PARTICIPANTS)
+    .select('user_id, participant_type, judge_role, is_active, has_voted, has_scored, has_responded, created_at')
+    .eq('event_id', eventId)
+    .order('created_at', { ascending: true })
+    .limit(EVENT_PARTICIPANT_LIMIT)
+  const enrolled = await wrap(enrolledResult, { context: 'admin.getEventParticipants.enrolled' })
+
+  const userIds = [...new Set(enrolled.map((row) => row.user_id).filter(Boolean))]
+  let users = []
+  if (userIds.length > 0) {
+    const usersResult = await db()
+      .from(DB_TABLES.USERS)
+      .select('id, email, first_name, last_name, school_id, program')
+      .in('id', userIds)
+    users = await wrap(usersResult, { context: 'admin.getEventParticipants.users' })
+  }
+  const byId = new Map(users.map((user) => [user.id, user]))
+
+  const participants = enrolled.map((row) => {
+    const user = byId.get(row.user_id) ?? {}
+    return {
+      userId: row.user_id,
+      email: user.email ?? null,
+      firstName: user.first_name ?? null,
+      lastName: user.last_name ?? null,
+      schoolId: user.school_id ?? null,
+      program: user.program ?? null,
+      participantType: row.participant_type ?? null,
+      judgeRole: row.judge_role ?? null,
+      isActive: row.is_active !== false,
+      hasVoted: Boolean(row.has_voted),
+      hasScored: Boolean(row.has_scored),
+      hasResponded: Boolean(row.has_responded),
+      enrolledAt: row.created_at ?? null,
+    }
+  })
+
+  return {
+    participants,
+    summary: {
+      total: participants.length,
+      voted: participants.filter((p) => p.hasVoted).length,
+      scored: participants.filter((p) => p.hasScored).length,
+      responded: participants.filter((p) => p.hasResponded).length,
+      truncated: enrolled.length >= EVENT_PARTICIPANT_LIMIT,
+    },
+  }
+}
+
 export async function getSystemSettings() {
   const result = await db()
     .from(DB_TABLES.SYSTEM_SETTINGS)

@@ -34,6 +34,111 @@ function eventModule(eventType) {
   return undefined
 }
 
+// What "participated" means depends on the module: elections vote, competitions
+// score (judges), polls respond.
+function participationFor(eventType) {
+  if (eventType === 'election') return { key: 'hasVoted', label: 'Voted', done: 'Voted', pending: 'Not yet' }
+  if (eventType === 'polling') return { key: 'hasResponded', label: 'Responded', done: 'Responded', pending: 'Not yet' }
+  return { key: 'hasScored', label: 'Scored', done: 'Scored', pending: 'Not yet' }
+}
+
+function participantName(p) {
+  return [p.firstName, p.lastName].filter(Boolean).join(' ') || '—'
+}
+
+// Participant records of one event (read-only): headline counts plus the
+// enrolled participants and whether each has taken part.
+function EventParticipantsSection({ eventId, eventType }) {
+  const [state, setState] = useState({ loading: true, error: null, participants: [], summary: null })
+  const [reloadKey, setReloadKey] = useState(0)
+  const participation = participationFor(eventType)
+
+  useEffect(() => {
+    let alive = true
+    setState({ loading: true, error: null, participants: [], summary: null })
+    adminService
+      .getEventParticipants(eventId)
+      .then(({ data }) => {
+        if (alive) setState({ loading: false, error: null, participants: data.participants || [], summary: data.summary || null })
+      })
+      .catch((err) => {
+        if (alive) setState({ loading: false, error: getErrorMessage(err, 'Failed to load participants'), participants: [], summary: null })
+      })
+    return () => { alive = false }
+  }, [eventId, reloadKey])
+
+  const { loading, error, participants, summary } = state
+  const taken = summary?.[participation.key === 'hasVoted' ? 'voted' : participation.key === 'hasResponded' ? 'responded' : 'scored'] ?? 0
+
+  return (
+    <div className="mb-6 space-y-4">
+      <h3 className="text-sm font-semibold text-v-text">Participants</h3>
+      {loading ? (
+        <div className="h-24 animate-pulse rounded-lg bg-v-surface-elevated" aria-label="Loading participants" />
+      ) : error ? (
+        <div className="flex flex-col items-start gap-2 rounded-lg border border-v-border p-4">
+          <p className="text-sm text-v-danger">{error}</p>
+          <Button type="button" size="sm" variant="secondary" onClick={() => setReloadKey((k) => k + 1)}>
+            Retry loading participants
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-v-border bg-v-surface-elevated p-4">
+              <p className="text-xs font-medium text-v-text-subtle">Enrolled participants</p>
+              <p className="mt-2 text-2xl font-semibold text-v-text">{summary?.total ?? participants.length}</p>
+            </div>
+            <div className="rounded-lg border border-v-border bg-v-surface-elevated p-4">
+              <p className="text-xs font-medium text-v-text-subtle">{participation.label}</p>
+              <p className="mt-2 text-2xl font-semibold text-v-text">{taken}</p>
+            </div>
+          </div>
+          {participants.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-v-border p-6 text-center text-sm text-v-text-subtle">
+              No participants are enrolled in this event yet.
+            </div>
+          ) : (
+            <div className="max-h-72 overflow-auto rounded-lg border border-v-border">
+              <table className="v-table min-w-[560px]">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>School ID</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-v-border">
+                  {participants.map((p) => (
+                    <tr key={p.userId}>
+                      <td className="font-medium text-v-text">{participantName(p)}</td>
+                      <td>{p.email || '—'}</td>
+                      <td>{p.schoolId || '—'}</td>
+                      <td className="capitalize">{(p.judgeRole || p.participantType || 'participant').replace(/_/g, ' ').toLowerCase()}</td>
+                      <td>
+                        <Badge tone={p[participation.key] ? 'success' : 'default'}>
+                          {p[participation.key] ? participation.done : participation.pending}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {summary?.truncated && (
+            <p className="text-xs text-v-text-subtle">
+              Showing the first {participants.length} participants. Use “Export Event Report” for the full list.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function GlobalEventsPage() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -398,33 +503,7 @@ export default function GlobalEventsPage() {
               </div>
             </div>
 
-            {/* Participation Stats Section */}
-            <div className="mb-6 space-y-4">
-              <h3 className="text-sm font-semibold text-v-text">Participation Metrics</h3>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-lg border border-v-border bg-v-surface-elevated p-4">
-                  <p className="text-xs font-medium text-v-text-subtle">Total Participants</p>
-                  <p className="mt-2 text-2xl font-semibold text-v-text">
-                    {selectedEvent.participant_count || 0}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-v-border bg-v-surface-elevated p-4">
-                  <p className="text-xs font-medium text-v-text-subtle">Voters/Judges</p>
-                  <p className="mt-2 text-2xl font-semibold text-v-text">
-                    {selectedEvent.voter_count || 0}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-v-border bg-v-surface-elevated p-4">
-                  <p className="text-xs font-medium text-v-text-subtle">Submissions</p>
-                  <p className="mt-2 text-2xl font-semibold text-v-text">
-                    {selectedEvent.submission_count || 0}
-                  </p>
-                </div>
-              </div>
-              <p className="text-xs text-v-text-subtle">
-                Note: Metrics may vary based on event type and configuration
-              </p>
-            </div>
+            <EventParticipantsSection eventId={selectedEvent.id} eventType={selectedEvent.event_type} />
 
             {/* Admin Actions Section */}
             <div className="space-y-4">

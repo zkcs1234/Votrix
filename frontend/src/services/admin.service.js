@@ -56,6 +56,9 @@ export const adminService = {
   getGlobalEvents() {
     return api.get(`${base}/events`)
   },
+  getEventParticipants(eventId) {
+    return api.get(`${base}/events/${eventId}/participants`)
+  },
   restoreEvent(eventId) {
     return api.patch(`${base}/events/${eventId}/restore`)
   },

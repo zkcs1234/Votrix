@@ -37,6 +37,7 @@ router.post('/organizer-applications/:applicationId/approve', adminActionLimiter
 router.post('/organizer-applications/:applicationId/decline', adminActionLimiter, onboardingController.declineOrganizerApplication)
 
 router.get('/events', adminController.getGlobalEvents)
+router.get('/events/:eventId/participants', adminController.getEventParticipants)
 router.patch('/events/:eventId/restore', adminActionLimiter, adminController.restoreEvent)
 
 // Voter (student participant) registration — plan Phase 3.

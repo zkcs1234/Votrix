@@ -73,22 +73,20 @@ describe('admin layout', () => {
     expect(screen.queryByText(/Maintenance mode is on/)).not.toBeInTheDocument()
   })
 
-  it('puts the platform name in the sidebar logo and the administration link', () => {
+  it('puts the platform name in the sidebar logo', () => {
     usePlatformStore.setState({ platformName: 'BISU Votes' })
     signIn('admin')
     renderAdmin()
     expect(screen.getAllByText('BISU Votes').length).toBeGreaterThan(0)
-    // (AppShell drops the leading arrow from footer links.)
-    expect(screen.getByRole('link', { name: 'BISU Votes administration' })).toBeInTheDocument()
     expect(screen.queryByText(/VOTRIX/)).not.toBeInTheDocument()
   })
 
   it('updates the sidebar logo live when the name is saved', () => {
     signIn('admin')
     renderAdmin()
-    expect(screen.getByRole('link', { name: 'Votrix administration' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: `${DEFAULT_PLATFORM_NAME} home` })).toBeInTheDocument()
     act(() => usePlatformStore.getState().apply({ platformName: 'Renamed' }))
-    expect(screen.getByRole('link', { name: 'Renamed administration' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Renamed home' })).toBeInTheDocument()
   })
 
   it('does not show the notice to other roles', () => {

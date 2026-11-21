@@ -29,17 +29,18 @@ it.each([0, 1, 2, 8])('renders %i events with existing routes and no extra data 
   renderEvents(Array.from({ length: count }, (_, index) => ({
     id: `id-${index}`, title: `Election ${index}`, status: 'active',
   })))
-  await screen.findByRole('heading', { name: 'Events' })
+  await screen.findByRole('heading', { name: 'Elections' })
   const cards = screen.queryAllByRole('article')
   expect(cards).toHaveLength(count)
   cards.forEach((card, index) => {
-    expect(within(card).getByRole('link', { name: 'Manage' }))
+    // Active events are locked, so the button is a read-only "View", not "Manage".
+    expect(within(card).getByRole('link', { name: 'View' }))
       .toHaveAttribute('href', `/organizer/election/events/id-${index}/edit`)
+    expect(within(card).queryByRole('link', { name: /Manage|Edit/ })).not.toBeInTheDocument()
     expect(within(card).getByRole('link', { name: `Election ${index}` }))
       .toHaveAttribute('href', `/organizer/election/events/id-${index}/positions`)
     expect(within(card).getByText('active')).toBeInTheDocument()
     expect(within(card).getByRole('button', { name: 'Preview' })).toBeInTheDocument()
-    expect(within(card).queryByText('View')).not.toBeInTheDocument()
   })
   if (!count) expect(screen.getByText('No election events yet.')).toBeInTheDocument()
   for (const link of screen.getAllByRole('link', { name: 'New event' })) {
@@ -72,7 +73,7 @@ it('keeps draft setup navigation, real descriptions, and status information', as
   expect(screen.getByText('setup')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Continue setup' }))
     .toHaveAttribute('href', '/organizer/election/events/draft/positions')
-  expect(screen.getByRole('link', { name: 'Manage' }))
+  expect(screen.getByRole('link', { name: 'Edit' }))
     .toHaveAttribute('href', '/organizer/election/events/draft/edit')
 })
 
