@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye } from 'lucide-react'
 import { pageantService } from '@/services/pageant.service'
+import { nativeCompetitionService } from '@/services/competition-native.service'
 import { isReadOnlyEventStatus } from '@/utils/constants'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
@@ -13,10 +14,124 @@ import useDraft from '@/hooks/useDraft'
 import DraftBanner from '@/components/organizer/DraftBanner'
 import { resolveScaleBounds, scaleBoundsLabel, minorScoreLabel } from '@/utils/scoreScale'
 
+// Native (child) competitions keep their criteria in each child's saved
+// configuration and their contestants in the child's entries. The event-level
+// foundation route is legacy-only (the backend rejects it for native events
+// with "An explicit legacy competition mapping is required"), so the preview
+// reads the child data instead and falls back to the legacy foundation only
+// when the event has no native children.
+function nativeSection(competition, foundation, entries, masters) {
+  const configuration = foundation.configuration ?? {}
+  const range = (item) => (item.minScore != null && item.maxScore != null ? `${item.minScore}–${item.maxScore}` : null)
+  const masterById = new Map(masters.map((m) => [m.id, m]))
+  return {
+    id: competition.id,
+    name: competition.name,
+    scoringConfig: configuration.scoringConfig ?? null,
+    criteria: (configuration.criteria ?? []).map((c) => ({
+      ...c,
+      rangeLabel: range(c),
+      minorCriteria: (c.minorCriteria ?? []).map((m) => ({ ...m, rangeLabel: range(m) })),
+    })),
+    contestants: entries.map((entry) => {
+      const master = masterById.get(entry.contestant_id) ?? {}
+      return { ...master, id: entry.id ?? entry.contestant_id, contestantNumber: master.contestantNumber ?? master.contestant_number ?? entry.entry_number }
+    }),
+  }
+}
+
+async function loadPreviewSections(eventId) {
+  // A disabled/unavailable native schema simply means there are no native children.
+  const competitions = await nativeCompetitionService.list(eventId).then(({ data }) => data.competitions ?? [], () => [])
+  const natives = competitions.filter((c) => c.origin === 'native')
+  if (natives.length) {
+    const [masters, ...details] = await Promise.all([
+      pageantService.listContestants(eventId).then(({ data }) => data.contestants ?? []),
+      ...natives.map((c) => Promise.all([nativeCompetitionService.foundation(eventId, c.id), nativeCompetitionService.entries(eventId, c.id)])),
+    ])
+    return natives.map((c, i) => nativeSection(c, details[i][0].data, details[i][1].data.entries ?? [], masters))
+  }
+  const { data } = await pageantService.getFoundation(eventId)
+  const foundation = data.foundation ?? data
+  return [{
+    id: 'legacy',
+    name: null,
+    contestants: foundation.contestants ?? [],
+    criteria: foundation.criteria ?? [],
+    scoringConfig: foundation.scoringConfig ?? foundation.event?.scoring_config ?? null,
+  }]
+}
+
+function PreviewSection({ section, showName }) {
+  const { criteria, contestants } = section
+  const eventBounds = resolveScaleBounds(section.scoringConfig)
+  return (
+    <div className="space-y-6">
+      {showName && <h4 className="text-lg font-semibold text-v-text">{section.name}</h4>}
+      <div className="space-y-3">
+        <h4 className="font-medium text-v-text">Criteria</h4>
+        {criteria.length > 0 ? (
+          <div className="space-y-2">
+            {criteria.map((c) => {
+              const minors = c.minorCriteria ?? []
+              return (
+                <div key={c.id} className="rounded-xl border border-v-border-strong px-4 py-2.5 bg-v-surface-elevated">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-v-text">{c.name}</span>
+                    <span className="text-xs text-v-text-subtle">
+                      {c.percentage != null ? `${c.percentage}%` : null}
+                      {minors.length === 0 && `${c.percentage != null ? ' · ' : ''}score ${c.rangeLabel ?? scaleBoundsLabel(eventBounds)}`}
+                    </span>
+                  </div>
+                  {minors.length > 0 && (
+                    <ul className="mt-2 space-y-1 border-t border-v-border/60 pt-2">
+                      {minors.map((m) => (
+                        <li key={m.id} className="flex items-center justify-between gap-3 text-xs text-v-text-subtle">
+                          <span>{m.name}</span>
+                          <span>score {m.rangeLabel ?? minorScoreLabel(m)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-v-text-subtle">No criteria added yet.</p>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h4 className="font-medium text-v-text">Contestants</h4>
+        {contestants.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {contestants.map((c) => (
+              <div key={c.id} className="v-card p-3 text-center">
+                {c.photo ? (
+                  <img src={c.photo} alt="" className="mb-2 h-24 w-full rounded-lg object-cover" />
+                ) : (
+                  <div className="mb-2 flex h-24 w-full items-center justify-center rounded-lg bg-v-surface-elevated text-v-text-subtle text-sm">
+                    No photo
+                  </div>
+                )}
+                <p className="text-sm font-medium text-v-text">{c.name}</p>
+                {(c.contestantNumber ?? c.contestant_number) != null && (
+                  <p className="text-xs text-v-text-subtle">#{c.contestantNumber ?? c.contestant_number}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-v-text-subtle">No contestants added yet.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ScoringSheetPreviewModal({ eventId, eventTitle, onClose }) {
-  const [contestants, setContestants] = useState([])
-  const [criteria, setCriteria] = useState([])
-  const [scoringConfig, setScoringConfig] = useState(null)
+  const [sections, setSections] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const beginRead = useLatestRequest(eventId)
@@ -24,24 +139,12 @@ function ScoringSheetPreviewModal({ eventId, eventTitle, onClose }) {
   const load = useCallback(async () => {
     const isCurrent = beginRead()
     setLoading(true); setError(null)
-    // The foundation carries the event's real score scale and each criterion's
-    // minor criteria, so the preview shows the range judges actually score
-    // against instead of a criterion's stale stored min/max.
-    await pageantService
-      .getFoundation(eventId)
-      .then(({ data }) => {
-        if (!isCurrent()) return
-        const foundation = data.foundation ?? data
-        setContestants(foundation.contestants ?? [])
-        setCriteria(foundation.criteria ?? [])
-        setScoringConfig(foundation.scoringConfig ?? foundation.event?.scoring_config ?? null)
-      })
+    await loadPreviewSections(eventId)
+      .then((next) => { if (isCurrent()) setSections(next) })
       .catch((err) => { if (isCurrent()) setError(getErrorMessage(err, 'Failed to load preview')) })
       .finally(() => { if (isCurrent()) setLoading(false) })
   }, [eventId, beginRead])
   useEffect(() => { void load() }, [load])
-
-  const eventBounds = resolveScaleBounds(scoringConfig)
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Scoring sheet preview" className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -65,77 +168,13 @@ function ScoringSheetPreviewModal({ eventId, eventTitle, onClose }) {
         {error && <div role="alert"><p className="text-sm text-v-danger">{error}</p><Button variant="secondary" onClick={load}>Retry preview</Button></div>}
 
         {!loading && !error && (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <p className="text-xs text-v-text-subtle">
               This is a read-only preview of the contestants and criteria judges will score.
             </p>
-
-            <div className="space-y-3">
-              <h4 className="font-medium text-v-text">Criteria</h4>
-              {criteria.length > 0 ? (
-                <div className="space-y-2">
-                  {criteria.map((c) => {
-                    const minors = c.minorCriteria ?? []
-                    return (
-                      <div
-                        key={c.id}
-                        className="rounded-xl border border-v-border-strong px-4 py-2.5 bg-v-surface-elevated"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm font-medium text-v-text">{c.name}</span>
-                          <span className="text-xs text-v-text-subtle">
-                            {c.percentage}%
-                            {minors.length === 0 && ` · score ${scaleBoundsLabel(eventBounds)}`}
-                          </span>
-                        </div>
-                        {minors.length > 0 && (
-                          <ul className="mt-2 space-y-1 border-t border-v-border/60 pt-2">
-                            {minors.map((m) => (
-                              <li
-                                key={m.id}
-                                className="flex items-center justify-between gap-3 text-xs text-v-text-subtle"
-                              >
-                                <span>{m.name}</span>
-                                <span>score {minorScoreLabel(m)}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-v-text-subtle">No criteria added yet.</p>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="font-medium text-v-text">Contestants</h4>
-              {contestants.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {contestants.map((c) => (
-                    <div key={c.id} className="v-card p-3 text-center">
-                      {c.photo ? (
-                        <img src={c.photo} alt="" className="mb-2 h-24 w-full rounded-lg object-cover" />
-                      ) : (
-                        <div className="mb-2 flex h-24 w-full items-center justify-center rounded-lg bg-v-surface-elevated text-v-text-subtle text-sm">
-                          No photo
-                        </div>
-                      )}
-                      <p className="text-sm font-medium text-v-text">{c.name}</p>
-                      {(c.contestantNumber ?? c.contestant_number) != null && (
-                        <p className="text-xs text-v-text-subtle">
-                          #{c.contestantNumber ?? c.contestant_number}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-v-text-subtle">No contestants added yet.</p>
-              )}
-            </div>
+            {sections.map((section) => (
+              <PreviewSection key={section.id} section={section} showName={sections.length > 1 || Boolean(section.name)} />
+            ))}
           </div>
         )}
       </div>
